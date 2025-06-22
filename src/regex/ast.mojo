@@ -13,13 +13,9 @@ alias NOT = 8
 alias GROUP = 9
 
 
-trait Node(Copyable, ImplicitlyBoolable, Movable):
-    fn is_leaf(self) -> Bool:
-        """Check if the node is a leaf node."""
-        pass
-
-
-struct ASTNode[origin: Origin](Node):
+struct ASTNode[origin: Origin](
+    Copyable, EqualityComparable, ImplicitlyBoolable, Movable, Stringable, Writable
+):
     """Struct for all the Regex AST nodes."""
 
     var type: Int
@@ -45,6 +41,8 @@ struct ASTNode[origin: Origin](Node):
         self.capturing = capturing
         self.matching = matching^
         self.group_name = group_name^
+        self.min = min
+        self.max = max
         # TODO: Uncomment when unpacked arguments are supported in Mojo
         # self.children = Deque[ASTNode[origin]](*children)
         self.children = Deque[ASTNode[origin]](capacity=len(children))
@@ -57,6 +55,8 @@ struct ASTNode[origin: Origin](Node):
         self.matching = other.matching
         self.capturing = other.capturing
         self.group_name = other.group_name
+        self.min = other.min
+        self.max = other.max
         self.children = Deque[ASTNode[origin]](capacity=len(other.children))
         for child in other.children:
             self.children.append(child)
@@ -68,6 +68,50 @@ struct ASTNode[origin: Origin](Node):
     fn __as_bool__(self) -> Bool:
         """Return a boolean representation of the node."""
         return self.__bool__()
+
+    fn __eq__(self, other: ASTNode[origin]) -> Bool:
+        """Check if two AST nodes are equal."""
+        return (
+            self.type == other.type
+            and self.matching == other.matching
+            and self.capturing == other.capturing
+            and self.group_name == other.group_name
+            and self.min == other.min
+            and self.max == other.max
+            and len(self.children) == len(other.children)
+            and self.children == other.children
+        )
+
+    fn __ne__(self, other: ASTNode[origin]) -> Bool:
+        """Check if two AST nodes are not equal."""
+        return not self.__eq__(other)
+
+    fn __repr__(self) -> String:
+        """Return a string representation of the PhoneNumberDesc."""
+        return String(
+            "ASTNode(type=",
+            self.type,
+            ", matching=",
+            self.matching,
+            ")",
+            sep="",
+        )
+
+    fn __str__(self) -> String:
+        """Returns a user-friendly string representation of the PhoneNumberDesc."""
+        return String.write(self)
+
+    @no_inline
+    fn write_to[W: Writer, //](self, mut writer: W):
+        """Writes a string representation of the PhoneNumberDesc to the writer.
+
+        Parameters:
+            W: The type of the writer, conforming to the `Writer` trait.
+
+        Args:
+            writer: The writer instance to output the representation to.
+        """
+        writer.write("ASTNode(type=", self.type, ", matching=", self.matching, ")")
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
