@@ -27,6 +27,8 @@ struct ASTNode[origin: Origin](Node):
     var children: Deque[ASTNode[origin]]
     var capturing: Bool
     var group_name: String
+    var min: Int
+    var max: Int
 
     fn __init__(
         out self,
@@ -34,6 +36,8 @@ struct ASTNode[origin: Origin](Node):
         owned matching: String = "",
         capturing: Bool = False,
         owned group_name: String = "",
+        min: Int = 0,
+        max: Int = 0,
         owned children: List[ASTNode[origin]] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
@@ -72,7 +76,24 @@ struct ASTNode[origin: Origin](Node):
         else:
             return False
 
+    fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
+        """Check if the node matches a given value."""
+        if self.type == ELEMENT:
+            return self.matching == value
+        elif self.type == WILDCARD:
+            return value != "\n"
+        else:
+            return False
+
 
 fn RENode[origin: Origin](child: ASTNode[origin]) -> ASTNode[origin]:
     """Create a RE node with a child."""
-    return ASTNode(type=RE, children=[child])
+    return ASTNode[origin](type=RE, children=[child])
+
+
+fn Element[origin: Origin](ref [origin]matching: String) -> ASTNode[origin]:
+    """Create an Element node with a matching string."""
+    return ASTNode[origin](
+        type=ELEMENT,
+        matching=matching,
+    )
