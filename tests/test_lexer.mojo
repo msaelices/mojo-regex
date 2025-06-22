@@ -1,69 +1,124 @@
-from testing import assert_equal, assert_raises
+from testing import assert_equal, assert_raises, assert_true
 
 from regex.lexer import scan
-from regex.tokens import ElementToken, Comma, Start, End, SpaceToken, Dash
+from regex.tokens import (
+    Token,
+    ElementToken,
+    Comma,
+    Start,
+    End,
+    SpaceToken,
+    Dash,
+    Wildcard,
+    LeftParenthesis,
+    RightParenthesis,
+    LeftBracket,
+    RightBracket,
+    LeftCurlyBrace,
+    RightCurlyBrace,
+    Asterisk,
+    Plus,
+    QuestionMark,
+    VerticalBar,
+)
 
 
 fn test_simple_re_lexing() raises:
-    tokens = scan("a")
+    var tokens = scan("a")
     assert_equal(tokens[0].char, "a")
+    assert_equal(tokens[0].type, Token.ELEMENT)
 
 
-# @pytest.fixture
-# def lexer():
-#     return Lexer()
-#
-#
-# def test_simple_re_lexing(lexer: Lexer):
-#     tokens = lexer.scan('a')
-#     assert tokens[0].char == 'a'
-#
-#
-# def test_escaping_char(lexer: Lexer):
-#     tokens = lexer.scan(r'a\\a\\t\.')
-#     assert type(tokens[1]) is ElementToken and tokens[1].char == '\\'
-#
-#
-# def test_escaping_get_tab(lexer: Lexer):
-#     tokens = lexer.scan(r'a\h\t')
-#     assert type(tokens[2]) is ElementToken and tokens[2].char == '\t'
-#
-#
-# def test_escaping_wildcard(lexer: Lexer):
-#     tokens = lexer.scan(r'\.')
-#     assert type(tokens[0]) is ElementToken and tokens[0].char == '.'
-#
-#
-# def test_get_comma(lexer: Lexer):
-#     tokens = lexer.scan('a{3,5}')
-#     assert type(tokens[3]) is Comma
-#
-#
-# def test_comma_is_element(lexer: Lexer):
-#     tokens = lexer.scan('a,')
-#     assert type(tokens[1]) is ElementToken
-#
-#
-# def test_match_start(lexer: Lexer):
-#     tokens = lexer.scan('^a')
-#     assert type(tokens[0]) is Start
-#
-#
-# def test_match_end(lexer: Lexer):
-#     tokens = lexer.scan(r'fdsad\$cs$')
-#     assert type(tokens[len(tokens) - 1]) is End
-#
-#
-# def test_fail_curly(lexer: Lexer):
-#     with pytest.raises(Exception):
-#         lexer.scan('advfe{a}')
-#
-#
-# def test_lexer_1(lexer: Lexer):
-#     tokens = lexer.scan(r'-\\\/\s~')
-#     assert len(tokens) == 5
-#     assert type(tokens[0]) is Dash
-#     assert type(tokens[1]) is ElementToken
-#     assert type(tokens[2]) is ElementToken
-#     assert type(tokens[3]) is SpaceToken
-#     assert type(tokens[4]) is ElementToken
+fn test_escaping_char() raises:
+    var tokens = scan("a\\\\a\\\\t\\.")
+    assert_equal(tokens[1].type, Token.ELEMENT)
+    assert_equal(tokens[1].char, "\\")
+
+
+fn test_escaping_get_tab() raises:
+    var tokens = scan("a\\h\\t")
+    assert_equal(tokens[2].type, Token.ELEMENT)
+    assert_equal(tokens[2].char, "\t")
+
+
+fn test_escaping_wildcard() raises:
+    var tokens = scan("\\.")
+    assert_equal(tokens[0].type, Token.ELEMENT)
+    assert_equal(tokens[0].char, ".")
+
+
+fn test_get_comma() raises:
+    var tokens = scan("a{3,5}")
+    assert_equal(tokens[3].type, Token.COMMA)
+
+
+fn test_comma_is_element() raises:
+    var tokens = scan("a,")
+    assert_equal(tokens[1].type, Token.ELEMENT)
+
+
+fn test_match_start() raises:
+    var tokens = scan("^a")
+    assert_equal(tokens[0].type, Token.START)
+
+
+fn test_match_end() raises:
+    var tokens = scan("fdsad\\$cs$")
+    assert_equal(tokens[len(tokens) - 1].type, Token.END)
+
+
+fn test_fail_curly() raises:
+    with assert_raises():
+        _ = scan("advfe{a}")
+
+
+fn test_lexer_1() raises:
+    var tokens = scan("-\\\\/\\s~")
+    assert_equal(len(tokens), 5)
+    assert_equal(tokens[0].type, Token.DASH)
+    assert_equal(tokens[1].type, Token.ELEMENT)
+    assert_equal(tokens[2].type, Token.ELEMENT)
+    assert_equal(tokens[3].type, Token.SPACE)
+    assert_equal(tokens[4].type, Token.ELEMENT)
+
+
+fn test_wildcard_lexing() raises:
+    var tokens = scan(".")
+    assert_equal(tokens[0].type, Token.WILDCARD)
+    assert_equal(tokens[0].char, ".")
+
+
+fn test_parenthesis_lexing() raises:
+    var tokens = scan("()")
+    assert_equal(tokens[0].type, Token.LEFTPARENTHESIS)
+    assert_equal(tokens[1].type, Token.RIGHTPARENTHESIS)
+
+
+fn test_bracket_lexing() raises:
+    var tokens = scan("[]")
+    assert_equal(tokens[0].type, Token.LEFTBRACKET)
+    assert_equal(tokens[1].type, Token.RIGHTBRACKET)
+
+
+fn test_curly_brace_lexing() raises:
+    var tokens = scan("{1}")
+    assert_equal(tokens[0].type, Token.LEFTCURLYBRACE)
+    assert_equal(tokens[1].type, Token.ELEMENT)
+    assert_equal(tokens[2].type, Token.RIGHTCURLYBRACE)
+
+
+fn test_quantifiers_lexing() raises:
+    var tokens = scan("*+?")
+    assert_equal(tokens[0].type, Token.ASTERISK)
+    assert_equal(tokens[1].type, Token.PLUS)
+    assert_equal(tokens[2].type, Token.QUESTIONMARK)
+
+
+fn test_vertical_bar_lexing() raises:
+    var tokens = scan("|")
+    assert_equal(tokens[0].type, Token.VERTICALBAR)
+
+
+fn test_dash_lexing() raises:
+    var tokens = scan("-")
+    assert_equal(tokens[0].type, Token.DASH)

@@ -276,3 +276,15 @@ fn Circumflex() -> Token:
 fn Dash() -> Token:
     """Token of the dash '-'."""
     return Token(Token.DASH)
+
+
+@always_inline
+fn ElementToken(char: String) -> Token:
+    """Token that are not associated to special meaning."""
+    return Token(type=Token.ELEMENT, char=char)
+
+
+@always_inline
+fn SpaceToken(char: String) -> Token:
+    """Token of a space."""
+    return Token(type=Token.SPACE, char=char)
