@@ -1,5 +1,8 @@
-struct Token[type: Int](Copyable, Movable, EqualityComparable, ImplicitlyBoolable):
+struct Token[type: Int](
+    Copyable, EqualityComparable, ImplicitlyBoolable, Movable
+):
     """Token struct."""
+
     var char: String
 
     alias ELEMENT = Int(0)
@@ -62,47 +65,47 @@ struct Token[type: Int](Copyable, Movable, EqualityComparable, ImplicitlyBoolabl
     fn __init__(out self):
         var char: String
         if type == Self.WILDCARD:
-            char = '.'
+            char = "."
         elif type == Self.START:
-            char = '^'
+            char = "^"
         elif type == Self.END:
-            char = '$'
+            char = "$"
         elif type == Self.ESCAPE:
-            char = '\\'
+            char = "\\"
         elif type == Self.COMMA:
-            char = ','
+            char = ","
         elif type == Self.LEFTPARENTHESIS:
-            char = '('
+            char = "("
         elif type == Self.RIGHTPARENTHESIS:
-            char = ')'
+            char = ")"
         elif type == Self.LEFTCURLYBRACE:
-            char = '{'
+            char = "{"
         elif type == Self.RIGHTCURLYBRACE:
-            char = '}'
+            char = "}"
         elif type == Self.LEFTBRACKET:
-            char = '['
+            char = "["
         elif type == Self.RIGHTBRACKET:
-            char = ']'
+            char = "]"
         elif type == Self.ASTERISK:
-            char = '*'
+            char = "*"
         elif type == Self.PLUS:
-            char = '+'
+            char = "+"
         elif type == Self.QUESTIONMARK:
-            char = '?'
+            char = "?"
         elif type == Self.VERTICALBAR:
-            char = '|'
+            char = "|"
         elif type == Self.CIRCUMFLEX:
-            char = '^'
+            char = "^"
         elif type == Self.DASH:
-            char = '-'
+            char = "-"
         elif type == Self.ORTOKEN:
-            char = '|'
+            char = "|"
         else:
-            char = ''
-        self.char = char 
+            char = ""
+        self.char = char
 
     fn __init__(out self, char: String):
-        self.char = char 
+        self.char = char
 
     fn __eq__(self, other: Self) -> Bool:
         """Equality operator for Token."""
@@ -114,7 +117,7 @@ struct Token[type: Int](Copyable, Movable, EqualityComparable, ImplicitlyBoolabl
 
     fn __bool__(self: Self) -> Bool:
         """Boolean conversion for Token."""
-        return self.type != Self.ELEMENT or self.char != ''
+        return self.type != Self.ELEMENT or self.char != ""
 
     fn __as_bool__(self) -> Bool:
         """Get the boolean representation of the value.
@@ -124,145 +127,146 @@ struct Token[type: Int](Copyable, Movable, EqualityComparable, ImplicitlyBoolabl
         """
         return self.__bool__()
 
+
 @always_inline
-fn Asterisk() -> Token[type=Token.ASTERISK]:
+fn Asterisk() -> Token[type = Token.ASTERISK]:
     """Quantifier 'zero or more' token using character '*'."""
     return Token[Token.ASTERISK]()
 
 
 @always_inline
-fn Wildcard() -> Token[type=Token.WILDCARD]:
+fn Wildcard() -> Token[type = Token.WILDCARD]:
     """Token using '.' as wildcard."""
     return Token[Token.WILDCARD]()
 
 
 @always_inline
-fn NotToken(char: String) -> Token[type=Token.NOTTOKEN]:
+fn NotToken(char: String) -> Token[type = Token.NOTTOKEN]:
     """Token of the negation."""
     return Token[Token.NOTTOKEN](char=char)
 
 
 @always_inline
-fn StartToken(char: String) -> Token[type=Token.START]:
+fn StartToken(char: String) -> Token[type = Token.START]:
     """Token of match start."""
     return Token[Token.START](char=char)
 
 
 @always_inline
-fn Start() -> Token[type=Token.START]:
+fn Start() -> Token[type = Token.START]:
     """Token using '^' to match start."""
     return Token[Token.START]()
 
 
 @always_inline
-fn EndToken(char: String) -> Token[type=Token.END]:
+fn EndToken(char: String) -> Token[type = Token.END]:
     """Token of match end."""
     return Token[Token.END](char=char)
 
 
 @always_inline
-fn End() -> Token[type=Token.END]:
+fn End() -> Token[type = Token.END]:
     """Token using '$' to match end."""
     return Token[Token.END]()
 
 
 @always_inline
-fn Escape() -> Token[type=Token.ESCAPE]:
+fn Escape() -> Token[type = Token.ESCAPE]:
     """Token of the escape character."""
     return Token[Token.ESCAPE]()
 
 
 @always_inline
-fn Comma() -> Token[type=Token.COMMA]:
+fn Comma() -> Token[type = Token.COMMA]:
     """Token of a comma."""
     return Token[Token.COMMA]()
 
 
 @always_inline
-fn LeftParenthesis() -> Token[type=Token.LEFTPARENTHESIS]:
+fn LeftParenthesis() -> Token[type = Token.LEFTPARENTHESIS]:
     """Left parenthesis token."""
     return Token[Token.LEFTPARENTHESIS]()
 
 
 @always_inline
-fn RightParenthesis() -> Token[type=Token.RIGHTPARENTHESIS]:
+fn RightParenthesis() -> Token[type = Token.RIGHTPARENTHESIS]:
     """Right parenthesis token."""
     return Token[Token.RIGHTPARENTHESIS]()
 
 
 @always_inline
-fn LeftCurlyBrace() -> Token[type=Token.LEFTCURLYBRACE]:
+fn LeftCurlyBrace() -> Token[type = Token.LEFTCURLYBRACE]:
     """Left curly brace token."""
     return Token[Token.LEFTCURLYBRACE]()
 
 
 @always_inline
-fn RightCurlyBrace() -> Token[type=Token.RIGHTCURLYBRACE]:
+fn RightCurlyBrace() -> Token[type = Token.RIGHTCURLYBRACE]:
     """Right curly brace token."""
     return Token[Token.RIGHTCURLYBRACE]()
 
 
 @always_inline
-fn LeftBracket() -> Token[type=Token.LEFTBRACKET]:
+fn LeftBracket() -> Token[type = Token.LEFTBRACKET]:
     """Left bracket token."""
     return Token[Token.LEFTBRACKET]()
 
 
 @always_inline
-fn RightBracket() -> Token[type=Token.RIGHTBRACKET]:
+fn RightBracket() -> Token[type = Token.RIGHTBRACKET]:
     """Right bracket token."""
     return Token[Token.RIGHTBRACKET]()
 
 
 @always_inline
-fn ZeroOrMore(char: String) -> Token[type=Token.ZEROORMORE]:
+fn ZeroOrMore(char: String) -> Token[type = Token.ZEROORMORE]:
     """Quantifier 'zero or more' token."""
     return Token[Token.ZEROORMORE](char=char)
 
 
 @always_inline
-fn OneOrMore(char: String) -> Token[type=Token.ONEORMORE]:
+fn OneOrMore(char: String) -> Token[type = Token.ONEORMORE]:
     """Quantifier 'one or more' token."""
     return Token[Token.ONEORMORE](char=char)
 
 
 @always_inline
-fn ZeroOrOne(char: String) -> Token[type=Token.ZEROORONE]:
+fn ZeroOrOne(char: String) -> Token[type = Token.ZEROORONE]:
     """Quantifier 'zero or one' token."""
     return Token[Token.ZEROORONE](char=char)
 
 
 @always_inline
-fn Plus() -> Token[type=Token.PLUS]:
+fn Plus() -> Token[type = Token.PLUS]:
     """Quantifier 'one or more' token using character '+'."""
     return Token[Token.PLUS]()
 
 
 @always_inline
-fn QuestionMark() -> Token[type=Token.QUESTIONMARK]:
+fn QuestionMark() -> Token[type = Token.QUESTIONMARK]:
     """Quantifier 'zero or one' token using character '?'."""
     return Token[Token.QUESTIONMARK]()
 
 
 @always_inline
-fn OrToken(char: String) -> Token[type=Token.ORTOKEN]:
+fn OrToken(char: String) -> Token[type = Token.ORTOKEN]:
     """Token of the or."""
     return Token[Token.ORTOKEN](char=char)
 
 
 @always_inline
-fn VerticalBar() -> Token[type=Token.VERTICALBAR]:
+fn VerticalBar() -> Token[type = Token.VERTICALBAR]:
     """Token of the or using '|'."""
     return Token[Token.VERTICALBAR]()
 
 
 @always_inline
-fn Circumflex() -> Token[type=Token.CIRCUMFLEX]:
+fn Circumflex() -> Token[type = Token.CIRCUMFLEX]:
     """Token of the negation using '^'."""
     return Token[Token.CIRCUMFLEX]()
 
 
 @always_inline
-fn Dash() -> Token[type=Token.DASH]:
+fn Dash() -> Token[type = Token.DASH]:
     """Token of the dash '-'."""
     return Token[Token.DASH]()
