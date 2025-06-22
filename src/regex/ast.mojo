@@ -19,7 +19,7 @@ struct ASTNode(
     """Struct for all the Regex AST nodes."""
 
     var type: Int
-    var matching: String
+    var value: String
     var children: Deque[ASTNode]
     var capturing: Bool
     var group_name: String
@@ -29,7 +29,7 @@ struct ASTNode(
     fn __init__(
         out self,
         type: Int = 0,
-        owned matching: String = "",
+        owned value: String = "",
         capturing: Bool = False,
         owned group_name: String = "",
         min: Int = 0,
@@ -39,7 +39,7 @@ struct ASTNode(
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.matching = matching^
+        self.value = value^
         self.group_name = group_name^
         self.min = min
         self.max = max
@@ -52,7 +52,7 @@ struct ASTNode(
     fn __copyinit__(out self, other: ASTNode):
         """Copy constructor for ASTNode."""
         self.type = other.type
-        self.matching = other.matching
+        self.value = other.value
         self.capturing = other.capturing
         self.group_name = other.group_name
         self.min = other.min
@@ -73,7 +73,7 @@ struct ASTNode(
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
-            and self.matching == other.matching
+            and self.value == other.value
             and self.capturing == other.capturing
             and self.group_name == other.group_name
             and self.min == other.min
@@ -91,8 +91,8 @@ struct ASTNode(
         return String(
             "ASTNode(type=",
             self.type,
-            ", matching=",
-            self.matching,
+            ", value=",
+            self.value,
             ")",
             sep="",
         )
@@ -111,7 +111,7 @@ struct ASTNode(
         Args:
             writer: The writer instance to output the representation to.
         """
-        writer.write("ASTNode(type=", self.type, ", matching=", self.matching, ")")
+        writer.write("ASTNode(type=", self.type, ", value=", self.value, ")")
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
@@ -123,7 +123,7 @@ struct ASTNode(
     fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
         if self.type == ELEMENT:
-            return self.matching == value
+            return self.value == value
         elif self.type == WILDCARD:
             return value != "\n"
         elif self.type == SPACE:
@@ -133,7 +133,7 @@ struct ASTNode(
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
-            var ch_found = self.matching.find(value) != -1
+            var ch_found = self.value.find(value) != -1
             return not (ch_found ^ (self.min == 1))  # min=1 means positive logic
         elif self.type == START:
             return str_i == 0
@@ -156,26 +156,26 @@ fn RENode(
     )
 
 
-fn Element(matching: String) -> ASTNode:
-    """Create an Element node with a matching string."""
-    return ASTNode(type=ELEMENT, matching=matching, min=1, max=1)
+fn Element(value: String) -> ASTNode:
+    """Create an Element node with a value string."""
+    return ASTNode(type=ELEMENT, value=value, min=1, max=1)
 
 
 fn WildcardElement() -> ASTNode:
     """Create a WildcardElement node."""
-    return ASTNode(type=WILDCARD, matching="anything", min=1, max=1)
+    return ASTNode(type=WILDCARD, value="anything", min=1, max=1)
 
 
 fn SpaceElement() -> ASTNode:
     """Create a SpaceElement node."""
-    return ASTNode(type=SPACE, matching="", min=1, max=1)
+    return ASTNode(type=SPACE, value="", min=1, max=1)
 
 
-fn RangeElement(match_str: String, is_positive_logic: Bool = True) -> ASTNode:
+fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:
     """Create a RangeElement node."""
     return ASTNode(
         type=RANGE,
-        matching=match_str,
+        value=value,
         min=1 if is_positive_logic else 0,  # Use min to store logic type
         max=1,
     )
@@ -183,12 +183,12 @@ fn RangeElement(match_str: String, is_positive_logic: Bool = True) -> ASTNode:
 
 fn StartElement() -> ASTNode:
     """Create a StartElement node."""
-    return ASTNode(type=START, matching="", min=1, max=1)
+    return ASTNode(type=START, value="", min=1, max=1)
 
 
 fn EndElement() -> ASTNode:
     """Create an EndElement node."""
-    return ASTNode(type=END, matching="", min=1, max=1)
+    return ASTNode(type=END, value="", min=1, max=1)
 
 
 fn OrNode(left: ASTNode, right: ASTNode) -> ASTNode:

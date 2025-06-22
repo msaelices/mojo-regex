@@ -43,7 +43,7 @@ fn test_Element() raises:
     var elem = Element("a")
     assert_true(Bool(elem))
     assert_equal(elem.type, ELEMENT)
-    assert_equal(elem.matching, "a")
+    assert_equal(elem.value, "a")
     assert_true(elem.is_match("a"))
     assert_false(elem.is_match("b"))
 
