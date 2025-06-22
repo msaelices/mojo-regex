@@ -13,14 +13,14 @@ alias NOT = 8
 alias GROUP = 9
 
 
-struct ASTNode[origin: Origin](
+struct ASTNode(
     Copyable, EqualityComparable, ImplicitlyBoolable, Movable, Stringable, Writable
 ):
     """Struct for all the Regex AST nodes."""
 
     var type: Int
     var matching: String
-    var children: Deque[ASTNode[origin]]
+    var children: Deque[ASTNode]
     var capturing: Bool
     var group_name: String
     var min: Int
@@ -34,7 +34,7 @@ struct ASTNode[origin: Origin](
         owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
-        owned children: List[ASTNode[origin]] = [],
+        owned children: List[ASTNode] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
@@ -45,11 +45,11 @@ struct ASTNode[origin: Origin](
         self.max = max
         # TODO: Uncomment when unpacked arguments are supported in Mojo
         # self.children = Deque[ASTNode[origin]](*children)
-        self.children = Deque[ASTNode[origin]](capacity=len(children))
+        self.children = Deque[ASTNode](capacity=len(children))
         for child in children:
             self.children.append(child)
 
-    fn __copyinit__(out self, other: ASTNode[origin]):
+    fn __copyinit__(out self, other: ASTNode):
         """Copy constructor for ASTNode."""
         self.type = other.type
         self.matching = other.matching
@@ -57,7 +57,7 @@ struct ASTNode[origin: Origin](
         self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
-        self.children = Deque[ASTNode[origin]](capacity=len(other.children))
+        self.children = Deque[ASTNode](capacity=len(other.children))
         for child in other.children:
             self.children.append(child)
 
@@ -69,7 +69,7 @@ struct ASTNode[origin: Origin](
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode[origin]) -> Bool:
+    fn __eq__(self, other: ASTNode) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
@@ -82,7 +82,7 @@ struct ASTNode[origin: Origin](
             and self.children == other.children
         )
 
-    fn __ne__(self, other: ASTNode[origin]) -> Bool:
+    fn __ne__(self, other: ASTNode) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
@@ -115,7 +115,7 @@ struct ASTNode[origin: Origin](
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, RANGE, START, END]:
+        if self.type in [ELEMENT, WILDCARD, SPACE, RANGE, START, END]:
             return True
         else:
             return False
@@ -126,18 +126,96 @@ struct ASTNode[origin: Origin](
             return self.matching == value
         elif self.type == WILDCARD:
             return value != "\n"
+        elif self.type == SPACE:
+            if len(value) == 1:
+                var ch = value
+                return ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f"
+            return False
+        elif self.type == RANGE:
+            # For range elements, use XNOR logic for positive/negative matching
+            var ch_found = self.matching.find(value) != -1
+            return not (ch_found ^ (self.min == 1))  # min=1 means positive logic
+        elif self.type == START:
+            return str_i == 0
+        elif self.type == END:
+            return str_i == str_len
         else:
             return False
 
+    fn is_capturing(self) -> Bool:
+        """Check if the node is capturing."""
+        return self.capturing
 
-fn RENode[origin: Origin](child: ASTNode[origin]) -> ASTNode[origin]:
+
+fn RENode(
+    child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
+) -> ASTNode:
     """Create a RE node with a child."""
-    return ASTNode[origin](type=RE, children=[child])
+    return ASTNode(
+        type=RE, children=[child], capturing=capturing, group_name=group_name
+    )
 
 
-fn Element[origin: Origin](ref [origin]matching: String) -> ASTNode[origin]:
+fn Element(matching: String) -> ASTNode:
     """Create an Element node with a matching string."""
-    return ASTNode[origin](
-        type=ELEMENT,
-        matching=matching,
+    return ASTNode(type=ELEMENT, matching=matching, min=1, max=1)
+
+
+fn WildcardElement() -> ASTNode:
+    """Create a WildcardElement node."""
+    return ASTNode(type=WILDCARD, matching="anything", min=1, max=1)
+
+
+fn SpaceElement() -> ASTNode:
+    """Create a SpaceElement node."""
+    return ASTNode(type=SPACE, matching="", min=1, max=1)
+
+
+fn RangeElement(match_str: String, is_positive_logic: Bool = True) -> ASTNode:
+    """Create a RangeElement node."""
+    return ASTNode(
+        type=RANGE,
+        matching=match_str,
+        min=1 if is_positive_logic else 0,  # Use min to store logic type
+        max=1,
+    )
+
+
+fn StartElement() -> ASTNode:
+    """Create a StartElement node."""
+    return ASTNode(type=START, matching="", min=1, max=1)
+
+
+fn EndElement() -> ASTNode:
+    """Create an EndElement node."""
+    return ASTNode(type=END, matching="", min=1, max=1)
+
+
+fn OrNode(left: ASTNode, right: ASTNode) -> ASTNode:
+    """Create an OrNode with left and right children."""
+    return ASTNode(type=OR, children=[left, right], min=1, max=1)
+
+
+fn NotNode(child: ASTNode) -> ASTNode:
+    """Create a NotNode with a child."""
+    return ASTNode(type=NOT, children=[child])
+
+
+fn GroupNode(
+    children: List[ASTNode],
+    capturing: Bool = False,
+    group_name: String = "",
+    group_id: Int = -1,
+) -> ASTNode:
+    """Create a GroupNode with children."""
+    var final_group_name = group_name if group_name != "" else "Group " + String(
+        group_id
+    )
+    return ASTNode(
+        type=GROUP,
+        children=children,
+        capturing=capturing,
+        group_name=final_group_name,
+        min=1,
+        max=1,
     )
