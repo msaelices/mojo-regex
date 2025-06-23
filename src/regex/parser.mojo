@@ -126,6 +126,8 @@ fn parse(regex: String) raises -> ASTNode:
                     # Skip closing brace
                     if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
                         i += 1
+                    # Don't increment i again - continue processing next token
+                    i -= 1  # Compensate for the i += 1 at the end of the loop
             elements.append(elem)
         elif token.type == Token.WILDCARD:
             elements.append(WildcardElement())
@@ -171,6 +173,9 @@ fn parse(regex: String) raises -> ASTNode:
 
                 i += 1
 
+            if paren_count > 0:
+                raise Error("Missing closing parenthesis ')'.")
+
             elements.append(GroupNode(group_elements, True, "", 0))
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
@@ -186,6 +191,16 @@ fn parse(regex: String) raises -> ASTNode:
 
             var right_group = GroupNode(right_elements, True, "", 0)
             return RENode(OrNode(left_group, right_group))
+        else:
+            # Check for unescaped special characters
+            if token.type == Token.RIGHTPARENTHESIS:
+                raise Error("Unescaped closing parenthesis ')'.")
+            elif token.type == Token.RIGHTBRACKET:
+                raise Error("Unescaped closing bracket ']'.")
+            elif token.type == Token.RIGHTCURLYBRACE:
+                raise Error("Unescaped closing curly brace '}'.")
+            else:
+                raise Error("Unexpected token: " + token.char)
 
         i += 1
 
