@@ -161,21 +161,24 @@ fn test_parse_match_start_end() raises:
 fn test_complex_regex() raises:
     var ast = parse("^[a-zA-Z]{1,20}@[a-zA-Z]\\.[a-z]{1,3}$")
     var top_group = ast.children[0]
-    # Note: Our current parser tokenizes this differently than expected
-    # This pattern produces more elements due to how escape sequences are handled
-    assert_equal(len(top_group.children), 12)
+    # Our parser correctly produces 7 elements:
+    # ^, [a-zA-Z]{1,20}, @, [a-zA-Z], \., [a-z]{1,3}, $
+    assert_equal(len(top_group.children), 7)
 
-    # Verify that we at least have START and END elements
+    # Verify structure: START, RANGE, ELEMENT, RANGE, ELEMENT, RANGE, END
     assert_equal(top_group.children[0].type, START)
-    assert_equal(top_group.children[11].type, END)
+    assert_equal(top_group.children[1].type, RANGE)
+    assert_equal(top_group.children[2].type, ELEMENT)
+    assert_equal(top_group.children[3].type, RANGE)
+    assert_equal(top_group.children[4].type, ELEMENT)
+    assert_equal(top_group.children[5].type, RANGE)
+    assert_equal(top_group.children[6].type, END)
 
-    # Verify we have some range elements (the exact structure may vary)
-    var has_range = False
-    for i in range(len(top_group.children)):
-        if top_group.children[i].type == RANGE:
-            has_range = True
-            break
-    assert_true(has_range)
+    # Verify quantifiers on ranges
+    assert_equal(top_group.children[1].min, 1)  # [a-zA-Z]{1,20}
+    assert_equal(top_group.children[1].max, 20)
+    assert_equal(top_group.children[5].min, 1)  # [a-z]{1,3}
+    assert_equal(top_group.children[5].max, 3)
 
 
 fn test_range_1() raises:
