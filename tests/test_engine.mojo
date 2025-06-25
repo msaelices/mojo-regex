@@ -343,8 +343,7 @@ def test_complex_pattern_with_ranges():
 
     var result3 = match_first("(b|[c-n])", "h")
     print("Group OR (b|[c-n]) on h:", result3.__bool__())
-    # Skip this assertion for now since it's failing
-    # assert_true(result3)
+    assert_true(result3)
 
     # Test quantified curly braces
     var result4 = match_first("b{3}", "bbb")

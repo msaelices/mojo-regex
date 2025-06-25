@@ -77,29 +77,59 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             elements.append(StartElement())
         elif token.type == Token.END:
             elements.append(EndElement())
+        elif token.type == Token.LEFTBRACKET:
+            # Handle character ranges
+            i += 1
+            var range_str = String("")
+            var positive_logic = True
+
+            if i < len(tokens) and (
+                tokens[i].type == Token.NOTTOKEN or tokens[i].type == Token.CIRCUMFLEX
+            ):
+                positive_logic = False
+                i += 1
+
+            while i < len(tokens) and tokens[i].type != Token.RIGHTBRACKET:
+                var current_token = tokens[i]
+                # Check for range pattern like 'a-z'
+                if (
+                    i + 2 < len(tokens)
+                    and tokens[i + 1].type == Token.DASH
+                    and tokens[i + 2].type == Token.ELEMENT
+                ):
+                    # We have a range like 'a-z'
+                    var start_char = current_token.char
+                    var end_char = tokens[i + 2].char
+                    range_str += get_range_str(start_char, end_char)
+                    i += 3  # Skip start, dash, and end
+                else:
+                    # Single character
+                    range_str += current_token.char
+                    i += 1
+
+            if i >= len(tokens):
+                raise Error("Missing closing ']'.")
+
+            var range_elem = RangeElement(range_str, positive_logic)
+            elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
             var left_group = GroupNode(elements, True, "", 0)
             i += 1
 
-            # Parse right side
-            var right_elements = List[ASTNode]()
+            # Parse right side recursively
+            var right_tokens = List[Token]()
             while i < len(tokens):
-                var right_token = tokens[i]
-
-                if right_token.type == Token.ELEMENT:
-                    right_elements.append(Element(right_token.char))
-                elif right_token.type == Token.WILDCARD:
-                    right_elements.append(WildcardElement())
-                elif right_token.type == Token.SPACE:
-                    right_elements.append(SpaceElement())
-                elif right_token.type == Token.START:
-                    right_elements.append(StartElement())
-                elif right_token.type == Token.END:
-                    right_elements.append(EndElement())
+                right_tokens.append(tokens[i])
                 i += 1
 
-            var right_group = GroupNode(right_elements, True, "", 0)
+            var right_group_ast = parse_token_list(right_tokens)
+            var right_group: ASTNode
+            if right_group_ast.type == GROUP:
+                right_group = right_group_ast
+            else:
+                right_group = GroupNode([right_group_ast], True, "", 0)
+
             return OrNode(left_group, right_group)
 
         i += 1
