@@ -130,7 +130,23 @@ fn parse(regex: String) raises -> ASTNode:
                     i -= 1  # Compensate for the i += 1 at the end of the loop
             elements.append(elem)
         elif token.type == Token.WILDCARD:
-            elements.append(WildcardElement())
+            var elem = WildcardElement()
+            # Check for quantifiers
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.SPACE:
             elements.append(SpaceElement())
         elif token.type == Token.LEFTBRACKET:
