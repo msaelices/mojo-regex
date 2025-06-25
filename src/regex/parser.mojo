@@ -148,7 +148,23 @@ fn parse(regex: String) raises -> ASTNode:
                     i += 1  # Skip quantifier
             elements.append(elem)
         elif token.type == Token.SPACE:
-            elements.append(SpaceElement())
+            var elem = SpaceElement()
+            # Check for quantifiers
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.LEFTBRACKET:
             # Simple range parsing
             i += 1
@@ -162,13 +178,43 @@ fn parse(regex: String) raises -> ASTNode:
                 i += 1
 
             while i < len(tokens) and tokens[i].type != Token.RIGHTBRACKET:
-                range_str += tokens[i].char
-                i += 1
+                var current_token = tokens[i]
+                # Check for range pattern like 'a-z'
+                if (
+                    i + 2 < len(tokens)
+                    and tokens[i + 1].type == Token.DASH
+                    and tokens[i + 2].type == Token.ELEMENT
+                ):
+                    # We have a range like 'a-z'
+                    var start_char = current_token.char
+                    var end_char = tokens[i + 2].char
+                    range_str += get_range_str(start_char, end_char)
+                    i += 3  # Skip start, dash, and end
+                else:
+                    # Single character
+                    range_str += current_token.char
+                    i += 1
 
             if i >= len(tokens):
                 raise Error("Missing closing ']'.")
 
-            elements.append(RangeElement(range_str, positive_logic))
+            var range_elem = RangeElement(range_str, positive_logic)
+            # Check for quantifiers after the range
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    range_elem.min = 0
+                    range_elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    range_elem.min = 1
+                    range_elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    range_elem.min = 0
+                    range_elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(range_elem)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping
             i += 1
