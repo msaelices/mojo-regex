@@ -214,6 +214,36 @@ fn parse(regex: String) raises -> ASTNode:
                     range_elem.min = 0
                     range_elem.max = 1
                     i += 1  # Skip quantifier
+                elif next_token.type == Token.LEFTCURLYBRACE:
+                    # Parse curly brace quantifiers for ranges
+                    i += 2  # Skip range and {
+                    var min_val = String("")
+                    var max_val = String("")
+
+                    # Parse min value
+                    while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        min_val += tokens[i].char
+                        i += 1
+
+                    range_elem.min = atol(min_val) if min_val != "" else 0
+
+                    # Check for comma (range) or closing brace (exact)
+                    if i < len(tokens) and tokens[i].type == Token.COMMA:
+                        i += 1  # Skip comma
+                        # Parse max value
+                        while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                            max_val += tokens[i].char
+                            i += 1
+                        range_elem.max = atol(max_val) if max_val != "" else -1
+                    else:
+                        # Exact quantifier {n}
+                        range_elem.max = range_elem.min
+
+                    # Skip closing brace
+                    if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
+                        i += 1
+                    # Don't increment i again - continue processing next token
+                    i -= 1  # Compensate for the i += 1 at the end of the loop
             elements.append(range_elem)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping
