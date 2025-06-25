@@ -149,10 +149,8 @@ def test_match_or_right_at_start_end():
 
 def test_no_match_after_end():
     """Test that pattern doesn't match when there's extra content."""
-    # This test demonstrates a known issue with end anchors in OR expressions
-    # TODO: Fix this - the pattern ^na|nb$ should not match "nb " due to the $ anchor
     var result = match_first("^na|nb$", "nb ")
-    # Currently fails: assert_true(not result)
+    assert_true(not result)
 
     # But simpler end anchor test works correctly
     var result2 = match_first("nb$", "nb ")

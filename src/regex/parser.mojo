@@ -293,8 +293,19 @@ fn parse(regex: String) raises -> ASTNode:
             # Parse right side
             var right_elements = List[ASTNode]()
             while i < len(tokens):
-                if tokens[i].type == Token.ELEMENT:
-                    right_elements.append(Element(tokens[i].char))
+                ref right_token = tokens[i]
+
+                if right_token.type == Token.START:
+                    right_elements.append(StartElement())
+                elif right_token.type == Token.END:
+                    right_elements.append(EndElement())
+                elif right_token.type == Token.ELEMENT:
+                    right_elements.append(Element(right_token.char))
+                elif right_token.type == Token.WILDCARD:
+                    right_elements.append(WildcardElement())
+                elif right_token.type == Token.SPACE:
+                    right_elements.append(SpaceElement())
+                # TODO: Add support for other token types like ranges, groups, etc.
                 i += 1
 
             var right_group = GroupNode(right_elements, True, "", 0)
