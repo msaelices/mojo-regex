@@ -366,8 +366,7 @@ def test_email_validation_simple():
 
     var result2 = match_first(".*(com|it)", "gmail.com")
     print("Complex .*(com|it) on gmail.com:", result2.__bool__())
-    # Skip assertion for now since it's failing
-    # assert_true(result2)
+    assert_true(result2)
 
 
 def test_multiple_patterns():
@@ -387,13 +386,6 @@ def test_multiple_patterns():
     assert_equal(consumed2, 5)
 
 
-#
-#
-# def test_no_match_after_end(reng: RegexEngine):
-#     res, _ = reng.match('^na|nb$', 'nb ')
-#     assert res == False
-#
-#
 # def test_match_sequence_with_start_end_correctly(reng: RegexEngine):
 #     res, _ = reng.match('^a|b$', 'a  ')
 #     assert res == True

@@ -54,6 +54,59 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
+fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
+    """Parse a list of tokens into an AST node (used for recursive parsing of groups).
+    """
+    if len(tokens) == 0:
+        return GroupNode(List[ASTNode](), True, "", 0)
+
+    # Simple implementation for now - parse elements and OR
+    var elements = List[ASTNode]()
+    var i = 0
+
+    while i < len(tokens):
+        var token = tokens[i]
+
+        if token.type == Token.ELEMENT:
+            elements.append(Element(token.char))
+        elif token.type == Token.WILDCARD:
+            elements.append(WildcardElement())
+        elif token.type == Token.SPACE:
+            elements.append(SpaceElement())
+        elif token.type == Token.START:
+            elements.append(StartElement())
+        elif token.type == Token.END:
+            elements.append(EndElement())
+        elif token.type == Token.VERTICALBAR:
+            # OR handling - create OrNode with left and right parts
+            var left_group = GroupNode(elements, True, "", 0)
+            i += 1
+
+            # Parse right side
+            var right_elements = List[ASTNode]()
+            while i < len(tokens):
+                var right_token = tokens[i]
+
+                if right_token.type == Token.ELEMENT:
+                    right_elements.append(Element(right_token.char))
+                elif right_token.type == Token.WILDCARD:
+                    right_elements.append(WildcardElement())
+                elif right_token.type == Token.SPACE:
+                    right_elements.append(SpaceElement())
+                elif right_token.type == Token.START:
+                    right_elements.append(StartElement())
+                elif right_token.type == Token.END:
+                    right_elements.append(EndElement())
+                i += 1
+
+            var right_group = GroupNode(right_elements, True, "", 0)
+            return OrNode(left_group, right_group)
+
+        i += 1
+
+    return GroupNode(elements, True, "", 0)
+
+
 fn parse(regex: String) raises -> ASTNode:
     """Parses a regular expression.
 
@@ -248,9 +301,10 @@ fn parse(regex: String) raises -> ASTNode:
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping
             i += 1
-            var group_elements = List[ASTNode]()
+            var group_tokens = List[Token]()
             var paren_count = 1
 
+            # Extract tokens inside the parentheses
             while i < len(tokens) and paren_count > 0:
                 if tokens[i].type == Token.LEFTPARENTHESIS:
                     paren_count += 1
@@ -259,16 +313,22 @@ fn parse(regex: String) raises -> ASTNode:
                     if paren_count == 0:
                         break
 
-                # Simple element parsing within parentheses
-                if tokens[i].type == Token.ELEMENT:
-                    group_elements.append(Element(tokens[i].char))
-
+                group_tokens.append(tokens[i])
                 i += 1
 
             if paren_count > 0:
                 raise Error("Missing closing parenthesis ')'.")
 
-            var group = GroupNode(group_elements, True, "", 0)
+            # Recursively parse the tokens inside the group
+            var group_ast = parse_token_list(group_tokens)
+            var group: ASTNode
+            if group_ast.type == GROUP:
+                # If it's already a group, use it directly but mark as capturing
+                group = group_ast
+                group.capturing = True
+            else:
+                # Otherwise wrap in a group
+                group = GroupNode([group_ast], True, "", 0)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
                 var next_token = tokens[i + 1]
