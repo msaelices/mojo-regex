@@ -93,7 +93,297 @@ struct RegexEngine:
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
+        var matches = Deque[Match]()
+        var str_i = start_str_i
+
+        while str_i <= len(string):
+            var result = self._match_node(ast, string, str_i, matches)
+            if result[0]:  # Match found
+                var end_idx = result[1]
+                if len(matches) > 0:
+                    return matches[0]
+                else:
+                    # Create a match for the whole expression
+                    var matched = Match(0, str_i, end_idx, string, "RegEx")
+                    return matched
+            str_i += 1
+
         return None
+
+    fn _match_node(
+        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+    ) capturing -> Tuple[Bool, Int]:
+        """Core matching function that processes AST nodes recursively.
+
+        Args:
+            ast: The AST node to match
+            string: The input string
+            str_i: Current position in string
+            matches: Deque to collect matched groups
+
+        Returns:
+            Tuple of (success, final_position)
+        """
+        from regex.ast import RE, ELEMENT, WILDCARD, SPACE, RANGE, START, END, OR, GROUP
+
+        if ast.type == ELEMENT:
+            return self._match_element(ast, string, str_i)
+        elif ast.type == WILDCARD:
+            return self._match_wildcard(ast, string, str_i)
+        elif ast.type == SPACE:
+            return self._match_space(ast, string, str_i)
+        elif ast.type == RANGE:
+            return self._match_range(ast, string, str_i)
+        elif ast.type == START:
+            return self._match_start(ast, string, str_i)
+        elif ast.type == END:
+            return self._match_end(ast, string, str_i)
+        elif ast.type == OR:
+            return self._match_or(ast, string, str_i, matches)
+        elif ast.type == GROUP:
+            return self._match_group(ast, string, str_i, matches)
+        elif ast.type == RE:
+            return self._match_re(ast, string, str_i, matches)
+        else:
+            return (False, str_i)
+
+    fn _match_element(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match a literal character element."""
+        if str_i >= len(string):
+            return (False, str_i)
+
+        var ch = string[str_i]
+        if ast.value == ch:
+            return self._apply_quantifier(ast, string, str_i, 1)
+        else:
+            return (False, str_i)
+
+    fn _match_wildcard(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match wildcard (.) - any character except newline."""
+        if str_i >= len(string):
+            return (False, str_i)
+
+        var ch = string[str_i]
+        if ch != "\n":
+            return self._apply_quantifier(ast, string, str_i, 1)
+        else:
+            return (False, str_i)
+
+    fn _match_space(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match whitespace character (\\s)."""
+        if str_i >= len(string):
+            return (False, str_i)
+
+        var ch = string[str_i]
+        if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
+            return self._apply_quantifier(ast, string, str_i, 1)
+        else:
+            return (False, str_i)
+
+    fn _match_range(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match character range [abc] or [^abc]."""
+        if str_i >= len(string):
+            return (False, str_i)
+
+        var ch = string[str_i]
+        var ch_found = ast.value.find(ch) != -1
+        var positive_logic = ast.min == 1  # min=1 means positive logic
+
+        if ch_found == positive_logic:
+            return self._apply_quantifier(ast, string, str_i, 1)
+        else:
+            return (False, str_i)
+
+    fn _match_start(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match start anchor (^)."""
+        if str_i == 0:
+            return (True, str_i)
+        else:
+            return (False, str_i)
+
+    fn _match_end(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match end anchor ($)."""
+        if str_i == len(string):
+            return (True, str_i)
+        else:
+            return (False, str_i)
+
+    fn _match_or(
+        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+    ) capturing -> Tuple[Bool, Int]:
+        """Match OR node - try left branch first, then right."""
+        if len(ast.children) < 2:
+            return (False, str_i)
+
+        # Try left branch first
+        var left_result = self._match_node(ast.children[0], string, str_i, matches)
+        if left_result[0]:
+            return left_result
+
+        # If left fails, try right branch
+        var right_result = self._match_node(ast.children[1], string, str_i, matches)
+        return right_result
+
+    fn _match_group(
+        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+    ) capturing -> Tuple[Bool, Int]:
+        """Match GROUP node - process children sequentially with backtracking."""
+        var start_pos = str_i
+
+        # Try to match all children sequentially with backtracking support
+        var result = self._match_sequence(ast.children, string, str_i, matches)
+        if not result[0]:
+            return (False, str_i)
+
+        # If this is a capturing group, add the match
+        if ast.is_capturing():
+            var matched = Match(0, start_pos, result[1], string, ast.group_name)
+            matches.append(matched)
+
+        return result
+
+    fn _match_sequence(
+        self,
+        children: Deque[ASTNode],
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
+    ) capturing -> Tuple[Bool, Int]:
+        """Match a sequence of AST nodes with backtracking support."""
+        if len(children) == 0:
+            return (True, str_i)
+
+        if len(children) == 1:
+            return self._match_node(children[0], string, str_i, matches)
+
+        # For multiple children, we need to handle backtracking
+        var first_child = children[0]
+        var remaining_children = Deque[ASTNode](capacity=len(children) - 1)
+        for i in range(1, len(children)):
+            remaining_children.append(children[i])
+
+        # Try different match lengths for the first child
+        if self._has_quantifier(first_child):
+            return self._match_with_backtracking(
+                first_child, remaining_children, string, str_i, matches
+            )
+        else:
+            # Simple case: match first child normally, then recursively match rest
+            var result = self._match_node(first_child, string, str_i, matches)
+            if not result[0]:
+                return (False, str_i)
+            return self._match_sequence(remaining_children, string, result[1], matches)
+
+    fn _has_quantifier(self, ast: ASTNode) capturing -> Bool:
+        """Check if node has quantifier (min != 1 or max != 1)."""
+        return ast.min != 1 or ast.max != 1
+
+    fn _match_with_backtracking(
+        self,
+        quantified_node: ASTNode,
+        remaining_children: Deque[ASTNode],
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
+    ) capturing -> Tuple[Bool, Int]:
+        """Match a quantified node followed by other nodes, with backtracking."""
+        var min_matches = quantified_node.min
+        var max_matches = quantified_node.max
+
+        if max_matches == -1:
+            max_matches = len(string) - str_i
+
+        # Try from maximum matches down to minimum matches (greedy with backtracking)
+        var match_count = max_matches
+        while match_count >= min_matches:
+            var consumed = self._try_match_count(
+                quantified_node, string, str_i, match_count
+            )
+            if consumed >= 0:  # Successfully matched this many times
+                var new_pos = str_i + consumed
+                # Try to match the remaining children
+                var result = self._match_sequence(
+                    remaining_children, string, new_pos, matches
+                )
+                if result[0]:
+                    return (True, result[1])
+            match_count -= 1
+
+        return (False, str_i)
+
+    fn _try_match_count(
+        self, ast: ASTNode, string: String, str_i: Int, count: Int
+    ) capturing -> Int:
+        """Try to match exactly 'count' repetitions of the node. Returns characters consumed or -1.
+        """
+        var pos = str_i
+        var matched = 0
+
+        while matched < count and pos < len(string):
+            if ast.is_match(string[pos], pos, len(string)):
+                matched += 1
+                pos += 1
+            else:
+                return -1  # Failed to match required count
+
+        if matched == count:
+            return pos - str_i
+        else:
+            return -1
+
+    fn _match_re(
+        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+    ) capturing -> Tuple[Bool, Int]:
+        """Match RE root node."""
+        if len(ast.children) == 0:
+            return (True, str_i)
+
+        return self._match_node(ast.children[0], string, str_i, matches)
+
+    fn _apply_quantifier(
+        self, ast: ASTNode, string: String, str_i: Int, char_consumed: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Apply quantifier logic to a matched element."""
+        var min_matches = ast.min
+        var max_matches = ast.max
+
+        if max_matches == -1:  # Unlimited
+            max_matches = len(string) - str_i
+
+        # If we have a simple single match (min=1, max=1)
+        if min_matches == 1 and max_matches == 1:
+            return (True, str_i + char_consumed)
+
+        # For quantifiers, we need to try different numbers of matches
+        # This is a simplified version - we'll start with greedy matching
+        var matches_count = 0
+        var current_pos = str_i
+
+        # Try to match as many times as possible (greedy)
+        while matches_count < max_matches and current_pos < len(string):
+            if ast.is_match(string[current_pos], current_pos, len(string)):
+                matches_count += 1
+                current_pos += 1
+            else:
+                break
+
+        # Check if we have enough matches
+        if matches_count >= min_matches:
+            return (True, current_pos)
+        else:
+            return (False, str_i)
 
 
 fn match_first(

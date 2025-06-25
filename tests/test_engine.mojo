@@ -1,39 +1,80 @@
 from testing import assert_equal, assert_true, assert_raises
 
-from regex.engine import match
+from regex.engine import match_first
 
 
-# import pytest
-# from ..pyregexp.engine import RegexEngine
-#
-#
-# @pytest.fixture
-# def reng() -> RegexEngine:
-#     return RegexEngine()
-#
-#
-# def test_simplest(reng: RegexEngine):
-#     assert (True, 1) == reng.match('a', 'a')
-#
-#
-# def test_simplest_with_wildcard(reng: RegexEngine):
-#     assert (True, 1) == reng.match('.', 'a')
-#
-#
-# def test_simplest_but_longer(reng: RegexEngine):
-#     assert (True, 3) == reng.match('a.c', 'abc')
-#
-#
-# def test_wildcard(reng: RegexEngine):
-#     assert (True, 2) == reng.match('.*a', 'aa')
-#
-#
-# def test_backtracking(reng: RegexEngine):
-#     assert (True, 4) == reng.match('a*a', 'aaaa')
-#
-#
-# def test_or(reng: RegexEngine):
-#     assert (True, 1) == reng.match('a.*|b', 'b')
+def test_simplest():
+    """Test the simplest case: single character match."""
+    var result = match_first("a", "a")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 1)
+
+
+def test_simplest_with_wildcard():
+    """Test wildcard matching any character."""
+    var result = match_first(".", "a")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 1)
+
+
+def test_simplest_but_longer():
+    """Test longer pattern matching."""
+    var result = match_first("a.c", "abc")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 3)
+
+
+def test_wildcard():
+    """Test wildcard with quantifier."""
+    var result = match_first(".*a", "aa")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 2)
+
+
+def test_backtracking():
+    """Test backtracking with quantifiers."""
+    var result = match_first("a*a", "aaaa")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 4)
+
+
+def test_or():
+    """Test alternation (OR) matching."""
+    var result = match_first("a.*|b", "b")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 1)
+
+
+def test_anchor_start():
+    """Test start anchor (^)."""
+    var result = match_first("^a", "abc")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 1)
+
+
+def test_anchor_end():
+    """Test end anchor ($)."""
+    var result = match_first("c$", "abc")
+    assert_true(result)
+    var matched = result.value()
+    var consumed = matched.end_idx - matched.start_idx
+    assert_equal(consumed, 1)
+
+
 #
 #
 # def test_or_no_match(reng: RegexEngine):
