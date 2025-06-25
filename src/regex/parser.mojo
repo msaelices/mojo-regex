@@ -192,7 +192,23 @@ fn parse(regex: String) raises -> ASTNode:
             if paren_count > 0:
                 raise Error("Missing closing parenthesis ')'.")
 
-            elements.append(GroupNode(group_elements, True, "", 0))
+            var group = GroupNode(group_elements, True, "", 0)
+            # Check for quantifiers after the group
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    group.min = 0
+                    group.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    group.min = 1
+                    group.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    group.min = 0
+                    group.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(group)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
             var left_group = GroupNode(elements, True, "", 0)

@@ -100,12 +100,9 @@ struct RegexEngine:
             var result = self._match_node(ast, string, str_i, matches)
             if result[0]:  # Match found
                 var end_idx = result[1]
-                if len(matches) > 0:
-                    return matches[0]
-                else:
-                    # Create a match for the whole expression
-                    var matched = Match(0, str_i, end_idx, string, "RegEx")
-                    return matched
+                # Always return the overall match with correct range
+                var matched = Match(0, str_i, end_idx, string, "RegEx")
+                return matched
             str_i += 1
 
         return None
@@ -242,7 +239,11 @@ struct RegexEngine:
         """Match GROUP node - process children sequentially with backtracking."""
         var start_pos = str_i
 
-        # Try to match all children sequentially with backtracking support
+        # Check if this group itself has a quantifier
+        if self._has_quantifier(ast):
+            return self._match_group_with_quantifier(ast, string, str_i, matches)
+
+        # Simple case: no quantifier on the group itself
         var result = self._match_sequence(ast.children, string, str_i, matches)
         if not result[0]:
             return (False, str_i)
@@ -253,6 +254,40 @@ struct RegexEngine:
             matches.append(matched)
 
         return result
+
+    fn _match_group_with_quantifier(
+        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+    ) capturing -> Tuple[Bool, Int]:
+        """Match a group that has a quantifier applied to it."""
+        var min_matches = ast.min
+        var max_matches = ast.max
+        var _ = str_i
+        var current_pos = str_i
+        var group_matches = 0
+
+        if max_matches == -1:
+            max_matches = len(string) - str_i
+
+        # Try to match the group as many times as possible (greedy)
+        while group_matches < max_matches and current_pos <= len(string):
+            var group_result = self._match_sequence(
+                ast.children, string, current_pos, matches
+            )
+            if group_result[0]:
+                group_matches += 1
+                current_pos = group_result[1]
+                # If this is a capturing group, add the match for this repetition
+                if ast.is_capturing():
+                    var matched = Match(0, str_i, current_pos, string, ast.group_name)
+                    matches.append(matched)
+            else:
+                break
+
+        # Check if we have enough matches
+        if group_matches >= min_matches:
+            return (True, current_pos)
+        else:
+            return (False, str_i)
 
     fn _match_sequence(
         self,
