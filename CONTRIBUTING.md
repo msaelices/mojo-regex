@@ -2,14 +2,14 @@
 
 Thank you for your interest in contributing to mojo-regex! This guide will help you understand the project structure, development workflow, and contribution guidelines.
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 The mojo-regex library follows a traditional regex engine architecture with clear separation of concerns:
 
 ### Core Components
 
 ```
-Input Regex String
+   Input Regex String
        ↓
    📝 Lexer (lexer.mojo)
        ↓
@@ -70,7 +70,7 @@ Input Regex String
 - **Memory management**: Uses Mojo's ownership system and List/Deque collections
 - **Performance**: Optimized for common patterns while maintaining flexibility
 
-## 🚀 Development Setup
+## Development Setup
 
 ### Prerequisites
 - [Mojo](https://docs.modular.com/mojo/) development environment
@@ -103,7 +103,7 @@ pre-commit install
 mojo benchmarks/bench_engine.mojo
 ```
 
-## 🧪 Testing
+## Testing
 
 ### Test Structure
 - `tests/test_*.mojo` - Comprehensive test suites for each module
@@ -127,10 +127,10 @@ When contributing new features:
 3. Ensure all existing tests continue to pass
 4. Add performance benchmarks if applicable
 
-## 🎯 Contribution Areas
+## Contribution Areas
 Check the TO-DO section in the README for current feature requests and improvements. Contributions are welcome.
 
-## 📝 Code Style Guidelines
+## Code Style Guidelines
 
 ### General Principles
 1. **Follow existing patterns** in the codebase
@@ -151,7 +151,7 @@ Check the TO-DO section in the README for current feature requests and improveme
 - Provide usage examples for complex functions
 - Document algorithm complexity where relevant
 
-## 📊 Performance Considerations
+## Performance Considerations
 
 ### Current Implementation
 - **Engine type**: NFA with backtracking
@@ -164,13 +164,13 @@ Check the TO-DO section in the README for current feature requests and improveme
 - Consider algorithmic improvements (DFA compilation)
 - Maintain correctness while improving performance
 
-## 🆘 Getting Help
+## Getting Help
 
 - **GitHub Issues**: For bugs, feature requests, and discussions
 - **Code Review**: All contributions go through review process
 - **Architecture Questions**: Reference this document and existing code patterns
 
-## 📜 Code of Conduct
+## Code of Conduct
 
 Please be respectful and constructive in all interactions. This project follows standard open-source community guidelines for inclusive and collaborative development.
 
