@@ -9,16 +9,6 @@ It aims to provide a similar interface as the [re](https://docs.python.org/3/lib
 
 This software is in an early stage of development. Even though it is functional, it is not yet feature-complete and may contain bugs. Check the features section below and the TO-DO sections for the current status
 
-## Architecture
-
-The library follows a traditional regex engine architecture:
-
-- **Lexer** (`lexer.mojo`): Tokenizes regex strings into a stream of tokens
-- **Parser** (`parser.mojo`): Builds an Abstract Syntax Tree (AST) from tokens
-- **AST** (`ast.mojo`): Represents regex patterns as tree structures
-- **Engine** (`engine.mojo`): Executes pattern matching with backtracking
-- **Tokens** (`tokens.mojo`): Defines all regex token types
-
 ## Implemented Features
 
 ### Basic Elements
