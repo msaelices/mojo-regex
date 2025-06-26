@@ -165,7 +165,7 @@ fn bench_group_match[text_length: Int, pattern: StaticString](mut b: Bencher) ra
 # ===-----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=3))
+    var m = Bench(BenchConfig(num_repetitions=2))
 
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
