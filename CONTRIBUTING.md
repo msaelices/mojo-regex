@@ -73,7 +73,7 @@ The mojo-regex library follows a traditional regex engine architecture with clea
 ## Development Setup
 
 ### Prerequisites
-- [Mojo](https://docs.modular.com/mojo/) development environment
+- [Mojo](https://docs.modular.com/mojo/manual/get-started) development environment
 - [pixi](https://pixi.sh/) package manager
 
 ### Quick Start
