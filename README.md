@@ -7,7 +7,7 @@ It aims to provide a similar interface as the [re](https://docs.python.org/3/lib
 
 ## Disclaimer ⚠️
 
-This software is in an early stage of development. Please DO NOT use yet for production ready services.
+This software is in an early stage of development. Even though it is functional, it is not yet feature-complete and may contain bugs. Check the features section below and the TO-DO sections for the current status
 
 ## Architecture
 
@@ -119,7 +119,7 @@ if result:
 mojo test -I src/ tests/test_engine.mojo
 ```
 
-## ❌ TO-DO: Missing Features
+## TO-DO: Missing Features
 
 ### High Priority
 - [ ] Global matching (`match_all()`)
@@ -163,7 +163,7 @@ Contributions are welcome! If you'd like to contribute, please follow the contri
 
 ## Acknowledgments
 
-We are heavily inspired by the pure-Python implementation done in the [pyregex](https://github.com/lorenzofelletti/pyregex) library.
+We are inspired by the pure-Python implementation done in the [pyregex](https://github.com/lorenzofelletti/pyregex) library.
 
 ## License
 
