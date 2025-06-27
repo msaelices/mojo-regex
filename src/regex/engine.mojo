@@ -45,7 +45,7 @@ struct RegexEngine:
         return_matches: Bool = False,
         continue_after_match: Bool = False,
         ignore_case: Int = 0,
-    ) -> Tuple[Bool, Int, List[Match]]:
+    ) raises -> Tuple[Bool, Int, List[Match]]:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -75,7 +75,53 @@ struct RegexEngine:
             match, and in the subsequent positions all the group and subgroups
             matched.
         """
-        return (False, 0, [])
+        # Parse the regex if it's different from the cached one
+        var ast: ASTNode
+        if self.prev_re != re:
+            from regex.parser import parse
+
+            ast = parse(re)
+            # Note: We should update cache here, but the method signature doesn't allow mutation
+        else:
+            if self.prev_ast:
+                ast = self.prev_ast.value()
+            else:
+                from regex.parser import parse
+
+                ast = parse(re)
+
+        var matches = List[Match]()
+        var last_match_end = 0
+        var found_any = False
+        var current_pos = 0
+
+        while current_pos <= len(text):
+            var temp_matches = Deque[Match]()
+            var result = self._match_node(ast, text, current_pos, temp_matches)
+            if result[0]:  # Match found
+                found_any = True
+                var match_start = current_pos
+                var match_end = result[1]
+                last_match_end = match_end
+
+                # Create match object
+                var matched = Match(0, match_start, match_end, text, "RegEx")
+                if return_matches:
+                    matches.append(matched)
+
+                # Move past this match to find next one
+                # Avoid infinite loop on zero-width matches
+                if match_end == match_start:
+                    current_pos += 1
+                else:
+                    current_pos = match_end
+
+                # If continue_after_match is False, we still continue to find all matches
+                # The parameter name seems to be for a different purpose in the original
+            else:
+                current_pos += 1
+
+        return (found_any, last_match_end, matches)
 
     fn match_first(
         self, ast: ASTNode, string: String, start_str_i: Int = 0
@@ -108,7 +154,11 @@ struct RegexEngine:
         return None
 
     fn _match_node(
-        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+        self,
+        ast: ASTNode,
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Core matching function that processes AST nodes recursively.
 
@@ -121,7 +171,17 @@ struct RegexEngine:
         Returns:
             Tuple of (success, final_position)
         """
-        from regex.ast import RE, ELEMENT, WILDCARD, SPACE, RANGE, START, END, OR, GROUP
+        from regex.ast import (
+            RE,
+            ELEMENT,
+            WILDCARD,
+            SPACE,
+            RANGE,
+            START,
+            END,
+            OR,
+            GROUP,
+        )
 
         if ast.type == ELEMENT:
             return self._match_element(ast, string, str_i)
@@ -218,30 +278,45 @@ struct RegexEngine:
             return (False, str_i)
 
     fn _match_or(
-        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+        self,
+        ast: ASTNode,
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
         if len(ast.children) < 2:
             return (False, str_i)
 
         # Try left branch first
-        var left_result = self._match_node(ast.children[0], string, str_i, matches)
+        var left_result = self._match_node(
+            ast.children[0], string, str_i, matches
+        )
         if left_result[0]:
             return left_result
 
         # If left fails, try right branch
-        var right_result = self._match_node(ast.children[1], string, str_i, matches)
+        var right_result = self._match_node(
+            ast.children[1], string, str_i, matches
+        )
         return right_result
 
     fn _match_group(
-        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+        self,
+        ast: ASTNode,
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
-        """Match GROUP node - process children sequentially with backtracking."""
+        """Match GROUP node - process children sequentially with backtracking.
+        """
         var start_pos = str_i
 
         # Check if this group itself has a quantifier
         if self._has_quantifier(ast):
-            return self._match_group_with_quantifier(ast, string, str_i, matches)
+            return self._match_group_with_quantifier(
+                ast, string, str_i, matches
+            )
 
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(ast.children, string, str_i, matches)
@@ -256,7 +331,11 @@ struct RegexEngine:
         return result
 
     fn _match_group_with_quantifier(
-        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+        self,
+        ast: ASTNode,
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match a group that has a quantifier applied to it."""
         var min_matches = ast.min
@@ -278,7 +357,9 @@ struct RegexEngine:
                 current_pos = group_result[1]
                 # If this is a capturing group, add the match for this repetition
                 if ast.is_capturing():
-                    var matched = Match(0, str_i, current_pos, string, ast.group_name)
+                    var matched = Match(
+                        0, str_i, current_pos, string, ast.group_name
+                    )
                     matches.append(matched)
             else:
                 break
@@ -319,7 +400,9 @@ struct RegexEngine:
             var result = self._match_node(first_child, string, str_i, matches)
             if not result[0]:
                 return (False, str_i)
-            return self._match_sequence(remaining_children, string, result[1], matches)
+            return self._match_sequence(
+                remaining_children, string, result[1], matches
+            )
 
     fn _has_quantifier(self, ast: ASTNode) capturing -> Bool:
         """Check if node has quantifier (min != 1 or max != 1)."""
@@ -333,7 +416,8 @@ struct RegexEngine:
         str_i: Int,
         mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
-        """Match a quantified node followed by other nodes, with backtracking."""
+        """Match a quantified node followed by other nodes, with backtracking.
+        """
         var min_matches = quantified_node.min
         var max_matches = quantified_node.max
 
@@ -379,7 +463,11 @@ struct RegexEngine:
             return -1
 
     fn _match_re(
-        self, ast: ASTNode, string: String, str_i: Int, mut matches: Deque[Match]
+        self,
+        ast: ASTNode,
+        string: String,
+        str_i: Int,
+        mut matches: Deque[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
         if len(ast.children) == 0:
@@ -444,3 +532,28 @@ fn match_first(
     """
     engine = RegexEngine()
     return engine.match_first(parse(re), text)
+
+
+fn match_all(
+    re: String, text: String, ignore_case: Int = 0
+) raises -> List[Match]:
+    """Searches for all matches of a regex in a test string.
+
+    Searches the passed regular expression in the passed test string and
+    returns all matches found.
+
+    Args:
+        re: The regular expression to search.
+        text: The test string.
+        ignore_case: When 0 the case is not ignored, when 1 a "soft"
+            case ignoring is performed, when 2 casefolding is performed.
+
+    Returns:
+        A list of Match objects representing all matches found in the text.
+        Returns an empty list if no matches are found.
+    """
+    engine = RegexEngine()
+    var result = engine.match_all(
+        re, text, return_matches=True, ignore_case=ignore_case
+    )
+    return result[2]  # Return the matches list

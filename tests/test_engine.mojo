@@ -1,6 +1,6 @@
 from testing import assert_equal, assert_true, assert_raises
 
-from regex.engine import match_first
+from regex.engine import match_first, match_all
 
 
 def test_simplest():
@@ -939,3 +939,89 @@ def test_multiple_patterns():
 # def test_double_or_nodes_with_wildcard_in_between(reng: RegexEngine):
 #     res, _ = reng.match(r'@(gm|ho).(com|it)', '@hoa.com')
 #     assert res == False
+
+
+def test_match_all_simple():
+    """Test match_all with simple pattern that appears multiple times."""
+    var matches = match_all("a", "banana")
+    assert_equal(len(matches), 3)
+    assert_equal(matches[0].start_idx, 1)
+    assert_equal(matches[0].end_idx, 2)
+    assert_equal(matches[1].start_idx, 3)
+    assert_equal(matches[1].end_idx, 4)
+    assert_equal(matches[2].start_idx, 5)
+    assert_equal(matches[2].end_idx, 6)
+
+
+def test_match_all_no_matches():
+    """Test match_all when pattern doesn't match anything."""
+    var matches = match_all("z", "banana")
+    assert_equal(len(matches), 0)
+
+
+def test_match_all_one_match():
+    """Test match_all when pattern appears only once."""
+    var matches = match_all("ban", "banana")
+    assert_equal(len(matches), 1)
+    assert_equal(matches[0].start_idx, 0)
+    assert_equal(matches[0].end_idx, 3)
+    assert_equal(matches[0].match_text, "ban")
+
+
+def test_match_all_overlapping_avoided():
+    """Test that match_all doesn't find overlapping matches."""
+    var matches = match_all("aa", "aaaa")
+    assert_equal(len(matches), 2)
+    assert_equal(matches[0].start_idx, 0)
+    assert_equal(matches[0].end_idx, 2)
+    assert_equal(matches[1].start_idx, 2)
+    assert_equal(matches[1].end_idx, 4)
+
+
+def test_match_all_with_quantifiers():
+    """Test match_all with quantifiers."""
+    var matches = match_all("[0-9]+", "abc123def456ghi")
+    assert_equal(len(matches), 2)
+    assert_equal(matches[0].match_text, "123")
+    assert_equal(matches[0].start_idx, 3)
+    assert_equal(matches[0].end_idx, 6)
+    assert_equal(matches[1].match_text, "456")
+    assert_equal(matches[1].start_idx, 9)
+    assert_equal(matches[1].end_idx, 12)
+
+
+def test_match_all_wildcard():
+    """Test match_all with wildcard pattern."""
+    var matches = match_all(".", "abc")
+    assert_equal(len(matches), 3)
+    assert_equal(matches[0].match_text, "a")
+    assert_equal(matches[1].match_text, "b")
+    assert_equal(matches[2].match_text, "c")
+
+
+def test_match_all_empty_string():
+    """Test match_all on empty string."""
+    var matches = match_all("a", "")
+    assert_equal(len(matches), 0)
+
+
+def test_match_all_anchors():
+    """Test match_all with anchors."""
+    # Start anchor should only match at beginning
+    var matches1 = match_all("^a", "aaa")
+    assert_equal(len(matches1), 1)
+    assert_equal(matches1[0].start_idx, 0)
+
+    # End anchor should only match at end
+    var matches2 = match_all("a$", "aaa")
+    assert_equal(len(matches2), 1)
+    assert_equal(matches2[0].start_idx, 2)
+
+
+def test_match_all_zero_width_matches():
+    """Test match_all handles zero-width matches correctly."""
+    # This tests that we don't get infinite loops on zero-width matches
+    var matches = match_all("^", "abc")
+    assert_equal(len(matches), 1)
+    assert_equal(matches[0].start_idx, 0)
+    assert_equal(matches[0].end_idx, 0)
