@@ -48,7 +48,9 @@ fn make_test_string[
 # Basic Literal Matching Benchmarks
 # ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher) raises:
+fn bench_literal_match[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
     """Benchmark literal string matching."""
     var test_text = make_test_string[text_length]()
 
@@ -67,7 +69,9 @@ fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher) 
 # Wildcard and Quantifier Benchmarks
 # ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_wildcard_match[text_length: Int, pattern: StaticString](mut b: Bencher) raises:
+fn bench_wildcard_match[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
     """Benchmark wildcard and quantifier patterns."""
     var test_text = make_test_string[text_length]()
 
@@ -86,7 +90,9 @@ fn bench_wildcard_match[text_length: Int, pattern: StaticString](mut b: Bencher)
 # Character Range Benchmarks
 # ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_range_match[text_length: Int, pattern: StaticString](mut b: Bencher) raises:
+fn bench_range_match[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
     """Benchmark character range patterns."""
     var test_text = make_test_string[text_length]("abc123XYZ")
 
@@ -105,7 +111,9 @@ fn bench_range_match[text_length: Int, pattern: StaticString](mut b: Bencher) ra
 # Anchor Benchmarks
 # ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_anchor_match[text_length: Int, pattern: StaticString](mut b: Bencher) raises:
+fn bench_anchor_match[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
     """Benchmark anchor patterns (^ and $)."""
     var test_text = make_test_string[text_length]()
 
@@ -145,7 +153,9 @@ fn bench_alternation_match[
 # Group Benchmarks
 # ===-----------------------------------------------------------------------===#
 @parameter
-fn bench_group_match[text_length: Int, pattern: StaticString](mut b: Bencher) raises:
+fn bench_group_match[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
     """Benchmark group patterns with quantifiers."""
     var test_text = make_test_string[text_length]("abcabcabc")
 
@@ -196,15 +206,21 @@ def main():
     m.bench_function[bench_range_match[1000, "[a-z]+"]](
         BenchId(String("range_lowercase"))
     )
-    m.bench_function[bench_range_match[1000, "[0-9]+"]](BenchId(String("range_digits")))
+    m.bench_function[bench_range_match[1000, "[0-9]+"]](
+        BenchId(String("range_digits"))
+    )
     m.bench_function[bench_range_match[1000, "[a-zA-Z0-9]+"]](
         BenchId(String("range_alphanumeric"))
     )
 
     # Anchors
     print("=== Anchor Benchmarks ===")
-    m.bench_function[bench_anchor_match[1000, "^abc"]](BenchId(String("anchor_start")))
-    m.bench_function[bench_anchor_match[1000, "xyz$"]](BenchId(String("anchor_end")))
+    m.bench_function[bench_anchor_match[1000, "^abc"]](
+        BenchId(String("anchor_start"))
+    )
+    m.bench_function[bench_anchor_match[1000, "xyz$"]](
+        BenchId(String("anchor_end"))
+    )
 
     # Alternation
     print("=== Alternation Benchmarks ===")
