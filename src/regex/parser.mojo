@@ -84,7 +84,8 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             var positive_logic = True
 
             if i < len(tokens) and (
-                tokens[i].type == Token.NOTTOKEN or tokens[i].type == Token.CIRCUMFLEX
+                tokens[i].type == Token.NOTTOKEN
+                or tokens[i].type == Token.CIRCUMFLEX
             ):
                 positive_logic = False
                 i += 1
@@ -198,7 +199,9 @@ fn parse(regex: String) raises -> ASTNode:
                     if i < len(tokens) and tokens[i].type == Token.COMMA:
                         i += 1  # Skip comma
                         # Parse max value
-                        while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        while (
+                            i < len(tokens) and tokens[i].type == Token.ELEMENT
+                        ):
                             max_val += tokens[i].char
                             i += 1
                         elem.max = atol(max_val) if max_val != "" else -1
@@ -207,7 +210,10 @@ fn parse(regex: String) raises -> ASTNode:
                         elem.max = elem.min
 
                     # Skip closing brace
-                    if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
+                    if (
+                        i < len(tokens)
+                        and tokens[i].type == Token.RIGHTCURLYBRACE
+                    ):
                         i += 1
                     # Don't increment i again - continue processing next token
                     i -= 1  # Compensate for the i += 1 at the end of the loop
@@ -255,7 +261,8 @@ fn parse(regex: String) raises -> ASTNode:
             var positive_logic = True
 
             if i < len(tokens) and (
-                tokens[i].type == Token.NOTTOKEN or tokens[i].type == Token.CIRCUMFLEX
+                tokens[i].type == Token.NOTTOKEN
+                or tokens[i].type == Token.CIRCUMFLEX
             ):
                 positive_logic = False
                 i += 1
@@ -314,7 +321,9 @@ fn parse(regex: String) raises -> ASTNode:
                     if i < len(tokens) and tokens[i].type == Token.COMMA:
                         i += 1  # Skip comma
                         # Parse max value
-                        while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        while (
+                            i < len(tokens) and tokens[i].type == Token.ELEMENT
+                        ):
                             max_val += tokens[i].char
                             i += 1
                         range_elem.max = atol(max_val) if max_val != "" else -1
@@ -323,7 +332,10 @@ fn parse(regex: String) raises -> ASTNode:
                         range_elem.max = range_elem.min
 
                     # Skip closing brace
-                    if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
+                    if (
+                        i < len(tokens)
+                        and tokens[i].type == Token.RIGHTCURLYBRACE
+                    ):
                         i += 1
                     # Don't increment i again - continue processing next token
                     i -= 1  # Compensate for the i += 1 at the end of the loop

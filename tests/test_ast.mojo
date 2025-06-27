@@ -134,7 +134,9 @@ fn test_GroupNode() raises:
     children.append(elem1)
     children.append(elem2)
 
-    var group = GroupNode(children, capturing=True, group_name="test_group", group_id=1)
+    var group = GroupNode(
+        children, capturing=True, group_name="test_group", group_id=1
+    )
     assert_true(Bool(group))
     assert_equal(group.type, GROUP)
     assert_true(group.is_capturing())

@@ -14,7 +14,12 @@ alias GROUP = 9
 
 
 struct ASTNode(
-    Copyable, EqualityComparable, ImplicitlyBoolable, Movable, Stringable, Writable
+    Copyable,
+    EqualityComparable,
+    ImplicitlyBoolable,
+    Movable,
+    Stringable,
+    Writable,
 ):
     """Struct for all the Regex AST nodes."""
 
@@ -98,7 +103,8 @@ struct ASTNode(
         )
 
     fn __str__(self) -> String:
-        """Returns a user-friendly string representation of the PhoneNumberDesc."""
+        """Returns a user-friendly string representation of the PhoneNumberDesc.
+        """
         return String.write(self)
 
     @no_inline
@@ -129,12 +135,20 @@ struct ASTNode(
         elif self.type == SPACE:
             if len(value) == 1:
                 var ch = value
-                return ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f"
+                return (
+                    ch == " "
+                    or ch == "\t"
+                    or ch == "\n"
+                    or ch == "\r"
+                    or ch == "\f"
+                )
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = self.value.find(value) != -1
-            return not (ch_found ^ (self.min == 1))  # min=1 means positive logic
+            return not (
+                ch_found ^ (self.min == 1)
+            )  # min=1 means positive logic
         elif self.type == START:
             return str_i == 0
         elif self.type == END:
@@ -208,8 +222,8 @@ fn GroupNode(
     group_id: Int = -1,
 ) -> ASTNode:
     """Create a GroupNode with children."""
-    var final_group_name = group_name if group_name != "" else "Group " + String(
-        group_id
+    var final_group_name = (
+        group_name if group_name != "" else "Group " + String(group_id)
     )
     return ASTNode(
         type=GROUP,
