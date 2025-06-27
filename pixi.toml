@@ -12,7 +12,4 @@ max = ">=25.4.0.dev2025053005"
 [tasks]
 test = "mojo test -I ./src tests/"
 format = "mojo format"
-template = "python tools/mojopkg.py generate-recipe"
-build = { cmd = "python tools/mojopkg.py build-conda-package" }
-publish = { cmd = "python tools/mojopkg.py publish", env = { PREFIX_API_KEY = "$PREFIX_API_KEY" } }
-build-and-publish = { cmd = "python tools/mojopkg.py build-and-publish" }
+recipe = "python tools/mojopkg.py generate-recipe"

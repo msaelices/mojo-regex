@@ -2,8 +2,6 @@
 
 import tomllib
 import os
-import subprocess
-import glob
 from typing import Any
 from pathlib import Path
 
@@ -90,41 +88,6 @@ def generate_recipe() -> None:
     # Write the final recipe.
     with Path("recipe.yaml").open("w+") as f:
         yaml.dump(recipe, f)
-
-
-@app.command()
-def publish(channel: str) -> None:
-    """Publishes the conda packages to the specified conda channel."""
-    print(f"Publishing packages to: {channel}, from {CONDA_BUILD_PATH}.")
-    for file in glob.glob(f"{CONDA_BUILD_PATH}/*.conda"):
-        print(f"Uploading {file} to {channel}...")
-        subprocess.run(
-            ["pixi", "upload", f"https://prefix.dev/api/v1/upload/{channel}", file],
-            check=True,
-        )
-
-        os.remove(file)
-
-
-@app.command()
-def build_conda_package() -> None:
-    """Builds the conda package for the project."""
-    # Generate the recipe if it does not exist already.
-    if not RECIPE_PATH.exists():
-        generate_recipe()
-
-    subprocess.run(
-        ["pixi", "build", "-o", CONDA_BUILD_PATH],
-        check=True,
-    )
-    os.remove("recipe.yaml")
-
-
-@app.command()
-def build_and_publish() -> None:
-    """Builds the conda package and publishes it to the specified channel."""
-    build_conda_package()
-    publish("mojo-community")
 
 
 if __name__ == "__main__":
