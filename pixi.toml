@@ -1,6 +1,6 @@
 [workspace]
 authors = ["Manuel Saelices <msaelices@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 description = "Library for dealing with regular expressions in Mojo"
 homepage = "https://github.com/msaelices/mojo-regex"
 repository = "https://github.com/msaelices/mojo-regex"
@@ -19,7 +19,7 @@ version = "0.1.0"
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-max = ">=25.4.0.dev2025053005"
+max = ">=25.4.0"
 
 [tasks]
 test = "mojo test -I ./src tests/"
