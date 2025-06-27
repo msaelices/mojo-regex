@@ -6,10 +6,7 @@ from typing import Any
 from pathlib import Path
 
 import yaml
-import typer
 
-
-app = typer.Typer()
 
 TEMP_DIR = Path(os.path.expandvars("$HOME/tmp"))
 PIXI_TOML_PATH = Path("pixi.toml")
@@ -42,7 +39,6 @@ def format_dependency(name: str, version: str) -> str:
     return f"{name} {operator} {version[start:]}"
 
 
-@app.command()
 def generate_recipe() -> None:
     """Generates a recipe for the project based on the project configuration in the pixi.toml."""
     # Replace the placeholders in the recipe with the project configuration.
@@ -60,7 +56,7 @@ def generate_recipe() -> None:
     }
 
     # Populate package information
-    package_name = "zlib"
+    package_name = "mojo-regex"
     recipe["package"]["name"] = PROJECT_CONFIG["package"]["name"]
     recipe["package"]["version"] = PROJECT_CONFIG["package"]["version"]
 
@@ -91,4 +87,4 @@ def generate_recipe() -> None:
 
 
 if __name__ == "__main__":
-    app()
+    generate_recipe()
