@@ -7,7 +7,7 @@ from regex.parser import parse
 def test_dfa_literal_pattern():
     """Test DFA compilation and execution for literal patterns."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("hello", False, False)
+    dfa.compile_pattern("hello", False, False)
 
     # Test successful match
     var result1 = dfa.match_dfa("hello world", 0)
@@ -32,7 +32,7 @@ def test_dfa_literal_pattern():
 def test_dfa_empty_pattern():
     """Test DFA with empty pattern."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("", False, False)
+    dfa.compile_pattern("", False, False)
 
     # Empty pattern should match at any position
     var result1 = dfa.match_dfa("hello", 0)
@@ -67,7 +67,7 @@ def test_dfa_character_class():
 def test_dfa_match_all():
     """Test DFA match_all functionality."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("a", False, False)
+    dfa.compile_pattern("a", False, False)
 
     var matches = dfa.match_all_dfa("banana")
     assert_equal(len(matches), 3)
@@ -122,7 +122,7 @@ def test_compile_simple_pattern():
 def test_dfa_single_character():
     """Test DFA with single character patterns."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("a", False, False)
+    dfa.compile_pattern("a", False, False)
 
     # Should match single character
     var result1 = dfa.match_dfa("a", 0)
@@ -138,7 +138,7 @@ def test_dfa_single_character():
 def test_dfa_case_sensitive():
     """Test that DFA matching is case sensitive."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("Hello", False, False)
+    dfa.compile_pattern("Hello", False, False)
 
     # Should match exact case
     var result1 = dfa.match_dfa("Hello World", 0)
@@ -171,7 +171,7 @@ def test_boyer_moore_edge_cases():
 def test_dfa_state_transitions():
     """Test DFA state transitions work correctly."""
     var dfa = DFAEngine()
-    dfa.compile_literal_pattern("abc", False, False)
+    dfa.compile_pattern("abc", False, False)
 
     # Should match complete pattern
     var result1 = dfa.match_dfa("abc", 0)

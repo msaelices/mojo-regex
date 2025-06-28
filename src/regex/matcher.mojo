@@ -8,8 +8,8 @@ on pattern complexity.
 
 from collections import List
 from regex.ast import ASTNode
-from regex.engine import Match
-from regex.engine import RegexEngine
+from regex.matching import Match
+from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_simple_pattern
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
@@ -45,7 +45,7 @@ trait RegexMatcher:
 struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var dfa: DFAEngine
+    var engine: DFAEngine
     var pattern_string: String
 
     fn __init__(out self, ast: ASTNode, pattern: String) raises:
@@ -56,31 +56,31 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
             pattern: Original pattern string
         """
         self.pattern_string = pattern
-        self.dfa = compile_simple_pattern(ast)
+        self.engine = compile_simple_pattern(ast)
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.dfa = other.dfa
+        self.engine = other.engine
         self.pattern_string = other.pattern_string
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
-        self.dfa = other.dfa^
+        self.engine = other.engine^
         self.pattern_string = other.pattern_string^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.dfa.match_dfa(text, start)
+        return self.engine.match_first(text, start)
 
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches using DFA execution."""
-        return self.dfa.match_all_dfa(text)
+        return self.engine.match_all(text)
 
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """NFA-based matcher using the existing regex engine."""
 
-    var engine: RegexEngine
+    var engine: NFAEngine
     var ast: ASTNode
     var pattern_string: String
 
@@ -91,32 +91,29 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             ast: AST representing the regex pattern
             pattern: Original pattern string
         """
-        self.engine = RegexEngine()
+        self.engine = NFAEngine(pattern)
         self.ast = ast
         self.pattern_string = pattern
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.engine = RegexEngine()  # Create new engine
+        self.engine = other.engine
         self.ast = other.ast
         self.pattern_string = other.pattern_string
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
-        self.engine = RegexEngine()  # Create new engine
+        self.engine = other.engine^
         self.ast = other.ast^
         self.pattern_string = other.pattern_string^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
-        return self.engine.match_first(self.ast, text, start)
+        return self.engine.match_first(text, start)
 
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches using NFA execution."""
-        var result = self.engine.match_all(
-            self.pattern_string, text, return_matches=True
-        )
-        return result[2]  # Return the matches list
+        return self.engine.match_all(text)
 
 
 struct HybridMatcher(Copyable, Movable, RegexMatcher):

@@ -7,7 +7,8 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 
 from collections import List, Set, Dict
 from regex.ast import ASTNode
-from regex.engine import Match
+from regex.engine import Engine
+from regex.matching import Match
 from regex.optimizer import (
     PatternComplexity,
     is_literal_pattern,
@@ -68,7 +69,7 @@ struct DFAState(Copyable, Movable):
         return -1
 
 
-struct DFAEngine(Copyable, Movable):
+struct DFAEngine(Engine):
     """DFA-based regex engine for O(n) pattern matching."""
 
     var states: List[DFAState]
@@ -93,7 +94,7 @@ struct DFAEngine(Copyable, Movable):
         self.start_state = other.start_state
         self.compiled_pattern = other.compiled_pattern^
 
-    fn compile_literal_pattern(
+    fn compile_pattern(
         mut self, pattern: String, has_start_anchor: Bool, has_end_anchor: Bool
     ) raises:
         """Compile a literal string pattern into a DFA.
@@ -177,7 +178,7 @@ struct DFAEngine(Copyable, Movable):
 
         self.start_state = 0
 
-    fn match_dfa(self, text: String, start: Int) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int) -> Optional[Match]:
         """Execute DFA matching against input text.
 
         Args:
@@ -241,7 +242,7 @@ struct DFAEngine(Copyable, Movable):
 
         return None
 
-    fn match_all_dfa(self, text: String) -> List[Match]:
+    fn match_all(self, text: String) -> List[Match]:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -254,7 +255,7 @@ struct DFAEngine(Copyable, Movable):
         var pos = 0
 
         while pos <= len(text):
-            var match_result = self.match_dfa(text, pos)
+            var match_result = self.match_first(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)
@@ -369,7 +370,7 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
         # Handle literal string patterns
         var literal_str = get_literal_string(ast)
         var has_start, has_end = pattern_has_anchors(ast)
-        dfa.compile_literal_pattern(literal_str, has_start, has_end)
+        dfa.compile_pattern(literal_str, has_start, has_end)
     else:
         # For now, only support literal patterns
         # TODO: Add support for character classes, simple quantifiers

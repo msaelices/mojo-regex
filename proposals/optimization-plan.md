@@ -153,7 +153,7 @@ struct DFAMatcher(RegexMatcher):
         return self.dfa.match_dfa(text, start)
 
 struct NFAMatcher(RegexMatcher):
-    var engine: RegexEngine  # Current implementation
+    var engine: NFAEngine  # Current implementation
 
     fn match_first(self, text: String, start: Int) -> Optional[Match]:
         return self.engine.match_first(...)
@@ -278,14 +278,14 @@ struct MatchPool:
 
 ```mojo
 @parameter
-fn compile_literal_pattern[pattern: StaticString]() -> DFAMatcher:
+fn compile_pattern[pattern: StaticString]() -> DFAMatcher:
     """Compile-time pattern compilation for string literals."""
     # Generate optimized DFA at compile time
     # Use constexpr evaluation for maximum performance
     pass
 
 # Usage:
-alias email_matcher = compile_literal_pattern["user@example.com"]()
+alias email_matcher = compile_pattern["user@example.com"]()
 ```
 
 ### 3.2 Aho-Corasick Multi-Pattern Matching
