@@ -178,18 +178,18 @@ struct ASTNode(
 
 @always_inline
 fn RENode(
-    child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
+    owned child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
 ) -> ASTNode:
     """Create a RE node with a child."""
     return ASTNode(
-        type=RE, children=[child], capturing=capturing, group_name=group_name
+        type=RE, children=[child^], capturing=capturing, group_name=group_name
     )
 
 
 @always_inline
-fn Element(value: String) -> ASTNode:
+fn Element(owned value: String) -> ASTNode:
     """Create an Element node with a value string."""
-    return ASTNode(type=ELEMENT, value=value, min=1, max=1)
+    return ASTNode(type=ELEMENT, value=value^, min=1, max=1)
 
 
 @always_inline
@@ -211,11 +211,11 @@ fn DigitElement() -> ASTNode:
 
 
 @always_inline
-fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:
+fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
     """Create a RangeElement node."""
     return ASTNode(
         type=RANGE,
-        value=value,
+        value=value^,
         min=1 if is_positive_logic else 0,  # Use min to store logic type
         max=1,
     )
@@ -234,13 +234,13 @@ fn EndElement() -> ASTNode:
 
 
 @always_inline
-fn OrNode(left: ASTNode, right: ASTNode) -> ASTNode:
+fn OrNode(owned left: ASTNode, owned right: ASTNode) -> ASTNode:
     """Create an OrNode with left and right children."""
     return ASTNode(type=OR, children=[left, right], min=1, max=1)
 
 
 @always_inline
-fn NotNode(child: ASTNode) -> ASTNode:
+fn NotNode(owned child: ASTNode) -> ASTNode:
     """Create a NotNode with a child."""
     return ASTNode(type=NOT, children=[child])
 
