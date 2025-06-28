@@ -1,6 +1,11 @@
 from testing import assert_equal, assert_true, assert_false
 
-from regex.dfa import DFAEngine, BoyerMoore, compile_simple_pattern
+from regex.dfa import (
+    DFAEngine,
+    BoyerMoore,
+    compile_simple_pattern,
+    compile_ast_pattern,
+)
 from regex.parser import parse
 
 
@@ -333,3 +338,14 @@ def test_dfa_anchors_with_high_level_api():
     var result3 = dfa3.match_first("hello", 0)
     assert_true(result3.__bool__())
     assert_equal(result3.value().match_text, "hello")
+
+
+def test_phone_numbers():
+    """Test phone number pattern matching using DFA."""
+    # Test simple digit pattern that should work with DFA
+    var ast = parse("\\d{8}")
+    var dfa = compile_ast_pattern(ast)
+
+    var result = dfa.match_first("12345678", 0)
+    assert_true(result.__bool__())
+    assert_equal(result.value().match_text, "12345678")

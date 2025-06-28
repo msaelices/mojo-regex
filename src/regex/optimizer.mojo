@@ -225,11 +225,19 @@ struct PatternAnalyzer:
             and quantifier_complexity.value == PatternComplexity.SIMPLE
         ):
             # For literal groups (like "hello" parsed as group of chars), be more generous
-            # Check if all children are literal elements
+            # Check if all children are literal elements or anchors
             var all_literal = True
             for i in range(len(ast.children)):
                 var child = ast.children[i]
-                if child.type != ELEMENT or child.min != 1 or child.max != 1:
+                if not (
+                    (
+                        child.type == ELEMENT
+                        and child.min == 1
+                        and child.max == 1
+                    )
+                    or child.type == START
+                    or child.type == END
+                ):
                     all_literal = False
                     break
 
@@ -279,7 +287,11 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         # Anchors are fine in literal patterns
         return True
     elif ast.type == GROUP:
-        # Group must contain only literal elements
+        # Only non-capturing groups (implicit sequence groups) can be literal
+        # Explicit capturing groups are not considered literal patterns
+        if ast.capturing:
+            return False
+        # Non-capturing group must contain only literal elements
         for i in range(len(ast.children)):
             if not _is_literal_sequence(ast.children[i]):
                 return False

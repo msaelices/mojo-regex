@@ -400,11 +400,11 @@ struct BoyerMoore:
         return positions
 
 
-fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
-    """Compile a simple pattern AST into a DFA engine.
+fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
+    """Compile an AST pattern into a DFA engine.
 
     Args:
-        ast: AST representing a simple pattern.
+        ast: AST representing a pattern that may include character classes.
 
     Returns:
         Compiled DFA engine ready for matching.
@@ -419,17 +419,110 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
         var literal_str = get_literal_string(ast)
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.compile_pattern(literal_str, has_start, has_end)
+    elif _is_pure_anchor_pattern(ast):
+        # Handle pure anchor patterns (just ^ or $ or ^$)
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.compile_pattern("", has_start, has_end)
+    elif _is_simple_character_class_pattern(ast):
+        # Handle simple character class patterns like \d, \d+, \d{3}
+        var char_class, min_matches, max_matches, has_start, has_end = (
+            _extract_character_class_info(ast)
+        )
+        dfa.compile_character_class(char_class, min_matches, max_matches)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
     else:
-        # Check if it's a pure anchor pattern (just ^ or $ or ^$)
-        if _is_pure_anchor_pattern(ast):
-            var has_start, has_end = pattern_has_anchors(ast)
-            dfa.compile_pattern("", has_start, has_end)
-        else:
-            # For now, only support literal and pure anchor patterns
-            # TODO: Add support for character classes, simple quantifiers
-            raise Error("Pattern too complex for current DFA implementation")
+        # Pattern too complex for current DFA implementation
+        raise Error("Pattern too complex for current DFA implementation")
 
     return dfa
+
+
+fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
+    """Compile a simple pattern AST into a DFA engine.
+
+    Args:
+        ast: AST representing a simple pattern.
+
+    Returns:
+        Compiled DFA engine ready for matching.
+
+    Raises:
+        Error if pattern is too complex for DFA compilation.
+    """
+    # Use the enhanced compilation function
+    return compile_ast_pattern(ast)
+
+
+fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
+    """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, etc.).
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a simple character class pattern.
+    """
+    from regex.ast import RE, DIGIT, GROUP
+
+    if ast.type == RE and len(ast.children) == 1:
+        var child = ast.children[0]
+        if child.type == DIGIT:
+            return True
+        elif child.type == GROUP and len(child.children) == 1:
+            # Check if group contains single digit element
+            return child.children[0].type == DIGIT
+    elif ast.type == DIGIT:
+        return True
+
+    return False
+
+
+fn _extract_character_class_info(
+    ast: ASTNode,
+) -> Tuple[String, Int, Int, Bool, Bool]:
+    """Extract character class information from AST.
+
+    Args:
+        ast: AST node representing a character class pattern.
+
+    Returns:
+        Tuple of (char_class_string, min_matches, max_matches, has_start_anchor, has_end_anchor).
+    """
+    from regex.ast import RE, DIGIT, GROUP
+
+    var char_class = String("")
+    var min_matches = 1
+    var max_matches = 1
+    var has_start = False
+    var has_end = False
+
+    # Find the DIGIT node
+    var digit_node: ASTNode
+    if ast.type == DIGIT:
+        digit_node = ast
+    elif ast.type == RE and len(ast.children) == 1:
+        if ast.children[0].type == DIGIT:
+            digit_node = ast.children[0]
+        elif (
+            ast.children[0].type == GROUP and len(ast.children[0].children) == 1
+        ):
+            digit_node = ast.children[0].children[0]
+        else:
+            digit_node = ast.children[0]  # fallback
+        # Check for anchors at root level
+        has_start, has_end = pattern_has_anchors(ast)
+    else:
+        digit_node = ast  # fallback
+
+    # Extract quantifier information
+    if digit_node.type == DIGIT:
+        min_matches = digit_node.min
+        max_matches = digit_node.max
+        # Generate digit character class string "0123456789"
+        char_class = "0123456789"
+
+    return (char_class, min_matches, max_matches, has_start, has_end)
 
 
 fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
