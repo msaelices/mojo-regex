@@ -127,23 +127,30 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 
 ### Pattern Performance Characteristics
 
-| Pattern Type | Engine Used | Time Complexity | Example |
-|--------------|-------------|-----------------|---------|
-| **Literal strings** | DFA | O(n) | `"hello"`, `"example.com"` |
-| **Character classes** | DFA + SIMD | O(n) | `"[a-z]+"`, `"[0-9]+"` |
-| **Simple quantifiers** | DFA | O(n) | `"a*"`, `"b+"`, `"c?"` |
-| **Anchors** | DFA | O(n) | `"^start"`, `"end$"` |
-| **Basic groups** | DFA/NFA | O(n) to O(nm) | `"(abc)+"` |
-| **Alternation** | DFA/NFA | O(n) to O(nm) | `"cat\|dog"` |
-| **Complex patterns** | NFA | O(nm) to O(2^n) | Backreferences, lookahead |
+| Pattern Type | Engine Used | Time Complexity | SIMD Optimization | Example |
+|--------------|-------------|-----------------|-------------------|---------|
+| **Literal strings** | DFA + SIMD | O(n/w) | String search vectorization | `"hello"`, `"example.com"` |
+| **Character classes** | DFA + SIMD | O(n/w) | Lookup table vectorization | `"[a-z]+"`, `"[0-9]+"` |
+| **Built-in classes** | DFA/NFA + SIMD | O(n/w) | Pre-built SIMD matchers | `"\d+"`, `"\s+"` |
+| **Simple quantifiers** | DFA + SIMD | O(n/w) | Vectorized counting | `"a*"`, `"[0-9]{3}"` |
+| **Anchors** | DFA | O(1) | Position validation | `"^start"`, `"end$"` |
+| **Basic groups** | DFA/NFA + SIMD | O(n) to O(nm) | Partial vectorization | `"(abc)+"`, `"([a-z]+)"` |
+| **Alternation** | DFA/NFA | O(n) to O(nm) | Engine-dependent | `"cat\|dog"` |
+| **Complex patterns** | NFA + SIMD | O(nm) to O(2^n) | Character-level SIMD | Backreferences, lookahead |
+
+*Where w = SIMD width (typically 16-32 characters processed per instruction)*
 
 ### Optimization Features
 
 - **Automatic Engine Selection**: Patterns are analyzed and routed to the optimal engine
-- **SIMD Acceleration**: Character class matching uses vectorized operations
-- **Boyer-Moore Search**: Literal string patterns use optimized string search
+- **SIMD Acceleration**: Vectorized operations for character class matching and literal string search
+  - **Character Classes**: `[a-z]+`, `[0-9]+`, `\d`, `\s` use SIMD lookup tables
+  - **Literal Strings**: `"hello"`, `"example.com"` use SIMD string search
+  - **Quantifiers**: SIMD-accelerated counting for `+`, `*`, `{n,m}` on character classes
+- **Boyer-Moore Search**: Literal string patterns use optimized string search algorithms
 - **Pattern Caching**: Compiled patterns are cached for reuse
 - **Memory Efficiency**: Zero-copy string operations where possible
+- **Intelligent Routing**: SIMD capability detection ensures optimal engine selection
 
 ## Building and Testing
 
@@ -157,8 +164,11 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 # Or run specific test
 mojo test -I src/ tests/test_matcher.mojo
 
-# Run benchmarks to see performance
+# Run benchmarks to see performance including SIMD optimizations
 mojo benchmarks/bench_engine.mojo
+
+# Run SIMD-specific tests
+mojo test -I src/ tests/test_simd_integration.mojo
 ```
 
 ## TO-DO: Missing Features
@@ -168,6 +178,9 @@ mojo benchmarks/bench_engine.mojo
 - [x] Hybrid DFA/NFA engine architecture
 - [x] Pattern complexity analysis and optimization
 - [x] SIMD-accelerated character class matching
+- [x] SIMD-accelerated literal string search
+- [x] SIMD capability detection and automatic routing
+- [x] Vectorized quantifier processing for character classes
 - [ ] Non-capturing groups (`(?:...)`)
 - [ ] Named groups (`(?<name>...)` or `(?P<name>...)`)
 - [ ] Predefined character classes (`\d`, `\w`, `\S`, `\D`, `\W`)
@@ -199,8 +212,10 @@ mojo benchmarks/bench_engine.mojo
 ### Engine Improvements
 - [x] Hybrid DFA/NFA architecture with automatic engine selection
 - [x] O(n) DFA engine for simple patterns
-- [x] SIMD optimization for character class matching
+- [x] SIMD optimization for character class matching and literal string search
 - [x] Pattern complexity analysis for optimal routing
+- [x] SIMD capability detection for intelligent engine selection
+- [x] Vectorized operations for quantifiers and repetition counting
 - [ ] Additional DFA pattern support (more complex quantifiers and groups)
 - [ ] Compile-time pattern specialization for string literals
 - [ ] Aho-Corasick multi-pattern matching for alternations
