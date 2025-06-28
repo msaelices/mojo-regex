@@ -305,9 +305,7 @@ struct CompiledRegex(Copyable, Movable):
 
 
 # Global pattern cache for improved performance
-# TODO: Implement LRU cache when Dict supports it properly
-var __pattern_cache = List[CompiledRegex]()
-var __cache_patterns = List[String]()
+var __cache_patterns = Dict[String, CompiledRegex]()
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
@@ -319,18 +317,15 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    # Simple linear search in cache (TODO: use proper hash map)
-    for i in range(len(__cache_patterns)):
-        if __cache_patterns[i] == pattern:
-            return __pattern_cache[i]
+    if pattern in __cache_patterns:
+        # Return cached compiled regex if available
+        return __cache_patterns[pattern]
 
     # Not in cache, compile new regex
     var compiled = CompiledRegex(pattern)
 
     # Add to cache (TODO: implement LRU eviction)
-    if len(__cache_patterns) < 100:  # Simple cache size limit
-        __cache_patterns.append(pattern)
-        __pattern_cache.append(compiled)
+    __cache_patterns[pattern] = compiled
 
     return compiled
 
@@ -338,7 +333,6 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
 fn clear_regex_cache():
     """Clear the compiled regex cache."""
     __cache_patterns.clear()
-    __pattern_cache.clear()
 
 
 # High-level convenience functions that match Python's re module interface
