@@ -176,6 +176,7 @@ struct ASTNode(
         return self.capturing
 
 
+@always_inline
 fn RENode(
     child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
 ) -> ASTNode:
@@ -185,26 +186,31 @@ fn RENode(
     )
 
 
+@always_inline
 fn Element(value: String) -> ASTNode:
     """Create an Element node with a value string."""
     return ASTNode(type=ELEMENT, value=value, min=1, max=1)
 
 
+@always_inline
 fn WildcardElement() -> ASTNode:
     """Create a WildcardElement node."""
     return ASTNode(type=WILDCARD, value="anything", min=1, max=1)
 
 
+@always_inline
 fn SpaceElement() -> ASTNode:
     """Create a SpaceElement node."""
     return ASTNode(type=SPACE, value="", min=1, max=1)
 
 
+@always_inline
 fn DigitElement() -> ASTNode:
     """Create a DigitElement node."""
     return ASTNode(type=DIGIT, value="", min=1, max=1)
 
 
+@always_inline
 fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:
     """Create a RangeElement node."""
     return ASTNode(
@@ -215,21 +221,25 @@ fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:
     )
 
 
+@always_inline
 fn StartElement() -> ASTNode:
     """Create a StartElement node."""
     return ASTNode(type=START, value="", min=1, max=1)
 
 
+@always_inline
 fn EndElement() -> ASTNode:
     """Create an EndElement node."""
     return ASTNode(type=END, value="", min=1, max=1)
 
 
+@always_inline
 fn OrNode(left: ASTNode, right: ASTNode) -> ASTNode:
     """Create an OrNode with left and right children."""
     return ASTNode(type=OR, children=[left, right], min=1, max=1)
 
 
+@always_inline
 fn NotNode(child: ASTNode) -> ASTNode:
     """Create a NotNode with a child."""
     return ASTNode(type=NOT, children=[child])
