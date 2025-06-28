@@ -121,6 +121,7 @@ struct NFAEngine(Engine):
 
         return None
 
+    @always_inline
     fn _match_node(
         self,
         ast: ASTNode,
@@ -175,6 +176,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_element(
         self, ast: ASTNode, string: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -188,6 +190,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_wildcard(
         self, ast: ASTNode, string: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -201,6 +204,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_space(
         self, ast: ASTNode, string: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -214,6 +218,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_digit(
         self, ast: ASTNode, string: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -238,6 +243,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_range(
         self, ast: ASTNode, string: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -399,10 +405,12 @@ struct NFAEngine(Engine):
                 remaining_children, string, result[1], matches
             )
 
+    @always_inline
     fn _has_quantifier(self, ast: ASTNode) capturing -> Bool:
         """Check if node has quantifier (min != 1 or max != 1)."""
         return ast.min != 1 or ast.max != 1
 
+    @always_inline
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
@@ -437,6 +445,7 @@ struct NFAEngine(Engine):
 
         return (False, str_i)
 
+    @always_inline
     fn _try_match_count(
         self, ast: ASTNode, string: String, str_i: Int, count: Int
     ) capturing -> Int:
