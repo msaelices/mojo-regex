@@ -5,12 +5,13 @@ alias RE = 0
 alias ELEMENT = 1
 alias WILDCARD = 2
 alias SPACE = 3
-alias RANGE = 4
-alias START = 5
-alias END = 6
-alias OR = 7
-alias NOT = 8
-alias GROUP = 9
+alias DIGIT = 4
+alias RANGE = 5
+alias START = 6
+alias END = 7
+alias OR = 8
+alias NOT = 9
+alias GROUP = 10
 
 
 struct ASTNode(
@@ -121,7 +122,7 @@ struct ASTNode(
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, WILDCARD, SPACE, RANGE, START, END]:
+        if self.type in [ELEMENT, WILDCARD, SPACE, DIGIT, RANGE, START, END]:
             return True
         else:
             return False
@@ -141,6 +142,22 @@ struct ASTNode(
                     or ch == "\n"
                     or ch == "\r"
                     or ch == "\f"
+                )
+            return False
+        elif self.type == DIGIT:
+            if len(value) == 1:
+                var ch = value
+                return (
+                    ch == "0"
+                    or ch == "1"
+                    or ch == "2"
+                    or ch == "3"
+                    or ch == "4"
+                    or ch == "5"
+                    or ch == "6"
+                    or ch == "7"
+                    or ch == "8"
+                    or ch == "9"
                 )
             return False
         elif self.type == RANGE:
@@ -183,6 +200,11 @@ fn WildcardElement() -> ASTNode:
 fn SpaceElement() -> ASTNode:
     """Create a SpaceElement node."""
     return ASTNode(type=SPACE, value="", min=1, max=1)
+
+
+fn DigitElement() -> ASTNode:
+    """Create a DigitElement node."""
+    return ASTNode(type=DIGIT, value="", min=1, max=1)
 
 
 fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:

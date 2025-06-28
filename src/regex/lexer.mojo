@@ -22,6 +22,7 @@ from regex.tokens import (
     VerticalBar,
     ElementToken,
     SpaceToken,
+    DigitToken,
 )
 
 alias DIGITS: String = "0123456789"
@@ -53,6 +54,8 @@ fn scan(regex: String) raises -> List[Token]:
                 tokens.append(ElementToken(char="\t"))
             elif ch == "s":
                 tokens.append(SpaceToken(char=ch))
+            elif ch == "d":
+                tokens.append(DigitToken(char=ch))
             else:
                 tokens.append(ElementToken(char=ch))
         elif ch == "\\":

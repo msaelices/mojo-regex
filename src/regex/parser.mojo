@@ -26,6 +26,7 @@ from regex.ast import (
     Element,
     WildcardElement,
     SpaceElement,
+    DigitElement,
     RangeElement,
     StartElement,
     EndElement,
@@ -35,6 +36,7 @@ from regex.ast import (
     ELEMENT,
     WILDCARD,
     SPACE,
+    DIGIT,
     RANGE,
     START,
     END,
@@ -73,6 +75,8 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             elements.append(WildcardElement())
         elif token.type == Token.SPACE:
             elements.append(SpaceElement())
+        elif token.type == Token.DIGIT:
+            elements.append(DigitElement())
         elif token.type == Token.START:
             elements.append(StartElement())
         elif token.type == Token.END:
@@ -255,6 +259,59 @@ fn parse(regex: String) raises -> ASTNode:
                     elem.max = 1
                     i += 1  # Skip quantifier
             elements.append(elem)
+        elif token.type == Token.DIGIT:
+            var elem = DigitElement()
+            # Check for quantifiers
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.LEFTCURLYBRACE:
+                    # Parse curly brace quantifiers
+                    i += 2  # Skip digit and {
+                    var min_val = String("")
+                    var max_val = String("")
+
+                    # Parse min value
+                    while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        min_val += tokens[i].char
+                        i += 1
+
+                    elem.min = atol(min_val) if min_val != "" else 0
+
+                    # Check for comma (range) or closing brace (exact)
+                    if i < len(tokens) and tokens[i].type == Token.COMMA:
+                        i += 1  # Skip comma
+                        # Parse max value
+                        while (
+                            i < len(tokens) and tokens[i].type == Token.ELEMENT
+                        ):
+                            max_val += tokens[i].char
+                            i += 1
+                        elem.max = atol(max_val) if max_val != "" else -1
+                    else:
+                        # Exact quantifier {n}
+                        elem.max = elem.min
+
+                    # Skip closing brace
+                    if (
+                        i < len(tokens)
+                        and tokens[i].type == Token.RIGHTCURLYBRACE
+                    ):
+                        i += 1
+                    # Don't increment i again - continue processing next token
+                    i -= 1  # Compensate for the i += 1 at the end of the loop
+            elements.append(elem)
         elif token.type == Token.LEFTBRACKET:
             # Simple range parsing
             i += 1
@@ -408,6 +465,8 @@ fn parse(regex: String) raises -> ASTNode:
                     right_elements.append(WildcardElement())
                 elif right_token.type == Token.SPACE:
                     right_elements.append(SpaceElement())
+                elif right_token.type == Token.DIGIT:
+                    right_elements.append(DigitElement())
                 # TODO: Add support for other token types like ranges, groups, etc.
                 i += 1
 

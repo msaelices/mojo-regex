@@ -144,6 +144,7 @@ struct NFAEngine(Engine):
             ELEMENT,
             WILDCARD,
             SPACE,
+            DIGIT,
             RANGE,
             START,
             END,
@@ -157,6 +158,8 @@ struct NFAEngine(Engine):
             return self._match_wildcard(ast, string, str_i)
         elif ast.type == SPACE:
             return self._match_space(ast, string, str_i)
+        elif ast.type == DIGIT:
+            return self._match_digit(ast, string, str_i)
         elif ast.type == RANGE:
             return self._match_range(ast, string, str_i)
         elif ast.type == START:
@@ -207,6 +210,30 @@ struct NFAEngine(Engine):
 
         var ch = string[str_i]
         if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
+            return self._apply_quantifier(ast, string, str_i, 1)
+        else:
+            return (False, str_i)
+
+    fn _match_digit(
+        self, ast: ASTNode, string: String, str_i: Int
+    ) capturing -> Tuple[Bool, Int]:
+        """Match digit character (\\d)."""
+        if str_i >= len(string):
+            return (False, str_i)
+
+        var ch = string[str_i]
+        if (
+            ch == "0"
+            or ch == "1"
+            or ch == "2"
+            or ch == "3"
+            or ch == "4"
+            or ch == "5"
+            or ch == "6"
+            or ch == "7"
+            or ch == "8"
+            or ch == "9"
+        ):
             return self._apply_quantifier(ast, string, str_i, 1)
         else:
             return (False, str_i)
