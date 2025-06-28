@@ -14,6 +14,7 @@ from regex.ast import (
     ELEMENT,
     WILDCARD,
     SPACE,
+    DIGIT,
     RANGE,
     START,
     END,
@@ -88,6 +89,10 @@ struct PatternAnalyzer:
 
         elif ast.type == SPACE:
             # Whitespace (\s) - simple with basic quantifiers
+            return self._classify_quantifier(ast)
+
+        elif ast.type == DIGIT:
+            # Digit (\d) - simple with basic quantifiers
             return self._classify_quantifier(ast)
 
         elif ast.type == RANGE:
