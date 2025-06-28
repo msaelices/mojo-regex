@@ -373,7 +373,7 @@ fn findall(pattern: String, text: String) raises -> List[Match]:
     return compiled.match_all(text)
 
 
-fn `match`(pattern: String, text: String) raises -> Optional[Match]:
+fn match_first(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

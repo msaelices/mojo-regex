@@ -6,7 +6,7 @@ from regex.matcher import (
     compile_regex,
     search,
     findall,
-    `match`,
+    match_first,
     clear_regex_cache,
 )
 from regex.optimizer import PatternComplexity
@@ -123,16 +123,16 @@ def test_findall_function():
 def test_match_function():
     """Test high-level match function (anchored at start)."""
     # Should match at start
-    var result1 = `match`("hello", "hello world")
+    var result1 = match_first("hello", "hello world")
     assert_true(result1.__bool__())
     assert_equal(result1.value().start_idx, 0)
 
     # Should not match if not at start
-    var result2 = `match`("world", "hello world")
+    var result2 = match_first("world", "hello world")
     assert_false(result2.__bool__())
 
     # Should match entire string
-    var result3 = `match`("hello", "hello")
+    var result3 = match_first("hello", "hello")
     assert_true(result3.__bool__())
 
 
