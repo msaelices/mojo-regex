@@ -8,7 +8,7 @@ from random import random_si64, seed
 from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex.engine import match_first
+from regex import match_first
 
 
 # ===-----------------------------------------------------------------------===#
