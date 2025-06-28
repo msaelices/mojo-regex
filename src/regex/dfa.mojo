@@ -165,7 +165,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text.
 
         Args:
