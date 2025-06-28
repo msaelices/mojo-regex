@@ -226,18 +226,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        if (
-            ch == "0"
-            or ch == "1"
-            or ch == "2"
-            or ch == "3"
-            or ch == "4"
-            or ch == "5"
-            or ch == "6"
-            or ch == "7"
-            or ch == "8"
-            or ch == "9"
-        ):
+        if ord("0") <= ord(ch) <= ord("9"):
             return self._apply_quantifier(ast, string, str_i, 1)
         else:
             return (False, str_i)
