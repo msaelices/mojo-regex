@@ -10,7 +10,7 @@ def test_dfa_literal_pattern():
     dfa.compile_pattern("hello", False, False)
 
     # Test successful match
-    var result1 = dfa.match_dfa("hello world", 0)
+    var result1 = dfa.match_first("hello world", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -18,14 +18,14 @@ def test_dfa_literal_pattern():
     assert_equal(match1.match_text, "hello")
 
     # Test match in middle of string
-    var result2 = dfa.match_dfa("say hello there", 0)
+    var result2 = dfa.match_first("say hello there", 0)
     assert_true(result2.__bool__())
     var match2 = result2.value()
     assert_equal(match2.start_idx, 4)
     assert_equal(match2.end_idx, 9)
 
     # Test no match
-    var result3 = dfa.match_dfa("goodbye world", 0)
+    var result3 = dfa.match_first("goodbye world", 0)
     assert_false(result3.__bool__())
 
 
@@ -35,14 +35,14 @@ def test_dfa_empty_pattern():
     dfa.compile_pattern("", False, False)
 
     # Empty pattern should match at any position
-    var result1 = dfa.match_dfa("hello", 0)
+    var result1 = dfa.match_first("hello", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
     assert_equal(match1.end_idx, 0)
 
     # Should also match in empty string
-    var result2 = dfa.match_dfa("", 0)
+    var result2 = dfa.match_first("", 0)
     assert_true(result2.__bool__())
 
 
@@ -52,7 +52,7 @@ def test_dfa_character_class():
     dfa.compile_character_class("abcdefghijklmnopqrstuvwxyz", 1, -1)  # [a-z]+
 
     # Test successful match
-    var result1 = dfa.match_dfa("hello123", 0)
+    var result1 = dfa.match_first("hello123", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -60,7 +60,7 @@ def test_dfa_character_class():
     assert_equal(match1.match_text, "hello")
 
     # Test no match (starts with digit)
-    var result2 = dfa.match_dfa("123hello", 0)
+    var result2 = dfa.match_first("123hello", 0)
     assert_false(result2.__bool__())
 
 
@@ -69,7 +69,7 @@ def test_dfa_match_all():
     var dfa = DFAEngine()
     dfa.compile_pattern("a", False, False)
 
-    var matches = dfa.match_all_dfa("banana")
+    var matches = dfa.match_all("banana")
     assert_equal(len(matches), 3)
 
     # Check positions
@@ -114,7 +114,7 @@ def test_compile_simple_pattern():
     var ast1 = parse("hello")
     var dfa1 = compile_simple_pattern(ast1)
 
-    var result1 = dfa1.match_dfa("hello world", 0)
+    var result1 = dfa1.match_first("hello world", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().match_text, "hello")
 
@@ -125,12 +125,12 @@ def test_dfa_single_character():
     dfa.compile_pattern("a", False, False)
 
     # Should match single character
-    var result1 = dfa.match_dfa("a", 0)
+    var result1 = dfa.match_first("a", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().match_text, "a")
 
     # Should match in longer string
-    var result2 = dfa.match_dfa("banana", 0)
+    var result2 = dfa.match_first("banana", 0)
     assert_true(result2.__bool__())
     assert_equal(result2.value().start_idx, 1)  # First 'a' in "banana"
 
@@ -141,14 +141,14 @@ def test_dfa_case_sensitive():
     dfa.compile_pattern("Hello", False, False)
 
     # Should match exact case
-    var result1 = dfa.match_dfa("Hello World", 0)
+    var result1 = dfa.match_first("Hello World", 0)
     assert_true(result1.__bool__())
 
     # Should not match different case
-    var result2 = dfa.match_dfa("hello world", 0)
+    var result2 = dfa.match_first("hello world", 0)
     assert_false(result2.__bool__())
 
-    var result3 = dfa.match_dfa("HELLO WORLD", 0)
+    var result3 = dfa.match_first("HELLO WORLD", 0)
     assert_false(result3.__bool__())
 
 
@@ -174,14 +174,14 @@ def test_dfa_state_transitions():
     dfa.compile_pattern("abc", False, False)
 
     # Should match complete pattern
-    var result1 = dfa.match_dfa("abc", 0)
+    var result1 = dfa.match_first("abc", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().match_text, "abc")
 
     # Should not match partial pattern
-    var result2 = dfa.match_dfa("ab", 0)
+    var result2 = dfa.match_first("ab", 0)
     assert_false(result2.__bool__())
 
     # Should not match with extra characters in between
-    var result3 = dfa.match_dfa("axbc", 0)
+    var result3 = dfa.match_first("axbc", 0)
     assert_false(result3.__bool__())
