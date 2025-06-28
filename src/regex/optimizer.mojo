@@ -95,8 +95,8 @@ struct PatternAnalyzer:
             return self._classify_quantifier(ast)
 
         elif ast.type == START or ast.type == END:
-            # Anchors ^ and $ - force to use NFA for now since DFA doesn't handle them properly
-            return PatternComplexity(PatternComplexity.MEDIUM)
+            # Anchors ^ and $ - supported by DFA
+            return PatternComplexity(PatternComplexity.SIMPLE)
 
         elif ast.type == OR:
             # Alternation (|) - analyze complexity of branches

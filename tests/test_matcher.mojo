@@ -228,7 +228,7 @@ def test_performance_simple_vs_complex():
     assert_true(complex_pattern.test("aaaa"))
 
     # Simple pattern should use DFA
-    var simple_stats = simple_pattern.get_stats()
+    var _ = simple_pattern.get_stats()
     # Could be DFA or NFA depending on implementation details
 
 

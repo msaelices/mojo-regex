@@ -75,24 +75,32 @@ struct DFAEngine(Engine):
     var states: List[DFAState]
     var start_state: Int
     var compiled_pattern: String  # The pattern this DFA was compiled from
+    var has_start_anchor: Bool  # Pattern starts with ^
+    var has_end_anchor: Bool  # Pattern ends with $
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
         self.states = List[DFAState]()
         self.start_state = 0
         self.compiled_pattern = ""
+        self.has_start_anchor = False
+        self.has_end_anchor = False
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.states = other.states
         self.start_state = other.start_state
         self.compiled_pattern = other.compiled_pattern
+        self.has_start_anchor = other.has_start_anchor
+        self.has_end_anchor = other.has_end_anchor
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.states = other.states^
         self.start_state = other.start_state
         self.compiled_pattern = other.compiled_pattern^
+        self.has_start_anchor = other.has_start_anchor
+        self.has_end_anchor = other.has_end_anchor
 
     fn compile_pattern(
         mut self, pattern: String, has_start_anchor: Bool, has_end_anchor: Bool
@@ -108,6 +116,8 @@ struct DFAEngine(Engine):
             has_end_anchor: Whether pattern has $ anchor.
         """
         self.compiled_pattern = pattern
+        self.has_start_anchor = has_start_anchor
+        self.has_end_anchor = has_end_anchor
         self.states = List[DFAState]()
 
         if len(pattern) == 0:
@@ -188,6 +198,13 @@ struct DFAEngine(Engine):
         Returns:
             Optional Match if pattern matches, None otherwise.
         """
+        # Handle start anchor - can only match at beginning of string
+        if self.has_start_anchor:
+            if start == 0:
+                return self._try_match_at_position(text, 0)
+            else:
+                return None
+
         # Try to find a match starting from each position from 'start' onwards
         for try_pos in range(start, len(text) + 1):
             var match_result = self._try_match_at_position(text, try_pos)
@@ -258,6 +275,9 @@ struct DFAEngine(Engine):
 
         # Return longest match found
         if last_accepting_pos != -1:
+            # Check end anchor constraint
+            if self.has_end_anchor and last_accepting_pos != len(text):
+                return None  # End anchor requires match to end at string end
             return Match(0, start_pos, last_accepting_pos, text, "DFA")
 
         return None
@@ -272,8 +292,16 @@ struct DFAEngine(Engine):
             List of all matches found.
         """
         var matches = List[Match]()
-        var pos = 0
 
+        # Special handling for anchored patterns
+        if self.has_start_anchor or self.has_end_anchor:
+            # Anchored patterns can only match once
+            var match_result = self.match_first(text, 0)
+            if match_result:
+                matches.append(match_result.value())
+            return matches
+
+        var pos = 0
         while pos <= len(text):
             var match_result = self.match_first(text, pos)
             if match_result:
@@ -387,13 +415,45 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
     var dfa = DFAEngine()
 
     if is_literal_pattern(ast):
-        # Handle literal string patterns
+        # Handle literal string patterns (possibly with anchors)
         var literal_str = get_literal_string(ast)
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.compile_pattern(literal_str, has_start, has_end)
     else:
-        # For now, only support literal patterns
-        # TODO: Add support for character classes, simple quantifiers
-        raise Error("Pattern too complex for current DFA implementation")
+        # Check if it's a pure anchor pattern (just ^ or $ or ^$)
+        if _is_pure_anchor_pattern(ast):
+            var has_start, has_end = pattern_has_anchors(ast)
+            dfa.compile_pattern("", has_start, has_end)
+        else:
+            # For now, only support literal and pure anchor patterns
+            # TODO: Add support for character classes, simple quantifiers
+            raise Error("Pattern too complex for current DFA implementation")
 
     return dfa
+
+
+fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
+    """Check if pattern is just anchors (^, $, or ^$).
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern contains only anchor nodes.
+    """
+    from regex.ast import RE, START, END, GROUP
+
+    if ast.type == START or ast.type == END:
+        return True
+    elif ast.type == RE:
+        if len(ast.children) == 0:
+            return False
+        return _is_pure_anchor_pattern(ast.children[0])
+    elif ast.type == GROUP:
+        # Check if group contains only anchors
+        for i in range(len(ast.children)):
+            if not _is_pure_anchor_pattern(ast.children[i]):
+                return False
+        return True
+    else:
+        return False
