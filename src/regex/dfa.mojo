@@ -86,14 +86,6 @@ struct DFAEngine(Engine):
         self.has_start_anchor = False
         self.has_end_anchor = False
 
-    fn __copyinit__(out self, other: Self):
-        """Copy constructor."""
-        self.states = other.states
-        self.start_state = other.start_state
-        self.compiled_pattern = other.compiled_pattern
-        self.has_start_anchor = other.has_start_anchor
-        self.has_end_anchor = other.has_end_anchor
-
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.states = other.states^
@@ -435,7 +427,7 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
         # Pattern too complex for current DFA implementation
         raise Error("Pattern too complex for current DFA implementation")
 
-    return dfa
+    return dfa^
 
 
 fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:

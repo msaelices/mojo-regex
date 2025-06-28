@@ -67,7 +67,7 @@ The mojo-regex library follows a traditional regex engine architecture with clea
 
 - **Functional approach**: Most functions are pure with clear inputs/outputs
 - **Error handling**: Uses Mojo's `raises` for parsing errors
-- **Memory management**: Uses Mojo's ownership system and List/Deque collections
+- **Memory management**: Uses Mojo's ownership system and List/List collections
 - **Performance**: Optimized for common patterns while maintaining flexibility
 
 ## Development Setup

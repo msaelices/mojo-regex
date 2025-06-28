@@ -1,4 +1,4 @@
-from collections import Deque
+from collections import List
 from regex.ast import ASTNode, RENode
 from regex.engine import Engine
 from regex.matching import Match
@@ -65,7 +65,7 @@ struct NFAEngine(Engine):
         var current_pos = 0
 
         while current_pos <= len(text):
-            var temp_matches = Deque[Match]()
+            var temp_matches = List[Match]()
             var result = self._match_node(ast, text, current_pos, temp_matches)
             if result[0]:  # Match found
                 var match_start = current_pos
@@ -99,7 +99,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = Deque[Match]()
+        var matches = List[Match]()
         var str_i = start
         var ast: ASTNode
         if self.regex:
@@ -127,7 +127,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Core matching function that processes AST nodes recursively.
 
@@ -135,7 +135,7 @@ struct NFAEngine(Engine):
             ast: The AST node to match
             string: The input string
             str_i: Current position in string
-            matches: Deque to collect matched groups
+            matches: List to collect matched groups
 
         Returns:
             Tuple of (success, final_position)
@@ -283,7 +283,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
         if len(ast.children) < 2:
@@ -307,7 +307,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match GROUP node - process children sequentially with backtracking.
         """
@@ -336,7 +336,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match a group that has a quantifier applied to it."""
         var min_matches = ast.min
@@ -373,10 +373,10 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children: Deque[ASTNode],
+        children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
         if len(children) == 0:
@@ -387,7 +387,7 @@ struct NFAEngine(Engine):
 
         # For multiple children, we need to handle backtracking
         var first_child = children[0]
-        var remaining_children = Deque[ASTNode](capacity=len(children) - 1)
+        var remaining_children = List[ASTNode](capacity=len(children) - 1)
         for i in range(1, len(children)):
             remaining_children.append(children[i])
 
@@ -414,10 +414,10 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        remaining_children: Deque[ASTNode],
+        remaining_children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match a quantified node followed by other nodes, with backtracking.
         """
@@ -471,7 +471,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: Deque[Match],
+        mut matches: List[Match],
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
         if len(ast.children) == 0:

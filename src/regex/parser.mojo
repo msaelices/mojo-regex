@@ -1,3 +1,4 @@
+from collections import List
 from regex.lexer import scan
 from regex.tokens import (
     Token,
@@ -47,12 +48,14 @@ from regex.ast import (
 
 fn get_range_str(start: String, end: String) -> String:
     """Generate a string containing all characters in the range [start, end]."""
-    var result = String("")
-    var i = ord(start)
+    var start_ord = ord(start)
     var end_ord = ord(end)
-    while i <= end_ord:
-        result += chr(i)
-        i += 1
+    var range_size = end_ord - start_ord + 1
+
+    # Pre-allocate result to avoid repeated reallocations
+    var result = String()
+    for i in range(range_size):
+        result += chr(start_ord + i)
     return result
 
 
@@ -119,7 +122,7 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements, True, "", 0)
+            var left_group = GroupNode(elements^, True, "", 0)
             i += 1
 
             # Parse right side recursively
@@ -139,7 +142,7 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
 
         i += 1
 
-    return GroupNode(elements, True, "", 0)
+    return GroupNode(elements^, True, "", 0)
 
 
 fn parse(regex: String) raises -> ASTNode:
@@ -447,7 +450,7 @@ fn parse(regex: String) raises -> ASTNode:
             elements.append(group)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements, True, "", 0)
+            var left_group = GroupNode(elements^, True, "", 0)
             i += 1
 
             # Parse right side
@@ -470,7 +473,7 @@ fn parse(regex: String) raises -> ASTNode:
                 # TODO: Add support for other token types like ranges, groups, etc.
                 i += 1
 
-            var right_group = GroupNode(right_elements, True, "", 0)
+            var right_group = GroupNode(right_elements^, True, "", 0)
             return RENode(OrNode(left_group, right_group))
         else:
             # Check for unescaped special characters
@@ -485,4 +488,4 @@ fn parse(regex: String) raises -> ASTNode:
 
         i += 1
 
-    return RENode(GroupNode(elements))
+    return RENode(GroupNode(elements^))

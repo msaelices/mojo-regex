@@ -1,4 +1,4 @@
-from collections import Deque
+from collections import List
 
 
 alias RE = 0
@@ -26,7 +26,7 @@ struct ASTNode(
 
     var type: Int
     var value: String
-    var children: Deque[ASTNode]
+    var children: List[ASTNode]
     var capturing: Bool
     var group_name: String
     var min: Int
@@ -50,8 +50,8 @@ struct ASTNode(
         self.min = min
         self.max = max
         # TODO: Uncomment when unpacked arguments are supported in Mojo
-        # self.children = Deque[ASTNode[origin]](*children)
-        self.children = Deque[ASTNode](capacity=len(children))
+        # self.children = List[ASTNode[origin]](*children)
+        self.children = List[ASTNode](capacity=len(children))
         for child in children:
             self.children.append(child)
 
@@ -63,7 +63,8 @@ struct ASTNode(
         self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
-        self.children = Deque[ASTNode](capacity=len(other.children))
+        # Deep copy children since List[ASTNode] is not directly copyable
+        self.children = List[ASTNode](capacity=len(other.children))
         for child in other.children:
             self.children.append(child)
 
@@ -238,7 +239,7 @@ fn NotNode(child: ASTNode) -> ASTNode:
 
 
 fn GroupNode(
-    children: List[ASTNode],
+    owned children: List[ASTNode],
     capturing: Bool = False,
     group_name: String = "",
     group_id: Int = -1,
@@ -249,7 +250,7 @@ fn GroupNode(
     )
     return ASTNode(
         type=GROUP,
-        children=children,
+        children=children^,
         capturing=capturing,
         group_name=final_group_name,
         min=1,

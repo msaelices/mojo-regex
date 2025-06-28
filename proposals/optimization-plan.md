@@ -32,7 +32,7 @@ This document outlines a comprehensive 3-phase optimization plan that will trans
 
 4. **Memory Allocation Overhead**
    - Creating temporary `Match` objects in inner loops
-   - Dynamic `Deque` allocations for match tracking
+   - Dynamic `List` allocations for match tracking
    - No object pooling or memory reuse (zero copy goal)
 
 5. **No Pattern Compilation Caching**
