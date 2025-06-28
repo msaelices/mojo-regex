@@ -24,7 +24,7 @@ from regex.ast import (
 
 
 @value
-struct PatternComplexity:
+struct PatternComplexity(Representable, Stringable, Writable):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
 
@@ -42,6 +42,38 @@ struct PatternComplexity:
 
     fn __ne__(self, other: Self) -> Bool:
         return self.value != other.value
+
+    fn __repr__(self) -> String:
+        if self.value == PatternComplexity.SIMPLE:
+            return "PatternComplexity(SIMPLE)"
+        elif self.value == PatternComplexity.MEDIUM:
+            return "PatternComplexity(MEDIUM)"
+        elif self.value == PatternComplexity.COMPLEX:
+            return "PatternComplexity(COMPLEX)"
+        else:
+            return String("PatternComplexity(UNKNOWN:", self.value, ")")
+
+    fn __str__(self) -> String:
+        if self.value == PatternComplexity.SIMPLE:
+            return "SIMPLE"
+        elif self.value == PatternComplexity.MEDIUM:
+            return "MEDIUM"
+        elif self.value == PatternComplexity.COMPLEX:
+            return "COMPLEX"
+        else:
+            return String("UNKNOWN:", self.value)
+
+    @no_inline
+    fn write_to[W: Writer, //](self, mut writer: W):
+        """Writes a string representation of the PhoneNumberDesc to the writer.
+
+        Parameters:
+            W: The type of the writer, conforming to the `Writer` trait.
+
+        Args:
+            writer: The writer instance to output the representation to.
+        """
+        writer.write(self.__str__())
 
 
 struct PatternAnalyzer:
