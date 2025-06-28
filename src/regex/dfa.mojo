@@ -28,7 +28,7 @@ struct DFAState(Copyable, Movable):
         """Initialize a DFA state with no transitions."""
         self.transitions = List[Int](capacity=256)
         # Initialize all transitions to -1 (no transition)
-        for i in range(256):
+        for _ in range(256):
             self.transitions.append(-1)
         self.is_accepting = False
         self.match_length = 0
@@ -49,8 +49,8 @@ struct DFAState(Copyable, Movable):
         """Add a transition from this state to target_state on character char_code.
 
         Args:
-            char_code: ASCII code of the character (0-255)
-            target_state: Target state index, or -1 for no transition
+            char_code: ASCII code of the character (0-255).
+            target_state: Target state index, or -1 for no transition.
         """
         if char_code >= 0 and char_code < 256:
             self.transitions[char_code] = target_state
@@ -59,10 +59,10 @@ struct DFAState(Copyable, Movable):
         """Get the target state for a given character.
 
         Args:
-            char_code: ASCII code of the character
+            char_code: ASCII code of the character.
 
         Returns:
-            Target state index, or -1 if no transition exists
+            Target state index, or -1 if no transition exists.
         """
         if char_code >= 0 and char_code < 256:
             return self.transitions[char_code]
@@ -103,9 +103,9 @@ struct DFAEngine(Engine):
         corresponds to one state transition.
 
         Args:
-            pattern: Literal string to match (e.g., "hello")
-            has_start_anchor: Whether pattern has ^ anchor
-            has_end_anchor: Whether pattern has $ anchor
+            pattern: Literal string to match (e.g., "hello").
+            has_start_anchor: Whether pattern has ^ anchor.
+            has_end_anchor: Whether pattern has $ anchor.
         """
         self.compiled_pattern = pattern
         self.states = List[DFAState]()
@@ -121,7 +121,7 @@ struct DFAEngine(Engine):
 
         # Create states: one for each character + one final accepting state
         var num_states = len(pattern) + 1
-        for i in range(num_states):
+        for _ in range(num_states):
             self.states.append(DFAState())
 
         # Set up transitions for each character in the pattern
@@ -141,9 +141,9 @@ struct DFAEngine(Engine):
         """Compile a character class pattern like [a-z]+ into a DFA.
 
         Args:
-            char_class: Character class string (e.g., "abcdefghijklmnopqrstuvwxyz" for [a-z])
-            min_matches: Minimum number of matches required
-            max_matches: Maximum number of matches (-1 for unlimited)
+            char_class: Character class string (e.g., "abcdefghijklmnopqrstuvwxyz" for [a-z]).
+            min_matches: Minimum number of matches required.
+            max_matches: Maximum number of matches (-1 for unlimited).
         """
         self.compiled_pattern = "[" + char_class + "]"
         self.states = List[DFAState]()
@@ -182,11 +182,11 @@ struct DFAEngine(Engine):
         """Execute DFA matching against input text.
 
         Args:
-            text: Input text to match against
-            start: Starting position in text
+            text: Input text to match against.
+            start: Starting position in text.
 
         Returns:
-            Optional Match if pattern matches, None otherwise
+            Optional Match if pattern matches, None otherwise.
         """
         if start >= len(text):
             # Check if we can match empty string
@@ -200,7 +200,6 @@ struct DFAEngine(Engine):
         var current_state = self.start_state
         var pos = start
         var last_accepting_pos = -1
-        var last_accepting_length = 0
 
         # Check if start state is accepting (for patterns like a*)
         if (
@@ -208,7 +207,6 @@ struct DFAEngine(Engine):
             and self.states[current_state].is_accepting
         ):
             last_accepting_pos = pos
-            last_accepting_length = self.states[current_state].match_length
 
         while pos < len(text):
             var ch = text[pos]
@@ -234,7 +232,6 @@ struct DFAEngine(Engine):
                 and self.states[current_state].is_accepting
             ):
                 last_accepting_pos = pos
-                last_accepting_length = pos - start
 
         # Return longest match found
         if last_accepting_pos != -1:
@@ -246,10 +243,10 @@ struct DFAEngine(Engine):
         """Find all non-overlapping matches using DFA.
 
         Args:
-            text: Input text to search
+            text: Input text to search.
 
         Returns:
-            List of all matches found
+            List of all matches found.
         """
         var matches = List[Match]()
         var pos = 0
@@ -281,7 +278,7 @@ struct BoyerMoore:
         """Initialize Boyer-Moore with a pattern.
 
         Args:
-            pattern: Literal string pattern to search for
+            pattern: Literal string pattern to search for.
         """
         self.pattern = pattern
         self.bad_char_table = List[Int](capacity=256)
@@ -290,7 +287,7 @@ struct BoyerMoore:
     fn _build_bad_char_table(mut self):
         """Build the bad character heuristic table."""
         # Initialize all characters to -1 (not in pattern)
-        for i in range(256):
+        for _ in range(256):
             self.bad_char_table.append(-1)
 
         # Set the last occurrence of each character in pattern
@@ -302,11 +299,11 @@ struct BoyerMoore:
         """Search for pattern in text using Boyer-Moore algorithm.
 
         Args:
-            text: Text to search in
-            start: Starting position in text
+            text: Text to search in.
+            start: Starting position in text.
 
         Returns:
-            Position of first match, or -1 if not found
+            Position of first match, or -1 if not found.
         """
         var m = len(self.pattern)
         var n = len(text)
@@ -334,10 +331,10 @@ struct BoyerMoore:
         """Find all occurrences of pattern in text.
 
         Args:
-            text: Text to search in
+            text: Text to search in.
 
         Returns:
-            List of starting positions of all matches
+            List of starting positions of all matches.
         """
         var positions = List[Int]()
         var start = 0
@@ -356,13 +353,13 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
     """Compile a simple pattern AST into a DFA engine.
 
     Args:
-        ast: AST representing a simple pattern
+        ast: AST representing a simple pattern.
 
     Returns:
-        Compiled DFA engine ready for matching
+        Compiled DFA engine ready for matching.
 
     Raises:
-        Error if pattern is too complex for DFA compilation
+        Error if pattern is too complex for DFA compilation.
     """
     var dfa = DFAEngine()
 

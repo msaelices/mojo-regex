@@ -62,18 +62,14 @@ struct NFAEngine(Engine):
                 return []
 
         var matches = List[Match]()
-        var last_match_end = 0
-        var found_any = False
         var current_pos = 0
 
         while current_pos <= len(text):
             var temp_matches = Deque[Match]()
             var result = self._match_node(ast, text, current_pos, temp_matches)
             if result[0]:  # Match found
-                found_any = True
                 var match_start = current_pos
                 var match_end = result[1]
-                last_match_end = match_end
 
                 # Create match object
                 var matched = Match(0, match_start, match_end, text, "RegEx")

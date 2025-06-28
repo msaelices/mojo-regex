@@ -22,11 +22,11 @@ trait RegexMatcher:
         """Find the first match in text starting from the given position.
 
         Args:
-            text: Input text to search
-            start: Starting position in text (default 0)
+            text: Input text to search.
+            start: Starting position in text (default 0).
 
         Returns:
-            Optional Match if found, None otherwise
+            Optional Match if found, None otherwise.
         """
         ...
 
@@ -34,10 +34,10 @@ trait RegexMatcher:
         """Find all non-overlapping matches in text.
 
         Args:
-            text: Input text to search
+            text: Input text to search.
 
         Returns:
-            List of all matches found
+            List of all matches found.
         """
         ...
 
@@ -52,8 +52,8 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Initialize DFA matcher by compiling the AST.
 
         Args:
-            ast: AST representing the regex pattern
-            pattern: Original pattern string
+            ast: AST representing the regex pattern.
+            pattern: Original pattern string.
         """
         self.pattern_string = pattern
         self.engine = compile_simple_pattern(ast)
@@ -88,8 +88,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Initialize NFA matcher with the existing engine.
 
         Args:
-            ast: AST representing the regex pattern
-            pattern: Original pattern string
+            ast: AST representing the regex pattern.
+            pattern: Original pattern string.
         """
         self.engine = NFAEngine(pattern)
         self.ast = ast
@@ -129,7 +129,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
 
         Args:
-            pattern: Regex pattern string to compile
+            pattern: Regex pattern string to compile.
         """
         self.pattern_string = pattern
         var ast = parse(pattern)
@@ -193,7 +193,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Get the type of engine being used (for debugging/profiling).
 
         Returns:
-            String indicating which engine is active ("DFA", "NFA", or "Hybrid")
+            String indicating which engine is active ("DFA", "NFA", or "Hybrid").
         """
         if (
             self.dfa_matcher
@@ -207,7 +207,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Get the analyzed complexity of the pattern.
 
         Returns:
-            PatternComplexity classification
+            PatternComplexity classification.
         """
         return self.complexity
 
@@ -223,7 +223,7 @@ struct CompiledRegex(Copyable, Movable):
         """Compile a regex pattern with automatic optimization.
 
         Args:
-            pattern: Regex pattern string
+            pattern: Regex pattern string.
         """
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
@@ -246,11 +246,11 @@ struct CompiledRegex(Copyable, Movable):
         """Find first match in text.
 
         Args:
-            text: Input text to search
-            start: Starting position (default 0)
+            text: Input text to search.
+            start: Starting position (default 0).
 
         Returns:
-            Optional Match if found
+            Optional Match if found.
         """
         return self.matcher.match_first(text, start)
 
@@ -258,10 +258,10 @@ struct CompiledRegex(Copyable, Movable):
         """Find all matches in text.
 
         Args:
-            text: Input text to search
+            text: Input text to search.
 
         Returns:
-            List of all matches found
+            List of all matches found.
         """
         return self.matcher.match_all(text)
 
@@ -269,10 +269,10 @@ struct CompiledRegex(Copyable, Movable):
         """Test if pattern matches anywhere in text.
 
         Args:
-            text: Input text to test
+            text: Input text to test.
 
         Returns:
-            True if pattern matches, False otherwise
+            True if pattern matches, False otherwise.
         """
         var result = self.match_first(text)
         return result.__bool__()
@@ -281,7 +281,7 @@ struct CompiledRegex(Copyable, Movable):
         """Get performance statistics and engine information.
 
         Returns:
-            String with debugging information
+            String with debugging information.
         """
         var engine_type = self.matcher.get_engine_type()
         var complexity = self.matcher.get_complexity()
@@ -314,10 +314,10 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     """Compile a regex pattern with caching for repeated use.
 
     Args:
-        pattern: Regex pattern string
+        pattern: Regex pattern string.
 
     Returns:
-        Compiled regex object ready for matching
+        Compiled regex object ready for matching.
     """
     # Simple linear search in cache (TODO: use proper hash map)
     for i in range(len(__cache_patterns)):
@@ -346,11 +346,11 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     """Search for pattern in text (equivalent to re.search in Python).
 
     Args:
-        pattern: Regex pattern string
-        text: Text to search in
+        pattern: Regex pattern string.
+        text: Text to search in.
 
     Returns:
-        Optional Match if found
+        Optional Match if found.
     """
     var compiled = compile_regex(pattern)
     return compiled.match_first(text)
@@ -360,11 +360,11 @@ fn findall(pattern: String, text: String) raises -> List[Match]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
-        pattern: Regex pattern string
-        text: Text to search in
+        pattern: Regex pattern string.
+        text: Text to search in.
 
     Returns:
-        List of all matches found
+        List of all matches found.
     """
     var compiled = compile_regex(pattern)
     return compiled.match_all(text)
@@ -374,11 +374,11 @@ fn match_first(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
-        pattern: Regex pattern string
-        text: Text to match against
+        pattern: Regex pattern string.
+        text: Text to match against.
 
     Returns:
-        Optional Match if pattern matches at start of text
+        Optional Match if pattern matches at start of text.
     """
     var compiled = compile_regex(pattern)
     var result = compiled.match_first(text, 0)

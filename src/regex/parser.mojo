@@ -145,10 +145,10 @@ fn parse(regex: String) raises -> ASTNode:
     If the regex contains errors raises an Exception.
 
     Args:
-        regex: a regular expression
+        regex: A regular expression.
 
     Returns:
-        The root node of the regular expression's AST
+        The root node of the regular expression's AST.
     """
     var tokens = scan(regex)
     if len(tokens) == 0:
