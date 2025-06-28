@@ -340,12 +340,12 @@ def test_dfa_anchors_with_high_level_api():
     assert_equal(result3.value().match_text, "hello")
 
 
-# def test_phone_numbers():
-#     """Test phone number pattern matching using DFA."""
-#     # General phone number pattern (digits, optional +, dashes, etc.)
-#     pattern = "\\d{2}|[+]*(?:[-x‐-―−().\\[\\]/~*]*\\d){3,}[-x‐-―−().\\[\\]/~*ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\\d]*"
-#     var ast = parse(pattern)
-#     var dfa = compile_simple_pattern(ast)
-#     result = dfa.match_first("+1-541-236-5432")
-#     assert_true(result.__bool__())
-#     assert_equal(result.value().match_text, "+1-541-236-5432")
+def test_phone_numbers():
+    """Test phone number pattern matching using DFA."""
+    # Complex phone number pattern with sequential character classes
+    pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
+    var ast = parse(pattern)
+    var dfa = compile_ast_pattern(ast)
+    var result = dfa.match_first("+1-541-236-5432", 0)
+    assert_true(result.__bool__())
+    assert_equal(result.value().match_text, "+1-541-236-5432")
