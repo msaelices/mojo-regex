@@ -212,7 +212,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return self.complexity
 
 
-struct CompiledRegex(Copyable, Movable):
+struct CompiledRegex(Movable):
     """High-level compiled regex object with caching and optimization."""
 
     var matcher: HybridMatcher
@@ -229,12 +229,6 @@ struct CompiledRegex(Copyable, Movable):
         self.matcher = HybridMatcher(pattern)
         # TODO: Add actual timestamp when time module is available
         self.compiled_at = 0
-
-    fn __copyinit__(out self, other: Self):
-        """Copy constructor."""
-        self.matcher = other.matcher
-        self.pattern = other.pattern
-        self.compiled_at = other.compiled_at
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -330,7 +324,7 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     # Add to cache (TODO: implement LRU eviction)
     # __cache_patterns[pattern] = compiled
 
-    return compiled
+    return compiled^
 
 
 fn clear_regex_cache():
