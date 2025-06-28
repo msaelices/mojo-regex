@@ -23,8 +23,7 @@ from regex.ast import (
 )
 
 
-@value
-struct PatternComplexity(Representable, Stringable, Writable):
+struct PatternComplexity(Copyable, Representable, Stringable, Writable):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
 
