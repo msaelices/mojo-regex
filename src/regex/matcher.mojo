@@ -304,8 +304,11 @@ struct CompiledRegex(Copyable, Movable):
         )
 
 
+# TODO: Disable cache for errors found while running tests:
+#  - Attempted to free corrupted pointer
+#  - Possible double free detected
 # Global pattern cache for improved performance
-var __cache_patterns = Dict[String, CompiledRegex]()
+# var __cache_patterns = Dict[String, CompiledRegex]()
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
@@ -317,22 +320,23 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    if pattern in __cache_patterns:
-        # Return cached compiled regex if available
-        return __cache_patterns[pattern]
+    # if pattern in __cache_patterns:
+    #     # Return cached compiled regex if available
+    #     return __cache_patterns[pattern]
 
     # Not in cache, compile new regex
     var compiled = CompiledRegex(pattern)
 
     # Add to cache (TODO: implement LRU eviction)
-    __cache_patterns[pattern] = compiled
+    # __cache_patterns[pattern] = compiled
 
     return compiled
 
 
 fn clear_regex_cache():
     """Clear the compiled regex cache."""
-    __cache_patterns.clear()
+    pass
+    # __cache_patterns.clear()
 
 
 # High-level convenience functions that match Python's re module interface
