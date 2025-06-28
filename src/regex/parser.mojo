@@ -71,77 +71,47 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
     while i < len(tokens):
         var token = tokens[i]
 
+        @always_inline
+        fn _check_for_quantifier(mut elem: ASTNode) capturing:
+            """Check for quantifiers after an element and set min/max accordingly.
+            """
+            var next_token = tokens[i + 1]
+            if next_token.type == Token.ASTERISK:
+                elem.min = 0
+                elem.max = -1  # -1 means unlimited
+                i += 1  # Skip quantifier
+            elif next_token.type == Token.PLUS:
+                elem.min = 1
+                elem.max = -1
+                i += 1  # Skip quantifier
+            elif next_token.type == Token.QUESTIONMARK:
+                elem.min = 0
+                elem.max = 1
+                i += 1  # Skip quantifier
+
         if token.type == Token.ELEMENT:
             var elem = Element(token.char)
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                var next_token = tokens[i + 1]
-                if next_token.type == Token.ASTERISK:
-                    elem.min = 0
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.PLUS:
-                    elem.min = 1
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.QUESTIONMARK:
-                    elem.min = 0
-                    elem.max = 1
-                    i += 1  # Skip quantifier
+                _check_for_quantifier(elem)
             elements.append(elem)
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement()
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                var next_token = tokens[i + 1]
-                if next_token.type == Token.ASTERISK:
-                    elem.min = 0
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.PLUS:
-                    elem.min = 1
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.QUESTIONMARK:
-                    elem.min = 0
-                    elem.max = 1
-                    i += 1  # Skip quantifier
+                _check_for_quantifier(elem)
             elements.append(elem)
         elif token.type == Token.SPACE:
             var elem = SpaceElement()
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                var next_token = tokens[i + 1]
-                if next_token.type == Token.ASTERISK:
-                    elem.min = 0
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.PLUS:
-                    elem.min = 1
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.QUESTIONMARK:
-                    elem.min = 0
-                    elem.max = 1
-                    i += 1  # Skip quantifier
+                _check_for_quantifier(elem)
             elements.append(elem)
         elif token.type == Token.DIGIT:
             var elem = DigitElement()
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                var next_token = tokens[i + 1]
-                if next_token.type == Token.ASTERISK:
-                    elem.min = 0
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.PLUS:
-                    elem.min = 1
-                    elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.QUESTIONMARK:
-                    elem.min = 0
-                    elem.max = 1
-                    i += 1  # Skip quantifier
+                _check_for_quantifier(elem)
             elements.append(elem)
         elif token.type == Token.START:
             elements.append(StartElement())
@@ -184,19 +154,7 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             var range_elem = RangeElement(range_str, positive_logic)
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                var next_token = tokens[i + 1]
-                if next_token.type == Token.ASTERISK:
-                    range_elem.min = 0
-                    range_elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.PLUS:
-                    range_elem.min = 1
-                    range_elem.max = -1
-                    i += 1  # Skip quantifier
-                elif next_token.type == Token.QUESTIONMARK:
-                    range_elem.min = 0
-                    range_elem.max = 1
-                    i += 1  # Skip quantifier
+                _check_for_quantifier(range_elem)
             elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
