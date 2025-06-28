@@ -245,6 +245,7 @@ fn NotNode(child: ASTNode) -> ASTNode:
     return ASTNode(type=NOT, children=[child])
 
 
+@always_inline
 fn GroupNode(
     owned children: List[ASTNode],
     capturing: Bool = False,
