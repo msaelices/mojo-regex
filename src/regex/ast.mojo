@@ -28,6 +28,7 @@ struct ASTNode(
     var group_name: String
     var min: Int
     var max: Int
+    var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
 
     fn __init__(
         out self,
@@ -37,6 +38,7 @@ struct ASTNode(
         owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
+        positive_logic: Bool = True,
         owned children: List[ASTNode] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
@@ -46,6 +48,7 @@ struct ASTNode(
         self.group_name = group_name^
         self.min = min
         self.max = max
+        self.positive_logic = positive_logic
         # TODO: Uncomment when unpacked arguments are supported in Mojo
         # self.children = List[ASTNode[origin]](*children)
         self.children = List[ASTNode](capacity=len(children))
@@ -60,6 +63,7 @@ struct ASTNode(
         self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
+        self.positive_logic = other.positive_logic
         # Deep copy children since List[ASTNode] is not directly copyable
         self.children = List[ASTNode](capacity=len(other.children))
         for child in other.children:
@@ -82,6 +86,7 @@ struct ASTNode(
             and self.group_name == other.group_name
             and self.min == other.min
             and self.max == other.max
+            and self.positive_logic == other.positive_logic
             and len(self.children) == len(other.children)
             and self.children == other.children
         )
@@ -162,8 +167,8 @@ struct ASTNode(
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = self.value.find(value) != -1
             return not (
-                ch_found ^ (self.min == 1)
-            )  # min=1 means positive logic
+                ch_found ^ self.positive_logic
+            )  # positive_logic determines if it's [abc] or [^abc]
         elif self.type == START:
             return str_i == 0
         elif self.type == END:
@@ -216,8 +221,9 @@ fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
     return ASTNode(
         type=RANGE,
         value=value^,
-        min=1 if is_positive_logic else 0,  # Use min to store logic type
+        min=1,
         max=1,
+        positive_logic=is_positive_logic,
     )
 
 

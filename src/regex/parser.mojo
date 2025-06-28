@@ -72,13 +72,77 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
         var token = tokens[i]
 
         if token.type == Token.ELEMENT:
-            elements.append(Element(token.char))
+            var elem = Element(token.char)
+            # Check for quantifiers after the element
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.WILDCARD:
-            elements.append(WildcardElement())
+            var elem = WildcardElement()
+            # Check for quantifiers after the wildcard
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.SPACE:
-            elements.append(SpaceElement())
+            var elem = SpaceElement()
+            # Check for quantifiers after the space
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.DIGIT:
-            elements.append(DigitElement())
+            var elem = DigitElement()
+            # Check for quantifiers after the digit
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+            elements.append(elem)
         elif token.type == Token.START:
             elements.append(StartElement())
         elif token.type == Token.END:
@@ -118,6 +182,21 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
                 raise Error("Missing closing ']'.")
 
             var range_elem = RangeElement(range_str, positive_logic)
+            # Check for quantifiers after the range
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    range_elem.min = 0
+                    range_elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    range_elem.min = 1
+                    range_elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    range_elem.min = 0
+                    range_elem.max = 1
+                    i += 1  # Skip quantifier
             elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
@@ -399,8 +478,20 @@ fn parse(regex: String) raises -> ASTNode:
                     i -= 1  # Compensate for the i += 1 at the end of the loop
             elements.append(range_elem)
         elif token.type == Token.LEFTPARENTHESIS:
-            # Handle grouping
+            # Handle grouping - check for non-capturing group (?:...)
             i += 1
+            var is_capturing = True
+
+            # Check if this is a non-capturing group (?:...)
+            if (
+                i + 1 < len(tokens)
+                and tokens[i].type == Token.QUESTIONMARK
+                and tokens[i + 1].type == Token.ELEMENT
+                and tokens[i + 1].char == ":"
+            ):
+                is_capturing = False
+                i += 2  # Skip ? and :
+
             var group_tokens = List[Token](capacity=len(tokens) - i)
             var paren_count = 1
 
@@ -423,12 +514,12 @@ fn parse(regex: String) raises -> ASTNode:
             var group_ast = parse_token_list(group_tokens)
             var group: ASTNode
             if group_ast.type == GROUP:
-                # If it's already a group, use it directly but mark as capturing
+                # If it's already a group, use it directly
                 group = group_ast
-                group.capturing = True
+                group.capturing = is_capturing
             else:
                 # Otherwise wrap in a group
-                group = GroupNode([group_ast], True, "", 0)
+                group = GroupNode([group_ast], is_capturing, "", 0)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
                 var next_token = tokens[i + 1]
@@ -444,6 +535,41 @@ fn parse(regex: String) raises -> ASTNode:
                     group.min = 0
                     group.max = 1
                     i += 1  # Skip quantifier
+                elif next_token.type == Token.LEFTCURLYBRACE:
+                    # Parse curly brace quantifiers for groups
+                    i += 2  # Skip to position after {
+                    var min_val = String("")
+                    var max_val = String("")
+
+                    # Parse min value
+                    while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        min_val += tokens[i].char
+                        i += 1
+
+                    group.min = atol(min_val) if min_val != "" else 0
+
+                    # Check for comma (range) or closing brace (exact)
+                    if i < len(tokens) and tokens[i].type == Token.COMMA:
+                        i += 1  # Skip comma
+                        # Parse max value
+                        while (
+                            i < len(tokens) and tokens[i].type == Token.ELEMENT
+                        ):
+                            max_val += tokens[i].char
+                            i += 1
+                        group.max = atol(max_val) if max_val != "" else -1
+                    else:
+                        # Exact quantifier {n}
+                        group.max = group.min
+
+                    # Skip closing brace
+                    if (
+                        i < len(tokens)
+                        and tokens[i].type == Token.RIGHTCURLYBRACE
+                    ):
+                        i += 1
+                    # Don't increment i again - continue processing next token
+                    i -= 1  # Compensate for the i += 1 at the end of the loop
             elements.append(group)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts

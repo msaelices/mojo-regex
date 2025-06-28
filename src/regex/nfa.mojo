@@ -241,9 +241,8 @@ struct NFAEngine(Engine):
 
         var ch = string[str_i]
         var ch_found = ast.value.find(ch) != -1
-        var positive_logic = ast.min == 1  # min=1 means positive logic
 
-        if ch_found == positive_logic:
+        if ch_found == ast.positive_logic:
             return self._apply_quantifier(ast, string, str_i, 1)
         else:
             return (False, str_i)
