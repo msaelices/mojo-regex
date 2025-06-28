@@ -160,7 +160,7 @@ fn parse(regex: String) raises -> ASTNode:
         return ASTNode(RE)
 
     # Simple implementation for basic parsing
-    var elements = List[ASTNode]()
+    var elements = List[ASTNode](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
