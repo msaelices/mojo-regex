@@ -58,7 +58,7 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
-fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
+fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
@@ -125,12 +125,10 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             i += 1
 
             # Parse right side recursively
-            var right_tokens = List[Token]()
-            while i < len(tokens):
-                right_tokens.append(tokens[i])
-                i += 1
+            var right_tokens = tokens[i:]
+            i += len(right_tokens)
 
-            var right_group_ast = parse_token_list(right_tokens)
+            var right_group_ast = parse_token_list(right_tokens^)
             var right_group: ASTNode
             if right_group_ast.type == GROUP:
                 right_group = right_group_ast
