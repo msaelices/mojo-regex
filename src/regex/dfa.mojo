@@ -280,9 +280,7 @@ struct DFAEngine(Engine):
                     )
                 elif element.max_matches > element.min_matches:
                     # Limited additional matches - create additional optional states
-                    for additional_match in range(
-                        element.max_matches - element.min_matches
-                    ):
+                    for _ in range(element.max_matches - element.min_matches):
                         var state = DFAState(is_accepting=is_last_element)
                         self.states.append(state)
                         var state_index = len(self.states) - 1
@@ -731,7 +729,7 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
             # Extract each character class element
             for i in range(len(child.children)):
                 var element = child.children[i]
-                var char_class = String("")
+                var char_class: String
 
                 if element.type == DIGIT:
                     char_class = "0123456789"
