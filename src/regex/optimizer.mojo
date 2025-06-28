@@ -215,7 +215,20 @@ struct PatternAnalyzer:
             max_child_complexity.value == PatternComplexity.SIMPLE
             and quantifier_complexity.value == PatternComplexity.SIMPLE
         ):
-            if len(ast.children) <= 3:
+            # For literal groups (like "hello" parsed as group of chars), be more generous
+            # Check if all children are literal elements
+            var all_literal = True
+            for i in range(len(ast.children)):
+                var child = ast.children[i]
+                if child.type != ELEMENT or child.min != 1 or child.max != 1:
+                    all_literal = False
+                    break
+
+            if (
+                all_literal and len(ast.children) <= 20
+            ):  # Allow longer literal strings
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            elif len(ast.children) <= 3:
                 return PatternComplexity(PatternComplexity.SIMPLE)
             else:
                 return PatternComplexity(PatternComplexity.MEDIUM)

@@ -152,7 +152,8 @@ fn parse(regex: String) raises -> ASTNode:
     """
     var tokens = scan(regex)
     if len(tokens) == 0:
-        raise Error("Empty regex.")
+        # Empty pattern - create an empty RE node
+        return ASTNode(RE)
 
     # Simple implementation for basic parsing
     var elements = List[ASTNode]()
