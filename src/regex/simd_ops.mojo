@@ -5,6 +5,7 @@ This module leverages Mojo's SIMD capabilities to vectorize character operations
 providing significant speedups for character class matching and string scanning.
 """
 
+from algorithm import vectorize
 from sys.info import simdwidthof
 
 # SIMD width for character operations (uint8)
@@ -119,18 +120,17 @@ struct CharacterClassSIMD(Copyable, Movable):
         var pos = 0
         var text_len = len(text)
 
-        while pos + SIMD_WIDTH <= text_len:
-            var chunk_matches = self._check_chunk_simd(text, pos)
-            for i in range(SIMD_WIDTH):
-                if chunk_matches[i]:
-                    matches.append(pos + i)
-            pos += SIMD_WIDTH
+        @parameter
+        fn closure[width: Int](i: Int) capturing:
+            if width != 1:
+                var chunk_matches = self._check_chunk_simd(text, pos + i)
+                for j in range(width):
+                    if chunk_matches[j]:
+                        matches.append(pos + i + j)
+            elif self.contains(text[pos + i]):
+                matches.append(pos + i)
 
-        # Handle remaining characters
-        while pos < text_len:
-            if self.contains(text[pos]):
-                matches.append(pos)
-            pos += 1
+        vectorize[closure, SIMD_WIDTH](text_len - pos)
 
         return matches
 
@@ -149,17 +149,15 @@ struct CharacterClassSIMD(Copyable, Movable):
         var count = 0
         var pos = start
 
-        # Process chunks using SIMD
-        while pos + SIMD_WIDTH <= actual_end:
-            var matches = self._check_chunk_simd(text, pos)
-            count += Int(matches.cast[DType.uint8]().reduce_add())
-            pos += SIMD_WIDTH
-
-        # Handle remaining characters
-        while pos < actual_end:
-            if self.contains(text[pos]):
+        @parameter
+        fn closure[width: Int](i: Int):
+            if width != 1:
+                var matches = self._check_chunk_simd(text, pos + i)
+                count += Int(matches.cast[DType.uint8]().reduce_add())
+            elif self.contains(text[pos + i]):
                 count += 1
-            pos += 1
+
+        vectorize[closure, SIMD_WIDTH](actual_end - pos)
 
         return count
 
