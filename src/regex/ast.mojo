@@ -1,6 +1,3 @@
-from collections import List
-
-
 alias RE = 0
 alias ELEMENT = 1
 alias WILDCARD = 2

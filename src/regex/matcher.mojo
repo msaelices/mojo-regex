@@ -6,7 +6,6 @@ and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
 
-from collections import List
 from regex.ast import ASTNode
 from regex.matching import Match
 from regex.nfa import NFAEngine

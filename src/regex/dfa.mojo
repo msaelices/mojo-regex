@@ -5,7 +5,6 @@ This module provides O(n) time complexity regex matching for simple patterns tha
 compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
-from collections import List, Set, Dict
 from regex.ast import ASTNode
 from regex.engine import Engine
 from regex.matching import Match

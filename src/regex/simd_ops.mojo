@@ -6,8 +6,6 @@ providing significant speedups for character class matching and string scanning.
 """
 
 from sys.info import simdwidthof
-from collections import List
-
 
 # SIMD width for character operations (uint8)
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()

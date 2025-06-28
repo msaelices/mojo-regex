@@ -1,4 +1,3 @@
-from collections import List
 from regex.lexer import scan
 from regex.tokens import (
     Token,

@@ -1,4 +1,3 @@
-from collections import List
 from regex.ast import ASTNode, RENode
 from regex.engine import Engine
 from regex.matching import Match

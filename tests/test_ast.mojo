@@ -1,4 +1,3 @@
-from collections import List
 from testing import assert_equal, assert_true, assert_false
 
 from regex.ast import (

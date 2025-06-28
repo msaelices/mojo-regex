@@ -7,7 +7,6 @@ This module implements the optimization strategies outlined in the optimization 
 - SIMD character class optimization
 """
 
-from collections import List
 from regex.ast import (
     ASTNode,
     RE,
