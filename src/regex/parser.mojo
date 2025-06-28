@@ -65,7 +65,7 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
         return GroupNode(List[ASTNode](), True, "", 0)
 
     # Simple implementation for now - parse elements and OR
-    var elements = List[ASTNode]()
+    var elements = List[ASTNode](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -401,7 +401,7 @@ fn parse(regex: String) raises -> ASTNode:
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping
             i += 1
-            var group_tokens = List[Token]()
+            var group_tokens = List[Token](capacity=len(tokens) - i)
             var paren_count = 1
 
             # Extract tokens inside the parentheses
@@ -451,7 +451,7 @@ fn parse(regex: String) raises -> ASTNode:
             i += 1
 
             # Parse right side
-            var right_elements = List[ASTNode]()
+            var right_elements = List[ASTNode](capacity=len(tokens) - i)
             while i < len(tokens):
                 ref right_token = tokens[i]
 
