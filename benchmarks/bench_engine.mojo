@@ -1,14 +1,12 @@
 # RUN: %mojo-no-debug %s -t
 
-from collections import Dict, Optional
-from collections.string import String
 from os import abort
 from pathlib import _dir_of_current_file
 from random import random_si64, seed
 from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex.engine import match_first
+from regex import match_first
 
 
 # ===-----------------------------------------------------------------------===#

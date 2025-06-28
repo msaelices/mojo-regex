@@ -26,6 +26,7 @@ from regex.ast import (
     Element,
     WildcardElement,
     SpaceElement,
+    DigitElement,
     RangeElement,
     StartElement,
     EndElement,
@@ -35,6 +36,7 @@ from regex.ast import (
     ELEMENT,
     WILDCARD,
     SPACE,
+    DIGIT,
     RANGE,
     START,
     END,
@@ -45,23 +47,25 @@ from regex.ast import (
 
 fn get_range_str(start: String, end: String) -> String:
     """Generate a string containing all characters in the range [start, end]."""
-    var result = String("")
-    var i = ord(start)
+    var start_ord = ord(start)
     var end_ord = ord(end)
-    while i <= end_ord:
-        result += chr(i)
-        i += 1
+    var range_size = end_ord - start_ord + 1
+
+    # Pre-allocate result to avoid repeated reallocations
+    var result = String()
+    for i in range(range_size):
+        result += chr(start_ord + i)
     return result
 
 
-fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
+fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
         return GroupNode(List[ASTNode](), True, "", 0)
 
     # Simple implementation for now - parse elements and OR
-    var elements = List[ASTNode]()
+    var elements = List[ASTNode](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -73,6 +77,8 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             elements.append(WildcardElement())
         elif token.type == Token.SPACE:
             elements.append(SpaceElement())
+        elif token.type == Token.DIGIT:
+            elements.append(DigitElement())
         elif token.type == Token.START:
             elements.append(StartElement())
         elif token.type == Token.END:
@@ -115,16 +121,14 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
             elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements, True, "", 0)
+            var left_group = GroupNode(elements^, True, "", 0)
             i += 1
 
             # Parse right side recursively
-            var right_tokens = List[Token]()
-            while i < len(tokens):
-                right_tokens.append(tokens[i])
-                i += 1
+            var right_tokens = tokens[i:]
+            i += len(right_tokens)
 
-            var right_group_ast = parse_token_list(right_tokens)
+            var right_group_ast = parse_token_list(right_tokens^)
             var right_group: ASTNode
             if right_group_ast.type == GROUP:
                 right_group = right_group_ast
@@ -135,7 +139,7 @@ fn parse_token_list(tokens: List[Token]) raises -> ASTNode:
 
         i += 1
 
-    return GroupNode(elements, True, "", 0)
+    return GroupNode(elements^, True, "", 0)
 
 
 fn parse(regex: String) raises -> ASTNode:
@@ -145,17 +149,18 @@ fn parse(regex: String) raises -> ASTNode:
     If the regex contains errors raises an Exception.
 
     Args:
-        regex: a regular expression
+        regex: A regular expression.
 
     Returns:
-        The root node of the regular expression's AST
+        The root node of the regular expression's AST.
     """
     var tokens = scan(regex)
     if len(tokens) == 0:
-        raise Error("Empty regex.")
+        # Empty pattern - create an empty RE node
+        return ASTNode(RE)
 
     # Simple implementation for basic parsing
-    var elements = List[ASTNode]()
+    var elements = List[ASTNode](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -254,6 +259,59 @@ fn parse(regex: String) raises -> ASTNode:
                     elem.max = 1
                     i += 1  # Skip quantifier
             elements.append(elem)
+        elif token.type == Token.DIGIT:
+            var elem = DigitElement()
+            # Check for quantifiers
+            if i + 1 < len(tokens):
+                var next_token = tokens[i + 1]
+                if next_token.type == Token.ASTERISK:
+                    elem.min = 0
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.PLUS:
+                    elem.min = 1
+                    elem.max = -1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.QUESTIONMARK:
+                    elem.min = 0
+                    elem.max = 1
+                    i += 1  # Skip quantifier
+                elif next_token.type == Token.LEFTCURLYBRACE:
+                    # Parse curly brace quantifiers
+                    i += 2  # Skip digit and {
+                    var min_val = String("")
+                    var max_val = String("")
+
+                    # Parse min value
+                    while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                        min_val += tokens[i].char
+                        i += 1
+
+                    elem.min = atol(min_val) if min_val != "" else 0
+
+                    # Check for comma (range) or closing brace (exact)
+                    if i < len(tokens) and tokens[i].type == Token.COMMA:
+                        i += 1  # Skip comma
+                        # Parse max value
+                        while (
+                            i < len(tokens) and tokens[i].type == Token.ELEMENT
+                        ):
+                            max_val += tokens[i].char
+                            i += 1
+                        elem.max = atol(max_val) if max_val != "" else -1
+                    else:
+                        # Exact quantifier {n}
+                        elem.max = elem.min
+
+                    # Skip closing brace
+                    if (
+                        i < len(tokens)
+                        and tokens[i].type == Token.RIGHTCURLYBRACE
+                    ):
+                        i += 1
+                    # Don't increment i again - continue processing next token
+                    i -= 1  # Compensate for the i += 1 at the end of the loop
+            elements.append(elem)
         elif token.type == Token.LEFTBRACKET:
             # Simple range parsing
             i += 1
@@ -343,7 +401,7 @@ fn parse(regex: String) raises -> ASTNode:
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping
             i += 1
-            var group_tokens = List[Token]()
+            var group_tokens = List[Token](capacity=len(tokens) - i)
             var paren_count = 1
 
             # Extract tokens inside the parentheses
@@ -389,11 +447,11 @@ fn parse(regex: String) raises -> ASTNode:
             elements.append(group)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements, True, "", 0)
+            var left_group = GroupNode(elements^, True, "", 0)
             i += 1
 
             # Parse right side
-            var right_elements = List[ASTNode]()
+            var right_elements = List[ASTNode](capacity=len(tokens) - i)
             while i < len(tokens):
                 ref right_token = tokens[i]
 
@@ -407,10 +465,12 @@ fn parse(regex: String) raises -> ASTNode:
                     right_elements.append(WildcardElement())
                 elif right_token.type == Token.SPACE:
                     right_elements.append(SpaceElement())
+                elif right_token.type == Token.DIGIT:
+                    right_elements.append(DigitElement())
                 # TODO: Add support for other token types like ranges, groups, etc.
                 i += 1
 
-            var right_group = GroupNode(right_elements, True, "", 0)
+            var right_group = GroupNode(right_elements^, True, "", 0)
             return RENode(OrNode(left_group, right_group))
         else:
             # Check for unescaped special characters
@@ -425,4 +485,4 @@ fn parse(regex: String) raises -> ASTNode:
 
         i += 1
 
-    return RENode(GroupNode(elements))
+    return RENode(GroupNode(elements^))

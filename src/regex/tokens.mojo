@@ -10,55 +10,57 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token using "." as wildcard."""
     alias SPACE = 2
     """Token of a space."""
-    alias START = 3
+    alias DIGIT = 3
+    """Token of a digit."""
+    alias START = 4
     """Token of match start."""
-    alias END = 4
+    alias END = 5
     """Token of match end."""
-    alias ESCAPE = 5
+    alias ESCAPE = 6
     """Token of the escape character."""
-    alias COMMA = 6
+    alias COMMA = 7
     """Token of a comma."""
-    alias PARENTHESIS = 7
+    alias PARENTHESIS = 8
     """Token of a parenthesis."""
-    alias LEFTPARENTHESIS = 8
+    alias LEFTPARENTHESIS = 9
     """Left parenthesis token."""
-    alias RIGHTPARENTHESIS = 9
+    alias RIGHTPARENTHESIS = 10
     """Right parenthesis token."""
-    alias CURLYBRACE = 10
+    alias CURLYBRACE = 11
     """Curly brace token."""
-    alias LEFTCURLYBRACE = 11
+    alias LEFTCURLYBRACE = 12
     """Left curly brace token."""
-    alias RIGHTCURLYBRACE = 12
+    alias RIGHTCURLYBRACE = 13
     """Right curly brace token."""
-    alias BRACKET = 13
+    alias BRACKET = 14
     """Brackets token."""
-    alias LEFTBRACKET = 14
+    alias LEFTBRACKET = 15
     """Left bracket token."""
-    alias RIGHTBRACKET = 15
+    alias RIGHTBRACKET = 16
     """Right bracket token."""
-    alias QUANTIFIER = 16
+    alias QUANTIFIER = 17
     """Quantifier token."""
-    alias ZEROORMORE = 17
+    alias ZEROORMORE = 18
     """Quantifier 'zero or more' token."""
-    alias ONEORMORE = 18
+    alias ONEORMORE = 19
     """Quantifier 'one or more' token."""
-    alias ZEROORONE = 19
+    alias ZEROORONE = 20
     """Quantifier 'zero or one' token."""
-    alias ASTERISK = 20
+    alias ASTERISK = 21
     """Quantifier 'zero or more' token using character '*'."""
-    alias PLUS = 21
+    alias PLUS = 22
     """Quantifier 'one or more' token using character '+'."""
-    alias QUESTIONMARK = 22
+    alias QUESTIONMARK = 23
     """Quantifier 'zero or one' token using character '?'."""
-    alias ORTOKEN = 23
+    alias ORTOKEN = 24
     """Token of the or."""
-    alias VERTICALBAR = 24
+    alias VERTICALBAR = 25
     """Token of the or using '|'."""
-    alias NOTTOKEN = 25
+    alias NOTTOKEN = 26
     """Token of the negation."""
-    alias CIRCUMFLEX = 26
+    alias CIRCUMFLEX = 27
     """Token of the negation using '^'."""
-    alias DASH = 27
+    alias DASH = 28
     """Token of the dash '-'."""
 
     fn __init__(out self, type: Int):
@@ -288,3 +290,9 @@ fn ElementToken(char: String) -> Token:
 fn SpaceToken(char: String) -> Token:
     """Token of a space."""
     return Token(type=Token.SPACE, char=char)
+
+
+@always_inline
+fn DigitToken(char: String) -> Token:
+    """Token of a digit."""
+    return Token(type=Token.DIGIT, char=char)

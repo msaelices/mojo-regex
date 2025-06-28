@@ -1,16 +1,14 @@
-from collections import Deque
-
-
 alias RE = 0
 alias ELEMENT = 1
 alias WILDCARD = 2
 alias SPACE = 3
-alias RANGE = 4
-alias START = 5
-alias END = 6
-alias OR = 7
-alias NOT = 8
-alias GROUP = 9
+alias DIGIT = 4
+alias RANGE = 5
+alias START = 6
+alias END = 7
+alias OR = 8
+alias NOT = 9
+alias GROUP = 10
 
 
 struct ASTNode(
@@ -25,7 +23,7 @@ struct ASTNode(
 
     var type: Int
     var value: String
-    var children: Deque[ASTNode]
+    var children: List[ASTNode]
     var capturing: Bool
     var group_name: String
     var min: Int
@@ -49,8 +47,8 @@ struct ASTNode(
         self.min = min
         self.max = max
         # TODO: Uncomment when unpacked arguments are supported in Mojo
-        # self.children = Deque[ASTNode[origin]](*children)
-        self.children = Deque[ASTNode](capacity=len(children))
+        # self.children = List[ASTNode[origin]](*children)
+        self.children = List[ASTNode](capacity=len(children))
         for child in children:
             self.children.append(child)
 
@@ -62,7 +60,8 @@ struct ASTNode(
         self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
-        self.children = Deque[ASTNode](capacity=len(other.children))
+        # Deep copy children since List[ASTNode] is not directly copyable
+        self.children = List[ASTNode](capacity=len(other.children))
         for child in other.children:
             self.children.append(child)
 
@@ -121,7 +120,7 @@ struct ASTNode(
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, WILDCARD, SPACE, RANGE, START, END]:
+        if self.type in [ELEMENT, WILDCARD, SPACE, DIGIT, RANGE, START, END]:
             return True
         else:
             return False
@@ -143,6 +142,22 @@ struct ASTNode(
                     or ch == "\f"
                 )
             return False
+        elif self.type == DIGIT:
+            if len(value) == 1:
+                var ch = value
+                return (
+                    ch == "0"
+                    or ch == "1"
+                    or ch == "2"
+                    or ch == "3"
+                    or ch == "4"
+                    or ch == "5"
+                    or ch == "6"
+                    or ch == "7"
+                    or ch == "8"
+                    or ch == "9"
+                )
+            return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = self.value.find(value) != -1
@@ -161,62 +176,78 @@ struct ASTNode(
         return self.capturing
 
 
+@always_inline
 fn RENode(
-    child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
+    owned child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
 ) -> ASTNode:
     """Create a RE node with a child."""
     return ASTNode(
-        type=RE, children=[child], capturing=capturing, group_name=group_name
+        type=RE, children=[child^], capturing=capturing, group_name=group_name
     )
 
 
-fn Element(value: String) -> ASTNode:
+@always_inline
+fn Element(owned value: String) -> ASTNode:
     """Create an Element node with a value string."""
-    return ASTNode(type=ELEMENT, value=value, min=1, max=1)
+    return ASTNode(type=ELEMENT, value=value^, min=1, max=1)
 
 
+@always_inline
 fn WildcardElement() -> ASTNode:
     """Create a WildcardElement node."""
     return ASTNode(type=WILDCARD, value="anything", min=1, max=1)
 
 
+@always_inline
 fn SpaceElement() -> ASTNode:
     """Create a SpaceElement node."""
     return ASTNode(type=SPACE, value="", min=1, max=1)
 
 
-fn RangeElement(value: String, is_positive_logic: Bool = True) -> ASTNode:
+@always_inline
+fn DigitElement() -> ASTNode:
+    """Create a DigitElement node."""
+    return ASTNode(type=DIGIT, value="", min=1, max=1)
+
+
+@always_inline
+fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
     """Create a RangeElement node."""
     return ASTNode(
         type=RANGE,
-        value=value,
+        value=value^,
         min=1 if is_positive_logic else 0,  # Use min to store logic type
         max=1,
     )
 
 
+@always_inline
 fn StartElement() -> ASTNode:
     """Create a StartElement node."""
     return ASTNode(type=START, value="", min=1, max=1)
 
 
+@always_inline
 fn EndElement() -> ASTNode:
     """Create an EndElement node."""
     return ASTNode(type=END, value="", min=1, max=1)
 
 
-fn OrNode(left: ASTNode, right: ASTNode) -> ASTNode:
+@always_inline
+fn OrNode(owned left: ASTNode, owned right: ASTNode) -> ASTNode:
     """Create an OrNode with left and right children."""
     return ASTNode(type=OR, children=[left, right], min=1, max=1)
 
 
-fn NotNode(child: ASTNode) -> ASTNode:
+@always_inline
+fn NotNode(owned child: ASTNode) -> ASTNode:
     """Create a NotNode with a child."""
     return ASTNode(type=NOT, children=[child])
 
 
+@always_inline
 fn GroupNode(
-    children: List[ASTNode],
+    owned children: List[ASTNode],
     capturing: Bool = False,
     group_name: String = "",
     group_id: Int = -1,
@@ -227,7 +258,7 @@ fn GroupNode(
     )
     return ASTNode(
         type=GROUP,
-        children=children,
+        children=children^,
         capturing=capturing,
         group_name=final_group_name,
         min=1,

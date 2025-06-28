@@ -135,7 +135,7 @@ fn test_GroupNode() raises:
     children.append(elem2)
 
     var group = GroupNode(
-        children, capturing=True, group_name="test_group", group_id=1
+        children^, capturing=True, group_name="test_group", group_id=1
     )
     assert_true(Bool(group))
     assert_equal(group.type, GROUP)
@@ -149,7 +149,7 @@ fn test_GroupNode_default_name() raises:
     var children = List[ASTNode]()
     children.append(elem)
 
-    var group = GroupNode(children, group_id=5)
+    var group = GroupNode(children^, group_id=5)
     assert_equal(group.group_name, "Group 5")
 
 
