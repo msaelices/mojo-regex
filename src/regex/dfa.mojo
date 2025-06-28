@@ -25,27 +25,13 @@ struct DFAState(Copyable, Movable):
     var is_accepting: Bool
     var match_length: Int  # Length of match when this state is reached
 
-    fn __init__(out self):
+    fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
         self.transitions = InlineArray[Int, 256](
             fill=-1
         )  # -1 means no transition
-        self.is_accepting = False
-        self.match_length = 0
-
-    @always_inline
-    fn __copyinit__(out self, other: Self):
-        """Copy constructor."""
-        self.transitions = other.transitions
-        self.is_accepting = other.is_accepting
-        self.match_length = other.match_length
-
-    @always_inline
-    fn __moveinit__(out self, owned other: Self):
-        """Move constructor."""
-        self.transitions = other.transitions^
-        self.is_accepting = other.is_accepting
-        self.match_length = other.match_length
+        self.is_accepting = is_accepting
+        self.match_length = match_length
 
     @always_inline
     fn add_transition(mut self, char_code: Int, target_state: Int):
@@ -118,9 +104,7 @@ struct DFAEngine(Engine):
 
         if len(pattern) == 0:
             # Empty pattern - create single accepting state
-            var state = DFAState()
-            state.is_accepting = True
-            state.match_length = 0
+            var state = DFAState(is_accepting=True, match_length=0)
             self.states.append(state)
             self.start_state = 0
             return
