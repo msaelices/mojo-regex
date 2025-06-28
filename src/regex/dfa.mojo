@@ -33,18 +33,21 @@ struct DFAState(Copyable, Movable):
         self.is_accepting = False
         self.match_length = 0
 
+    @always_inline
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.transitions = other.transitions
         self.is_accepting = other.is_accepting
         self.match_length = other.match_length
 
+    @always_inline
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.transitions = other.transitions^
         self.is_accepting = other.is_accepting
         self.match_length = other.match_length
 
+    @always_inline
     fn add_transition(mut self, char_code: Int, target_state: Int):
         """Add a transition from this state to target_state on character char_code.
 
@@ -55,6 +58,7 @@ struct DFAState(Copyable, Movable):
         if char_code >= 0 and char_code < 256:
             self.transitions[char_code] = target_state
 
+    @always_inline
     fn get_transition(self, char_code: Int) -> Int:
         """Get the target state for a given character.
 
