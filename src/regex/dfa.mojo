@@ -110,18 +110,16 @@ struct DFAEngine(Engine):
             return
 
         # Create states: one for each character + one final accepting state
-        var num_states = len(pattern) + 1
-        for _ in range(num_states):
-            self.states.append(DFAState())
-
         # Set up transitions for each character in the pattern
         for i in range(len(pattern)):
+            var state = DFAState()
             var char_code = ord(pattern[i])
-            self.states[i].add_transition(char_code, i + 1)
+            state.add_transition(char_code, i + 1)
+            self.states.append(state^)
 
-        # Mark final state as accepting
-        self.states[len(pattern)].is_accepting = True
-        self.states[len(pattern)].match_length = len(pattern)
+        # Add final accepting state
+        var final_state = DFAState(is_accepting=True, match_length=len(pattern))
+        self.states.append(final_state^)
 
         self.start_state = 0
 
