@@ -95,8 +95,8 @@ struct PatternAnalyzer:
             return self._classify_quantifier(ast)
 
         elif ast.type == START or ast.type == END:
-            # Anchors ^ and $ - always simple
-            return PatternComplexity(PatternComplexity.SIMPLE)
+            # Anchors ^ and $ - force to use NFA for now since DFA doesn't handle them properly
+            return PatternComplexity(PatternComplexity.MEDIUM)
 
         elif ast.type == OR:
             # Alternation (|) - analyze complexity of branches
@@ -196,6 +196,10 @@ struct PatternAnalyzer:
         var quantifier_complexity = self._classify_quantifier(ast)
         if quantifier_complexity.value == PatternComplexity.COMPLEX:
             return PatternComplexity(PatternComplexity.COMPLEX)
+
+        # If group has any quantifier, use NFA for now since DFA doesn't handle group quantifiers properly
+        if ast.min != 1 or ast.max != 1:
+            return PatternComplexity(PatternComplexity.MEDIUM)
 
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
