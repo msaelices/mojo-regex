@@ -133,36 +133,35 @@ struct DFAEngine(Engine):
             min_matches: Minimum number of matches required.
             max_matches: Maximum number of matches (-1 for unlimited).
         """
-        self.compiled_pattern = "[" + char_class + "]"
+        self.compiled_pattern = String("[", char_class, "]")
         self.states = List[DFAState]()
 
+        var start_state: DFAState
         if min_matches == 0:
             # Can match zero characters - start state is accepting
-            var start_state = DFAState()
-            start_state.is_accepting = True
-            start_state.match_length = 0
+            start_state = DFAState(is_accepting=True)
             self.states.append(start_state)
         else:
             # Must match at least one character
-            var start_state = DFAState()
+            start_state = DFAState()
             self.states.append(start_state)
 
         # Add accepting state for one or more matches
-        var accepting_state = DFAState()
-        accepting_state.is_accepting = True
-        accepting_state.match_length = 1  # Will be updated during matching
+        var accepting_state = DFAState(is_accepting=True, match_length=1)
         self.states.append(accepting_state)
 
         # Set up transitions from start state to accepting state
+        ref state = self.states[0]
         for i in range(len(char_class)):
             var char_code = ord(char_class[i])
-            self.states[0].add_transition(char_code, 1)
+            state.add_transition(char_code, 1)
 
         # Set up self-transitions on accepting state for + and * quantifiers
         if max_matches == -1 or max_matches > 1:
+            ref state = self.states[1]
             for i in range(len(char_class)):
                 var char_code = ord(char_class[i])
-                self.states[1].add_transition(char_code, 1)
+                state.add_transition(char_code, 1)
 
         self.start_state = 0
 
