@@ -475,3 +475,37 @@ struct NFAEngine(Engine):
             return (True, current_pos)
         else:
             return (False, str_i)
+
+
+fn findall(pattern: String, text: String) raises -> List[Match]:
+    """Find all matches of pattern in text (equivalent to re.findall in Python).
+
+    Args:
+        pattern: Regex pattern string.
+        text: Text to search in.
+
+    Returns:
+        List of all matches found.
+    """
+    var engine = NFAEngine(pattern)
+    return engine.match_all(text)
+
+
+fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+    """Match pattern at beginning of text (equivalent to re.match in Python).
+
+    Args:
+        pattern: Regex pattern string.
+        text: Text to match against.
+
+    Returns:
+        Optional Match if pattern matches at start of text.
+    """
+    var engine = NFAEngine(pattern)
+    var result = engine.match_first(text, 0)
+
+    # Python's re.match only succeeds if match starts at position 0
+    if result and result.value().start_idx == 0:
+        return result
+    else:
+        return None
