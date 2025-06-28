@@ -188,17 +188,40 @@ struct DFAEngine(Engine):
         Returns:
             Optional Match if pattern matches, None otherwise.
         """
-        if start >= len(text):
+        # Try to find a match starting from each position from 'start' onwards
+        for try_pos in range(start, len(text) + 1):
+            var match_result = self._try_match_at_position(text, try_pos)
+            if match_result:
+                return match_result
+
+        return None
+
+    fn _try_match_at_position(
+        self, text: String, start_pos: Int
+    ) -> Optional[Match]:
+        """Try to match pattern starting at a specific position.
+
+        Args:
+            text: Input text to match against.
+            start_pos: Position to start matching from.
+
+        Returns:
+            Optional Match if pattern matches at this position, None otherwise.
+        """
+        if start_pos > len(text):
+            return None
+
+        if start_pos == len(text):
             # Check if we can match empty string
             if (
                 len(self.states) > 0
                 and self.states[self.start_state].is_accepting
             ):
-                return Match(0, start, start, text, "DFA")
+                return Match(0, start_pos, start_pos, text, "DFA")
             return None
 
         var current_state = self.start_state
-        var pos = start
+        var pos = start_pos
         var last_accepting_pos = -1
 
         # Check if start state is accepting (for patterns like a*)
@@ -235,7 +258,7 @@ struct DFAEngine(Engine):
 
         # Return longest match found
         if last_accepting_pos != -1:
-            return Match(0, start, last_accepting_pos, text, "DFA")
+            return Match(0, start_pos, last_accepting_pos, text, "DFA")
 
         return None
 

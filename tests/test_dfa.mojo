@@ -59,9 +59,13 @@ def test_dfa_character_class():
     assert_equal(match1.end_idx, 5)
     assert_equal(match1.match_text, "hello")
 
-    # Test no match (starts with digit)
+    # Test match found later in string (should find "hello" at position 3)
     var result2 = dfa.match_first("123hello", 0)
-    assert_false(result2.__bool__())
+    assert_true(result2.__bool__())
+    var match2 = result2.value()
+    assert_equal(match2.start_idx, 3)
+    assert_equal(match2.end_idx, 8)
+    assert_equal(match2.match_text, "hello")
 
 
 def test_dfa_match_all():
