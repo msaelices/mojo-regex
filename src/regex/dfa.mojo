@@ -19,16 +19,17 @@ from regex.optimizer import (
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
-    var transitions: List[Int]  # ASCII transition table (256 entries)
+    var transitions: InlineArray[
+        Int, 256
+    ]  # ASCII transition table (256 entries)
     var is_accepting: Bool
     var match_length: Int  # Length of match when this state is reached
 
     fn __init__(out self):
         """Initialize a DFA state with no transitions."""
-        self.transitions = List[Int](capacity=256)
-        # Initialize all transitions to -1 (no transition)
-        for _ in range(256):
-            self.transitions.append(-1)
+        self.transitions = InlineArray[Int, 256](
+            fill=-1
+        )  # -1 means no transition
         self.is_accepting = False
         self.match_length = 0
 
