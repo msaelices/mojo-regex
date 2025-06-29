@@ -5,7 +5,6 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
-
 from regex.ast import ASTNode
 from regex.matching import Match
 from regex.nfa import NFAEngine
@@ -45,27 +44,22 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
     var engine: DFAEngine
-    var pattern_string: String
 
-    fn __init__(out self, ast: ASTNode, pattern: String) raises:
+    fn __init__(out self, owned ast: ASTNode) raises:
         """Initialize DFA matcher by compiling the AST.
 
         Args:
             ast: AST representing the regex pattern.
-            pattern: Original pattern string.
         """
-        self.pattern_string = pattern
         self.engine = compile_simple_pattern(ast)
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.engine = other.engine
-        self.pattern_string = other.pattern_string
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.engine = other.engine^
-        self.pattern_string = other.pattern_string^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
@@ -81,7 +75,6 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     var engine: NFAEngine
     var ast: ASTNode
-    var pattern_string: String
 
     fn __init__(out self, ast: ASTNode, pattern: String):
         """Initialize NFA matcher with the existing engine.
@@ -92,19 +85,16 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """
         self.engine = NFAEngine(pattern)
         self.ast = ast
-        self.pattern_string = pattern
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.engine = other.engine
         self.ast = other.ast
-        self.pattern_string = other.pattern_string
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.engine = other.engine^
         self.ast = other.ast^
-        self.pattern_string = other.pattern_string^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
@@ -122,7 +112,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     var dfa_matcher: Optional[DFAMatcher]
     var nfa_matcher: NFAMatcher
     var complexity: PatternComplexity
-    var pattern_string: String
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -130,7 +119,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         Args:
             pattern: Regex pattern string to compile.
         """
-        self.pattern_string = pattern
         var ast = parse(pattern)
 
         # Analyze pattern complexity
@@ -143,7 +131,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Create DFA matcher if pattern is simple enough
         if self.complexity.value == PatternComplexity.SIMPLE:
             try:
-                self.dfa_matcher = DFAMatcher(ast, pattern)
+                self.dfa_matcher = DFAMatcher(ast)
             except:
                 # DFA compilation failed, fall back to NFA only
                 self.dfa_matcher = None
@@ -155,14 +143,12 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.dfa_matcher = other.dfa_matcher
         self.nfa_matcher = other.nfa_matcher
         self.complexity = other.complexity
-        self.pattern_string = other.pattern_string
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.dfa_matcher = other.dfa_matcher^
         self.nfa_matcher = other.nfa_matcher^
         self.complexity = other.complexity
-        self.pattern_string = other.pattern_string^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine."""
@@ -211,7 +197,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return self.complexity
 
 
-struct CompiledRegex(Movable):
+struct CompiledRegex(Copyable, Movable):
     """High-level compiled regex object with caching and optimization."""
 
     var matcher: HybridMatcher
@@ -301,7 +287,7 @@ struct CompiledRegex(Movable):
 #  - Attempted to free corrupted pointer
 #  - Possible double free detected
 # Global pattern cache for improved performance
-# var __cache_patterns = Dict[String, CompiledRegex]()
+var __cache_patterns = Dict[String, CompiledRegex]()
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
@@ -313,23 +299,22 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    # if pattern in __cache_patterns:
-    #     # Return cached compiled regex if available
-    #     return __cache_patterns[pattern]
+    if pattern in __cache_patterns:
+        # Return cached compiled regex if available
+        return __cache_patterns[pattern]
 
     # Not in cache, compile new regex
     var compiled = CompiledRegex(pattern)
 
     # Add to cache (TODO: implement LRU eviction)
-    # __cache_patterns[pattern] = compiled
+    __cache_patterns[pattern] = compiled
 
-    return compiled^
+    return compiled
 
 
 fn clear_regex_cache():
     """Clear the compiled regex cache."""
-    pass
-    # __cache_patterns.clear()
+    __cache_patterns.clear()
 
 
 # High-level convenience functions that match Python's re module interface
