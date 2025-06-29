@@ -45,6 +45,56 @@ from regex.ast import (
 )
 
 
+@always_inline
+fn check_for_quantifiers(
+    mut i: Int, mut elem: ASTNode, read tokens: List[Token]
+) raises:
+    """Check for quantifiers after an element and set min/max accordingly."""
+    var next_token = tokens[i + 1]
+    if next_token.type == Token.ASTERISK:
+        elem.min = 0
+        elem.max = -1  # -1 means unlimited
+        i += 1  # Skip quantifier
+    elif next_token.type == Token.PLUS:
+        elem.min = 1
+        elem.max = -1
+        i += 1  # Skip quantifier
+    elif next_token.type == Token.QUESTIONMARK:
+        elem.min = 0
+        elem.max = 1
+        i += 1  # Skip quantifier
+    elif next_token.type == Token.LEFTCURLYBRACE:
+        # Parse curly brace quantifiers
+        i += 2  # Skip element and {
+        var min_val = String("")
+        var max_val = String("")
+
+        # Parse min value
+        while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+            min_val += tokens[i].char
+            i += 1
+
+        elem.min = atol(min_val) if min_val != "" else 0
+
+        # Check for comma (range) or closing brace (exact)
+        if i < len(tokens) and tokens[i].type == Token.COMMA:
+            i += 1  # Skip comma
+            # Parse max value
+            while i < len(tokens) and tokens[i].type == Token.ELEMENT:
+                max_val += tokens[i].char
+                i += 1
+            elem.max = atol(max_val) if max_val != "" else -1
+        else:
+            # Exact quantifier {n}
+            elem.max = elem.min
+
+        # Skip closing brace
+        if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
+            i += 1
+        # Don't increment i again - continue processing next token
+        i -= 1  # Compensate for the i += 1 at the end of the loop
+
+
 fn get_range_str(start: String, end: String) -> String:
     """Generate a string containing all characters in the range [start, end]."""
     var start_ord = ord(start)
@@ -71,47 +121,29 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
     while i < len(tokens):
         var token = tokens[i]
 
-        @always_inline
-        fn _check_for_quantifier(mut elem: ASTNode) capturing:
-            """Check for quantifiers after an element and set min/max accordingly.
-            """
-            var next_token = tokens[i + 1]
-            if next_token.type == Token.ASTERISK:
-                elem.min = 0
-                elem.max = -1  # -1 means unlimited
-                i += 1  # Skip quantifier
-            elif next_token.type == Token.PLUS:
-                elem.min = 1
-                elem.max = -1
-                i += 1  # Skip quantifier
-            elif next_token.type == Token.QUESTIONMARK:
-                elem.min = 0
-                elem.max = 1
-                i += 1  # Skip quantifier
-
         if token.type == Token.ELEMENT:
             var elem = Element(token.char)
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement()
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.SPACE:
             var elem = SpaceElement()
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.DIGIT:
             var elem = DigitElement()
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.START:
             elements.append(StartElement())
@@ -154,7 +186,7 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             var range_elem = RangeElement(range_str, positive_logic)
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                _check_for_quantifier(range_elem)
+                check_for_quantifiers(i, range_elem, tokens^)
             elements.append(range_elem)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
@@ -203,54 +235,6 @@ fn parse(regex: String) raises -> ASTNode:
     while i < len(tokens):
         var token = tokens[i]
 
-        @always_inline
-        fn _check_for_quantifier(mut elem: ASTNode) raises capturing:
-            """Check for quantifiers after an element and set min/max accordingly.
-            """
-            var next_token = tokens[i + 1]
-            if next_token.type == Token.ASTERISK:
-                elem.min = 0
-                elem.max = -1  # -1 means unlimited
-                i += 1  # Skip quantifier
-            elif next_token.type == Token.PLUS:
-                elem.min = 1
-                elem.max = -1
-                i += 1  # Skip quantifier
-            elif next_token.type == Token.QUESTIONMARK:
-                elem.min = 0
-                elem.max = 1
-                i += 1  # Skip quantifier
-            elif next_token.type == Token.LEFTCURLYBRACE:
-                # Parse curly brace quantifiers
-                i += 2  # Skip element and {
-                var min_val = String("")
-                var max_val = String("")
-
-                # Parse min value
-                while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                    min_val += tokens[i].char
-                    i += 1
-
-                elem.min = atol(min_val) if min_val != "" else 0
-
-                # Check for comma (range) or closing brace (exact)
-                if i < len(tokens) and tokens[i].type == Token.COMMA:
-                    i += 1  # Skip comma
-                    # Parse max value
-                    while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                        max_val += tokens[i].char
-                        i += 1
-                    elem.max = atol(max_val) if max_val != "" else -1
-                else:
-                    # Exact quantifier {n}
-                    elem.max = elem.min
-
-                # Skip closing brace
-                if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
-                    i += 1
-                # Don't increment i again - continue processing next token
-                i -= 1  # Compensate for the i += 1 at the end of the loop
-
         if token.type == Token.START:
             elements.append(StartElement())
         elif token.type == Token.END:
@@ -259,25 +243,25 @@ fn parse(regex: String) raises -> ASTNode:
             var elem = Element(token.char)
             # Check for quantifiers
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement()
             # Check for quantifiers
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.SPACE:
             var elem = SpaceElement()
             # Check for quantifiers
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.DIGIT:
             var elem = DigitElement()
             # Check for quantifiers
             if i + 1 < len(tokens):
-                _check_for_quantifier(elem)
+                check_for_quantifiers(i, elem, tokens)
             elements.append(elem)
         elif token.type == Token.LEFTBRACKET:
             # Simple range parsing
@@ -316,7 +300,7 @@ fn parse(regex: String) raises -> ASTNode:
             var range_elem = RangeElement(range_str, positive_logic)
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                _check_for_quantifier(range_elem)
+                check_for_quantifiers(i, range_elem, tokens)
             elements.append(range_elem)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping - check for non-capturing group (?:...)
@@ -363,7 +347,7 @@ fn parse(regex: String) raises -> ASTNode:
                 group = GroupNode([group_ast], is_capturing, "", 0)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
-                _check_for_quantifier(group)
+                check_for_quantifiers(i, group, tokens)
             elements.append(group)
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
