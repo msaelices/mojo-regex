@@ -128,7 +128,6 @@ struct DFAEngine(Engine):
         self.compiled_pattern = pattern
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
-        self.states = List[DFAState]()
 
         if len(pattern) == 0:
             # Empty pattern - create single accepting state
@@ -253,7 +252,6 @@ struct DFAEngine(Engine):
         self.compiled_pattern = "sequential_pattern"
         self.has_start_anchor = pattern_info.has_start_anchor
         self.has_end_anchor = pattern_info.has_end_anchor
-        self.states = List[DFAState]()
 
         if not pattern_info.elements:
             self._create_accepting_state()
@@ -348,7 +346,6 @@ struct DFAEngine(Engine):
         self.compiled_pattern = "multi_char_class_sequence"
         self.has_start_anchor = sequence_info.has_start_anchor
         self.has_end_anchor = sequence_info.has_end_anchor
-        self.states = List[DFAState]()
 
         if not sequence_info.elements:
             self._create_accepting_state()
