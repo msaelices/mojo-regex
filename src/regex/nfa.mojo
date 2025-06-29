@@ -109,14 +109,12 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        while str_i <= len(text):
-            var result = self._match_node(ast, text, str_i, matches)
-            if result[0]:  # Match found
-                var end_idx = result[1]
-                # Always return the overall match with correct range
-                var matched = Match(0, str_i, end_idx, text, "RegEx")
-                return matched
-            str_i += 1
+        var result = self._match_node(ast, text, str_i, matches)
+        if result[0]:  # Match found
+            var end_idx = result[1]
+            # Always return the overall match with correct range
+            var matched = Match(0, str_i, end_idx, text, "RegEx")
+            return matched^
 
         return None
 

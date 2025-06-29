@@ -310,7 +310,8 @@ struct DFAEngine(Engine):
             state.add_transition(char_code, to_state)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Execute DFA matching against input text.
+        """Execute DFA matching against input text. To be Python compatible,
+        it will not match if the start position is not at the beginning of a line.
 
         Args:
             text: Input text to match against.
@@ -320,6 +321,23 @@ struct DFAEngine(Engine):
             Optional Match if pattern matches, None otherwise.
         """
         # Handle start anchor - can only match at beginning of string
+        if self.has_start_anchor and start > 0:
+            return None  # Start anchor requires match at position 0
+
+        # Python only allows matching at the start of the string
+        return self._try_match_at_position(text, start)
+
+    fn _match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Execute DFA matching against input text. It will match from the given start
+        position.
+
+        Args:
+            text: Input text to match against.
+            start: Starting position in text.
+
+        Returns:
+            Optional Match if pattern matches, None otherwise.
+        """
         if self.has_start_anchor:
             if start == 0:
                 return self._try_match_at_position(text, 0)
@@ -331,7 +349,6 @@ struct DFAEngine(Engine):
             var match_result = self._try_match_at_position(text, try_pos)
             if match_result:
                 return match_result
-
         return None
 
     fn _try_match_at_position(
@@ -417,14 +434,14 @@ struct DFAEngine(Engine):
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
             # Anchored patterns can only match once
-            var match_result = self.match_first(text, 0)
+            var match_result = self._match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
             return matches
 
         var pos = 0
         while pos <= len(text):
-            var match_result = self.match_first(text, pos)
+            var match_result = self._match_next(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)

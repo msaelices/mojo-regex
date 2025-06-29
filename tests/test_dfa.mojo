@@ -22,12 +22,10 @@ def test_dfa_literal_pattern():
     assert_equal(match1.end_idx, 5)
     assert_equal(match1.match_text, "hello")
 
-    # Test match in middle of string
+    # Test in middle of string
     var result2 = dfa.match_first("say hello there", 0)
-    assert_true(result2.__bool__())
-    var match2 = result2.value()
-    assert_equal(match2.start_idx, 4)
-    assert_equal(match2.end_idx, 9)
+    # Python equivalent would also return False if not at start
+    assert_false(result2.__bool__())
 
     # Test no match
     var result3 = dfa.match_first("goodbye world", 0)
@@ -64,13 +62,9 @@ def test_dfa_character_class():
     assert_equal(match1.end_idx, 5)
     assert_equal(match1.match_text, "hello")
 
-    # Test match found later in string (should find "hello" at position 3)
     var result2 = dfa.match_first("123hello", 0)
-    assert_true(result2.__bool__())
-    var match2 = result2.value()
-    assert_equal(match2.start_idx, 3)
-    assert_equal(match2.end_idx, 8)
-    assert_equal(match2.match_text, "hello")
+    # Like Python, this should return False if not at start
+    assert_false(result2.__bool__())
 
 
 def test_dfa_match_all():
@@ -140,8 +134,8 @@ def test_dfa_single_character():
 
     # Should match in longer string
     var result2 = dfa.match_first("banana", 0)
-    assert_true(result2.__bool__())
-    assert_equal(result2.value().start_idx, 1)  # First 'a' in "banana"
+    # Like Python, this should return False if not at start
+    assert_false(result2.__bool__())
 
 
 def test_dfa_case_sensitive():
@@ -225,11 +219,8 @@ def test_dfa_end_anchor():
 
     # Should match at end
     var result1 = dfa.match_first("hello world", 0)
-    assert_true(result1.__bool__())
-    var match1 = result1.value()
-    assert_equal(match1.start_idx, 6)
-    assert_equal(match1.end_idx, 11)
-    assert_equal(match1.match_text, "world")
+    # Like Python, this should return False as "world" is not at the beginning
+    assert_false(result1.__bool__())
 
     # Should not match when not at end
     var result2 = dfa.match_first("world peace", 0)
@@ -278,10 +269,8 @@ def test_dfa_pure_anchors():
     var dfa2 = compile_simple_pattern(ast2)
 
     var result3 = dfa2.match_first("hello", 0)
-    assert_true(result3.__bool__())
-    var match2 = result3.value()
-    assert_equal(match2.start_idx, 5)
-    assert_equal(match2.end_idx, 5)  # Zero-width match at end
+    # Like Python, this should return False if not at end
+    assert_false(result3.__bool__())
 
 
 def test_dfa_anchored_match_all():
@@ -329,8 +318,8 @@ def test_dfa_anchors_with_high_level_api():
     var dfa2 = compile_simple_pattern(ast2)
 
     var result2 = dfa2.match_first("hello world", 0)
-    assert_true(result2.__bool__())
-    assert_equal(result2.value().match_text, "world")
+    # Like Python, this should return False if not at start
+    assert_false(result2.__bool__())
 
     var ast3 = parse("^hello$")
     var dfa3 = compile_simple_pattern(ast3)
