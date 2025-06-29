@@ -16,6 +16,8 @@ from regex.optimizer import (
     pattern_has_anchors,
 )
 
+alias DEFAULT_DFA_CAPACITY = 50  # Default capacity for DFA states
+
 
 struct SequentialPatternElement(Copyable, Movable):
     """Information about a single element in a sequential pattern."""
@@ -99,7 +101,7 @@ struct DFAEngine(Engine):
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
-        self.states = List[DFAState]()
+        self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
         self.compiled_pattern = ""
         self.has_start_anchor = False
