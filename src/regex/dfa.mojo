@@ -6,6 +6,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
 from regex.ast import ASTNode
+from regex.constants import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.optimizer import (
@@ -1106,11 +1107,7 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
                     char_class = " \t\n\r\f"
                 elif element.type == WILDCARD:
                     # Wildcard matches any character except newline
-                    # For simplicity, use printable ASCII range (we'll handle this specially)
-                    char_class = ""
-                    for ascii_code in range(32, 127):
-                        if ascii_code != ord("\n"):
-                            char_class += chr(ascii_code)
+                    char_class = ALL_EXCEPT_NEWLINE
                 else:
                     continue  # Skip unknown elements
 
