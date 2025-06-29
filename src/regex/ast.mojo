@@ -10,6 +10,9 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+alias ZERO_CODE = ord("0")
+alias NINE_CODE = ord("9")
+
 
 struct ASTNode(
     Copyable,
@@ -149,19 +152,8 @@ struct ASTNode(
             return False
         elif self.type == DIGIT:
             if len(value) == 1:
-                var ch = value
-                return (
-                    ch == "0"
-                    or ch == "1"
-                    or ch == "2"
-                    or ch == "3"
-                    or ch == "4"
-                    or ch == "5"
-                    or ch == "6"
-                    or ch == "7"
-                    or ch == "8"
-                    or ch == "9"
-                )
+                var ch_code = ord(value)
+                return ZERO_CODE <= ch_code <= NINE_CODE
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
