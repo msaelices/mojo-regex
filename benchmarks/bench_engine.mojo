@@ -177,10 +177,10 @@ def main():
 
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
-    m.bench_function[bench_literal_match[1000, "abcdefghijklmn"]](
+    m.bench_function[bench_literal_match[1000, "hello"]](
         BenchId(String("literal_match_short"))
     )
-    m.bench_function[bench_literal_match[10000, "abcdefghijklmn"]](
+    m.bench_function[bench_literal_match[10000, "hello"]](
         BenchId(String("literal_match_long"))
     )
 
