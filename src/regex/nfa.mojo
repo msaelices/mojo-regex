@@ -1,4 +1,5 @@
 from regex.ast import ASTNode, RENode
+from regex.constants import ZERO_CODE, NINE_CODE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
@@ -224,7 +225,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        if ord("0") <= ord(ch) <= ord("9"):
+        if ZERO_CODE <= ord(ch) <= NINE_CODE:
             return self._apply_quantifier(ast, string, str_i, 1)
         else:
             return (False, str_i)

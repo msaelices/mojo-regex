@@ -10,8 +10,7 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
-alias ZERO_CODE = ord("0")
-alias NINE_CODE = ord("9")
+from regex.constants import ZERO_CODE, NINE_CODE
 
 
 struct ASTNode(
