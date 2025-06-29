@@ -296,6 +296,7 @@ alias _CACHE_GLOBAL = _Global["RegexCache", RegexCache, _init_regex_cache]
 
 
 fn _init_regex_cache() -> RegexCache:
+    """Initialize the global regex cache."""
     return RegexCache()
 
 
