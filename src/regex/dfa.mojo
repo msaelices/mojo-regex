@@ -162,7 +162,6 @@ struct DFAEngine(Engine):
             max_matches: Maximum number of matches (-1 for unlimited).
         """
         self.compiled_pattern = String("[", char_class, "]")
-        self.states = List[DFAState]()
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -256,11 +255,8 @@ struct DFAEngine(Engine):
         self.has_end_anchor = pattern_info.has_end_anchor
         self.states = List[DFAState]()
 
-        if len(pattern_info.elements) == 0:
-            # Empty pattern - create single accepting state
-            var state = DFAState(is_accepting=True, match_length=0)
-            self.states.append(state)
-            self.start_state = 0
+        if not pattern_info.elements:
+            self._create_accepting_state()
             return
 
         # Build a chain of states for each element in the sequence
@@ -354,11 +350,8 @@ struct DFAEngine(Engine):
         self.has_end_anchor = sequence_info.has_end_anchor
         self.states = List[DFAState]()
 
-        if len(sequence_info.elements) == 0:
-            # Empty pattern - create single accepting state
-            var state = DFAState(is_accepting=True, match_length=0)
-            self.states.append(state)
-            self.start_state = 0
+        if not sequence_info.elements:
+            self._create_accepting_state()
             return
 
         # Build a chain of states for each character class in the sequence
@@ -462,7 +455,6 @@ struct DFAEngine(Engine):
                         self._add_character_class_transitions(
                             current_state_index, state_index, element.char_class
                         )
-
                     current_state_index = state_index
 
                 # Handle additional optional matches
@@ -475,7 +467,7 @@ struct DFAEngine(Engine):
                     )
                 elif element.max_matches > element.min_matches:
                     # Limited additional matches
-                    for match_count in range(
+                    for _ in range(
                         element.min_matches + 1, element.max_matches + 1
                     ):
                         var optional_state = DFAState(
@@ -490,6 +482,14 @@ struct DFAEngine(Engine):
                         )
                         current_state_index = optional_state_index
 
+        self.start_state = 0
+
+    @always_inline
+    fn _create_accepting_state(mut self: Self):
+        """Create a single accepting state if the pattern is empty."""
+        # Empty pattern - create single accepting state
+        var state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(state^)
         self.start_state = 0
 
     fn _add_character_class_transitions(
