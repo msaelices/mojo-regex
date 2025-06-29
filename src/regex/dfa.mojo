@@ -24,9 +24,9 @@ struct SequentialPatternElement(Copyable, Movable):
     var max_matches: Int  # Maximum matches for this element (-1 for unlimited)
 
     fn __init__(
-        out self, char_class: String, min_matches: Int, max_matches: Int
+        out self, owned char_class: String, min_matches: Int, max_matches: Int
     ):
-        self.char_class = char_class
+        self.char_class = char_class^
         self.min_matches = min_matches
         self.max_matches = max_matches
 
