@@ -5,6 +5,9 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
+from memory import UnsafePointer
+from sys.ffi import _Global
+
 from regex.ast import ASTNode
 from regex.matching import Match
 from regex.nfa import NFAEngine
@@ -287,7 +290,20 @@ struct CompiledRegex(Copyable, Movable):
 #  - Attempted to free corrupted pointer
 #  - Possible double free detected
 # Global pattern cache for improved performance
-var __cache_patterns = Dict[String, CompiledRegex]()
+alias RegexCache = Dict[String, CompiledRegex]
+
+alias _CACHE_GLOBAL = _Global["RegexCache", RegexCache, _init_regex_cache]
+
+
+fn _init_regex_cache() -> RegexCache:
+    return RegexCache()
+
+
+fn _get_regex_cache() -> UnsafePointer[RegexCache]:
+    """Returns an pointer to the global regex cache."""
+
+    var ptr = _CACHE_GLOBAL.get_or_create_ptr()
+    return ptr
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
@@ -299,22 +315,27 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    if pattern in __cache_patterns:
-        # Return cached compiled regex if available
-        return __cache_patterns[pattern]
+    regex_cache_ptr = _get_regex_cache()
+    var compiled: CompiledRegex
 
-    # Not in cache, compile new regex
-    var compiled = CompiledRegex(pattern)
+    if pattern in regex_cache_ptr[]:
+        # Return cached compiled regex if available
+        compiled = regex_cache_ptr[][pattern]
+        return compiled
+    else:
+        # Not in cache, compile new regex
+        compiled = CompiledRegex(pattern)
 
     # Add to cache (TODO: implement LRU eviction)
-    __cache_patterns[pattern] = compiled
+    regex_cache_ptr[][pattern] = compiled
 
     return compiled
 
 
 fn clear_regex_cache():
     """Clear the compiled regex cache."""
-    __cache_patterns.clear()
+    regex_cache_ptr = _get_regex_cache()
+    regex_cache_ptr[].clear()
 
 
 # High-level convenience functions that match Python's re module interface
