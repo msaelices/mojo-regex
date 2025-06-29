@@ -116,7 +116,10 @@ struct DFAEngine(Engine):
         self.has_end_anchor = other.has_end_anchor
 
     fn compile_pattern(
-        mut self, pattern: String, has_start_anchor: Bool, has_end_anchor: Bool
+        mut self,
+        owned pattern: String,
+        has_start_anchor: Bool,
+        has_end_anchor: Bool,
     ) raises:
         """Compile a literal string pattern into a DFA.
 
@@ -128,30 +131,31 @@ struct DFAEngine(Engine):
             has_start_anchor: Whether pattern has ^ anchor.
             has_end_anchor: Whether pattern has $ anchor.
         """
-        self.compiled_pattern = pattern
+        var len_pattern = len(pattern)
+        self.compiled_pattern = pattern^
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
 
-        if len(pattern) == 0:
+        if len_pattern == 0:
             self._create_accepting_state()
             return
 
         # Create states: one for each character + one final accepting state
         # Set up transitions for each character in the pattern
-        for i in range(len(pattern)):
+        for i in range(len_pattern):
             var state = DFAState()
-            var char_code = ord(pattern[i])
+            var char_code = ord(self.compiled_pattern[i])
             state.add_transition(char_code, i + 1)
             self.states.append(state^)
 
         # Add final accepting state
-        var final_state = DFAState(is_accepting=True, match_length=len(pattern))
+        var final_state = DFAState(is_accepting=True, match_length=len_pattern)
         self.states.append(final_state^)
 
         self.start_state = 0
 
     fn compile_character_class(
-        mut self, char_class: String, min_matches: Int, max_matches: Int
+        mut self, owned char_class: String, min_matches: Int, max_matches: Int
     ) raises:
         """Compile a character class pattern like [a-z]+ into a DFA.
 
@@ -160,7 +164,7 @@ struct DFAEngine(Engine):
             min_matches: Minimum number of matches required.
             max_matches: Maximum number of matches (-1 for unlimited).
         """
-        self.compiled_pattern = String("[", char_class, "]")
+        self.compiled_pattern = String("[", char_class^, "]")
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -336,7 +340,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_multi_character_class_sequence(
-        mut self, sequence_info: SequentialPatternInfo
+        mut self, owned sequence_info: SequentialPatternInfo
     ) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
 
@@ -931,7 +935,7 @@ fn _extract_character_class_info(
         # Use the range value directly as character class
         char_class = class_node.value
 
-    return (char_class, min_matches, max_matches, has_start, has_end)
+    return (char_class^, min_matches, max_matches, has_start, has_end)
 
 
 fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
