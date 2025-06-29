@@ -173,7 +173,7 @@ fn bench_group_match[
 # ===-----------------------------------------------------------------------===#
 def main():
     seed()
-    var m = Bench(BenchConfig(num_repetitions=2))
+    var m = Bench(BenchConfig(num_repetitions=1))
 
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
