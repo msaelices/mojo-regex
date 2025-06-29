@@ -17,7 +17,7 @@ from regex.optimizer import (
 )
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
-alias DEFAULT_DFA_TRANSITIONS = 128
+alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
 
 struct SequentialPatternElement(Copyable, Movable):
@@ -48,6 +48,7 @@ struct SequentialPatternInfo(Copyable, Movable):
         self.has_end_anchor = False
 
 
+@register_passable
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
@@ -147,11 +148,11 @@ struct DFAEngine(Engine):
             var state = DFAState()
             var char_code = ord(self.compiled_pattern[i])
             state.add_transition(char_code, i + 1)
-            self.states.append(state^)
+            self.states.append(state)
 
         # Add final accepting state
         var final_state = DFAState(is_accepting=True, match_length=len_pattern)
-        self.states.append(final_state^)
+        self.states.append(final_state)
 
         self.start_state = 0
 
@@ -487,7 +488,7 @@ struct DFAEngine(Engine):
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
         var state = DFAState(is_accepting=True, match_length=0)
-        self.states.append(state^)
+        self.states.append(state)
         self.start_state = 0
 
     @always_inline
