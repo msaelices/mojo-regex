@@ -442,10 +442,7 @@ struct DFAEngine(Engine):
                     self.states.append(state)
                     var state_index = len(self.states) - 1
 
-                    if match_num == 0 and element_idx == 0:
-                        # First state of first element
-                        current_state_index = 0
-                    elif match_num > 0:
+                    if match_num > 0:
                         # Connect from previous state
                         self._add_character_class_transitions(
                             state_index - 1, state_index, element.char_class
