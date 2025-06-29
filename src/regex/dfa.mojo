@@ -16,7 +16,8 @@ from regex.optimizer import (
     pattern_has_anchors,
 )
 
-alias DEFAULT_DFA_CAPACITY = 50  # Default capacity for DFA states
+alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
+alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
 
 struct SequentialPatternElement(Copyable, Movable):
@@ -47,19 +48,20 @@ struct SequentialPatternInfo(Copyable, Movable):
         self.has_end_anchor = False
 
 
+@register_passable
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
-    var transitions: InlineArray[
-        Int, 256
+    var transitions: SIMD[
+        DType.uint8, DEFAULT_DFA_TRANSITIONS
     ]  # ASCII transition table (256 entries)
     var is_accepting: Bool
     var match_length: Int  # Length of match when this state is reached
 
     fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
-        self.transitions = InlineArray[Int, 256](
-            fill=-1
+        self.transitions = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](
+            -1
         )  # -1 means no transition
         self.is_accepting = is_accepting
         self.match_length = match_length
@@ -72,7 +74,7 @@ struct DFAState(Copyable, Movable):
             char_code: ASCII code of the character (0-255).
             target_state: Target state index, or -1 for no transition.
         """
-        if char_code >= 0 and char_code < 256:
+        if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
             self.transitions[char_code] = target_state
 
     @always_inline
@@ -85,8 +87,8 @@ struct DFAState(Copyable, Movable):
         Returns:
             Target state index, or -1 if no transition exists.
         """
-        if char_code >= 0 and char_code < 256:
-            return self.transitions[char_code]
+        if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
+            return Int(self.transitions[char_code])
         return -1
 
 
@@ -146,11 +148,11 @@ struct DFAEngine(Engine):
             var state = DFAState()
             var char_code = ord(self.compiled_pattern[i])
             state.add_transition(char_code, i + 1)
-            self.states.append(state^)
+            self.states.append(state)
 
         # Add final accepting state
         var final_state = DFAState(is_accepting=True, match_length=len_pattern)
-        self.states.append(final_state^)
+        self.states.append(final_state)
 
         self.start_state = 0
 
@@ -486,7 +488,7 @@ struct DFAEngine(Engine):
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
         var state = DFAState(is_accepting=True, match_length=0)
-        self.states.append(state^)
+        self.states.append(state)
         self.start_state = 0
 
     @always_inline
