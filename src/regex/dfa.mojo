@@ -131,10 +131,7 @@ struct DFAEngine(Engine):
         self.has_end_anchor = has_end_anchor
 
         if len(pattern) == 0:
-            # Empty pattern - create single accepting state
-            var state = DFAState(is_accepting=True, match_length=0)
-            self.states.append(state)
-            self.start_state = 0
+            self._create_accepting_state()
             return
 
         # Create states: one for each character + one final accepting state
@@ -481,8 +478,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     fn _create_accepting_state(mut self: Self):
-        """Create a single accepting state if the pattern is empty."""
-        # Empty pattern - create single accepting state
+        """Create a single accepting state as the pattern is empty."""
         var state = DFAState(is_accepting=True, match_length=0)
         self.states.append(state^)
         self.start_state = 0
