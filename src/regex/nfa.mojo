@@ -1,4 +1,5 @@
 from regex.ast import ASTNode, RENode
+from regex.constants import ZERO_CODE, NINE_CODE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
@@ -109,14 +110,12 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        while str_i <= len(text):
-            var result = self._match_node(ast, text, str_i, matches)
-            if result[0]:  # Match found
-                var end_idx = result[1]
-                # Always return the overall match with correct range
-                var matched = Match(0, str_i, end_idx, text, "RegEx")
-                return matched
-            str_i += 1
+        var result = self._match_node(ast, text, str_i, matches)
+        if result[0]:  # Match found
+            var end_idx = result[1]
+            # Always return the overall match with correct range
+            var matched = Match(0, str_i, end_idx, text, "RegEx")
+            return matched^
 
         return None
 
@@ -226,7 +225,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        if ord("0") <= ord(ch) <= ord("9"):
+        if ZERO_CODE <= ord(ch) <= NINE_CODE:
             return self._apply_quantifier(ast, string, str_i, 1)
         else:
             return (False, str_i)

@@ -6,6 +6,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
 from regex.ast import ASTNode
+from regex.constants import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.optimizer import (
@@ -14,6 +15,8 @@ from regex.optimizer import (
     get_literal_string,
     pattern_has_anchors,
 )
+
+alias DEFAULT_DFA_CAPACITY = 50  # Default capacity for DFA states
 
 
 struct SequentialPatternElement(Copyable, Movable):
@@ -24,9 +27,9 @@ struct SequentialPatternElement(Copyable, Movable):
     var max_matches: Int  # Maximum matches for this element (-1 for unlimited)
 
     fn __init__(
-        out self, char_class: String, min_matches: Int, max_matches: Int
+        out self, owned char_class: String, min_matches: Int, max_matches: Int
     ):
-        self.char_class = char_class
+        self.char_class = char_class^
         self.min_matches = min_matches
         self.max_matches = max_matches
 
@@ -98,7 +101,7 @@ struct DFAEngine(Engine):
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
-        self.states = List[DFAState]()
+        self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
         self.compiled_pattern = ""
         self.has_start_anchor = False
@@ -113,7 +116,10 @@ struct DFAEngine(Engine):
         self.has_end_anchor = other.has_end_anchor
 
     fn compile_pattern(
-        mut self, pattern: String, has_start_anchor: Bool, has_end_anchor: Bool
+        mut self,
+        owned pattern: String,
+        has_start_anchor: Bool,
+        has_end_anchor: Bool,
     ) raises:
         """Compile a literal string pattern into a DFA.
 
@@ -125,34 +131,31 @@ struct DFAEngine(Engine):
             has_start_anchor: Whether pattern has ^ anchor.
             has_end_anchor: Whether pattern has $ anchor.
         """
-        self.compiled_pattern = pattern
+        var len_pattern = len(pattern)
+        self.compiled_pattern = pattern^
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
-        self.states = List[DFAState]()
 
-        if len(pattern) == 0:
-            # Empty pattern - create single accepting state
-            var state = DFAState(is_accepting=True, match_length=0)
-            self.states.append(state)
-            self.start_state = 0
+        if len_pattern == 0:
+            self._create_accepting_state()
             return
 
         # Create states: one for each character + one final accepting state
         # Set up transitions for each character in the pattern
-        for i in range(len(pattern)):
+        for i in range(len_pattern):
             var state = DFAState()
-            var char_code = ord(pattern[i])
+            var char_code = ord(self.compiled_pattern[i])
             state.add_transition(char_code, i + 1)
             self.states.append(state^)
 
         # Add final accepting state
-        var final_state = DFAState(is_accepting=True, match_length=len(pattern))
+        var final_state = DFAState(is_accepting=True, match_length=len_pattern)
         self.states.append(final_state^)
 
         self.start_state = 0
 
     fn compile_character_class(
-        mut self, char_class: String, min_matches: Int, max_matches: Int
+        mut self, owned char_class: String, min_matches: Int, max_matches: Int
     ) raises:
         """Compile a character class pattern like [a-z]+ into a DFA.
 
@@ -161,35 +164,84 @@ struct DFAEngine(Engine):
             min_matches: Minimum number of matches required.
             max_matches: Maximum number of matches (-1 for unlimited).
         """
-        self.compiled_pattern = String("[", char_class, "]")
-        self.states = List[DFAState]()
+        self.compiled_pattern = String("[", char_class^, "]")
 
-        var start_state: DFAState
         if min_matches == 0:
-            # Can match zero characters - start state is accepting
-            start_state = DFAState(is_accepting=True)
+            # Pattern like [a-z]* - can match zero characters
+            var start_state = DFAState(is_accepting=True, match_length=0)
             self.states.append(start_state)
+
+            # Add state for one or more matches
+            var match_state = DFAState(is_accepting=True, match_length=1)
+            self.states.append(match_state)
+
+            # Transitions from start to match state
+            self._add_character_class_transitions(0, 1, char_class)
+
+            # Self-loop on match state for additional matches
+            if max_matches == -1 or max_matches > 1:
+                self._add_character_class_transitions(1, 1, char_class)
+
+        elif min_matches == 1:
+            # Pattern like [a-z]+ or [a-z] - must match at least one
+            var start_state = DFAState()
+            self.states.append(start_state)
+
+            # Add accepting state for matches
+            var match_state = DFAState(is_accepting=True, match_length=1)
+            self.states.append(match_state)
+
+            # Transitions from start to match state
+            self._add_character_class_transitions(0, 1, char_class)
+
+            # Handle additional matches
+            if max_matches == -1:
+                # Unlimited matches ([a-z]+) - self-loop
+                self._add_character_class_transitions(1, 1, char_class)
+            elif max_matches > 1:
+                # Limited matches like [a-z]{1,3} - create additional states
+                for match_count in range(2, max_matches + 1):
+                    var state = DFAState(
+                        is_accepting=True, match_length=match_count
+                    )
+                    self.states.append(state)
+                    # Add transitions from previous state
+                    self._add_character_class_transitions(
+                        match_count - 1, match_count, char_class
+                    )
         else:
-            # Must match at least one character
-            start_state = DFAState()
-            self.states.append(start_state)
+            # Pattern with min_matches > 1, like [a-z]{3,5}
+            # Create states for required matches first
+            for match_count in range(min_matches + 1):
+                var is_accepting = match_count >= min_matches
+                var state = DFAState(
+                    is_accepting=is_accepting, match_length=match_count
+                )
+                self.states.append(state)
 
-        # Add accepting state for one or more matches
-        var accepting_state = DFAState(is_accepting=True, match_length=1)
-        self.states.append(accepting_state)
+                if match_count > 0:
+                    # Add transitions from previous state
+                    self._add_character_class_transitions(
+                        match_count - 1, match_count, char_class
+                    )
 
-        # Set up transitions from start state to accepting state
-        ref state = self.states[0]
-        for i in range(len(char_class)):
-            var char_code = ord(char_class[i])
-            state.add_transition(char_code, 1)
-
-        # Set up self-transitions on accepting state for + and * quantifiers
-        if max_matches == -1 or max_matches > 1:
-            ref state = self.states[1]
-            for i in range(len(char_class)):
-                var char_code = ord(char_class[i])
-                state.add_transition(char_code, 1)
+            # Add additional optional states if max_matches allows
+            if max_matches == -1:
+                # Unlimited additional matches - self-loop on last state
+                var last_state_idx = len(self.states) - 1
+                self._add_character_class_transitions(
+                    last_state_idx, last_state_idx, char_class
+                )
+            elif max_matches > min_matches:
+                # Limited additional matches
+                for match_count in range(min_matches + 1, max_matches + 1):
+                    var state = DFAState(
+                        is_accepting=True, match_length=match_count
+                    )
+                    self.states.append(state)
+                    self._add_character_class_transitions(
+                        match_count - 1, match_count, char_class
+                    )
 
         self.start_state = 0
 
@@ -204,13 +256,9 @@ struct DFAEngine(Engine):
         self.compiled_pattern = "sequential_pattern"
         self.has_start_anchor = pattern_info.has_start_anchor
         self.has_end_anchor = pattern_info.has_end_anchor
-        self.states = List[DFAState]()
 
-        if len(pattern_info.elements) == 0:
-            # Empty pattern - create single accepting state
-            var state = DFAState(is_accepting=True, match_length=0)
-            self.states.append(state)
-            self.start_state = 0
+        if not pattern_info.elements:
+            self._create_accepting_state()
             return
 
         # Build a chain of states for each element in the sequence
@@ -291,6 +339,157 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
+    fn compile_multi_character_class_sequence(
+        mut self, owned sequence_info: SequentialPatternInfo
+    ) raises:
+        """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
+
+        Args:
+            sequence_info: Information about the character class sequence elements.
+        """
+        self.compiled_pattern = "multi_char_class_sequence"
+        self.has_start_anchor = sequence_info.has_start_anchor
+        self.has_end_anchor = sequence_info.has_end_anchor
+
+        if not sequence_info.elements:
+            self._create_accepting_state()
+            return
+
+        # Build a chain of states for each character class in the sequence
+        var current_state_index = 0
+
+        for element_idx in range(len(sequence_info.elements)):
+            var element = sequence_info.elements[element_idx]
+            var is_last_element = element_idx == len(sequence_info.elements) - 1
+
+            # For multi-character sequences, SIMD optimization is applied per character class
+            # but not globally since we have multiple different character classes
+
+            if element.min_matches == 0:
+                # Optional element (e.g., [a-z]*)
+                if element_idx == 0:
+                    # First element is optional - start state can accept or transition
+                    var start_state = DFAState(is_accepting=is_last_element)
+                    self.states.append(start_state)
+                    current_state_index = 0
+
+                # Create state for matching this element
+                var match_state = DFAState(is_accepting=is_last_element)
+                self.states.append(match_state)
+                var match_state_index = len(self.states) - 1
+
+                # Add transitions from current state to match state
+                self._add_character_class_transitions(
+                    current_state_index, match_state_index, element.char_class
+                )
+
+                # Handle unlimited matches (*) - self-loop
+                if element.max_matches == -1:
+                    self._add_character_class_transitions(
+                        match_state_index, match_state_index, element.char_class
+                    )
+
+                current_state_index = match_state_index
+
+            elif element.min_matches == 1:
+                # Required element with + or {1,n} quantifier
+                if element_idx == 0:
+                    # First element - start from initial state
+                    var start_state = DFAState()
+                    self.states.append(start_state)
+                    current_state_index = 0
+
+                # Create accepting state for this element
+                var is_accepting = is_last_element
+                var match_state = DFAState(is_accepting=is_accepting)
+                self.states.append(match_state)
+                var match_state_index = len(self.states) - 1
+
+                # Add transitions from current state
+                self._add_character_class_transitions(
+                    current_state_index, match_state_index, element.char_class
+                )
+
+                # Handle additional matches
+                if element.max_matches == -1:
+                    # Unlimited matches (+) - self-loop
+                    self._add_character_class_transitions(
+                        match_state_index, match_state_index, element.char_class
+                    )
+                elif element.max_matches > 1:
+                    # Limited additional matches - create optional states
+                    for match_count in range(2, element.max_matches + 1):
+                        var additional_state = DFAState(
+                            is_accepting=is_last_element
+                        )
+                        self.states.append(additional_state)
+                        var additional_state_index = len(self.states) - 1
+                        self._add_character_class_transitions(
+                            match_state_index + match_count - 2,
+                            additional_state_index,
+                            element.char_class,
+                        )
+
+                current_state_index = match_state_index
+
+            else:
+                # Element with min_matches > 1 (e.g., [a-z]{3,5})
+                # Create required states first
+                for match_num in range(element.min_matches):
+                    var is_accepting = (
+                        match_num >= element.min_matches - 1
+                    ) and is_last_element
+                    var state = DFAState(is_accepting=is_accepting)
+                    self.states.append(state)
+                    var state_index = len(self.states) - 1
+
+                    if match_num > 0:
+                        # Connect from previous state
+                        self._add_character_class_transitions(
+                            state_index - 1, state_index, element.char_class
+                        )
+                    else:
+                        # Connect from previous element's final state
+                        self._add_character_class_transitions(
+                            current_state_index, state_index, element.char_class
+                        )
+                    current_state_index = state_index
+
+                # Handle additional optional matches
+                if element.max_matches == -1:
+                    # Unlimited additional matches - self-loop on last state
+                    self._add_character_class_transitions(
+                        current_state_index,
+                        current_state_index,
+                        element.char_class,
+                    )
+                elif element.max_matches > element.min_matches:
+                    # Limited additional matches
+                    for _ in range(
+                        element.min_matches + 1, element.max_matches + 1
+                    ):
+                        var optional_state = DFAState(
+                            is_accepting=is_last_element
+                        )
+                        self.states.append(optional_state)
+                        var optional_state_index = len(self.states) - 1
+                        self._add_character_class_transitions(
+                            current_state_index,
+                            optional_state_index,
+                            element.char_class,
+                        )
+                        current_state_index = optional_state_index
+
+        self.start_state = 0
+
+    @always_inline
+    fn _create_accepting_state(mut self: Self):
+        """Create a single accepting state as the pattern is empty."""
+        var state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(state^)
+        self.start_state = 0
+
+    @always_inline
     fn _add_character_class_transitions(
         mut self, from_state: Int, to_state: Int, char_class: String
     ):
@@ -310,7 +509,8 @@ struct DFAEngine(Engine):
             state.add_transition(char_code, to_state)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Execute DFA matching against input text.
+        """Execute DFA matching against input text. To be Python compatible,
+        it will not match if the start position is not at the beginning of a line.
 
         Args:
             text: Input text to match against.
@@ -320,6 +520,23 @@ struct DFAEngine(Engine):
             Optional Match if pattern matches, None otherwise.
         """
         # Handle start anchor - can only match at beginning of string
+        if self.has_start_anchor and start > 0:
+            return None  # Start anchor requires match at position 0
+
+        # Python only allows matching at the start of the string
+        return self._try_match_at_position(text, start)
+
+    fn _match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Execute DFA matching against input text. It will match from the given start
+        position.
+
+        Args:
+            text: Input text to match against.
+            start: Starting position in text.
+
+        Returns:
+            Optional Match if pattern matches, None otherwise.
+        """
         if self.has_start_anchor:
             if start == 0:
                 return self._try_match_at_position(text, 0)
@@ -331,7 +548,6 @@ struct DFAEngine(Engine):
             var match_result = self._try_match_at_position(text, try_pos)
             if match_result:
                 return match_result
-
         return None
 
     fn _try_match_at_position(
@@ -417,14 +633,14 @@ struct DFAEngine(Engine):
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
             # Anchored patterns can only match once
-            var match_result = self.match_first(text, 0)
+            var match_result = self._match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
             return matches
 
         var pos = 0
         while pos <= len(text):
-            var match_result = self.match_first(text, pos)
+            var match_result = self._match_next(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)
@@ -438,6 +654,60 @@ struct DFAEngine(Engine):
                 pos += 1
 
         return matches
+
+    fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
+        """SIMD-optimized matching for character class patterns.
+
+        Args:
+            text: Input text to match against.
+            start_pos: Position to start matching from.
+
+        Returns:
+            Optional Match if pattern matches at this position, None otherwise.
+        """
+        if not self.simd_matcher:
+            return None
+
+        var simd_matcher = self.simd_matcher.value()
+        var pos = start_pos
+        var match_count = 0
+        var text_len = len(text)
+
+        # Check if start state is accepting (for patterns like [a-z]*)
+        var start_accepting = (
+            len(self.states) > 0 and self.states[self.start_state].is_accepting
+        )
+
+        # Count consecutive matching characters using SIMD
+        while pos < text_len:
+            var ch = text[pos]
+            if simd_matcher.contains(ch):
+                match_count += 1
+                pos += 1
+            else:
+                break
+
+        # Determine if we have a valid match based on the DFA pattern
+        var is_valid_match = False
+        var match_end = start_pos + match_count
+
+        if match_count == 0:
+            # No characters matched - only valid if start state accepts (e.g., [a-z]*)
+            if start_accepting:
+                is_valid_match = True
+                match_end = start_pos
+        else:
+            # Some characters matched - check if this satisfies the pattern
+            # For character class patterns, any positive match count is typically valid
+            is_valid_match = True
+
+        if is_valid_match:
+            # Check end anchor constraint
+            if self.has_end_anchor and match_end != text_len:
+                return None
+            return Match(0, start_pos, match_end, text, "DFA+SIMD")
+
+        return None
 
 
 struct BoyerMoore:
@@ -545,13 +815,19 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.compile_pattern("", has_start, has_end)
     elif _is_simple_character_class_pattern(ast):
-        # Handle simple character class patterns like \d, \d+, \d{3}
+        # Handle simple character class patterns like \d, \d+, \d{3}, [a-z]+, [0-9]*
         var char_class, min_matches, max_matches, has_start, has_end = (
             _extract_character_class_info(ast)
         )
         dfa.compile_character_class(char_class, min_matches, max_matches)
         dfa.has_start_anchor = has_start
         dfa.has_end_anchor = has_end
+    elif _is_multi_character_class_sequence(ast):
+        # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
+        var sequence_info = _extract_multi_class_sequence_info(ast)
+        dfa.compile_multi_character_class_sequence(sequence_info)
+        dfa.has_start_anchor = sequence_info.has_start_anchor
+        dfa.has_end_anchor = sequence_info.has_end_anchor
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
         var sequence_info = _extract_sequential_pattern_info(ast)
@@ -582,7 +858,7 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
 
 
 fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
-    """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, etc.).
+    """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, [a-z]+, etc.).
 
     Args:
         ast: Root AST node.
@@ -590,16 +866,21 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
     Returns:
         True if pattern is a simple character class pattern.
     """
-    from regex.ast import RE, DIGIT, GROUP
+    from regex.ast import RE, DIGIT, RANGE, GROUP
+
+    # First check if it's a multi-character sequence - if so, not simple
+    if _is_multi_character_class_sequence(ast):
+        return False
 
     if ast.type == RE and len(ast.children) == 1:
         var child = ast.children[0]
-        if child.type == DIGIT:
+        if child.type == DIGIT or child.type == RANGE:
             return True
         elif child.type == GROUP and len(child.children) == 1:
-            # Check if group contains single digit element
-            return child.children[0].type == DIGIT
-    elif ast.type == DIGIT:
+            # Check if group contains single digit or range element
+            var inner = child.children[0]
+            return inner.type == DIGIT or inner.type == RANGE
+    elif ast.type == DIGIT or ast.type == RANGE:
         return True
 
     return False
@@ -616,7 +897,7 @@ fn _extract_character_class_info(
     Returns:
         Tuple of (char_class_string, min_matches, max_matches, has_start_anchor, has_end_anchor).
     """
-    from regex.ast import RE, DIGIT, GROUP
+    from regex.ast import RE, DIGIT, RANGE, GROUP
 
     var char_class = String("")
     var min_matches = 1
@@ -624,32 +905,37 @@ fn _extract_character_class_info(
     var has_start = False
     var has_end = False
 
-    # Find the DIGIT node
-    var digit_node: ASTNode
-    if ast.type == DIGIT:
-        digit_node = ast
+    # Find the character class node (DIGIT or RANGE)
+    var class_node: ASTNode
+    if ast.type == DIGIT or ast.type == RANGE:
+        class_node = ast
     elif ast.type == RE and len(ast.children) == 1:
-        if ast.children[0].type == DIGIT:
-            digit_node = ast.children[0]
+        if ast.children[0].type == DIGIT or ast.children[0].type == RANGE:
+            class_node = ast.children[0]
         elif (
             ast.children[0].type == GROUP and len(ast.children[0].children) == 1
         ):
-            digit_node = ast.children[0].children[0]
+            class_node = ast.children[0].children[0]
         else:
-            digit_node = ast.children[0]  # fallback
+            class_node = ast.children[0]  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:
-        digit_node = ast  # fallback
+        class_node = ast  # fallback
 
-    # Extract quantifier information
-    if digit_node.type == DIGIT:
-        min_matches = digit_node.min
-        max_matches = digit_node.max
+    # Extract quantifier information and character class
+    if class_node.type == DIGIT:
+        min_matches = class_node.min
+        max_matches = class_node.max
         # Generate digit character class string "0123456789"
         char_class = "0123456789"
+    elif class_node.type == RANGE:
+        min_matches = class_node.min
+        max_matches = class_node.max
+        # Use the range value directly as character class
+        char_class = class_node.value
 
-    return (char_class, min_matches, max_matches, has_start, has_end)
+    return (char_class^, min_matches, max_matches, has_start, has_end)
 
 
 fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
@@ -740,6 +1026,95 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
 
                 var pattern_element = SequentialPatternElement(
                     char_class, element.min, element.max
+                )
+                info.elements.append(pattern_element)
+
+    return info^
+
+
+fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
+    """Check if pattern is a sequence of multiple character classes.
+
+    Examples: [a-z]+[0-9]+, digit+word+, [A-Z][a-z]*[0-9]{2,4}
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a multi-character class sequence.
+    """
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+
+    if ast.type != RE or len(ast.children) != 1:
+        return False
+
+    var child = ast.children[0]
+    if child.type != GROUP:
+        return False
+
+    # Check if all children are character classes with quantifiers
+    # Must have at least 2 elements to be considered a sequence
+    if len(child.children) < 2:
+        return False
+
+    var char_class_count = 0
+    for i in range(len(child.children)):
+        ref element = child.children[i]
+        if (
+            element.type == RANGE
+            or element.type == DIGIT
+            or element.type == SPACE
+        ):
+            char_class_count += 1
+        elif element.type == WILDCARD:
+            # Wildcard can be considered a character class
+            char_class_count += 1
+        else:
+            # Non-character class element found
+            return False
+
+    # Must be all character classes
+    return char_class_count == len(child.children)
+
+
+fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
+    """Extract information about a multi-character class sequence.
+
+    Args:
+        ast: AST node representing a multi-character class sequence.
+
+    Returns:
+        SequentialPatternInfo with details about each character class element.
+    """
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+
+    var info = SequentialPatternInfo()
+
+    # Check for anchors at root level
+    info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
+
+    if ast.type == RE and len(ast.children) == 1:
+        var child = ast.children[0]
+        if child.type == GROUP:
+            # Extract each character class element
+            for i in range(len(child.children)):
+                ref element = child.children[i]
+                var char_class: String
+
+                if element.type == DIGIT:
+                    char_class = "0123456789"
+                elif element.type == RANGE:
+                    char_class = element.value
+                elif element.type == SPACE:
+                    char_class = " \t\n\r\f"
+                elif element.type == WILDCARD:
+                    # Wildcard matches any character except newline
+                    char_class = ALL_EXCEPT_NEWLINE
+                else:
+                    continue  # Skip unknown elements
+
+                var pattern_element = SequentialPatternElement(
+                    char_class^, element.min, element.max
                 )
                 info.elements.append(pattern_element)
 
