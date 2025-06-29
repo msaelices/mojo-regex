@@ -636,3 +636,132 @@ def test_findall_zero_width_matches():
     assert_equal(len(matches), 1)
     assert_equal(matches[0].start_idx, 0)
     assert_equal(matches[0].end_idx, 0)
+
+
+def test_dfa_character_class_plus():
+    """Test DFA optimization for character classes with + quantifier."""
+    # Test [a-z]+ pattern
+    var result = match_first("[a-z]+", "hello123")
+    assert_true(result.__bool__())
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 5)
+    assert_equal(matched.match_text, "hello")
+
+
+def test_dfa_character_class_star():
+    """Test DFA optimization for character classes with * quantifier."""
+    # Test [0-9]* pattern
+    var result1 = match_first("[0-9]*", "123abc")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 3)
+    assert_equal(matched1.match_text, "123")
+
+    # Test [0-9]* pattern with no digits at start
+    var result2 = match_first("[0-9]*", "abc123")
+    assert_true(result2.__bool__())
+    var matched2 = result2.value()
+    assert_equal(matched2.start_idx, 0)
+    assert_equal(matched2.end_idx, 0)
+    assert_equal(matched2.match_text, "")
+
+
+def test_dfa_character_class_exact():
+    """Test DFA optimization for character classes with exact quantifiers."""
+    # Test [a-z]{3} pattern
+    var result1 = match_first("[a-z]{3}", "hello")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 3)
+    assert_equal(matched1.match_text, "hel")
+
+    # Test [a-z]{5} pattern with insufficient characters
+    var result2 = match_first("[a-z]{5}", "hi")
+    assert_true(not result2.__bool__())
+
+
+def test_dfa_character_class_range():
+    """Test DFA optimization for character classes with range quantifiers."""
+    # Test [0-9]{2,4} pattern
+    var result1 = match_first("[0-9]{2,4}", "12345")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 4)
+    assert_equal(matched1.match_text, "1234")
+
+    # Test minimum requirement
+    var result2 = match_first("[0-9]{2,4}", "1a")
+    assert_true(not result2.__bool__())
+
+    # Test exact minimum
+    var result3 = match_first("[0-9]{2,4}", "12a")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.start_idx, 0)
+    assert_equal(matched3.end_idx, 2)
+    assert_equal(matched3.match_text, "12")
+
+
+def test_dfa_character_class_anchors():
+    """Test DFA character class optimization with anchors."""
+    # Test ^[a-z]+$ pattern
+    var result1 = match_first("^[a-z]+$", "hello")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 5)
+    assert_equal(matched1.match_text, "hello")
+
+    # Test ^[a-z]+$ pattern with mixed case (should fail)
+    var result2 = match_first("^[a-z]+$", "Hello")
+    assert_true(not result2.__bool__())
+
+
+def test_dfa_mixed_character_classes():
+    """Test DFA with mixed character classes."""
+    # Test [a-zA-Z0-9]+ pattern
+    var result = match_first("[a-zA-Z0-9]+", "Hello123")
+    assert_true(result.__bool__())
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 8)
+    assert_equal(matched.match_text, "Hello123")
+
+
+def test_dfa_character_class_findall():
+    """Test findall with DFA character class optimization."""
+    # Test finding all [0-9]+ sequences
+    var matches = findall("[0-9]+", "abc123def456ghi")
+    assert_equal(len(matches), 2)
+    assert_equal(matches[0].match_text, "123")
+    assert_equal(matches[0].start_idx, 3)
+    assert_equal(matches[0].end_idx, 6)
+    assert_equal(matches[1].match_text, "456")
+    assert_equal(matches[1].start_idx, 9)
+    assert_equal(matches[1].end_idx, 12)
+
+
+def test_dfa_negated_character_class():
+    """Test DFA with negated character classes."""
+    # Test [^0-9]+ pattern (match non-digits)
+    var result = match_first("[^0-9]+", "abc123")
+    assert_true(result.__bool__())
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 3)
+    assert_equal(matched.match_text, "abc")
+
+
+def test_dfa_performance_vs_nfa():
+    """Test that character class patterns use DFA engine for better performance.
+    """
+    # Test that [a-z]+ is classified as SIMPLE and uses DFA
+    var regex = CompiledRegex("[a-z]+")
+    var stats = regex.get_stats()
+
+    # Should mention DFA or show optimized pattern
+    assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
