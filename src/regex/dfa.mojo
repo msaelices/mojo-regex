@@ -1056,7 +1056,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
 
     var char_class_count = 0
     for i in range(len(child.children)):
-        var element = child.children[i]
+        ref element = child.children[i]
         if (
             element.type == RANGE
             or element.type == DIGIT
@@ -1095,7 +1095,7 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
         if child.type == GROUP:
             # Extract each character class element
             for i in range(len(child.children)):
-                var element = child.children[i]
+                ref element = child.children[i]
                 var char_class: String
 
                 if element.type == DIGIT:
@@ -1115,7 +1115,7 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
                     continue  # Skip unknown elements
 
                 var pattern_element = SequentialPatternElement(
-                    char_class, element.min, element.max
+                    char_class^, element.min, element.max
                 )
                 info.elements.append(pattern_element)
 
