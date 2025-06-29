@@ -1,7 +1,7 @@
 # Mojo Regex
-High-Performance Regular Expressions Library for Mojo
+Regular Expressions Library for Mojo
 
-`mojo-regex` is a high-performance regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
+`mojo-regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
 
 It aims to provide a similar interface as the [re](https://docs.python.org/3/library/re.html) stdlib package while leveraging Mojo's performance capabilities.
 
