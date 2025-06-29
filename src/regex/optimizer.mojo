@@ -139,6 +139,9 @@ struct PatternAnalyzer:
 
         elif ast.type == GROUP:
             # Groups (...) - analyze complexity based on nesting and content
+            # First check if it's a multi-character class sequence
+            if self._is_multi_char_class_sequence(ast):
+                return PatternComplexity(PatternComplexity.SIMPLE)
             return self._analyze_group(ast, depth)
 
         else:
@@ -281,6 +284,35 @@ struct PatternAnalyzer:
                 return PatternComplexity(PatternComplexity.MEDIUM)
         else:
             return PatternComplexity(PatternComplexity.MEDIUM)
+
+    fn _is_multi_char_class_sequence(self, ast: ASTNode) -> Bool:
+        """Check if this GROUP represents a multi-character class sequence.
+
+        Args:
+            ast: GROUP node to analyze
+
+        Returns:
+            True if it's a sequence of character classes
+        """
+        if ast.type != GROUP:
+            return False
+
+        # Must have at least 2 elements to be a sequence
+        if len(ast.children) < 2:
+            return False
+
+        # All children must be character classes (RANGE, DIGIT, SPACE)
+        for i in range(len(ast.children)):
+            var element = ast.children[i]
+            if not (
+                element.type == RANGE
+                or element.type == DIGIT
+                or element.type == SPACE
+                or element.type == WILDCARD
+            ):
+                return False
+
+        return True
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:

@@ -765,3 +765,109 @@ def test_dfa_performance_vs_nfa():
 
     # Should mention DFA or show optimized pattern
     assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
+
+
+def test_dfa_multi_character_class_basic():
+    """Test DFA optimization for basic multi-character class sequences."""
+    # Test [a-z]+[0-9]+ pattern
+    var result1 = match_first("[a-z]+[0-9]+", "hello123")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 8)
+    assert_equal(matched1.match_text, "hello123")
+
+    # Test pattern that should not match
+    var result2 = match_first("[a-z]+[0-9]+", "hello")
+    assert_true(not result2.__bool__())
+
+    # Test pattern with mixed case that should not match first part
+    var result3 = match_first("[a-z]+[0-9]+", "Hello123")
+    assert_true(not result3.__bool__())
+
+
+def test_dfa_multi_character_class_digit_alpha():
+    """Test DFA with \\d+ followed by [a-z]+ patterns."""
+    # Test \\d+[a-z]+ pattern (though \\d might not be fully implemented yet)
+    var result1 = match_first("[0-9]+[a-z]+", "123abc")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 6)
+    assert_equal(matched1.match_text, "123abc")
+
+    # Test with insufficient second part
+    var result2 = match_first("[0-9]+[a-z]+", "123")
+    assert_true(not result2.__bool__())
+
+
+def test_dfa_multi_character_class_with_quantifiers():
+    """Test multi-character class sequences with various quantifiers."""
+    # Test [a-z]*[0-9]+ pattern (first part optional)
+    var result1 = match_first("[a-z]*[0-9]+", "123")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 3)
+    assert_equal(matched1.match_text, "123")
+
+    # Test with both parts present
+    var result2 = match_first("[a-z]*[0-9]+", "abc123")
+    assert_true(result2.__bool__())
+    var matched2 = result2.value()
+    assert_equal(matched2.start_idx, 0)
+    assert_equal(matched2.end_idx, 6)
+    assert_equal(matched2.match_text, "abc123")
+
+
+def test_dfa_multi_character_class_three_parts():
+    """Test DFA with three character class sequence."""
+    # Test [A-Z][a-z]+[0-9]+ pattern
+    var result1 = match_first("[A-Z][a-z]+[0-9]+", "Hello123")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 8)
+    assert_equal(matched1.match_text, "Hello123")
+
+    # Test insufficient first part
+    var result2 = match_first("[A-Z][a-z]+[0-9]+", "hello123")
+    assert_true(not result2.__bool__())
+
+
+def test_dfa_multi_character_class_anchored():
+    """Test anchored multi-character class sequences."""
+    # Test ^[a-z]+[0-9]+$ pattern
+    var result1 = match_first("^[a-z]+[0-9]+$", "hello123")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 8)
+    assert_equal(matched1.match_text, "hello123")
+
+    # Test with extra characters that should fail end anchor
+    var result2 = match_first("^[a-z]+[0-9]+$", "hello123x")
+    assert_true(not result2.__bool__())
+
+
+def test_dfa_multi_character_class_findall():
+    """Test findall with multi-character class sequences."""
+    # Test finding all [a-z]+[0-9]+ patterns
+    var matches = findall("[a-z]+[0-9]+", "hello123 world456 test789")
+    assert_equal(len(matches), 3)
+    assert_equal(matches[0].match_text, "hello123")
+    assert_equal(matches[0].start_idx, 0)
+    assert_equal(matches[1].match_text, "world456")
+    assert_equal(matches[1].start_idx, 9)
+    assert_equal(matches[2].match_text, "test789")
+    assert_equal(matches[2].start_idx, 18)
+
+
+def test_dfa_multi_character_class_engine_selection():
+    """Test that multi-character class sequences use DFA engine."""
+    # Test that [a-z]+[0-9]+ is classified as SIMPLE and uses DFA
+    var regex = CompiledRegex("[a-z]+[0-9]+")
+    var stats = regex.get_stats()
+
+    # Should mention DFA or show optimized pattern
+    assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
