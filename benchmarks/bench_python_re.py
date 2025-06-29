@@ -90,14 +90,12 @@ def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_literal_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_literal_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark literal string matching."""
-    test_text = make_test_string(text_length)
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(100):
-            result = compiled_pattern.search(test_text)
+            result = re.match(pattern, test_text)
             # Keep result to prevent optimization
             bool(result)
 
@@ -109,14 +107,12 @@ def bench_literal_match(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_wildcard_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_wildcard_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark wildcard and quantifier patterns."""
-    test_text = make_test_string(text_length)
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(50):
-            result = compiled_pattern.search(test_text)
+            result = re.match(pattern, test_text)
             bool(result)
 
     return benchmark_fn
@@ -127,14 +123,12 @@ def bench_wildcard_match(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_range_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_range_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark character range patterns."""
-    test_text = make_test_string(text_length, "abc123XYZ")
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(50):
-            result = compiled_pattern.search(test_text)
+            result = re.match(pattern, test_text)
             bool(result)
 
     return benchmark_fn
@@ -145,14 +139,12 @@ def bench_range_match(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_anchor_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_anchor_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark anchor patterns (^ and $)."""
-    test_text = make_test_string(text_length)
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(100):
-            result = compiled_pattern.search(test_text)
+            result = re.match(pattern, test_text)
             bool(result)
 
     return benchmark_fn
@@ -163,14 +155,12 @@ def bench_anchor_match(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_alternation_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_alternation_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark alternation patterns (|)."""
-    test_text = make_test_string(text_length, "abcdefghijklmnopqrstuvwxyz")
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(50):
-            result = compiled_pattern.search(test_text)
+            result = re.search(pattern, test_text)
             bool(result)
 
     return benchmark_fn
@@ -181,14 +171,12 @@ def bench_alternation_match(text_length: int, pattern: str) -> Callable[[], None
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_group_match(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_group_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark group patterns with quantifiers."""
-    test_text = make_test_string(text_length, "abcabcabc")
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(50):
-            result = compiled_pattern.search(test_text)
+            result = re.search(pattern, test_text)
             bool(result)
 
     return benchmark_fn
@@ -199,14 +187,12 @@ def bench_group_match(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_match_all(text_length: int, pattern: str) -> Callable[[], None]:
+def bench_match_all(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark finding all matches in text."""
-    test_text = make_test_string(text_length)
-    compiled_pattern = re.compile(pattern)
 
     def benchmark_fn():
         for _ in range(10):  # Fewer iterations since findall is more expensive
-            results = compiled_pattern.findall(test_text)
+            results = re.findall(pattern, test_text)
             len(results)  # Keep result
 
     return benchmark_fn
@@ -217,31 +203,25 @@ def bench_match_all(text_length: int, pattern: str) -> Callable[[], None]:
 # ===-----------------------------------------------------------------------===#
 
 
-def bench_complex_email_match(text_length: int) -> Callable[[], None]:
+def bench_complex_email_match(email_text: str) -> Callable[[], None]:
     """Benchmark complex email validation pattern."""
-    # Create text with embedded emails
-    base_text = make_test_string(text_length // 2)
-    email_text = f"{base_text} user@example.com more text john@test.org {base_text}"
-    pattern = re.compile(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")
+    pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
 
     def benchmark_fn():
         for _ in range(25):
-            results = pattern.findall(email_text)
+            results = re.findall(pattern, email_text)
             len(results)
 
     return benchmark_fn
 
 
-def bench_complex_number_extraction(text_length: int) -> Callable[[], None]:
+def bench_complex_number_extraction(number_text: str) -> Callable[[], None]:
     """Benchmark extracting numbers from text."""
-    # Create text with embedded numbers
-    base_text = make_test_string(text_length // 2, "abc def ghi ")
-    number_text = f"{base_text} 123 price $456.78 quantity 789 {base_text}"
-    pattern = re.compile(r"\d+\.?\d*")
+    pattern = r"\d+\.?\d*"
 
     def benchmark_fn():
         for _ in range(25):
-            results = pattern.findall(number_text)
+            results = re.findall(pattern, number_text)
             len(results)
 
     return benchmark_fn
@@ -257,58 +237,94 @@ def main():
     print("Python RE Module Benchmark Suite")
     print("=" * 50)
     print(f"Python version: {re.__doc__}")
-    print("Using compiled patterns for optimal performance")
     print()
 
     m = Benchmark(num_repetitions=5)
 
+    # Pre-create test strings to avoid measurement overhead
+    text_1000 = make_test_string(1000)
+    text_10000 = make_test_string(10000)
+    text_range_1000 = make_test_string(1000, "abc123XYZ")
+    text_alternation_1000 = make_test_string(1000, "abcdefghijklmnopqrstuvwxyz")
+    text_group_1000 = make_test_string(1000, "abcabcabc")
+
+    # Create complex text patterns
+    base_text = make_test_string(500)
+    email_text = f"{base_text} user@example.com more text john@test.org {base_text}"
+
+    base_number_text = make_test_string(500, "abc def ghi ")
+    number_text = (
+        f"{base_number_text} 123 price $456.78 quantity 789 {base_number_text}"
+    )
+
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
-    m.bench_function("literal_match_short", bench_literal_match(1000, "hello"))
-    m.bench_function("literal_match_long", bench_literal_match(10000, "hello"))
+    m.bench_function(
+        "literal_match_short",
+        bench_literal_match(
+            text_1000,
+            "abcdefghijklmn",
+        ),
+    )
+    m.bench_function(
+        "literal_match_long",
+        bench_literal_match(
+            text_10000,
+            "abcdefghijklmn",
+        ),
+    )
 
     # Wildcard and quantifiers
     print("\n=== Wildcard and Quantifier Benchmarks ===")
-    m.bench_function("wildcard_match_any", bench_wildcard_match(1000, ".*"))
-    m.bench_function("quantifier_zero_or_more", bench_wildcard_match(1000, "a*"))
-    m.bench_function("quantifier_one_or_more", bench_wildcard_match(1000, "a+"))
-    m.bench_function("quantifier_zero_or_one", bench_wildcard_match(1000, "a?"))
+    m.bench_function("wildcard_match_any", bench_wildcard_match(text_1000, ".*"))
+    m.bench_function("quantifier_zero_or_more", bench_wildcard_match(text_1000, "a*"))
+    m.bench_function("quantifier_one_or_more", bench_wildcard_match(text_1000, "a+"))
+    m.bench_function("quantifier_zero_or_one", bench_wildcard_match(text_1000, "a?"))
 
     # Character ranges
     print("\n=== Character Range Benchmarks ===")
-    m.bench_function("range_lowercase", bench_range_match(1000, "[a-z]+"))
-    m.bench_function("range_digits", bench_range_match(1000, "[0-9]+"))
-    m.bench_function("range_alphanumeric", bench_range_match(1000, "[a-zA-Z0-9]+"))
+    m.bench_function("range_lowercase", bench_range_match(text_range_1000, "[a-z]+"))
+    m.bench_function("range_digits", bench_range_match(text_range_1000, "[0-9]+"))
+    m.bench_function(
+        "range_alphanumeric", bench_range_match(text_range_1000, "[a-zA-Z0-9]+")
+    )
 
     # Anchors
     print("\n=== Anchor Benchmarks ===")
-    m.bench_function("anchor_start", bench_anchor_match(1000, "^abc"))
-    m.bench_function("anchor_end", bench_anchor_match(1000, "xyz$"))
+    m.bench_function("anchor_start", bench_anchor_match(text_1000, "^abc"))
+    m.bench_function("anchor_end", bench_anchor_match(text_1000, "xyz$"))
 
     # Alternation
     print("\n=== Alternation Benchmarks ===")
-    m.bench_function("alternation_simple", bench_alternation_match(1000, "a|b|c"))
-    m.bench_function("alternation_words", bench_alternation_match(1000, "abc|def|ghi"))
+    m.bench_function(
+        "alternation_simple", bench_alternation_match(text_alternation_1000, "a|b|c")
+    )
+    m.bench_function(
+        "alternation_words",
+        bench_alternation_match(text_alternation_1000, "abc|def|ghi"),
+    )
 
     # Groups
     print("\n=== Group Benchmarks ===")
-    m.bench_function("group_quantified", bench_group_match(1000, "(abc)+"))
-    m.bench_function("group_alternation", bench_group_match(1000, "(a|b)*"))
+    m.bench_function("group_quantified", bench_group_match(text_group_1000, "(abc)+"))
+    m.bench_function("group_alternation", bench_group_match(text_group_1000, "(a|b)*"))
 
     # Global matching (unique to our implementation)
     print("\n=== Global Matching Benchmarks ===")
-    m.bench_function("match_all_simple", bench_match_all(1000, "a"))
-    m.bench_function("match_all_pattern", bench_match_all(1000, "[a-z]+"))
+    m.bench_function("match_all_simple", bench_match_all(text_1000, "a"))
+    m.bench_function("match_all_pattern", bench_match_all(text_1000, "[a-z]+"))
 
     # Complex real-world patterns
     print("\n=== Complex Pattern Benchmarks ===")
-    m.bench_function("complex_email_extraction", bench_complex_email_match(1000))
-    m.bench_function("complex_number_extraction", bench_complex_number_extraction(1000))
+    m.bench_function("complex_email_extraction", bench_complex_email_match(email_text))
+    m.bench_function(
+        "complex_number_extraction", bench_complex_number_extraction(number_text)
+    )
 
     # Results summary
     m.dump_report()
 
-    print("\nNote: This benchmark uses Python's re module with compiled patterns")
+    print("\nNote: This benchmark uses Python's re module")
     print("for optimal performance comparison with the Mojo regex implementation.")
     print("Run the Mojo benchmark with: pixi run mojo benchmarks/bench_engine.mojo")
 
