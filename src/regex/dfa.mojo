@@ -492,6 +492,7 @@ struct DFAEngine(Engine):
         self.states.append(state^)
         self.start_state = 0
 
+    @always_inline
     fn _add_character_class_transitions(
         mut self, from_state: Int, to_state: Int, char_class: String
     ):
