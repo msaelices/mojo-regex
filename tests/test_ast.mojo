@@ -84,7 +84,9 @@ fn test_RangeElement_negative_logic() raises:
     var nre = RangeElement("abc", False)
     assert_true(Bool(nre))
     assert_equal(nre.type, RANGE)
-    assert_equal(nre.min, 0)  # Negative logic encoded as min=0
+    assert_equal(
+        nre.min, 1
+    )  # Both positive and negative logic should match exactly 1 character
     assert_false(nre.is_match("a"))
     assert_false(nre.is_match("b"))
     assert_false(nre.is_match("c"))
