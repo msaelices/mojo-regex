@@ -1,10 +1,10 @@
-# Contributing to mojo-regex
+# Contributing to regex
 
-Thank you for your interest in contributing to mojo-regex! This guide will help you understand the project structure, development workflow, and contribution guidelines.
+Thank you for your interest in contributing to regex! This guide will help you understand the project structure, development workflow, and contribution guidelines.
 
 ## Architecture Overview
 
-The mojo-regex library uses a hybrid DFA/NFA architecture with intelligent pattern routing for optimal performance:
+The regex library uses a hybrid DFA/NFA architecture with intelligent pattern routing for optimal performance:
 
 ### Core Components
 
@@ -222,4 +222,4 @@ Please be respectful and constructive in all interactions. This project follows 
 
 ---
 
-Thank you for contributing to mojo-regex! Your efforts help make regex processing in Mojo better for everyone. 🙏
+Thank you for contributing to regex! Your efforts help make regex processing in Mojo better for everyone. 🙏

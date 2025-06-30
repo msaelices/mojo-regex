@@ -1,7 +1,7 @@
 # Mojo Regex
 Regular Expressions Library for Mojo
 
-`mojo-regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
+`regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
 
 It aims to provide a similar interface as the [re](https://docs.python.org/3/library/re.html) stdlib package while leveraging Mojo's performance capabilities.
 
@@ -232,4 +232,4 @@ We are inspired by the pure-Python implementation done in the [pyregex](https://
 
 ## License
 
-mojo-regex is licensed under the [MIT license](LICENSE).
+mojo is licensed under the [MIT license](LICENSE).

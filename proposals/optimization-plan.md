@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-The current mojo-regex implementation is significantly slower than Python's `re` module due to its naive NFA (Non-deterministic Finite Automaton) implementation with excessive backtracking. Benchmark results show Python's `re` module performing operations in 0.006-0.120ms while our implementation would likely be orders of magnitude slower.
+The current regex implementation is significantly slower than Python's `re` module due to its naive NFA (Non-deterministic Finite Automaton) implementation with excessive backtracking. Benchmark results show Python's `re` module performing operations in 0.006-0.120ms while our implementation would likely be orders of magnitude slower.
 
-This document outlines a comprehensive 3-phase optimization plan that will transform the mojo-regex engine from a simple AST interpreter to a sophisticated multi-engine system capable of competing with Python's highly optimized C implementation.
+This document outlines a comprehensive 3-phase optimization plan that will transform the regex engine from a simple AST interpreter to a sophisticated multi-engine system capable of competing with Python's highly optimized C implementation.
 
 **Expected Performance Gains:**
 - **Phase 1**: 10-100x speedup for simple patterns via DFA compilation
@@ -500,7 +500,7 @@ fn match_char_class_vectorized(text: String, start: Int, lookup: SIMD[DType.uint
 
 ## Conclusion
 
-This optimization plan transforms the mojo-regex engine from a naive NFA interpreter to a sophisticated multi-engine system capable of competing with Python's highly optimized `re` module. The phased approach ensures steady progress while maintaining correctness, with each phase delivering measurable performance improvements.
+This optimization plan transforms the regex engine from a naive NFA interpreter to a sophisticated multi-engine system capable of competing with Python's highly optimized `re` module. The phased approach ensures steady progress while maintaining correctness, with each phase delivering measurable performance improvements.
 
 The combination of DFA compilation, SIMD optimization, bytecode execution, and advanced algorithms will result in a regex engine that not only matches Python's performance but potentially exceeds it by leveraging Mojo's compile-time optimization capabilities.
 

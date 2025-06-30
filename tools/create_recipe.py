@@ -56,7 +56,7 @@ def generate_recipe() -> None:
     }
 
     # Populate package information
-    package_name = "mojo-regex"
+    package_name = "regex"
     recipe["package"]["name"] = PROJECT_CONFIG["package"]["name"]
     recipe["package"]["version"] = PROJECT_CONFIG["package"]["version"]
 

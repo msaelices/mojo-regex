@@ -1,10 +1,10 @@
 # Benchmark Suite
 
-This directory contains benchmarks for comparing the performance of the mojo-regex library with Python's built-in `re` module.
+This directory contains benchmarks for comparing the performance of the regex library with Python's built-in `re` module.
 
 ## Files
 
-- **`bench_engine.mojo`** - Mojo benchmark suite testing the mojo-regex library
+- **`bench_engine.mojo`** - Mojo benchmark suite testing the regex library
 - **`bench_python_re.py`** - Python benchmark suite testing Python's `re` module
 - **`README.md`** - This file
 
