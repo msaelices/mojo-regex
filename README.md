@@ -140,18 +140,6 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 
 *Where w = SIMD width (typically 16-32 characters processed per instruction)*
 
-### Optimization Features
-
-- **Automatic Engine Selection**: Patterns are analyzed and routed to the optimal engine
-- **SIMD Acceleration**: Vectorized operations for character class matching and literal string search
-  - **Character Classes**: `[a-z]+`, `[0-9]+`, `\d`, `\s` use SIMD lookup tables
-  - **Literal Strings**: `"hello"`, `"example.com"` use SIMD string search
-  - **Quantifiers**: SIMD-accelerated counting for `+`, `*`, `{n,m}` on character classes
-- **Boyer-Moore Search**: Literal string patterns use optimized string search algorithms
-- **Pattern Caching**: Compiled patterns are cached for reuse
-- **Memory Efficiency**: Zero-copy string operations where possible
-- **Intelligent Routing**: SIMD capability detection ensures optimal engine selection
-
 ## Building and Testing
 
 ```bash
@@ -228,7 +216,7 @@ Contributions are welcome! If you'd like to contribute, please follow the contri
 
 ## Acknowledgments
 
-We are inspired by the pure-Python implementation done in the [pyregex](https://github.com/lorenzofelletti/pyregex) library.
+Thanks to Claude Code for helping a lot with the implementation and testing of the regex library, and to the Mojo community for their support and feedback.
 
 ## License
 
