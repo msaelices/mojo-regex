@@ -871,3 +871,167 @@ def test_dfa_multi_character_class_engine_selection():
 
     # Should mention DFA or show optimized pattern
     assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
+
+
+def test_dfa_negated_character_class_basic():
+    """Test basic negated character class functionality with DFA."""
+    # Test [^a-z] pattern (match non-lowercase letters)
+    var result1 = match_first("[^a-z]", "A")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 1)
+    assert_equal(matched1.match_text, "A")
+
+    # Test [^a-z] should not match lowercase
+    var result2 = match_first("[^a-z]", "a")
+    assert_true(not result2.__bool__())
+
+    # Test [^0-9] pattern (match non-digits)
+    var result3 = match_first("[^0-9]", "x")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.match_text, "x")
+
+    # Test [^0-9] should not match digits
+    var result4 = match_first("[^0-9]", "5")
+    assert_true(not result4.__bool__())
+
+
+def test_dfa_negated_character_class_quantifiers():
+    """Test negated character classes with quantifiers."""
+    # Test [^0-9]+ pattern (one or more non-digits)
+    var result1 = match_first("[^0-9]+", "abc123")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 3)
+    assert_equal(matched1.match_text, "abc")
+
+    # Test [^a-z]* pattern (zero or more non-lowercase)
+    var result2 = match_first("[^a-z]*", "ABC123def")
+    assert_true(result2.__bool__())
+    var matched2 = result2.value()
+    assert_equal(matched2.start_idx, 0)
+    assert_equal(matched2.end_idx, 6)
+    assert_equal(matched2.match_text, "ABC123")
+
+    # Test [^abc]{3} pattern (exactly 3 non-abc characters)
+    var result3 = match_first("[^abc]{3}", "xyz123")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.start_idx, 0)
+    assert_equal(matched3.end_idx, 3)
+    assert_equal(matched3.match_text, "xyz")
+
+
+def test_dfa_negated_character_class_anchors():
+    """Test negated character classes with anchors."""
+    # Test ^[^0-9]+$ pattern (entire string must be non-digits)
+    var result1 = match_first("^[^0-9]+$", "hello")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.start_idx, 0)
+    assert_equal(matched1.end_idx, 5)
+    assert_equal(matched1.match_text, "hello")
+
+    # Test ^[^0-9]+$ should fail with digits
+    var result2 = match_first("^[^0-9]+$", "hello5")
+    assert_true(not result2.__bool__())
+
+    # Test [^a-z]$ pattern (end with non-lowercase)
+    var result3 = match_first("[^a-z]$", "hello5")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.match_text, "5")
+
+
+def test_dfa_negated_character_class_complex():
+    """Test complex negated character class patterns."""
+    # Test [^aeiou]+ pattern (consonants and non-letters)
+    var result1 = match_first("[^aeiou]+", "bcdfg")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.match_text, "bcdfg")
+
+    # Test [^aeiou]+ should stop at vowels
+    var result2 = match_first("[^aeiou]+", "bcde")
+    assert_true(result2.__bool__())
+    var matched2 = result2.value()
+    assert_equal(matched2.start_idx, 0)
+    assert_equal(matched2.end_idx, 3)
+    assert_equal(matched2.match_text, "bcd")
+
+    # Test [^A-Z0-9]+ pattern (not uppercase or digits)
+    var result3 = match_first("[^A-Z0-9]+", "hello!@#")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.match_text, "hello!@#")
+
+
+def test_dfa_negated_character_class_findall():
+    """Test findall with negated character classes."""
+    # Test finding all [^0-9]+ sequences (non-digit sequences)
+    var matches = findall("[^0-9]+", "abc123def456ghi")
+    assert_equal(len(matches), 3)
+    assert_equal(matches[0].match_text, "abc")
+    assert_equal(matches[0].start_idx, 0)
+    assert_equal(matches[0].end_idx, 3)
+    assert_equal(matches[1].match_text, "def")
+    assert_equal(matches[1].start_idx, 6)
+    assert_equal(matches[1].end_idx, 9)
+    assert_equal(matches[2].match_text, "ghi")
+    assert_equal(matches[2].start_idx, 12)
+    assert_equal(matches[2].end_idx, 15)
+
+
+def test_dfa_negated_character_class_edge_cases():
+    """Test edge cases for negated character classes."""
+    # Test [^] (should match any character since nothing is excluded)
+    # Note: Empty negated class behavior may depend on implementation
+
+    # Test [^abc] with characters outside ASCII range
+    var result1 = match_first("[^abc]", " ")
+    assert_true(result1.__bool__())
+    var matched1 = result1.value()
+    assert_equal(matched1.match_text, " ")
+
+    # Test [^abc] with newline (should match since newline is not in "abc")
+    var result2 = match_first("[^abc]", "\n")
+    assert_true(result2.__bool__())
+    var matched2 = result2.value()
+    assert_equal(matched2.match_text, "\n")
+
+    # Test [^abc] with tab (should match)
+    var result3 = match_first("[^abc]", "\t")
+    assert_true(result3.__bool__())
+    var matched3 = result3.value()
+    assert_equal(matched3.match_text, "\t")
+
+
+def test_dfa_negated_vs_positive_character_classes():
+    """Test that negated and positive character classes behave correctly."""
+    # Test that [a-z] and [^a-z] are complementary
+    var test_string = "Hello123World"
+
+    # Positive class should match lowercase letters
+    var pos_matches = findall("[a-z]+", test_string)
+    assert_equal(len(pos_matches), 1)
+    assert_equal(pos_matches[0].match_text, "ello")
+
+    # Negative class should match everything except lowercase letters
+    var neg_matches = findall("[^a-z]+", test_string)
+    assert_equal(len(neg_matches), 3)
+    assert_equal(neg_matches[0].match_text, "H")
+    assert_equal(neg_matches[1].match_text, "123")
+    assert_equal(neg_matches[2].match_text, "W")
+
+
+def test_dfa_negated_character_class_engine_selection():
+    """Test that negated character classes use DFA engine when possible."""
+    # Test that [^a-z]+ is classified as SIMPLE and uses DFA
+    var regex = CompiledRegex("[^a-z]+")
+    var stats = regex.get_stats()
+
+    # Should mention DFA or show optimized pattern
+    assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)

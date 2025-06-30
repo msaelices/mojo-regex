@@ -26,13 +26,19 @@ struct SequentialPatternElement(Copyable, Movable):
     var char_class: String  # Character class string (e.g., "0123456789" for \d)
     var min_matches: Int  # Minimum matches for this element
     var max_matches: Int  # Maximum matches for this element (-1 for unlimited)
+    var positive_logic: Bool  # True for [abc], False for [^abc]
 
     fn __init__(
-        out self, owned char_class: String, min_matches: Int, max_matches: Int
+        out self,
+        owned char_class: String,
+        min_matches: Int,
+        max_matches: Int,
+        positive_logic: Bool = True,
     ):
         self.char_class = char_class^
         self.min_matches = min_matches
         self.max_matches = max_matches
+        self.positive_logic = positive_logic
 
 
 struct SequentialPatternInfo(Copyable, Movable):
@@ -166,7 +172,27 @@ struct DFAEngine(Engine):
             min_matches: Minimum number of matches required.
             max_matches: Maximum number of matches (-1 for unlimited).
         """
-        self.compiled_pattern = String("[", char_class^, "]")
+        self.compile_character_class_with_logic(
+            char_class^, min_matches, max_matches, True
+        )
+
+    fn compile_character_class_with_logic(
+        mut self,
+        owned char_class: String,
+        min_matches: Int,
+        max_matches: Int,
+        positive_logic: Bool,
+    ) raises:
+        """Compile a character class pattern like [a-z]+ or [^a-z]+ into a DFA.
+
+        Args:
+            char_class: Character class string (e.g., "abcdefghijklmnopqrstuvwxyz" for [a-z]).
+            min_matches: Minimum number of matches required.
+            max_matches: Maximum number of matches (-1 for unlimited).
+            positive_logic: True for [a-z], False for [^a-z].
+        """
+        var prefix = "[" if positive_logic else "[^"
+        self.compiled_pattern = String(prefix, char_class^, "]")
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -178,11 +204,15 @@ struct DFAEngine(Engine):
             self.states.append(match_state)
 
             # Transitions from start to match state
-            self._add_character_class_transitions(0, 1, char_class)
+            self._add_character_class_transitions_with_logic(
+                0, 1, char_class, positive_logic
+            )
 
             # Self-loop on match state for additional matches
             if max_matches == -1 or max_matches > 1:
-                self._add_character_class_transitions(1, 1, char_class)
+                self._add_character_class_transitions_with_logic(
+                    1, 1, char_class, positive_logic
+                )
 
         elif min_matches == 1:
             # Pattern like [a-z]+ or [a-z] - must match at least one
@@ -194,12 +224,16 @@ struct DFAEngine(Engine):
             self.states.append(match_state)
 
             # Transitions from start to match state
-            self._add_character_class_transitions(0, 1, char_class)
+            self._add_character_class_transitions_with_logic(
+                0, 1, char_class, positive_logic
+            )
 
             # Handle additional matches
             if max_matches == -1:
                 # Unlimited matches ([a-z]+) - self-loop
-                self._add_character_class_transitions(1, 1, char_class)
+                self._add_character_class_transitions_with_logic(
+                    1, 1, char_class, positive_logic
+                )
             elif max_matches > 1:
                 # Limited matches like [a-z]{1,3} - create additional states
                 for match_count in range(2, max_matches + 1):
@@ -208,8 +242,8 @@ struct DFAEngine(Engine):
                     )
                     self.states.append(state)
                     # Add transitions from previous state
-                    self._add_character_class_transitions(
-                        match_count - 1, match_count, char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_count - 1, match_count, char_class, positive_logic
                     )
         else:
             # Pattern with min_matches > 1, like [a-z]{3,5}
@@ -223,16 +257,16 @@ struct DFAEngine(Engine):
 
                 if match_count > 0:
                     # Add transitions from previous state
-                    self._add_character_class_transitions(
-                        match_count - 1, match_count, char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_count - 1, match_count, char_class, positive_logic
                     )
 
             # Add additional optional states if max_matches allows
             if max_matches == -1:
                 # Unlimited additional matches - self-loop on last state
                 var last_state_idx = len(self.states) - 1
-                self._add_character_class_transitions(
-                    last_state_idx, last_state_idx, char_class
+                self._add_character_class_transitions_with_logic(
+                    last_state_idx, last_state_idx, char_class, positive_logic
                 )
             elif max_matches > min_matches:
                 # Limited additional matches
@@ -241,8 +275,8 @@ struct DFAEngine(Engine):
                         is_accepting=True, match_length=match_count
                     )
                     self.states.append(state)
-                    self._add_character_class_transitions(
-                        match_count - 1, match_count, char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_count - 1, match_count, char_class, positive_logic
                     )
 
         self.start_state = 0
@@ -285,14 +319,20 @@ struct DFAEngine(Engine):
                 var match_state_index = len(self.states) - 1
 
                 # Add transitions from current state to match state
-                self._add_character_class_transitions(
-                    current_state_index, match_state_index, element.char_class
+                self._add_character_class_transitions_with_logic(
+                    current_state_index,
+                    match_state_index,
+                    element.char_class,
+                    element.positive_logic,
                 )
 
                 # Handle unlimited matches (*) - self-loop
                 if element.max_matches == -1:
-                    self._add_character_class_transitions(
-                        match_state_index, match_state_index, element.char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_state_index,
+                        match_state_index,
+                        element.char_class,
+                        element.positive_logic,
                     )
 
                 current_state_index = match_state_index
@@ -309,13 +349,19 @@ struct DFAEngine(Engine):
                     # Add transitions from previous state
                     if match_num == 0:
                         # First required match - transition from current state
-                        self._add_character_class_transitions(
-                            current_state_index, state_index, element.char_class
+                        self._add_character_class_transitions_with_logic(
+                            current_state_index,
+                            state_index,
+                            element.char_class,
+                            element.positive_logic,
                         )
                     else:
                         # Subsequent required matches - transition from previous match state
-                        self._add_character_class_transitions(
-                            state_index - 1, state_index, element.char_class
+                        self._add_character_class_transitions_with_logic(
+                            state_index - 1,
+                            state_index,
+                            element.char_class,
+                            element.positive_logic,
                         )
 
                     current_state_index = state_index
@@ -323,10 +369,11 @@ struct DFAEngine(Engine):
                 # Handle additional matches (+ or {n,m})
                 if element.max_matches == -1:
                     # Unlimited additional matches - add self-loop
-                    self._add_character_class_transitions(
+                    self._add_character_class_transitions_with_logic(
                         current_state_index,
                         current_state_index,
                         element.char_class,
+                        element.positive_logic,
                     )
                 elif element.max_matches > element.min_matches:
                     # Limited additional matches - create additional optional states
@@ -334,8 +381,11 @@ struct DFAEngine(Engine):
                         var state = DFAState(is_accepting=is_last_element)
                         self.states.append(state)
                         var state_index = len(self.states) - 1
-                        self._add_character_class_transitions(
-                            current_state_index, state_index, element.char_class
+                        self._add_character_class_transitions_with_logic(
+                            current_state_index,
+                            state_index,
+                            element.char_class,
+                            element.positive_logic,
                         )
                         current_state_index = state_index
 
@@ -381,14 +431,20 @@ struct DFAEngine(Engine):
                 var match_state_index = len(self.states) - 1
 
                 # Add transitions from current state to match state
-                self._add_character_class_transitions(
-                    current_state_index, match_state_index, element.char_class
+                self._add_character_class_transitions_with_logic(
+                    current_state_index,
+                    match_state_index,
+                    element.char_class,
+                    element.positive_logic,
                 )
 
                 # Handle unlimited matches (*) - self-loop
                 if element.max_matches == -1:
-                    self._add_character_class_transitions(
-                        match_state_index, match_state_index, element.char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_state_index,
+                        match_state_index,
+                        element.char_class,
+                        element.positive_logic,
                     )
 
                 current_state_index = match_state_index
@@ -408,15 +464,21 @@ struct DFAEngine(Engine):
                 var match_state_index = len(self.states) - 1
 
                 # Add transitions from current state
-                self._add_character_class_transitions(
-                    current_state_index, match_state_index, element.char_class
+                self._add_character_class_transitions_with_logic(
+                    current_state_index,
+                    match_state_index,
+                    element.char_class,
+                    element.positive_logic,
                 )
 
                 # Handle additional matches
                 if element.max_matches == -1:
                     # Unlimited matches (+) - self-loop
-                    self._add_character_class_transitions(
-                        match_state_index, match_state_index, element.char_class
+                    self._add_character_class_transitions_with_logic(
+                        match_state_index,
+                        match_state_index,
+                        element.char_class,
+                        element.positive_logic,
                     )
                 elif element.max_matches > 1:
                     # Limited additional matches - create optional states
@@ -426,10 +488,11 @@ struct DFAEngine(Engine):
                         )
                         self.states.append(additional_state)
                         var additional_state_index = len(self.states) - 1
-                        self._add_character_class_transitions(
+                        self._add_character_class_transitions_with_logic(
                             match_state_index + match_count - 2,
                             additional_state_index,
                             element.char_class,
+                            element.positive_logic,
                         )
 
                 current_state_index = match_state_index
@@ -447,23 +510,30 @@ struct DFAEngine(Engine):
 
                     if match_num > 0:
                         # Connect from previous state
-                        self._add_character_class_transitions(
-                            state_index - 1, state_index, element.char_class
+                        self._add_character_class_transitions_with_logic(
+                            state_index - 1,
+                            state_index,
+                            element.char_class,
+                            element.positive_logic,
                         )
                     else:
                         # Connect from previous element's final state
-                        self._add_character_class_transitions(
-                            current_state_index, state_index, element.char_class
+                        self._add_character_class_transitions_with_logic(
+                            current_state_index,
+                            state_index,
+                            element.char_class,
+                            element.positive_logic,
                         )
                     current_state_index = state_index
 
                 # Handle additional optional matches
                 if element.max_matches == -1:
                     # Unlimited additional matches - self-loop on last state
-                    self._add_character_class_transitions(
+                    self._add_character_class_transitions_with_logic(
                         current_state_index,
                         current_state_index,
                         element.char_class,
+                        element.positive_logic,
                     )
                 elif element.max_matches > element.min_matches:
                     # Limited additional matches
@@ -475,10 +545,11 @@ struct DFAEngine(Engine):
                         )
                         self.states.append(optional_state)
                         var optional_state_index = len(self.states) - 1
-                        self._add_character_class_transitions(
+                        self._add_character_class_transitions_with_logic(
                             current_state_index,
                             optional_state_index,
                             element.char_class,
+                            element.positive_logic,
                         )
                         current_state_index = optional_state_index
 
@@ -502,13 +573,53 @@ struct DFAEngine(Engine):
             to_state: Target state index.
             char_class: String containing all valid characters.
         """
+        self._add_character_class_transitions_with_logic(
+            from_state, to_state, char_class, True
+        )
+
+    @always_inline
+    fn _add_character_class_transitions_with_logic(
+        mut self,
+        from_state: Int,
+        to_state: Int,
+        char_class: String,
+        positive_logic: Bool,
+    ):
+        """Add transitions for characters in a character class, supporting negated logic.
+
+        Args:
+            from_state: Source state index.
+            to_state: Target state index.
+            char_class: String containing characters for the class.
+            positive_logic: True for [abc], False for [^abc].
+        """
         if from_state >= len(self.states):
             return
 
         ref state = self.states[from_state]
-        for i in range(len(char_class)):
-            var char_code = ord(char_class[i])
-            state.add_transition(char_code, to_state)
+
+        if positive_logic:
+            # Positive logic: [abc] - add transitions for characters in char_class
+            for i in range(len(char_class)):
+                var char_code = ord(char_class[i])
+                state.add_transition(char_code, to_state)
+        else:
+            # Negative logic: [^abc] - add transitions for all characters NOT in char_class
+            # Create a lookup set for fast character checking
+            var char_set = List[Bool](capacity=256)
+            for _ in range(256):
+                char_set.append(False)
+
+            # Mark characters in char_class as True
+            for i in range(len(char_class)):
+                var char_code = ord(char_class[i])
+                if char_code >= 0 and char_code < 256:
+                    char_set[char_code] = True
+
+            # Add transitions for all characters NOT in the class
+            for char_code in range(256):
+                if not char_set[char_code]:
+                    state.add_transition(char_code, to_state)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
@@ -817,11 +928,13 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.compile_pattern("", has_start, has_end)
     elif _is_simple_character_class_pattern(ast):
-        # Handle simple character class patterns like \d, \d+, \d{3}, [a-z]+, [0-9]*
-        var char_class, min_matches, max_matches, has_start, has_end = (
-            _extract_character_class_info(ast)
+        # Handle simple character class patterns like \d, \d+, \d{3}, [a-z]+, [0-9]*, [^a-z]+
+        var char_class, min_matches, max_matches, has_start, has_end, positive_logic = _extract_character_class_info(
+            ast
         )
-        dfa.compile_character_class(char_class, min_matches, max_matches)
+        dfa.compile_character_class_with_logic(
+            char_class, min_matches, max_matches, positive_logic
+        )
         dfa.has_start_anchor = has_start
         dfa.has_end_anchor = has_end
     elif _is_multi_character_class_sequence(ast):
@@ -890,14 +1003,14 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
 
 fn _extract_character_class_info(
     ast: ASTNode,
-) -> Tuple[String, Int, Int, Bool, Bool]:
+) -> Tuple[String, Int, Int, Bool, Bool, Bool]:
     """Extract character class information from AST.
 
     Args:
         ast: AST node representing a character class pattern.
 
     Returns:
-        Tuple of (char_class_string, min_matches, max_matches, has_start_anchor, has_end_anchor).
+        Tuple of (char_class_string, min_matches, max_matches, has_start_anchor, has_end_anchor, positive_logic).
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP
 
@@ -906,6 +1019,7 @@ fn _extract_character_class_info(
     var max_matches = 1
     var has_start = False
     var has_end = False
+    var positive_logic = True
 
     # Find the character class node (DIGIT or RANGE)
     var class_node: ASTNode
@@ -929,15 +1043,24 @@ fn _extract_character_class_info(
     if class_node.type == DIGIT:
         min_matches = class_node.min
         max_matches = class_node.max
+        positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
         char_class = "0123456789"
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
+        positive_logic = class_node.positive_logic
         # Use the range value directly as character class
         char_class = class_node.value
 
-    return (char_class^, min_matches, max_matches, has_start, has_end)
+    return (
+        char_class^,
+        min_matches,
+        max_matches,
+        has_start,
+        has_end,
+        positive_logic,
+    )
 
 
 fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
@@ -1027,7 +1150,7 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
                     continue  # Skip unknown elements
 
                 var pattern_element = SequentialPatternElement(
-                    char_class, element.min, element.max
+                    char_class, element.min, element.max, element.positive_logic
                 )
                 info.elements.append(pattern_element)
 
@@ -1116,7 +1239,10 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
                     continue  # Skip unknown elements
 
                 var pattern_element = SequentialPatternElement(
-                    char_class^, element.min, element.max
+                    char_class^,
+                    element.min,
+                    element.max,
+                    element.positive_logic,
                 )
                 info.elements.append(pattern_element)
 

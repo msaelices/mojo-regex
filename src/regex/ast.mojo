@@ -212,7 +212,7 @@ fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
     return ASTNode(
         type=RANGE,
         value=value^,
-        min=1 if is_positive_logic else 0,
+        min=1,
         max=1,
         positive_logic=is_positive_logic,
     )
