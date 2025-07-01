@@ -639,7 +639,7 @@ struct DFAEngine(Engine):
         # Python only allows matching at the start of the string
         return self._try_match_at_position(text, start)
 
-    fn _match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
         position.
 
@@ -746,14 +746,14 @@ struct DFAEngine(Engine):
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
             # Anchored patterns can only match once
-            var match_result = self._match_next(text, 0)
+            var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
             return matches
 
         var pos = 0
         while pos <= len(text):
-            var match_result = self._match_next(text, pos)
+            var match_result = self.match_next(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)
