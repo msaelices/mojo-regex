@@ -91,7 +91,9 @@ fn test_range_negative() raises:
     var top_group = ast.children[0]
     var element = top_group.children[0]
     assert_equal(element.type, RANGE)
-    assert_equal(element.min, 0)  # Negative logic
+    assert_equal(
+        element.min, 1
+    )  # Both positive and negative logic should match 1 character
     assert_false(element.is_match("a"))
     assert_true(element.is_match("x"))
 
@@ -186,7 +188,9 @@ fn test_range_1() raises:
     var top_group = ast.children[0]
     var element = top_group.children[0]
     assert_equal(element.type, RANGE)
-    assert_equal(element.min, 0)  # Negative logic
+    assert_equal(
+        element.min, 1
+    )  # Both positive and negative logic should match 1 character
     assert_false(element.is_match("a"))
 
 
