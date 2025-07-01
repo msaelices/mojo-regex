@@ -68,6 +68,10 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine.match_first(text, start)
 
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Find first match using DFA execution."""
+        return self.engine.match_next(text, start)
+
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches using DFA execution."""
         return self.engine.match_all(text)
@@ -102,6 +106,10 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
+
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Find first match using DFA execution."""
+        return self.engine.match_next(text, start)
 
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches using NFA execution."""
@@ -154,7 +162,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.complexity = other.complexity
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Find first match using optimal engine."""
+        """Find first match using optimal engine. This equivalent to re.match in Python.
+        """
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
@@ -164,6 +173,19 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
+
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Find first match using optimal engine. This is equivalent to re.search in Python.
+        """
+        if (
+            self.dfa_matcher
+            and self.complexity.value == PatternComplexity.SIMPLE
+        ):
+            # Use high-performance DFA for simple patterns
+            return self.dfa_matcher.value().match_next(text, start)
+        else:
+            # Fall back to NFA for complex patterns
+            return self.nfa_matcher.match_next(text, start)
 
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches using optimal engine."""
@@ -225,7 +247,7 @@ struct CompiledRegex(Copyable, Movable):
         self.compiled_at = other.compiled_at
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Find first match in text.
+        """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
             text: Input text to search.
@@ -235,6 +257,18 @@ struct CompiledRegex(Copyable, Movable):
             Optional Match if found.
         """
         return self.matcher.match_first(text, start)
+
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Find first match in text. This is equivalent to re.search in Python.
+
+        Args:
+            text: Input text to search.
+            start: Starting position (default 0).
+
+        Returns:
+            Optional Match if found.
+        """
+        return self.matcher.match_next(text, start)
 
     fn match_all(self, text: String) raises -> List[Match]:
         """Find all matches in text.
@@ -256,7 +290,7 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             True if pattern matches, False otherwise.
         """
-        var result = self.match_first(text)
+        var result = self.match_next(text)
         return result.__bool__()
 
     fn get_stats(self) -> String:

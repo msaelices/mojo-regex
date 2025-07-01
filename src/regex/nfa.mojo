@@ -88,6 +88,42 @@ struct NFAEngine(Engine):
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
+        Equivalent to re.match in Python.
+
+        Args:
+            text: The test string.
+            start: The starting position in the string to search from.
+
+        Returns:
+            A tuple containing whether a match was found or not, the last
+            matched character index, and a deque of Match, where the first
+            position contains the whole match, and the subsequent positions
+            contain all the group and subgroups matched.
+        """
+        var matches = List[Match]()
+        var str_i = start
+        var ast: ASTNode
+        if self.regex:
+            ast = self.regex.value()
+        else:
+            try:
+                ast = parse(self.pattern)
+            except:
+                return None
+
+        # TODO: It should only match at the start of the string
+        var result = self._match_node(ast, text, str_i, matches)
+        if result[0]:  # Match found
+            var end_idx = result[1]
+            # Always return the overall match with correct range
+            var matched = Match(0, str_i, end_idx, text, "RegEx")
+            return matched^
+
+        return None
+
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Same as match_all, but always returns after the first match.
+        It's equivalent to re.search in Python.
 
         Args:
             text: The test string.
