@@ -1037,3 +1037,76 @@ def test_phone_numbers():
     result = match_first(pattern, "+1-541-236-5432")
     assert_true(result.__bool__())
     assert_equal(result.value().match_text, "+1-541-236-5432")
+
+
+def test_match_first_vs_search_behavior():
+    """Test that match_first behaves like Python's re.match (only matches at start).
+    """
+    # Test case: pattern "world" should NOT match in "hello world" with match_first
+    var result1 = match_first("world", "hello world")
+    assert_true(
+        not result1.__bool__()
+    )  # Should fail because "world" is not at position 0
+
+    # Test case: pattern "hello" SHOULD match in "hello world" with match_first
+    var result2 = match_first("hello", "hello world")
+    assert_true(
+        result2.__bool__()
+    )  # Should succeed because "hello" starts at position 0
+    var match2 = result2.value()
+    assert_equal(match2.start_idx, 0)
+    assert_equal(match2.end_idx, 5)
+    assert_equal(match2.match_text, "hello")
+
+    # Test case: pattern should not match if there's prefix
+    var result3 = match_first("hello", "say hello")
+    assert_true(
+        not result3.__bool__()
+    )  # Should fail because "hello" is not at position 0
+
+
+def test_match_first_anchored_patterns():
+    """Test match_first with explicitly anchored patterns."""
+    # Test explicit start anchor
+    var result1 = match_first("^hello", "hello world")
+    assert_true(result1.__bool__())
+    var match1 = result1.value()
+    assert_equal(match1.match_text, "hello")
+
+    # Test that it fails when not at start
+    var result2 = match_first("^hello", "say hello")
+    assert_true(not result2.__bool__())
+
+
+def test_match_first_empty_pattern():
+    """Test match_first with empty pattern."""
+    var result1 = match_first("", "hello")
+    assert_true(result1.__bool__())
+    var match1 = result1.value()
+    assert_equal(match1.start_idx, 0)
+    assert_equal(match1.end_idx, 0)
+    assert_equal(match1.match_text, "")
+
+
+def test_specific_user_issue():
+    """Test the specific issue mentioned: 'world' pattern should NOT match 'hello world'.
+    """
+    # This is the exact case the user mentioned
+    var result = match_first("world", "hello world")
+    print("NFA match_first('world', 'hello world') result:", result.__bool__())
+
+    # This should be False according to Python's re.match() behavior
+    assert_true(not result.__bool__())
+
+    # Let's also test the equivalent using the hybrid matcher to compare
+    from regex.matcher import CompiledRegex
+
+    var regex = CompiledRegex("world")
+    var hybrid_result = regex.match_first("hello world")
+    print(
+        "Hybrid match_first('world', 'hello world') result:",
+        hybrid_result.__bool__(),
+    )
+
+    # Both should behave the same
+    assert_equal(result.__bool__(), hybrid_result.__bool__())

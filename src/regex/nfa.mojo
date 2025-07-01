@@ -111,13 +111,20 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        # TODO: It should only match at the start of the string
+        # Try to match at the exact start position only (like Python's re.match)
         var result = self._match_node(ast, text, str_i, matches)
         if result[0]:  # Match found
             var end_idx = result[1]
-            # Always return the overall match with correct range
+            # Create the match object
             var matched = Match(0, str_i, end_idx, text, "RegEx")
-            return matched^
+
+            # Python's re.match() only succeeds if the pattern matches at the exact start position
+            if matched.start_idx == start:
+                return matched^
+            else:
+                # Match found but not at the required start position - this should not happen
+                # with proper NFA implementation, but added as safety check
+                return None
 
         return None
 
