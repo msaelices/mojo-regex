@@ -1,5 +1,24 @@
-# Mojo Regex
-Regular Expressions Library for Mojo
+<a name="readme-top"></a>
+
+<br />
+<div align="center">
+    <img src="static/logo.jpeg" alt="Logo" width="250" height="250">
+
+  <h3 align="center">Regex</h3>
+
+  <p align="center">Regular Expressions Library for Mojo
+
+    <br/>
+
+   ![Written in Mojo][language-shield]
+   [![MIT License][license-shield]][license-url]
+   ![Build status][build-shield]
+   [![CodeQL](https://github.com/{username}/{repo name}/workflows/CodeQL/badge.svg)]
+   <br/>
+   [![Contributors Welcome][contributors-shield]][contributors-url]
+
+  </p>
+</div>
 
 `regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
 
