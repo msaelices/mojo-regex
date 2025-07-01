@@ -24,7 +24,6 @@ max = ">=25.4.0"
 [tasks]
 test = "mojo test -I ./src tests/"
 format = "mojo format benchmarks/ src/regex/ tests/"
-recipe = "python tools/create_recipe.py"
 
 [feature.mojopkg.dependencies]
 pyyaml = ">=6.0.2,<7"
