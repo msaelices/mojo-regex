@@ -1,11 +1,6 @@
 # Regex
 Regex Library for Mojo
 
-[![Language][language-shield]][language-url]
-[![License][license-shield]][license-url]
-[![Build Status][build-shield]][build-url]
-[![Contributors Welcome][contributors-shield]][contributors-url]
-[![CodeQL](https://github.com/{username}/{repo name}/workflows/CodeQL/badge.svg)]
 
 `regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
 
@@ -227,3 +222,10 @@ Thanks to Claude Code for helping a lot with the implementation and testing of t
 ## License
 
 mojo is licensed under the [MIT license](LICENSE).
+
+---
+
+[![Language](https://img.shields.io/badge/language-mojo-orange)](https://www.modular.com/mojo)
+[![License](https://img.shields.io/github/license/msaelices/mojo-regex?logo=github)](https://github.com/msaelices/mojo-regex/blob/main/LICENSE)
+[![Contributors Welcome](https://img.shields.io/badge/contributors-welcome!-blue)](https://github.com/msaelices/mojo-regex#contributing)
+![CodeQL](https://github.com/msaelices/mojo-regex/workflows/CodeQL/badge.svg)
