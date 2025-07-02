@@ -340,6 +340,22 @@ def test_phone_numbers():
     assert_equal(result.value().match_text, "+1-541-236-5432")
 
 
+def test_es_phone_numbers():
+    es_pattern = "[5-9]\\d{8}"
+    phone = "810123456"
+    var ast = parse(es_pattern)
+    var dfa = compile_ast_pattern(ast)
+    var result = dfa.match_first(phone, 0)
+    assert_true(result.__bool__())
+    assert_equal(result.value().match_text, phone)
+    es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
+    var ast2 = parse(es_fixed_line_pattern)
+    var dfa2 = compile_ast_pattern(ast2)
+    var result2 = dfa2.match_first(phone)
+    assert_true(result2.__bool__())
+    assert_equal(result2.value().match_text, phone)
+
+
 def test_dfa_state_construction_logic():
     """Test DFA state construction to prevent assignment logic bugs.
 
