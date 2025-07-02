@@ -1039,6 +1039,92 @@ def test_phone_numbers():
     assert_equal(result.value().match_text, "+1-541-236-5432")
 
 
+def test_es_phone_numbers():
+    es_pattern = "[5-9]\\d{8}"
+    phone = "810123456"
+    var result = match_first(es_pattern, phone)
+    assert_true(result.__bool__())
+    assert_equal(result.value().match_text, phone)
+    es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
+    var result2 = match_first(es_fixed_line_pattern, phone)
+    assert_true(result2.__bool__())
+    assert_equal(result2.value().match_text, phone)
+
+
+def test_comprehensive_spanish_phone_patterns():
+    """Test various Spanish phone number patterns to ensure robustness."""
+    # Test basic mobile pattern
+    var mobile_pattern = "[5-9]\\d{8}"
+
+    # Test various valid mobile numbers
+    var mobile_numbers = List[String]()
+    mobile_numbers.append("600123456")  # 6xx numbers
+    mobile_numbers.append("700234567")  # 7xx numbers
+    mobile_numbers.append("810123456")  # 8xx numbers
+    mobile_numbers.append("912345678")  # 9xx numbers
+
+    for i in range(len(mobile_numbers)):
+        var number = mobile_numbers[i]
+        var result = match_first(mobile_pattern, number)
+        assert_true(result.__bool__())
+        assert_equal(result.value().match_text, number)
+
+    # Test invalid mobile numbers (should not match)
+    var invalid_numbers = List[String]()
+    invalid_numbers.append("400123456")  # Starts with 4 (not in [5-9])
+    invalid_numbers.append("12345678")  # Too short
+    invalid_numbers.append("1234567890")  # Too long
+
+    for i in range(len(invalid_numbers)):
+        var number = invalid_numbers[i]
+        var result = match_first(mobile_pattern, number)
+        assert_true(not result.__bool__())
+
+
+def test_non_capturing_groups_comprehensive():
+    """Test non-capturing groups in various contexts."""
+    # Test simple non-capturing group
+    var result1 = match_first("(?:ab)+", "ababab")
+    assert_true(result1.__bool__())
+    assert_equal(result1.value().match_text, "ababab")
+
+    # Test non-capturing groups with simple alternation
+    var result2 = match_first("(?:cat|dog)", "cat")
+    assert_true(result2.__bool__())
+    assert_equal(result2.value().match_text, "cat")
+
+    # Test non-capturing groups with alternation and quantifier
+    var result3 = match_first("(?:a|b)+", "ababab")
+    assert_true(result3.__bool__())
+    assert_equal(result3.value().match_text, "ababab")
+
+    # Test nested non-capturing groups with alternation
+    var result4 = match_first("(?:(?:a|b)(?:c|d))+", "acbdac")
+    assert_true(result4.__bool__())
+    assert_equal(result4.value().match_text, "acbdac")
+
+
+def test_complex_alternation_patterns():
+    """Test complex alternation patterns like those in phone numbers."""
+    # Test multiple character class alternations
+    var result1 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "81")
+    assert_true(result1.__bool__())
+    assert_equal(result1.value().match_text, "81")
+
+    # Test different branches
+    var result2 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "15")
+    assert_true(result2.__bool__())
+    assert_equal(result2.value().match_text, "15")
+
+    var result3 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "41")
+    assert_true(result3.__bool__())
+    assert_equal(result3.value().match_text, "41")
+
+    # Test pattern that should not match
+    var result4 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "09")
+    assert_true(not result4.__bool__())
+
+
 def test_match_first_vs_search_behavior():
     """Test that match_first behaves like Python's re.match (only matches at start).
     """

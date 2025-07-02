@@ -114,7 +114,29 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
     if len(tokens) == 0:
         return GroupNode(List[ASTNode](), True, "", 0)
 
-    # Simple implementation for now - parse elements and OR
+    # Handle OR at the top level by finding the first OR token outside of groups
+    var paren_depth = 0
+    for k in range(len(tokens)):
+        if tokens[k].type == Token.LEFTPARENTHESIS:
+            paren_depth += 1
+        elif tokens[k].type == Token.RIGHTPARENTHESIS:
+            paren_depth -= 1
+        elif tokens[k].type == Token.VERTICALBAR and paren_depth == 0:
+            # Split into left and right parts (only when not inside parentheses)
+            var left_tokens = tokens[:k]
+            var right_tokens = tokens[k + 1 :]
+
+            # Parse both sides
+            var left_ast = parse_token_list(left_tokens^) if len(
+                left_tokens
+            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
+            var right_ast = parse_token_list(right_tokens^) if len(
+                right_tokens
+            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
+
+            return OrNode(left_ast, right_ast)
+
+    # No OR found, parse elements sequentially
     var elements = List[ASTNode](capacity=len(tokens))
     var i = 0
 
@@ -188,23 +210,53 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, range_elem, tokens^)
             elements.append(range_elem)
-        elif token.type == Token.VERTICALBAR:
-            # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements^, True, "", 0)
+        elif token.type == Token.LEFTPARENTHESIS:
+            # Handle nested grouping - check for non-capturing group (?:...)
             i += 1
+            var is_capturing = True
 
-            # Parse right side recursively
-            var right_tokens = tokens[i:]
-            i += len(right_tokens)
+            # Check if this is a non-capturing group (?:...)
+            if (
+                i + 1 < len(tokens)
+                and tokens[i].type == Token.QUESTIONMARK
+                and tokens[i + 1].type == Token.ELEMENT
+                and tokens[i + 1].char == ":"
+            ):
+                is_capturing = False
+                i += 2  # Skip ? and :
 
-            var right_group_ast = parse_token_list(right_tokens^)
-            var right_group: ASTNode
-            if right_group_ast.type == GROUP:
-                right_group = right_group_ast
+            var group_tokens = List[Token](capacity=len(tokens) - i)
+            var paren_count = 1
+
+            # Extract tokens inside the parentheses
+            while i < len(tokens) and paren_count > 0:
+                if tokens[i].type == Token.LEFTPARENTHESIS:
+                    paren_count += 1
+                elif tokens[i].type == Token.RIGHTPARENTHESIS:
+                    paren_count -= 1
+                    if paren_count == 0:
+                        break
+
+                group_tokens.append(tokens[i])
+                i += 1
+
+            if paren_count > 0:
+                raise Error("Missing closing parenthesis ')'.")
+
+            # Recursively parse the tokens inside the group
+            var group_ast = parse_token_list(group_tokens)
+            var group: ASTNode
+            if group_ast.type == GROUP:
+                # If it's already a group, use it directly
+                group = group_ast
+                group.capturing = is_capturing
             else:
-                right_group = GroupNode([right_group_ast], True, "", 0)
-
-            return OrNode(left_group, right_group)
+                # Otherwise wrap in a group
+                group = GroupNode([group_ast], is_capturing, "", 0)
+            # Check for quantifiers after the group
+            if i + 1 < len(tokens):
+                check_for_quantifiers(i, group, tokens)
+            elements.append(group)
 
         i += 1
 
@@ -354,27 +406,20 @@ fn parse(regex: String) raises -> ASTNode:
             var left_group = GroupNode(elements^, True, "", 0)
             i += 1
 
-            # Parse right side
-            var right_elements = List[ASTNode](capacity=len(tokens) - i)
+            # Parse right side - collect remaining tokens
+            var right_tokens = List[Token](capacity=len(tokens) - i)
             while i < len(tokens):
-                ref right_token = tokens[i]
-
-                if right_token.type == Token.START:
-                    right_elements.append(StartElement())
-                elif right_token.type == Token.END:
-                    right_elements.append(EndElement())
-                elif right_token.type == Token.ELEMENT:
-                    right_elements.append(Element(right_token.char))
-                elif right_token.type == Token.WILDCARD:
-                    right_elements.append(WildcardElement())
-                elif right_token.type == Token.SPACE:
-                    right_elements.append(SpaceElement())
-                elif right_token.type == Token.DIGIT:
-                    right_elements.append(DigitElement())
-                # TODO: Add support for other token types like ranges, groups, etc.
+                right_tokens.append(tokens[i])
                 i += 1
 
-            var right_group = GroupNode(right_elements^, True, "", 0)
+            # Recursively parse the right side
+            var right_group_ast = parse_token_list(right_tokens^)
+            var right_group: ASTNode
+            if right_group_ast.type == GROUP:
+                right_group = right_group_ast
+            else:
+                right_group = GroupNode([right_group_ast], True, "", 0)
+
             return RENode(OrNode(left_group, right_group))
         else:
             # Check for unescaped special characters

@@ -66,10 +66,7 @@ struct ASTNode(
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        # Deep copy children since List[ASTNode] is not directly copyable
-        self.children = List[ASTNode](capacity=len(other.children))
-        for child in other.children:
-            self.children.append(child)
+        self.children = other.children
 
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
