@@ -62,7 +62,7 @@ This software is in an early stage of development. Even though it is functional,
 2. **Add the Package** (at the top level of your project):
 
     ```bash
-    pixi add regex
+    pixi add mojo-regex
     ```
 
 ## Example Usage
