@@ -12,21 +12,20 @@ from sys.info import simdwidthof
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 
 
+@register_passable("trivial")
 struct CharacterClassSIMD(Copyable, Movable):
     """SIMD-optimized character class matcher."""
 
     var lookup_table: SIMD[
         DType.uint8, 256
     ]  # Bit vector for each ASCII character
-    var char_class: String  # Original character class for debugging
 
-    fn __init__(out self, char_class: String):
+    fn __init__(out self, owned char_class: String):
         """Initialize SIMD character class matcher.
 
         Args:
             char_class: String containing all characters in the class (e.g., "abcdefg...").
         """
-        self.char_class = char_class
         self.lookup_table = SIMD[DType.uint8, 256](0)
 
         # Set bits for each character in the class
@@ -42,7 +41,6 @@ struct CharacterClassSIMD(Copyable, Movable):
             start_char: First character in range.
             end_char: Last character in range.
         """
-        self.char_class = start_char + "-" + end_char
         self.lookup_table = SIMD[DType.uint8, 256](0)
 
         var start_code = ord(start_char)
@@ -51,16 +49,6 @@ struct CharacterClassSIMD(Copyable, Movable):
         for char_code in range(start_code, end_code + 1):
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
-
-    fn __copyinit__(out self, other: Self):
-        """Copy constructor."""
-        self.lookup_table = other.lookup_table
-        self.char_class = other.char_class
-
-    fn __moveinit__(out self, owned other: Self):
-        """Move constructor."""
-        self.lookup_table = other.lookup_table
-        self.char_class = other.char_class^
 
     fn contains(self, ch: String) -> Bool:
         """Check if character is in this character class.
@@ -187,21 +175,25 @@ struct CharacterClassSIMD(Copyable, Movable):
         return matches
 
 
+@always_inline
 fn create_ascii_lowercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII lowercase letters [a-z]."""
     return CharacterClassSIMD("a", "z")
 
 
+@always_inline
 fn create_ascii_uppercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII uppercase letters [A-Z]."""
     return CharacterClassSIMD("A", "Z")
 
 
+@always_inline
 fn create_ascii_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII digits [0-9]."""
     return CharacterClassSIMD("0", "9")
 
 
+@always_inline
 fn create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
@@ -218,10 +210,10 @@ fn create_ascii_alphanumeric() -> CharacterClassSIMD:
     for i in range(ord("0"), ord("9") + 1):
         result.lookup_table[i] = 1
 
-    result.char_class = "[a-zA-Z0-9]"
     return result
 
 
+@always_inline
 fn create_whitespace() -> CharacterClassSIMD:
     """Create SIMD matcher for whitespace characters [ \\t\\n\\r\\f\\v]."""
     var whitespace_chars = " \t\n\r\f\v"
