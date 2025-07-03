@@ -36,9 +36,7 @@ struct ASTNode(
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
-    var simd_matcher: Optional[
-        CharacterClassSIMD
-    ]  # SIMD-optimized character class matcher
+    var enable_simd: Bool  # Flag to enable SIMD optimization for this node
 
     fn __init__(
         out self,
@@ -49,6 +47,7 @@ struct ASTNode(
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        enable_simd: Bool = False,
         owned children: List[ASTNode] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
@@ -59,7 +58,7 @@ struct ASTNode(
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.simd_matcher = None
+        self.enable_simd = enable_simd
         # TODO: Uncomment when unpacked arguments are supported in Mojo
         # self.children = List[ASTNode[origin]](*children)
         self.children = List[ASTNode](capacity=len(children))
@@ -75,7 +74,7 @@ struct ASTNode(
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        self.simd_matcher = other.simd_matcher
+        self.enable_simd = other.enable_simd
         self.children = other.children
 
     fn __bool__(self) -> Bool:
@@ -96,9 +95,9 @@ struct ASTNode(
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
+            and self.enable_simd == other.enable_simd
             and len(self.children) == len(other.children)
             and self.children == other.children
-            # Note: simd_matcher is not compared as it's an optimization detail
         )
 
     fn __ne__(self, other: ASTNode) -> Bool:
@@ -147,9 +146,10 @@ struct ASTNode(
         elif self.type == WILDCARD:
             return value != "\n"
         elif self.type == SPACE:
-            # Use SIMD optimization if available
-            if self.simd_matcher:
-                return self.simd_matcher.value().contains(value)
+            # Use SIMD optimization if enabled
+            if self.enable_simd:
+                var simd_matcher = create_whitespace()
+                return simd_matcher.contains(value)
             if len(value) == 1:
                 var ch = value
                 return (
@@ -161,18 +161,20 @@ struct ASTNode(
                 )
             return False
         elif self.type == DIGIT:
-            # Use SIMD optimization if available
-            if self.simd_matcher:
-                return self.simd_matcher.value().contains(value)
+            # Use SIMD optimization if enabled
+            if self.enable_simd:
+                var simd_matcher = create_ascii_digits()
+                return simd_matcher.contains(value)
             if len(value) == 1:
                 var ch_code = ord(value)
                 return ZERO_CODE <= ch_code <= NINE_CODE
             return False
         elif self.type == RANGE:
-            # TODO: Temporarily disable SIMD optimization for debugging
-            # if self.simd_matcher:
-            #     var match_result = self.simd_matcher.value().contains(value)
-            #     return match_result if self.positive_logic else not match_result
+            # Use SIMD optimization if enabled
+            if self.enable_simd:
+                var simd_matcher = CharacterClassSIMD(self.value)
+                var match_result = simd_matcher.contains(value)
+                return match_result if self.positive_logic else not match_result
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = self.value.find(value) != -1
             return not (
@@ -215,34 +217,26 @@ fn WildcardElement() -> ASTNode:
 @always_inline
 fn SpaceElement() -> ASTNode:
     """Create a SpaceElement node."""
-    var node = ASTNode(type=SPACE, value="", min=1, max=1)
-    # TODO: Temporarily disable SIMD for debugging
-    # node.simd_matcher = create_whitespace()
-    return node
+    return ASTNode(type=SPACE, value="", min=1, max=1, enable_simd=True)
 
 
 @always_inline
 fn DigitElement() -> ASTNode:
     """Create a DigitElement node."""
-    var node = ASTNode(type=DIGIT, value="", min=1, max=1)
-    # TODO: Temporarily disable SIMD for debugging
-    # node.simd_matcher = create_ascii_digits()
-    return node
+    return ASTNode(type=DIGIT, value="", min=1, max=1, enable_simd=True)
 
 
 @always_inline
 fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
     """Create a RangeElement node."""
-    var node = ASTNode(
+    return ASTNode(
         type=RANGE,
         value=value^,
         min=1,
         max=1,
         positive_logic=is_positive_logic,
+        enable_simd=True,
     )
-    # TODO: Temporarily disable SIMD construction due to segfault
-    # node.simd_matcher = CharacterClassSIMD(node.value)
-    return node
 
 
 @always_inline

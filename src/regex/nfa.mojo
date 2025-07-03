@@ -325,9 +325,12 @@ struct NFAEngine(Engine):
         var ch = string[str_i]
         var is_space: Bool
 
-        # Use SIMD optimization if available
-        if ast.simd_matcher:
-            is_space = ast.simd_matcher.value().contains(ch)
+        # Use SIMD optimization if enabled
+        if ast.enable_simd:
+            from regex.simd_ops import create_whitespace
+
+            var simd_matcher = create_whitespace()
+            is_space = simd_matcher.contains(ch)
         else:
             # Fallback to traditional comparison
             is_space = (
@@ -361,9 +364,12 @@ struct NFAEngine(Engine):
         var ch = string[str_i]
         var is_digit: Bool
 
-        # Use SIMD optimization if available
-        if ast.simd_matcher:
-            is_digit = ast.simd_matcher.value().contains(ch)
+        # Use SIMD optimization if enabled
+        if ast.enable_simd:
+            from regex.simd_ops import create_ascii_digits
+
+            var simd_matcher = create_ascii_digits()
+            is_digit = simd_matcher.contains(ch)
         else:
             # Fallback to traditional comparison
             is_digit = ZERO_CODE <= ord(ch) <= NINE_CODE
@@ -391,9 +397,12 @@ struct NFAEngine(Engine):
         var ch = string[str_i]
         var match_found: Bool
 
-        # Use SIMD optimization if available
-        if ast.simd_matcher:
-            var simd_match = ast.simd_matcher.value().contains(ch)
+        # Use SIMD optimization if enabled
+        if ast.enable_simd:
+            from regex.simd_ops import CharacterClassSIMD
+
+            var simd_matcher = CharacterClassSIMD(ast.value)
+            var simd_match = simd_matcher.contains(ch)
             match_found = simd_match if ast.positive_logic else not simd_match
         else:
             # Fallback to linear search
@@ -761,7 +770,7 @@ struct NFAEngine(Engine):
         # Use SIMD bulk matching for character classes with quantifiers
         from regex.ast import RANGE, DIGIT, SPACE
 
-        if ast.simd_matcher and (
+        if ast.enable_simd and (
             ast.type == RANGE or ast.type == DIGIT or ast.type == SPACE
         ):
             # Calculate the maximum search length
@@ -772,27 +781,47 @@ struct NFAEngine(Engine):
                 )
 
             if search_len > 0:
-                # Use SIMD to count consecutive matches
-                var simd_matcher = ast.simd_matcher.value()
+                # Create SIMD matcher based on type
                 var consecutive_matches = 0
 
-                # Count consecutive character class matches using SIMD
-                for i in range(search_len):
-                    var ch = string[current_pos + i]
-                    var is_match: Bool
+                if ast.type == RANGE:
+                    from regex.simd_ops import CharacterClassSIMD
 
-                    if ast.type == RANGE:
+                    var simd_matcher = CharacterClassSIMD(ast.value)
+                    # Count consecutive character class matches using SIMD
+                    for i in range(search_len):
+                        var ch = string[current_pos + i]
                         var simd_match = simd_matcher.contains(ch)
-                        is_match = (
+                        var is_match = (
                             simd_match if ast.positive_logic else not simd_match
                         )
-                    else:
-                        is_match = simd_matcher.contains(ch)
 
-                    if is_match:
-                        consecutive_matches += 1
-                    else:
-                        break
+                        if is_match:
+                            consecutive_matches += 1
+                        else:
+                            break
+                elif ast.type == DIGIT:
+                    from regex.simd_ops import create_ascii_digits
+
+                    var simd_matcher = create_ascii_digits()
+                    # Count consecutive digit matches using SIMD
+                    for i in range(search_len):
+                        var ch = string[current_pos + i]
+                        if simd_matcher.contains(ch):
+                            consecutive_matches += 1
+                        else:
+                            break
+                elif ast.type == SPACE:
+                    from regex.simd_ops import create_whitespace
+
+                    var simd_matcher = create_whitespace()
+                    # Count consecutive space matches using SIMD
+                    for i in range(search_len):
+                        var ch = string[current_pos + i]
+                        if simd_matcher.contains(ch):
+                            consecutive_matches += 1
+                        else:
+                            break
 
                 matches_count = min(consecutive_matches, max_matches)
                 current_pos += matches_count
