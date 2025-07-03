@@ -228,6 +228,50 @@ def bench_complex_number_extraction(number_text: str) -> Callable[[], None]:
 
 
 # ===-----------------------------------------------------------------------===#
+# SIMD-Heavy Character Filtering Benchmarks
+# ===-----------------------------------------------------------------------===#
+
+
+def make_mixed_content_text(length: int) -> str:
+    """Generate large mixed content text optimal for SIMD character class testing.
+
+    Args:
+        length: The desired length of the test string.
+
+    Returns:
+        String with mixed alphanumeric, punctuation, and whitespace content.
+    """
+    if length <= 0:
+        return ""
+
+    # Pattern that creates realistic mixed content with plenty of alphanumeric sequences
+    base_pattern = "User123 sent email to user456@domain.com with ID abc789! Status: ACTIVE_2024 (priority=HIGH). "
+    pattern_len = len(base_pattern)
+    full_repeats = length // pattern_len
+    remainder = length % pattern_len
+
+    result = base_pattern * full_repeats + base_pattern[:remainder]
+    return result
+
+
+def bench_simd_heavy_filtering(test_text: str, pattern: str) -> Callable[[], None]:
+    """Benchmark SIMD-optimized character class filtering on large mixed content.
+
+    This benchmark is designed to show maximum SIMD performance benefits by:
+    - Using character classes that benefit from SIMD lookup tables
+    - Processing large amounts of text to amortize SIMD setup costs
+    - Using realistic mixed content with alphanumeric sequences
+    """
+
+    def benchmark_fn():
+        for _ in range(10):  # Fewer iterations due to large text size
+            result = re.match(pattern, test_text)
+            bool(result)
+
+    return benchmark_fn
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
 
@@ -321,12 +365,35 @@ def main():
         "complex_number_extraction", bench_complex_number_extraction(number_text)
     )
 
+    # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit in Mojo comparison)
+    print("\n=== SIMD-Optimized Character Filtering Benchmarks ===")
+    large_mixed_text = make_mixed_content_text(10000)
+    xlarge_mixed_text = make_mixed_content_text(50000)
+
+    m.bench_function(
+        "simd_alphanumeric_large",
+        bench_simd_heavy_filtering(large_mixed_text, r"[a-zA-Z0-9]+")
+    )
+    m.bench_function(
+        "simd_alphanumeric_xlarge",
+        bench_simd_heavy_filtering(xlarge_mixed_text, r"[a-zA-Z0-9]+")
+    )
+    m.bench_function(
+        "simd_negated_alphanumeric",
+        bench_simd_heavy_filtering(large_mixed_text, r"[^a-zA-Z0-9]+")
+    )
+    m.bench_function(
+        "simd_multi_char_class",
+        bench_simd_heavy_filtering(large_mixed_text, r"[a-z]+[0-9]+")
+    )
+
     # Results summary
     m.dump_report()
 
     print("\nNote: This benchmark uses Python's re module")
     print("for optimal performance comparison with the Mojo regex implementation.")
     print("Run the Mojo benchmark with: pixi run mojo benchmarks/bench_engine.mojo")
+    print("Run the Mojo SIMD comparison with: pixi run mojo benchmarks/comparative_benchmark.mojo")
 
 
 if __name__ == "__main__":

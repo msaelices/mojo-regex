@@ -169,6 +169,63 @@ fn bench_group_match[
 
 
 # ===-----------------------------------------------------------------------===#
+# SIMD-Heavy Character Filtering Benchmarks
+# ===-----------------------------------------------------------------------===#
+fn make_mixed_content_text[length: Int]() -> String:
+    """Generate large mixed content text optimal for SIMD character class testing.
+
+    Parameters:
+        length: The desired length of the test string.
+
+    Returns:
+        String with mixed alphanumeric, punctuation, and whitespace content.
+    """
+    if length <= 0:
+        return ""
+
+    # Pattern that creates realistic mixed content with plenty of alphanumeric sequences
+    var base_pattern = "User123 sent email to user456@domain.com with ID abc789! Status: ACTIVE_2024 (priority=HIGH). "
+    var pattern_len = len(base_pattern)
+    var result = String()
+    var full_repeats = length // pattern_len
+    var remainder = length % pattern_len
+
+    # Add full pattern repeats
+    for _ in range(full_repeats):
+        result += base_pattern
+
+    # Add partial pattern for remainder
+    for i in range(remainder):
+        result += base_pattern[i]
+
+    return result
+
+
+@parameter
+fn bench_simd_heavy_filtering[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
+    """Benchmark SIMD-optimized character class filtering on large mixed content.
+
+    This benchmark is designed to show maximum SIMD performance benefits by:
+    - Using character classes that benefit from SIMD lookup tables
+    - Processing large amounts of text to amortize SIMD setup costs
+    - Using realistic mixed content with alphanumeric sequences
+    """
+    var test_text = make_mixed_content_text[text_length]()
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for _ in range(10):  # Fewer iterations due to large text size
+            var result = match_first(pattern, test_text)
+            keep(result.__bool__())
+
+    b.iter[call_fn]()
+    keep(Bool(test_text))
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
 def main():
@@ -236,6 +293,21 @@ def main():
     )
     m.bench_function[bench_group_match[1000, "(a|b)*"]](
         BenchId(String("group_alternation"))
+    )
+
+    # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)
+    print("=== SIMD-Optimized Character Filtering Benchmarks ===")
+    m.bench_function[bench_simd_heavy_filtering[10000, "[a-zA-Z0-9]+"]](
+        BenchId(String("simd_alphanumeric_large"))
+    )
+    m.bench_function[bench_simd_heavy_filtering[50000, "[a-zA-Z0-9]+"]](
+        BenchId(String("simd_alphanumeric_xlarge"))
+    )
+    m.bench_function[bench_simd_heavy_filtering[10000, "[^a-zA-Z0-9]+"]](
+        BenchId(String("simd_negated_alphanumeric"))
+    )
+    m.bench_function[bench_simd_heavy_filtering[10000, "[a-z]+[0-9]+"]](
+        BenchId(String("simd_multi_char_class"))
     )
 
     # Results summary
