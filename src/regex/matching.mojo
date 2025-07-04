@@ -17,14 +17,6 @@ struct Match(Copyable, Movable):
         end_idx: Int,
         text: String,
     ):
-        print(
-            "Match.__init__ called with group_id:",
-            group_id,
-            "start_idx:",
-            start_idx,
-            "end_idx:",
-            end_idx,
-        )
         self.group_id = group_id
         self.start_idx = start_idx
         self.end_idx = end_idx
