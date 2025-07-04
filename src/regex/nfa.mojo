@@ -80,7 +80,7 @@ struct NFAEngine(Engine):
                 var match_end = result[1]
 
                 # Create match object
-                var matched = Match(0, match_start, match_end, text, "RegEx")
+                var matched = Match(0, match_start, match_end, text)
                 matches.append(matched)
 
                 # Move past this match to find next one
@@ -132,7 +132,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Create the match object
-            var matched = Match(0, str_i, end_idx, text, "RegEx")
+            var matched = Match(0, str_i, end_idx, text)
             return matched^
 
         return None
@@ -173,7 +173,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Always return the overall match with correct range
-            var matched = Match(0, str_i, end_idx, text, "RegEx")
+            var matched = Match(0, str_i, end_idx, text)
             return matched^
 
         return None
@@ -467,7 +467,7 @@ struct NFAEngine(Engine):
 
         # If this is a capturing group, add the match
         if ast.is_capturing():
-            var matched = Match(0, start_pos, result[1], string, ast.group_name)
+            var matched = Match(0, start_pos, result[1], string)
             matches.append(matched)
 
         return result
@@ -512,9 +512,7 @@ struct NFAEngine(Engine):
                 ):
                     break
                 if ast.is_capturing():
-                    var matched = Match(
-                        0, str_i, current_pos, string, ast.group_name
-                    )
+                    var matched = Match(0, str_i, current_pos, string)
                     matches.append(matched)
             else:
                 break

@@ -8,7 +8,6 @@ struct Match(Copyable, Movable):
     var start_idx: Int
     var end_idx: Int
     var text_ptr: UnsafePointer[String, mut=False]
-    var name: String
 
     fn __init__(
         out self,
@@ -16,10 +15,16 @@ struct Match(Copyable, Movable):
         start_idx: Int,
         end_idx: Int,
         text: String,
-        owned name: String,
     ):
+        print(
+            "Match.__init__ called with group_id:",
+            group_id,
+            "start_idx:",
+            start_idx,
+            "end_idx:",
+            end_idx,
+        )
         self.group_id = group_id
-        self.name: String = name^
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.text_ptr = UnsafePointer(to=text)

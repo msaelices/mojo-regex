@@ -101,7 +101,7 @@ struct DFAEngine:
             if current_state == -1:  # No transition, no match
                 return None
             if self.states[current_state].is_accepting:
-                return Match(0, start, pos + 1, text, "DFA")
+                return Match(0, start, pos + 1, text)
             pos += 1
 
         return None
@@ -243,7 +243,7 @@ struct RegexVM:
                     if not self._backtrack():
                         return None
             elif instr.opcode == Opcode.MATCH:
-                return Match(0, start, pos, text, "VM")
+                return Match(0, start, pos, text)
             # ... handle other opcodes
 
         return None
@@ -264,7 +264,7 @@ struct MatchPool:
             return match
         else:
             # Expand pool if needed
-            self.pool.append(Match(0, 0, 0, "", ""))
+            self.pool.append(Match(0, 0, 0, ""))
             return self.get_match()
 
     fn reset(mut self):
@@ -314,7 +314,7 @@ struct AhoCorasick:
             # Check for pattern matches at current state
             for pattern in self.output[state]:
                 var start = i - len(pattern) + 1
-                matches.append(Match(0, start, i + 1, text, pattern))
+                matches.append(Match(0, start, i + 1, text))
 
         return matches
 ```
