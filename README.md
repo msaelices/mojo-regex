@@ -73,13 +73,13 @@ from regex import match_first, findall
 # Basic literal matching
 var result = match_first("hello", "hello world")
 if result:
-    print("Match found:", result.value().match_text)
+    print("Match found:", result.value().get_match_text())
 
 # Find all matches
 var matches = findall("a", "banana")
 print("Found", len(matches), "matches:")
 for i in range(len(matches)):
-    print("  Match", i, ":", matches[i].match_text, "at position", matches[i].start_idx)
+    print("  Match", i, ":", matches[i].get_match_text(), "at position", matches[i].start_idx)
 
 # Wildcard and quantifiers
 result = match_first(".*@.*", "user@domain.com")
@@ -89,22 +89,22 @@ if result:
 # Find all numbers in text
 var numbers = findall("[0-9]+", "Price: $123, Quantity: 456, Total: $579")
 for i in range(len(numbers)):
-    print("Number found:", numbers[i].match_text)
+    print("Number found:", numbers[i].get_match_text())
 
 # Character ranges
 result = match_first("[a-z]+", "hello123")
 if result:
-    print("Letters:", result.value().match_text)
+    print("Letters:", result.value().get_match_text())
 
 # Groups and alternation
 result = match_first("(com|org|net)", "example.com")
 if result:
-    print("TLD found:", result.value().match_text)
+    print("TLD found:", result.value().get_match_text())
 
 # Find all domains in text
 var domains = findall("(com|org|net)", "Visit example.com or test.org for more info")
 for i in range(len(domains)):
-    print("Domain found:", domains[i].match_text)
+    print("Domain found:", domains[i].get_match_text())
 
 # Anchors
 result = match_first("^https?://", "https://example.com")
@@ -119,7 +119,7 @@ if result:
 # Find all email addresses in text
 var emails = findall("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "Contact john@example.com or mary@test.org")
 for i in range(len(emails)):
-    print("Email found:", emails[i].match_text)
+    print("Email found:", emails[i].get_match_text())
 ```
 
 ## Performance
