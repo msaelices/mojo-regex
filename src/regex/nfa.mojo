@@ -132,8 +132,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Create the match object
-            var matched = Match(0, str_i, end_idx, text)
-            return matched^
+            return Match(0, str_i, end_idx, text)
 
         return None
 
@@ -173,8 +172,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Always return the overall match with correct range
-            var matched = Match(0, str_i, end_idx, text)
-            return matched^
+            return Match(0, str_i, end_idx, text)
 
         return None
 

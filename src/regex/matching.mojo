@@ -1,6 +1,7 @@
 from memory import UnsafePointer
 
 
+@register_passable("trivial")
 struct Match(Copyable, Movable):
     """Contains the information of a match in a regular expression."""
 
