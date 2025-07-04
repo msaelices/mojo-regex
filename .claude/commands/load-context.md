@@ -3,6 +3,6 @@
 * Read the pixi.toml file.
 * Read the docs/*.md documents.
 * Read the tools/*.sh scripts.
-* Read the benchmarks/*.mojo files.
+* Read the benchmarks/*.mojo and benchmarks/*.py files.
 * Read the src/regex/*.mojo files.
 * Read the tests/test_matcher.mojo file.

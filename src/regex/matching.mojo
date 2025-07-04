@@ -1,11 +1,14 @@
+from memory import UnsafePointer
+
+
+@register_passable("trivial")
 struct Match(Copyable, Movable):
     """Contains the information of a match in a regular expression."""
 
     var group_id: Int
     var start_idx: Int
     var end_idx: Int
-    var match_text: String
-    var name: String
+    var text_ptr: UnsafePointer[String, mut=False]
 
     fn __init__(
         out self,
@@ -13,10 +16,12 @@ struct Match(Copyable, Movable):
         start_idx: Int,
         end_idx: Int,
         text: String,
-        name: String,
     ):
         self.group_id = group_id
-        self.name: String = name
         self.start_idx = start_idx
         self.end_idx = end_idx
-        self.match_text = text[start_idx:end_idx]
+        self.text_ptr = UnsafePointer(to=text)
+
+    fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
+        """Returns the text that was matched."""
+        return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]

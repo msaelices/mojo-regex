@@ -26,7 +26,8 @@ struct NFAEngine(Engine):
     fn match_all(
         self,
         text: String,
-    ) -> List[Match]:
+        out matches: List[Match, hint_trivial_type=True],
+    ):
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -59,13 +60,20 @@ struct NFAEngine(Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return []
+                matches = []
+                return
 
-        var matches = List[Match]()
+        alias estimated_matches = 16  # TODO: Estimate based on pattern complexity
+        matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_matches
+        )
         var current_pos = 0
 
+        var temp_matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_matches
+        )
         while current_pos <= len(text):
-            var temp_matches = List[Match]()
+            temp_matches.clear()
             var result = self._match_node(
                 ast,
                 text,
@@ -79,7 +87,7 @@ struct NFAEngine(Engine):
                 var match_end = result[1]
 
                 # Create match object
-                var matched = Match(0, match_start, match_end, text, "RegEx")
+                var matched = Match(0, match_start, match_end, text)
                 matches.append(matched)
 
                 # Move past this match to find next one
@@ -90,8 +98,6 @@ struct NFAEngine(Engine):
                     current_pos = match_end
             else:
                 current_pos += 1
-
-        return matches
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
@@ -107,7 +113,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
         var ast: ASTNode
         if self.regex:
@@ -131,8 +137,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Create the match object
-            var matched = Match(0, str_i, end_idx, text, "RegEx")
-            return matched^
+            return Match(0, str_i, end_idx, text)
 
         return None
 
@@ -150,7 +155,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
         var ast: ASTNode
         if self.regex:
@@ -172,8 +177,7 @@ struct NFAEngine(Engine):
         if result[0]:  # Match found
             var end_idx = result[1]
             # Always return the overall match with correct range
-            var matched = Match(0, str_i, end_idx, text, "RegEx")
-            return matched^
+            return Match(0, str_i, end_idx, text)
 
         return None
 
@@ -183,7 +187,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -439,7 +443,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -475,7 +479,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -508,7 +512,7 @@ struct NFAEngine(Engine):
 
         # If this is a capturing group, add the match
         if ast.is_capturing():
-            var matched = Match(0, start_pos, result[1], string, ast.group_name)
+            var matched = Match(0, start_pos, result[1], string)
             matches.append(matched)
 
         return result
@@ -518,7 +522,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -553,9 +557,7 @@ struct NFAEngine(Engine):
                 ):
                     break
                 if ast.is_capturing():
-                    var matched = Match(
-                        0, str_i, current_pos, string, ast.group_name
-                    )
+                    var matched = Match(0, str_i, current_pos, string)
                     matches.append(matched)
             else:
                 break
@@ -571,7 +573,7 @@ struct NFAEngine(Engine):
         children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -639,7 +641,7 @@ struct NFAEngine(Engine):
         remaining_children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -726,7 +728,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -850,7 +852,11 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
 
-fn findall(pattern: String, text: String) raises -> List[Match]:
+fn findall(
+    pattern: String,
+    text: String,
+    out matches: List[Match, hint_trivial_type=True],
+) raises:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -861,7 +867,7 @@ fn findall(pattern: String, text: String) raises -> List[Match]:
         List of all matches found.
     """
     var engine = NFAEngine(pattern)
-    return engine.match_all(text)
+    matches = engine.match_all(text)
 
 
 fn match_first(pattern: String, text: String) raises -> Optional[Match]:

@@ -6,7 +6,7 @@ from random import random_si64, seed
 from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex import match_first
+from regex import match_first, findall
 
 
 # ===-----------------------------------------------------------------------===#
@@ -169,6 +169,70 @@ fn bench_group_match[
 
 
 # ===-----------------------------------------------------------------------===#
+# Global Matching Benchmarks
+# ===-----------------------------------------------------------------------===#
+@parameter
+fn bench_match_all[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
+    """Benchmark finding all matches in text."""
+    var test_text = make_test_string[text_length]()
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for _ in range(10):  # Fewer iterations since findall is more expensive
+            var results = findall(pattern, test_text)
+            keep(len(results))
+
+    b.iter[call_fn]()
+    keep(Bool(test_text))
+
+
+# ===-----------------------------------------------------------------------===#
+# Complex Pattern Benchmarks
+# ===-----------------------------------------------------------------------===#
+@parameter
+fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
+    """Benchmark complex email validation pattern."""
+    var base_text = make_test_string[text_length // 2]()
+    var email_text = (
+        base_text + " user@example.com more text john@test.org " + base_text
+    )
+    var pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for _ in range(25):
+            var results = findall(pattern, email_text)
+            keep(len(results))
+
+    b.iter[call_fn]()
+    keep(Bool(email_text))
+
+
+@parameter
+fn bench_complex_number_extraction[text_length: Int](mut b: Bencher) raises:
+    """Benchmark extracting numbers from text."""
+    var base_number_text = make_test_string[text_length // 2]("abc def ghi ")
+    var number_text = (
+        base_number_text + " 123 price 456.78 quantity 789 " + base_number_text
+    )
+    var pattern = "[0-9]+\\.?[0-9]*"
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for _ in range(25):
+            var results = findall(pattern, number_text)
+            keep(len(results))
+
+    b.iter[call_fn]()
+    keep(Bool(number_text))
+
+
+# ===-----------------------------------------------------------------------===#
 # SIMD-Heavy Character Filtering Benchmarks
 # ===-----------------------------------------------------------------------===#
 fn make_mixed_content_text[length: Int]() -> String:
@@ -293,6 +357,24 @@ def main():
     )
     m.bench_function[bench_group_match[1000, "(a|b)*"]](
         BenchId(String("group_alternation"))
+    )
+
+    # Global matching
+    print("=== Global Matching Benchmarks ===")
+    m.bench_function[bench_match_all[1000, "a"]](
+        BenchId(String("match_all_simple"))
+    )
+    m.bench_function[bench_match_all[1000, "[a-z]+"]](
+        BenchId(String("match_all_pattern"))
+    )
+
+    # Complex real-world patterns
+    print("=== Complex Pattern Benchmarks ===")
+    m.bench_function[bench_complex_email_match[1000]](
+        BenchId(String("complex_email_extraction"))
+    )
+    m.bench_function[bench_complex_number_extraction[1000]](
+        BenchId(String("complex_number_extraction"))
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)

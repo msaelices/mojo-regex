@@ -1,3 +1,6 @@
+from regex.matching import Match
+
+
 trait Engine(Copyable, Movable):
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
@@ -12,13 +15,12 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_all(self, text: String) -> List[Match]:
+    fn match_all(
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ):
         """Find all non-overlapping matches using DFA.
 
         Args:
             text: Input text to search.
-
-        Returns:
-            List of all matches found.
         """
         ...

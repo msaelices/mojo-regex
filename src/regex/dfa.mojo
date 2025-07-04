@@ -684,7 +684,7 @@ struct DFAEngine(Engine):
                 len(self.states) > 0
                 and self.states[self.start_state].is_accepting
             ):
-                return Match(0, start_pos, start_pos, text, "DFA")
+                return Match(0, start_pos, start_pos, text)
             return None
 
         var current_state = self.start_state
@@ -728,11 +728,13 @@ struct DFAEngine(Engine):
             # Check end anchor constraint
             if self.has_end_anchor and last_accepting_pos != len(text):
                 return None  # End anchor requires match to end at string end
-            return Match(0, start_pos, last_accepting_pos, text, "DFA")
+            return Match(0, start_pos, last_accepting_pos, text)
 
         return None
 
-    fn match_all(self, text: String) -> List[Match]:
+    fn match_all(
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ):
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -741,7 +743,7 @@ struct DFAEngine(Engine):
         Returns:
             List of all matches found.
         """
-        var matches = List[Match]()
+        matches = List[Match, hint_trivial_type=True]()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
@@ -749,7 +751,7 @@ struct DFAEngine(Engine):
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
-            return matches
+            return
 
         var pos = 0
         while pos <= len(text):
@@ -765,8 +767,6 @@ struct DFAEngine(Engine):
                     pos = match_obj.end_idx
             else:
                 pos += 1
-
-        return matches
 
     # fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
     #     """SIMD-optimized matching for character class patterns.
@@ -818,7 +818,7 @@ struct DFAEngine(Engine):
     #         # Check end anchor constraint
     #         if self.has_end_anchor and match_end != text_len:
     #             return None
-    #         return Match(0, start_pos, match_end, text, "DFA+SIMD")
+    #         return Match(0, start_pos, match_end, text)
     #
     #     return None
 
