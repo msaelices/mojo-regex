@@ -6,7 +6,7 @@ from random import random_si64, seed
 from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex import match_first
+from regex import match_first, findall
 
 
 # ===-----------------------------------------------------------------------===#
@@ -169,6 +169,27 @@ fn bench_group_match[
 
 
 # ===-----------------------------------------------------------------------===#
+# Global Matching Benchmarks
+# ===-----------------------------------------------------------------------===#
+@parameter
+fn bench_match_all[
+    text_length: Int, pattern: StaticString
+](mut b: Bencher) raises:
+    """Benchmark finding all matches in text."""
+    var test_text = make_test_string[text_length]()
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        for _ in range(10):  # Fewer iterations since findall is more expensive
+            var results = findall(pattern, test_text)
+            keep(len(results))
+
+    b.iter[call_fn]()
+    keep(Bool(test_text))
+
+
+# ===-----------------------------------------------------------------------===#
 # SIMD-Heavy Character Filtering Benchmarks
 # ===-----------------------------------------------------------------------===#
 fn make_mixed_content_text[length: Int]() -> String:
@@ -293,6 +314,15 @@ def main():
     )
     m.bench_function[bench_group_match[1000, "(a|b)*"]](
         BenchId(String("group_alternation"))
+    )
+
+    # Global matching
+    print("=== Global Matching Benchmarks ===")
+    m.bench_function[bench_match_all[1000, "a"]](
+        BenchId(String("match_all_simple"))
+    )
+    m.bench_function[bench_match_all[1000, "[a-z]+"]](
+        BenchId(String("match_all_pattern"))
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)
