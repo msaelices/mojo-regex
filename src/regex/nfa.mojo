@@ -63,10 +63,15 @@ struct NFAEngine(Engine):
                 matches = []
                 return
 
-        matches = List[Match, hint_trivial_type=True](capacity=len(text))
+        alias estimated_matches = 16  # TODO: Estimate based on pattern complexity
+        matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_matches
+        )
         var current_pos = 0
 
-        var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
+        var temp_matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_matches
+        )
         while current_pos <= len(text):
             temp_matches.clear()
             var result = self._match_node(
