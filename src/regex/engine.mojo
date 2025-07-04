@@ -1,3 +1,6 @@
+from regex.matching import Match
+
+
 trait Engine(Copyable, Movable):
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,

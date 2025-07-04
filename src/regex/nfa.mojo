@@ -61,11 +61,12 @@ struct NFAEngine(Engine):
             except:
                 return []
 
-        var matches = List[Match]()
+        var matches = List[Match](capacity=len(text))
         var current_pos = 0
 
+        var temp_matches = List[Match](capacity=10)
         while current_pos <= len(text):
-            var temp_matches = List[Match]()
+            temp_matches.clear()
             var result = self._match_node(
                 ast,
                 text,

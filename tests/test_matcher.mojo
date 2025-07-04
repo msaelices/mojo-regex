@@ -26,7 +26,7 @@ def test_hybrid_matcher_simple_pattern():
     var match_obj = result.value()
     assert_equal(match_obj.start_idx, 0)
     assert_equal(match_obj.end_idx, 5)
-    assert_equal(match_obj.match_text, "hello")
+    assert_equal(match_obj.get_match_text(), "hello")
 
 
 def test_hybrid_matcher_complex_pattern():
@@ -58,7 +58,7 @@ def test_compiled_regex():
     # Test match_first
     var result1 = regex.match_first("hello world")
     assert_true(result1.__bool__())
-    assert_equal(result1.value().match_text, "hello")
+    assert_equal(result1.value().get_match_text(), "hello")
 
     # Test match_all
     var matches = regex.match_all("hello world hello")
@@ -97,14 +97,16 @@ def test_regex_caching():
 
     assert_true(result1.__bool__())
     assert_true(result2.__bool__())
-    assert_equal(result1.value().match_text, result2.value().match_text)
+    assert_equal(
+        result1.value().get_match_text(), result2.value().get_match_text()
+    )
 
 
 def test_search_function():
     """Test high-level search function."""
     var result = search("hello", "hello world")
     assert_true(result.__bool__())
-    assert_equal(result.value().match_text, "hello")
+    assert_equal(result.value().get_match_text(), "hello")
 
     var no_result = search("xyz", "hello world")
     assert_false(no_result.__bool__())
@@ -163,7 +165,7 @@ def test_multiple_patterns():
         var test_text = pattern + " text"
         var result = regex.match_first(test_text)
         assert_true(result.__bool__())
-        assert_equal(result.value().match_text, pattern)
+        assert_equal(result.value().get_match_text(), pattern)
 
 
 def test_empty_pattern():
@@ -576,7 +578,7 @@ def test_findall_one_match():
     assert_equal(len(matches), 1)
     assert_equal(matches[0].start_idx, 0)
     assert_equal(matches[0].end_idx, 3)
-    assert_equal(matches[0].match_text, "ban")
+    assert_equal(matches[0].get_match_text(), "ban")
 
 
 def test_findall_overlapping_avoided():
@@ -593,10 +595,10 @@ def test_findall_with_quantifiers():
     """Test findall with quantifiers."""
     var matches = findall("[0-9]+", "abc123def456ghi")
     assert_equal(len(matches), 2)
-    assert_equal(matches[0].match_text, "123")
+    assert_equal(matches[0].get_match_text(), "123")
     assert_equal(matches[0].start_idx, 3)
     assert_equal(matches[0].end_idx, 6)
-    assert_equal(matches[1].match_text, "456")
+    assert_equal(matches[1].get_match_text(), "456")
     assert_equal(matches[1].start_idx, 9)
     assert_equal(matches[1].end_idx, 12)
 
@@ -605,9 +607,9 @@ def test_findall_wildcard():
     """Test findall with wildcard pattern."""
     var matches = findall(".", "abc")
     assert_equal(len(matches), 3)
-    assert_equal(matches[0].match_text, "a")
-    assert_equal(matches[1].match_text, "b")
-    assert_equal(matches[2].match_text, "c")
+    assert_equal(matches[0].get_match_text(), "a")
+    assert_equal(matches[1].get_match_text(), "b")
+    assert_equal(matches[2].get_match_text(), "c")
 
 
 def test_findall_empty_string():
@@ -646,7 +648,7 @@ def test_dfa_character_class_plus():
     var matched = result.value()
     assert_equal(matched.start_idx, 0)
     assert_equal(matched.end_idx, 5)
-    assert_equal(matched.match_text, "hello")
+    assert_equal(matched.get_match_text(), "hello")
 
 
 def test_dfa_character_class_star():
@@ -657,7 +659,7 @@ def test_dfa_character_class_star():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 3)
-    assert_equal(matched1.match_text, "123")
+    assert_equal(matched1.get_match_text(), "123")
 
     # Test [0-9]* pattern with no digits at start
     var result2 = match_first("[0-9]*", "abc123")
@@ -665,7 +667,7 @@ def test_dfa_character_class_star():
     var matched2 = result2.value()
     assert_equal(matched2.start_idx, 0)
     assert_equal(matched2.end_idx, 0)
-    assert_equal(matched2.match_text, "")
+    assert_equal(matched2.get_match_text(), "")
 
 
 def test_dfa_character_class_exact():
@@ -676,7 +678,7 @@ def test_dfa_character_class_exact():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 3)
-    assert_equal(matched1.match_text, "hel")
+    assert_equal(matched1.get_match_text(), "hel")
 
     # Test [a-z]{5} pattern with insufficient characters
     var result2 = match_first("[a-z]{5}", "hi")
@@ -691,7 +693,7 @@ def test_dfa_character_class_range():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 4)
-    assert_equal(matched1.match_text, "1234")
+    assert_equal(matched1.get_match_text(), "1234")
 
     # Test minimum requirement
     var result2 = match_first("[0-9]{2,4}", "1a")
@@ -703,7 +705,7 @@ def test_dfa_character_class_range():
     var matched3 = result3.value()
     assert_equal(matched3.start_idx, 0)
     assert_equal(matched3.end_idx, 2)
-    assert_equal(matched3.match_text, "12")
+    assert_equal(matched3.get_match_text(), "12")
 
 
 def test_dfa_character_class_anchors():
@@ -714,7 +716,7 @@ def test_dfa_character_class_anchors():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 5)
-    assert_equal(matched1.match_text, "hello")
+    assert_equal(matched1.get_match_text(), "hello")
 
     # Test ^[a-z]+$ pattern with mixed case (should fail)
     var result2 = match_first("^[a-z]+$", "Hello")
@@ -729,7 +731,7 @@ def test_dfa_mixed_character_classes():
     var matched = result.value()
     assert_equal(matched.start_idx, 0)
     assert_equal(matched.end_idx, 8)
-    assert_equal(matched.match_text, "Hello123")
+    assert_equal(matched.get_match_text(), "Hello123")
 
 
 def test_dfa_character_class_findall():
@@ -737,10 +739,10 @@ def test_dfa_character_class_findall():
     # Test finding all [0-9]+ sequences
     var matches = findall("[0-9]+", "abc123def456ghi")
     assert_equal(len(matches), 2)
-    assert_equal(matches[0].match_text, "123")
+    assert_equal(matches[0].get_match_text(), "123")
     assert_equal(matches[0].start_idx, 3)
     assert_equal(matches[0].end_idx, 6)
-    assert_equal(matches[1].match_text, "456")
+    assert_equal(matches[1].get_match_text(), "456")
     assert_equal(matches[1].start_idx, 9)
     assert_equal(matches[1].end_idx, 12)
 
@@ -753,7 +755,7 @@ def test_dfa_negated_character_class():
     var matched = result.value()
     assert_equal(matched.start_idx, 0)
     assert_equal(matched.end_idx, 3)
-    assert_equal(matched.match_text, "abc")
+    assert_equal(matched.get_match_text(), "abc")
 
 
 def test_dfa_performance_vs_nfa():
@@ -775,7 +777,7 @@ def test_dfa_multi_character_class_basic():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 8)
-    assert_equal(matched1.match_text, "hello123")
+    assert_equal(matched1.get_match_text(), "hello123")
 
     # Test pattern that should not match
     var result2 = match_first("[a-z]+[0-9]+", "hello")
@@ -794,7 +796,7 @@ def test_dfa_multi_character_class_digit_alpha():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 6)
-    assert_equal(matched1.match_text, "123abc")
+    assert_equal(matched1.get_match_text(), "123abc")
 
     # Test with insufficient second part
     var result2 = match_first("[0-9]+[a-z]+", "123")
@@ -809,7 +811,7 @@ def test_dfa_multi_character_class_with_quantifiers():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 6)
-    assert_equal(matched1.match_text, "abc123")
+    assert_equal(matched1.get_match_text(), "abc123")
 
     # Test with both parts present
     var result2 = match_first("[a-z]*[0-9]+", "abc123")
@@ -817,7 +819,7 @@ def test_dfa_multi_character_class_with_quantifiers():
     var matched2 = result2.value()
     assert_equal(matched2.start_idx, 0)
     assert_equal(matched2.end_idx, 6)
-    assert_equal(matched2.match_text, "abc123")
+    assert_equal(matched2.get_match_text(), "abc123")
 
 
 def test_dfa_multi_character_class_three_parts():
@@ -828,7 +830,7 @@ def test_dfa_multi_character_class_three_parts():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 8)
-    assert_equal(matched1.match_text, "Hello123")
+    assert_equal(matched1.get_match_text(), "Hello123")
 
     # Test insufficient first part
     var result2 = match_first("[A-Z][a-z]+[0-9]+", "hello123")
@@ -843,7 +845,7 @@ def test_dfa_multi_character_class_anchored():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 8)
-    assert_equal(matched1.match_text, "hello123")
+    assert_equal(matched1.get_match_text(), "hello123")
 
     # Test with extra characters that should fail end anchor
     var result2 = match_first("^[a-z]+[0-9]+$", "hello123x")
@@ -855,11 +857,11 @@ def test_dfa_multi_character_class_findall():
     # Test finding all [a-z]+[0-9]+ patterns
     var matches = findall("[a-z]+[0-9]+", "hello123 world456 test789")
     assert_equal(len(matches), 3)
-    assert_equal(matches[0].match_text, "hello123")
+    assert_equal(matches[0].get_match_text(), "hello123")
     assert_equal(matches[0].start_idx, 0)
-    assert_equal(matches[1].match_text, "world456")
+    assert_equal(matches[1].get_match_text(), "world456")
     assert_equal(matches[1].start_idx, 9)
-    assert_equal(matches[2].match_text, "test789")
+    assert_equal(matches[2].get_match_text(), "test789")
     assert_equal(matches[2].start_idx, 18)
 
 
@@ -881,7 +883,7 @@ def test_dfa_negated_character_class_basic():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 1)
-    assert_equal(matched1.match_text, "A")
+    assert_equal(matched1.get_match_text(), "A")
 
     # Test [^a-z] should not match lowercase
     var result2 = match_first("[^a-z]", "a")
@@ -891,7 +893,7 @@ def test_dfa_negated_character_class_basic():
     var result3 = match_first("[^0-9]", "x")
     assert_true(result3.__bool__())
     var matched3 = result3.value()
-    assert_equal(matched3.match_text, "x")
+    assert_equal(matched3.get_match_text(), "x")
 
     # Test [^0-9] should not match digits
     var result4 = match_first("[^0-9]", "5")
@@ -906,7 +908,7 @@ def test_dfa_negated_character_class_quantifiers():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 3)
-    assert_equal(matched1.match_text, "abc")
+    assert_equal(matched1.get_match_text(), "abc")
 
     # Test [^a-z]* pattern (zero or more non-lowercase)
     var result2 = match_first("[^a-z]*", "ABC123def")
@@ -914,7 +916,7 @@ def test_dfa_negated_character_class_quantifiers():
     var matched2 = result2.value()
     assert_equal(matched2.start_idx, 0)
     assert_equal(matched2.end_idx, 6)
-    assert_equal(matched2.match_text, "ABC123")
+    assert_equal(matched2.get_match_text(), "ABC123")
 
     # Test [^abc]{3} pattern (exactly 3 non-abc characters)
     var result3 = match_first("[^abc]{3}", "xyz123")
@@ -922,7 +924,7 @@ def test_dfa_negated_character_class_quantifiers():
     var matched3 = result3.value()
     assert_equal(matched3.start_idx, 0)
     assert_equal(matched3.end_idx, 3)
-    assert_equal(matched3.match_text, "xyz")
+    assert_equal(matched3.get_match_text(), "xyz")
 
 
 def test_dfa_negated_character_class_anchors():
@@ -936,7 +938,7 @@ def test_dfa_negated_character_class_anchors():
     var matched1 = result1.value()
     assert_equal(matched1.start_idx, 0)
     assert_equal(matched1.end_idx, 1)
-    assert_equal(matched1.match_text, "h")
+    assert_equal(matched1.get_match_text(), "h")
 
     # Test [^0-9] should not match digits
     var result2 = match_first("[^0-9]", "5")
@@ -946,7 +948,7 @@ def test_dfa_negated_character_class_anchors():
     var result3 = match_first("[^a-z]", "A")
     assert_true(result3.__bool__())
     var matched3 = result3.value()
-    assert_equal(matched3.match_text, "A")
+    assert_equal(matched3.get_match_text(), "A")
 
 
 def test_dfa_negated_character_class_complex():
@@ -955,7 +957,7 @@ def test_dfa_negated_character_class_complex():
     var result1 = match_first("[^aeiou]+", "bcdfg")
     assert_true(result1.__bool__())
     var matched1 = result1.value()
-    assert_equal(matched1.match_text, "bcdfg")
+    assert_equal(matched1.get_match_text(), "bcdfg")
 
     # Test [^aeiou]+ should stop at vowels
     var result2 = match_first("[^aeiou]+", "bcde")
@@ -963,13 +965,13 @@ def test_dfa_negated_character_class_complex():
     var matched2 = result2.value()
     assert_equal(matched2.start_idx, 0)
     assert_equal(matched2.end_idx, 3)
-    assert_equal(matched2.match_text, "bcd")
+    assert_equal(matched2.get_match_text(), "bcd")
 
     # Test [^A-Z0-9]+ pattern (not uppercase or digits)
     var result3 = match_first("[^A-Z0-9]+", "hello!@#")
     assert_true(result3.__bool__())
     var matched3 = result3.value()
-    assert_equal(matched3.match_text, "hello!@#")
+    assert_equal(matched3.get_match_text(), "hello!@#")
 
 
 def test_dfa_negated_character_class_findall():
@@ -977,13 +979,13 @@ def test_dfa_negated_character_class_findall():
     # Test finding all [^0-9]+ sequences (non-digit sequences)
     var matches = findall("[^0-9]+", "abc123def456ghi")
     assert_equal(len(matches), 3)
-    assert_equal(matches[0].match_text, "abc")
+    assert_equal(matches[0].get_match_text(), "abc")
     assert_equal(matches[0].start_idx, 0)
     assert_equal(matches[0].end_idx, 3)
-    assert_equal(matches[1].match_text, "def")
+    assert_equal(matches[1].get_match_text(), "def")
     assert_equal(matches[1].start_idx, 6)
     assert_equal(matches[1].end_idx, 9)
-    assert_equal(matches[2].match_text, "ghi")
+    assert_equal(matches[2].get_match_text(), "ghi")
     assert_equal(matches[2].start_idx, 12)
     assert_equal(matches[2].end_idx, 15)
 
@@ -997,19 +999,19 @@ def test_dfa_negated_character_class_edge_cases():
     var result1 = match_first("[^abc]", " ")
     assert_true(result1.__bool__())
     var matched1 = result1.value()
-    assert_equal(matched1.match_text, " ")
+    assert_equal(matched1.get_match_text(), " ")
 
     # Test [^abc] with newline (should match since newline is not in "abc")
     var result2 = match_first("[^abc]", "\n")
     assert_true(result2.__bool__())
     var matched2 = result2.value()
-    assert_equal(matched2.match_text, "\n")
+    assert_equal(matched2.get_match_text(), "\n")
 
     # Test [^abc] with tab (should match)
     var result3 = match_first("[^abc]", "\t")
     assert_true(result3.__bool__())
     var matched3 = result3.value()
-    assert_equal(matched3.match_text, "\t")
+    assert_equal(matched3.get_match_text(), "\t")
 
 
 def test_dfa_negated_vs_positive_character_classes():
@@ -1020,14 +1022,14 @@ def test_dfa_negated_vs_positive_character_classes():
     # Positive class should match lowercase letters
     var pos_matches = findall("[a-z]+", test_string)
     assert_equal(len(pos_matches), 2)
-    assert_equal(pos_matches[0].match_text, "ello")
-    assert_equal(pos_matches[1].match_text, "orld")
+    assert_equal(pos_matches[0].get_match_text(), "ello")
+    assert_equal(pos_matches[1].get_match_text(), "orld")
 
     # Negative class should match everything except lowercase letters
     var neg_matches = findall("[^a-z]+", test_string)
     assert_equal(len(neg_matches), 2)
-    assert_equal(neg_matches[0].match_text, "H")
-    assert_equal(neg_matches[1].match_text, "123W")
+    assert_equal(neg_matches[0].get_match_text(), "H")
+    assert_equal(neg_matches[1].get_match_text(), "123W")
 
 
 def test_dfa_negated_character_class_engine_selection():
