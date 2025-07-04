@@ -732,7 +732,9 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
+    fn match_all(
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ):
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -741,7 +743,7 @@ struct DFAEngine(Engine):
         Returns:
             List of all matches found.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        matches = List[Match, hint_trivial_type=True]()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
@@ -749,7 +751,7 @@ struct DFAEngine(Engine):
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
-            return matches
+            return
 
         var pos = 0
         while pos <= len(text):
@@ -765,8 +767,6 @@ struct DFAEngine(Engine):
                     pos = match_obj.end_idx
             else:
                 pos += 1
-
-        return matches
 
     # fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
     #     """SIMD-optimized matching for character class patterns.

@@ -32,8 +32,8 @@ trait RegexMatcher:
         ...
 
     fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ) raises:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -75,8 +75,8 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_next(text, start)
 
     fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ) raises:
         """Find all matches using DFA execution."""
         return self.engine.match_all(text)
 
@@ -116,10 +116,10 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_next(text, start)
 
     fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ) raises:
         """Find all matches using NFA execution."""
-        return self.engine.match_all(text)
+        matches = self.engine.match_all(text)
 
 
 struct HybridMatcher(Copyable, Movable, RegexMatcher):
@@ -194,18 +194,18 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             return self.nfa_matcher.match_next(text, start)
 
     fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ) raises:
         """Find all matches using optimal engine."""
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
             # Use high-performance DFA for simple patterns
-            return self.dfa_matcher.value().match_all(text)
+            matches = self.dfa_matcher.value().match_all(text)
         else:
             # Fall back to NFA for complex patterns
-            return self.nfa_matcher.match_all(text)
+            matches = self.nfa_matcher.match_all(text)
 
     fn get_engine_type(self) -> String:
         """Get the type of engine being used (for debugging/profiling).
@@ -279,8 +279,8 @@ struct CompiledRegex(Copyable, Movable):
         return self.matcher.match_next(text, start)
 
     fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+        self, text: String, out matches: List[Match, hint_trivial_type=True]
+    ) raises:
         """Find all matches in text.
 
         Args:
@@ -289,7 +289,7 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             List of all matches found.
         """
-        return self.matcher.match_all(text)
+        matches = self.matcher.match_all(text)
 
     fn test(self, text: String) -> Bool:
         """Test if pattern matches anywhere in text.
@@ -399,8 +399,10 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
 
 
 fn findall(
-    pattern: String, text: String
-) raises -> List[Match, hint_trivial_type=True]:
+    pattern: String,
+    text: String,
+    out matches: List[Match, hint_trivial_type=True],
+) raises:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -411,7 +413,7 @@ fn findall(
         List of all matches found.
     """
     var compiled = compile_regex(pattern)
-    return compiled.match_all(text)
+    matches = compiled.match_all(text)
 
 
 fn match_first(pattern: String, text: String) raises -> Optional[Match]:

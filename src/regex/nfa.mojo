@@ -26,7 +26,8 @@ struct NFAEngine(Engine):
     fn match_all(
         self,
         text: String,
-    ) -> List[Match, hint_trivial_type=True]:
+        out matches: List[Match, hint_trivial_type=True],
+    ):
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -59,9 +60,10 @@ struct NFAEngine(Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return []
+                matches = []
+                return
 
-        var matches = List[Match, hint_trivial_type=True](capacity=len(text))
+        matches = List[Match, hint_trivial_type=True](capacity=len(text))
         var current_pos = 0
 
         var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
@@ -91,8 +93,6 @@ struct NFAEngine(Engine):
                     current_pos = match_end
             else:
                 current_pos += 1
-
-        return matches
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
@@ -744,8 +744,10 @@ struct NFAEngine(Engine):
 
 
 fn findall(
-    pattern: String, text: String
-) raises -> List[Match, hint_trivial_type=True]:
+    pattern: String,
+    text: String,
+    out matches: List[Match, hint_trivial_type=True],
+) raises:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -756,7 +758,7 @@ fn findall(
         List of all matches found.
     """
     var engine = NFAEngine(pattern)
-    return engine.match_all(text)
+    matches = engine.match_all(text)
 
 
 fn match_first(pattern: String, text: String) raises -> Optional[Match]:
