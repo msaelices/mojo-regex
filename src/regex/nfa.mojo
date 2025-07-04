@@ -26,7 +26,7 @@ struct NFAEngine(Engine):
     fn match_all(
         self,
         text: String,
-    ) -> List[Match]:
+    ) -> List[Match, hint_trivial_type=True]:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -61,10 +61,10 @@ struct NFAEngine(Engine):
             except:
                 return []
 
-        var matches = List[Match](capacity=len(text))
+        var matches = List[Match, hint_trivial_type=True](capacity=len(text))
         var current_pos = 0
 
-        var temp_matches = List[Match](capacity=10)
+        var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
         while current_pos <= len(text):
             temp_matches.clear()
             var result = self._match_node(
@@ -108,7 +108,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
         var ast: ASTNode
         if self.regex:
@@ -150,7 +150,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
         var ast: ASTNode
         if self.regex:
@@ -182,7 +182,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -396,7 +396,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -432,7 +432,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -475,7 +475,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -526,7 +526,7 @@ struct NFAEngine(Engine):
         children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -594,7 +594,7 @@ struct NFAEngine(Engine):
         remaining_children: List[ASTNode],
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -681,7 +681,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         string: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -743,7 +743,9 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
 
-fn findall(pattern: String, text: String) raises -> List[Match]:
+fn findall(
+    pattern: String, text: String
+) raises -> List[Match, hint_trivial_type=True]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:

@@ -31,7 +31,9 @@ trait RegexMatcher:
         """
         ...
 
-    fn match_all(self, text: String) raises -> List[Match]:
+    fn match_all(
+        self, text: String
+    ) raises -> List[Match, hint_trivial_type=True]:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -72,7 +74,9 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> List[Match]:
+    fn match_all(
+        self, text: String
+    ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using DFA execution."""
         return self.engine.match_all(text)
 
@@ -111,7 +115,9 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> List[Match]:
+    fn match_all(
+        self, text: String
+    ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
@@ -187,7 +193,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> List[Match]:
+    fn match_all(
+        self, text: String
+    ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using optimal engine."""
         if (
             self.dfa_matcher
@@ -270,7 +278,9 @@ struct CompiledRegex(Copyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> List[Match]:
+    fn match_all(
+        self, text: String
+    ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches in text.
 
         Args:
@@ -388,7 +398,9 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     return compiled.match_first(text)
 
 
-fn findall(pattern: String, text: String) raises -> List[Match]:
+fn findall(
+    pattern: String, text: String
+) raises -> List[Match, hint_trivial_type=True]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:

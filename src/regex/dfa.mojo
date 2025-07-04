@@ -732,7 +732,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> List[Match]:
+    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -741,7 +741,7 @@ struct DFAEngine(Engine):
         Returns:
             List of all matches found.
         """
-        var matches = List[Match]()
+        var matches = List[Match, hint_trivial_type=True]()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:

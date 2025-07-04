@@ -15,7 +15,7 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_all(self, text: String) -> List[Match]:
+    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
         """Find all non-overlapping matches using DFA.
 
         Args:
