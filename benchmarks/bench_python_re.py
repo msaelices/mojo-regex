@@ -208,7 +208,7 @@ def bench_complex_email_match(email_text: str) -> Callable[[], None]:
     pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
 
     def benchmark_fn():
-        for _ in range(25):
+        for _ in range(2):
             results = re.findall(pattern, email_text)
             len(results)
 
@@ -293,8 +293,9 @@ def main():
     text_group_1000 = make_test_string(1000, "abcabcabc")
 
     # Create complex text patterns
-    base_text = make_test_string(500)
-    email_text = f"{base_text} user@example.com more text john@test.org {base_text}"
+    base_text = make_test_string(100)
+    emails = " user@example.com more text john@test.org "
+    email_text = f"{base_text} {emails} {base_text} {emails} {base_text}"
 
     base_number_text = make_test_string(500, "abc def ghi ")
     number_text = (
@@ -372,19 +373,19 @@ def main():
 
     m.bench_function(
         "simd_alphanumeric_large",
-        bench_simd_heavy_filtering(large_mixed_text, r"[a-zA-Z0-9]+")
+        bench_simd_heavy_filtering(large_mixed_text, r"[a-zA-Z0-9]+"),
     )
     m.bench_function(
         "simd_alphanumeric_xlarge",
-        bench_simd_heavy_filtering(xlarge_mixed_text, r"[a-zA-Z0-9]+")
+        bench_simd_heavy_filtering(xlarge_mixed_text, r"[a-zA-Z0-9]+"),
     )
     m.bench_function(
         "simd_negated_alphanumeric",
-        bench_simd_heavy_filtering(large_mixed_text, r"[^a-zA-Z0-9]+")
+        bench_simd_heavy_filtering(large_mixed_text, r"[^a-zA-Z0-9]+"),
     )
     m.bench_function(
         "simd_multi_char_class",
-        bench_simd_heavy_filtering(large_mixed_text, r"[a-z]+[0-9]+")
+        bench_simd_heavy_filtering(large_mixed_text, r"[a-z]+[0-9]+"),
     )
 
     # Results summary
@@ -393,7 +394,9 @@ def main():
     print("\nNote: This benchmark uses Python's re module")
     print("for optimal performance comparison with the Mojo regex implementation.")
     print("Run the Mojo benchmark with: pixi run mojo benchmarks/bench_engine.mojo")
-    print("Run the Mojo SIMD comparison with: pixi run mojo benchmarks/comparative_benchmark.mojo")
+    print(
+        "Run the Mojo SIMD comparison with: pixi run mojo benchmarks/comparative_benchmark.mojo"
+    )
 
 
 if __name__ == "__main__":
