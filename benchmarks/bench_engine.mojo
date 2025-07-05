@@ -196,15 +196,14 @@ fn bench_match_all[
 fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
     """Benchmark complex email validation pattern."""
     var base_text = make_test_string[text_length // 2]()
-    var email_text = (
-        base_text + " user@example.com more text john@test.org " + base_text
-    )
+    var emails = " user@example.com more text john@test.org "
+    var email_text = base_text + emails + base_text + emails
     var pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
 
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(25):
+        for _ in range(2):
             var results = findall(pattern, email_text)
             keep(len(results))
 
@@ -370,7 +369,7 @@ def main():
 
     # Complex real-world patterns
     print("=== Complex Pattern Benchmarks ===")
-    m.bench_function[bench_complex_email_match[1000]](
+    m.bench_function[bench_complex_email_match[100]](
         BenchId(String("complex_email_extraction"))
     )
     m.bench_function[bench_complex_number_extraction[1000]](
