@@ -15,12 +15,13 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_all(
-        self, text: String, out matches: List[Match, hint_trivial_type=True]
-    ):
+    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
         """Find all non-overlapping matches using DFA.
 
         Args:
             text: Input text to search.
+
+        Returns:
+            List of all matches found.
         """
         ...
