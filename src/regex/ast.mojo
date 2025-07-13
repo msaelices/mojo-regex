@@ -69,8 +69,8 @@ struct ASTNode(
         self.max = other.max
         self.positive_logic = other.positive_logic
         self.children = other.children
-        var call_location = __call_location()
-        print("Copying ASTNode:", self, "in ", call_location)
+        # var call_location = __call_location()
+        # print("Copying ASTNode:", self, "in ", call_location)
 
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
