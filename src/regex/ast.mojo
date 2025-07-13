@@ -10,6 +10,7 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+from builtin._location import __call_location
 from regex.constants import ZERO_CODE, NINE_CODE
 
 
@@ -51,12 +52,9 @@ struct ASTNode(
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        # TODO: Uncomment when unpacked arguments are supported in Mojo
-        # self.children = List[ASTNode[origin]](*children)
-        self.children = List[ASTNode](capacity=len(children))
-        for child in children:
-            self.children.append(child)
+        self.children = children^
 
+    @always_inline
     fn __copyinit__(out self, other: ASTNode):
         """Copy constructor for ASTNode."""
         self.type = other.type
@@ -67,6 +65,8 @@ struct ASTNode(
         self.max = other.max
         self.positive_logic = other.positive_logic
         self.children = other.children
+        # var call_location = __call_location()
+        # print("Copying ASTNode:", self, "in ", call_location)
 
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
