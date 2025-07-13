@@ -454,6 +454,7 @@ struct NFAEngine(Engine):
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(
             ast.children,
+            0,
             string,
             str_i,
             matches,
@@ -493,6 +494,7 @@ struct NFAEngine(Engine):
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
                 ast.children,
+                0,
                 string,
                 current_pos,
                 matches,
@@ -524,6 +526,7 @@ struct NFAEngine(Engine):
     fn _match_sequence(
         self,
         children: List[ASTNode],
+        child_index: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -531,12 +534,12 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
-        if len(children) == 0:
+        if child_index >= len(children):
             return (True, str_i)
 
-        if len(children) == 1:
+        if child_index == len(children) - 1:
             return self._match_node(
-                children[0],
+                children[child_index],
                 string,
                 str_i,
                 matches,
@@ -544,17 +547,15 @@ struct NFAEngine(Engine):
                 required_start_pos,
             )
 
-        # For multiple children, we need to handle backtracking
-        var first_child = children[0]
-        var remaining_children = List[ASTNode](capacity=len(children) - 1)
-        for i in range(1, len(children)):
-            remaining_children.append(children[i])
+        # For multiple remaining children, we need to handle backtracking
+        var first_child = children[child_index]
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
             return self._match_with_backtracking(
                 first_child,
-                remaining_children,
+                children,
+                child_index + 1,
                 string,
                 str_i,
                 matches,
@@ -574,7 +575,8 @@ struct NFAEngine(Engine):
             if not result[0]:
                 return (False, str_i)
             return self._match_sequence(
-                remaining_children,
+                children,
+                child_index + 1,
                 string,
                 result[1],
                 matches,
@@ -591,7 +593,8 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        remaining_children: List[ASTNode],
+        children: List[ASTNode],
+        remaining_index: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -628,7 +631,8 @@ struct NFAEngine(Engine):
                     return (False, str_i)
                 # Try to match the remaining children
                 var result = self._match_sequence(
-                    remaining_children,
+                    children,
+                    remaining_index,
                     string,
                     new_pos,
                     matches,
