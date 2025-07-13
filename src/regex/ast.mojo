@@ -52,11 +52,7 @@ struct ASTNode(
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        # TODO: Uncomment when unpacked arguments are supported in Mojo
-        # self.children = List[ASTNode[origin]](*children)
-        self.children = List[ASTNode](capacity=len(children))
-        for child in children:
-            self.children.append(child)
+        self.children = children^
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode):
