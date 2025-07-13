@@ -548,7 +548,7 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        var first_child = children[child_index]
+        ref first_child = children[child_index]
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
