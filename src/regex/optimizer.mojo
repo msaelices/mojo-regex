@@ -303,7 +303,7 @@ struct PatternAnalyzer:
 
         # All children must be character classes (RANGE, DIGIT, SPACE)
         for i in range(len(ast.children)):
-            var element = ast.children[i]
+            ref element = ast.children[i]
             if not (
                 element.type == RANGE
                 or element.type == DIGIT
