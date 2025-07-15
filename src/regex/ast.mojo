@@ -64,7 +64,11 @@ struct ASTNode(
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        self.children = other.children
+        # TODO: Switch back to builtin copy when the following PR is merged
+        # https://github.com/modular/modular/pull/5023
+        # self.children = other.children
+        self.children = List[ASTNode](capacity=len(other.children))
+        self.children.append(other.children)
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 

@@ -22,6 +22,7 @@ from regex.ast import (
 )
 
 
+@register_passable("trivial")
 struct PatternComplexity(Copyable, Representable, Stringable, Writable):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
