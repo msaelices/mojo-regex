@@ -212,27 +212,29 @@ fn Element[origin: Origin](ref [origin]value: String) -> ASTNode[origin]:
 
 
 @always_inline
-fn WildcardElement() -> ASTNode:
+fn WildcardElement[origin: Origin]() -> ASTNode[origin]:
     """Create a WildcardElement node."""
-    return ASTNode(type=WILDCARD, value="anything", min=1, max=1)
+    return ASTNode[origin](type=WILDCARD, value="anything", min=1, max=1)
 
 
 @always_inline
-fn SpaceElement() -> ASTNode:
+fn SpaceElement[origin: Origin]() -> ASTNode[origin]:
     """Create a SpaceElement node."""
-    return ASTNode(type=SPACE, value="", min=1, max=1)
+    return ASTNode[origin](type=SPACE, value="", min=1, max=1)
 
 
 @always_inline
-fn DigitElement() -> ASTNode:
+fn DigitElement[origin: Origin]() -> ASTNode[origin]:
     """Create a DigitElement node."""
-    return ASTNode(type=DIGIT, value="", min=1, max=1)
+    return ASTNode[origin](type=DIGIT, value="", min=1, max=1)
 
 
 @always_inline
-fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
+fn RangeElement[
+    origin: Origin
+](owned value: String, is_positive_logic: Bool = True) -> ASTNode[origin]:
     """Create a RangeElement node."""
-    return ASTNode(
+    return ASTNode[origin](
         type=RANGE,
         value=value^,
         min=1,
@@ -242,41 +244,47 @@ fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
 
 
 @always_inline
-fn StartElement() -> ASTNode:
+fn StartElement[origin: Origin]() -> ASTNode[origin]:
     """Create a StartElement node."""
-    return ASTNode(type=START, value="", min=1, max=1)
+    return ASTNode[origin](type=START, value=String(""), min=1, max=1)
 
 
 @always_inline
-fn EndElement() -> ASTNode:
+fn EndElement[origin: Origin]() -> ASTNode[origin]:
     """Create an EndElement node."""
-    return ASTNode(type=END, value="", min=1, max=1)
+    return ASTNode[origin](type=END, value=String(""), min=1, max=1)
 
 
 @always_inline
-fn OrNode(owned left: ASTNode, owned right: ASTNode) -> ASTNode:
+fn OrNode[
+    origin: Origin
+](owned left: ASTNode[origin], owned right: ASTNode[origin]) -> ASTNode[origin]:
     """Create an OrNode with left and right children."""
-    return ASTNode(type=OR, children=[left, right], min=1, max=1)
+    return ASTNode[origin](
+        type=OR, children=List[ASTNode[origin]](left, right), min=1, max=1
+    )
 
 
 @always_inline
-fn NotNode(owned child: ASTNode) -> ASTNode:
+fn NotNode[origin: Origin](owned child: ASTNode[origin]) -> ASTNode[origin]:
     """Create a NotNode with a child."""
-    return ASTNode(type=NOT, children=[child])
+    return ASTNode[origin](type=NOT, children=List[ASTNode[origin]](child))
 
 
 @always_inline
-fn GroupNode(
-    owned children: List[ASTNode],
+fn GroupNode[
+    origin: Origin
+](
+    owned children: List[ASTNode[origin]],
     capturing: Bool = False,
     group_name: String = "",
     group_id: Int = -1,
-) -> ASTNode:
+) -> ASTNode[origin]:
     """Create a GroupNode with children."""
     var final_group_name = (
         group_name if group_name != "" else "Group " + String(group_id)
     )
-    return ASTNode(
+    return ASTNode[origin](
         type=GROUP,
         children=children,
         capturing=capturing,
