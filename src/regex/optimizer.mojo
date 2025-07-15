@@ -105,7 +105,7 @@ struct PatternAnalyzer:
         """
         if ast.type == RE:
             # Analyze root node - delegate to children
-            if ast.children_len() == 0:
+            if not ast.has_children():
                 return PatternComplexity(PatternComplexity.SIMPLE)
             return self._analyze_node(ast.children_ptr[][0], depth)
 
@@ -328,7 +328,7 @@ fn is_literal_pattern(ast: ASTNode) -> Bool:
     if ast.type != RE:
         return False
 
-    if ast.children_len() == 0:
+    if not ast.has_children():
         return True  # Empty pattern
 
     return _is_literal_sequence(ast.children_ptr[][0])

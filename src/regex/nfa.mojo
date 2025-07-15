@@ -690,7 +690,7 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
-        if ast.children_len() == 0:
+        if not ast.has_children():
             return (True, str_i)
 
         return self._match_node(

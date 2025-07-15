@@ -1,4 +1,3 @@
-from benchmark import keep
 from memory import Pointer, UnsafePointer
 from builtin._location import __call_location
 
