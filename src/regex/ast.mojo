@@ -60,7 +60,7 @@ struct ASTNode[origin: Origin](
         var call_location = __call_location()
         print("Creating ASTNode in ", call_location)
         self.children_ptr = Pointer[List[ASTNode[origin]], origin](to=children)
-        print("self.children_ptr[0].type=", self.children_ptr[][0].type)
+        print("self.children_ptr[0].type=", self.get_child(0).type)
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode[origin]):
@@ -182,6 +182,11 @@ struct ASTNode[origin: Origin](
     @always_inline
     fn has_children(self) -> Bool:
         return self.children_len() > 0
+
+    @always_inline
+    fn get_child(self, i: Int) -> ASTNode[origin]:
+        """Get the children of the AST node."""
+        return self.children_ptr[][i]
 
 
 @always_inline

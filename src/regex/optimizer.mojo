@@ -107,7 +107,7 @@ struct PatternAnalyzer:
             # Analyze root node - delegate to children
             if not ast.has_children():
                 return PatternComplexity(PatternComplexity.SIMPLE)
-            return self._analyze_node(ast.children_ptr[][0], depth)
+            return self._analyze_node(ast.get_child(0), depth)
 
         elif ast.type == ELEMENT:
             # Literal character - always simple
@@ -201,7 +201,7 @@ struct PatternAnalyzer:
         # Analyze all branches of the alternation
         for i in range(ast.children_len()):
             var branch_complexity = self._analyze_node(
-                ast.children_ptr[][i], depth + 1
+                ast.get_child(i), depth + 1
             )
             if branch_complexity.value == PatternComplexity.COMPLEX:
                 return PatternComplexity(PatternComplexity.COMPLEX)
@@ -244,7 +244,7 @@ struct PatternAnalyzer:
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
         for i in range(ast.children_len()):
             var child_complexity = self._analyze_node(
-                ast.children_ptr[][i], depth + 1
+                ast.get_child(i), depth + 1
             )
             if child_complexity.value == PatternComplexity.COMPLEX:
                 return PatternComplexity(PatternComplexity.COMPLEX)
@@ -262,7 +262,7 @@ struct PatternAnalyzer:
             # Check if all children are literal elements or anchors
             var all_literal = True
             for i in range(ast.children_len()):
-                var child = ast.children_ptr[][i]
+                var child = ast.get_child(i)
                 if not (
                     (
                         child.type == ELEMENT
@@ -304,7 +304,7 @@ struct PatternAnalyzer:
 
         # All children must be character classes (RANGE, DIGIT, SPACE)
         for i in range(ast.children_len()):
-            ref element = ast.children_ptr[][i]
+            ref element = ast.get_child(i)
             if not (
                 element.type == RANGE
                 or element.type == DIGIT
@@ -331,7 +331,7 @@ fn is_literal_pattern(ast: ASTNode) -> Bool:
     if not ast.has_children():
         return True  # Empty pattern
 
-    return _is_literal_sequence(ast.children_ptr[][0])
+    return _is_literal_sequence(ast.get_child(0))
 
 
 fn _is_literal_sequence(ast: ASTNode) -> Bool:
@@ -356,7 +356,7 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
             return False
         # Non-capturing group must contain only literal elements
         for i in range(ast.children_len()):
-            if not _is_literal_sequence(ast.children_ptr[][i]):
+            if not _is_literal_sequence(ast.get_child(i)):
                 return False
         return True
     else:
@@ -377,7 +377,7 @@ fn get_literal_string(ast: ASTNode) -> String:
         Should only be called on patterns where is_literal_pattern() returns True.
     """
     if ast.type == RE and ast.children_len() > 0:
-        return _extract_literal_chars(ast.children_ptr[][0])
+        return _extract_literal_chars(ast.get_child(0))
     else:
         return ""
 
@@ -396,7 +396,7 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
     elif ast.type == GROUP:
         var result = String("")
         for i in range(ast.children_len()):
-            result += _extract_literal_chars(ast.children_ptr[][i])
+            result += _extract_literal_chars(ast.get_child(i))
         return result
     elif ast.type == START or ast.type == END:
         # Anchors don't contribute to literal string
@@ -418,7 +418,7 @@ fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     var has_end = False
 
     if ast.type == RE and ast.children_len() > 0:
-        var child = ast.children_ptr[][0]
+        var child = ast.get_child(0)
         has_start, has_end = _check_anchors_recursive(child)
 
     return (has_start, has_end)
@@ -442,7 +442,7 @@ fn _check_anchors_recursive(ast: ASTNode) -> Tuple[Bool, Bool]:
         var has_end = False
         for i in range(ast.children_len()):
             var child_start, child_end = _check_anchors_recursive(
-                ast.children_ptr[][i]
+                ast.get_child(i)
             )
             has_start = has_start or child_start
             has_end = has_end or child_end

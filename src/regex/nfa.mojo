@@ -406,7 +406,7 @@ struct NFAEngine(Engine):
 
         # Try left branch first
         var left_result = self._match_node(
-            ast.children_ptr[][0],
+            ast.get_child(0),
             string,
             str_i,
             matches,
@@ -694,7 +694,7 @@ struct NFAEngine(Engine):
             return (True, str_i)
 
         return self._match_node(
-            ast.children_ptr[][0],
+            ast.get_child(0),
             string,
             str_i,
             matches,
