@@ -401,12 +401,12 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
-        if len(ast.children) < 2:
+        if len(ast.children_ptr[]) < 2:
             return (False, str_i)
 
         # Try left branch first
         var left_result = self._match_node(
-            ast.children[0],
+            ast.children_ptr[][0],
             string,
             str_i,
             matches,
@@ -418,7 +418,7 @@ struct NFAEngine(Engine):
 
         # If left fails, try right branch
         var right_result = self._match_node(
-            ast.children[1],
+            ast.children_ptr[][1],
             string,
             str_i,
             matches,
@@ -453,7 +453,7 @@ struct NFAEngine(Engine):
 
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(
-            ast.children,
+            ast.children_ptr[],
             0,
             string,
             str_i,
@@ -493,7 +493,7 @@ struct NFAEngine(Engine):
         # Use regular greedy matching with conservative early termination
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                ast.children,
+                ast.children_ptr[],
                 0,
                 string,
                 current_pos,
@@ -690,11 +690,11 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
-        if len(ast.children) == 0:
+        if len(ast.children_ptr[]) == 0:
             return (True, str_i)
 
         return self._match_node(
-            ast.children[0],
+            ast.children_ptr[][0],
             string,
             str_i,
             matches,

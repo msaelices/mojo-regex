@@ -1,3 +1,9 @@
+from builtin._location import __call_location
+from memory import UnsafePointer
+
+from regex.constants import ZERO_CODE, NINE_CODE
+
+
 alias RE = 0
 alias ELEMENT = 1
 alias WILDCARD = 2
@@ -9,9 +15,6 @@ alias END = 7
 alias OR = 8
 alias NOT = 9
 alias GROUP = 10
-
-from builtin._location import __call_location
-from regex.constants import ZERO_CODE, NINE_CODE
 
 
 struct ASTNode(
@@ -26,7 +29,7 @@ struct ASTNode(
 
     var type: Int
     var value: String
-    var children: List[ASTNode]
+    var children_ptr: UnsafePointer[List[ASTNode], mut=False]
     var capturing: Bool
     var group_name: String
     var min: Int
@@ -52,7 +55,7 @@ struct ASTNode(
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children = children^
+        self.children_ptr = UnsafePointer(to=children^)
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode):
@@ -64,11 +67,7 @@ struct ASTNode(
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        # TODO: Switch back to builtin copy when the following PR is merged
-        # https://github.com/modular/modular/pull/5023
-        # self.children = other.children
-        self.children = List[ASTNode](capacity=len(other.children))
-        self.children.append(other.children)
+        self.children_ptr = other.children_ptr
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 
@@ -90,8 +89,7 @@ struct ASTNode(
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
-            and len(self.children) == len(other.children)
-            and self.children == other.children
+            and self.children_ptr == other.children_ptr
         )
 
     fn __ne__(self, other: ASTNode) -> Bool:

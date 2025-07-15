@@ -987,13 +987,13 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
     if _is_multi_character_class_sequence(ast):
         return False
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and len(ast.children_ptr[]) == 1:
+        var child = ast.children_ptr[][0]
         if child.type == DIGIT or child.type == RANGE:
             return True
-        elif child.type == GROUP and len(child.children) == 1:
+        elif child.type == GROUP and len(child.children_ptr[]) == 1:
             # Check if group contains single digit or range element
-            var inner = child.children[0]
+            var inner = child.children_ptr[][0]
             return inner.type == DIGIT or inner.type == RANGE
     elif ast.type == DIGIT or ast.type == RANGE:
         return True
@@ -1025,15 +1025,19 @@ fn _extract_character_class_info(
     var class_node: ASTNode
     if ast.type == DIGIT or ast.type == RANGE:
         class_node = ast
-    elif ast.type == RE and len(ast.children) == 1:
-        if ast.children[0].type == DIGIT or ast.children[0].type == RANGE:
-            class_node = ast.children[0]
-        elif (
-            ast.children[0].type == GROUP and len(ast.children[0].children) == 1
+    elif ast.type == RE and len(ast.children_ptr[]) == 1:
+        if (
+            ast.children_ptr[][0].type == DIGIT
+            or ast.children_ptr[][0].type == RANGE
         ):
-            class_node = ast.children[0].children[0]
+            class_node = ast.children_ptr[][0]
+        elif (
+            ast.children_ptr[][0].type == GROUP
+            and len(ast.children_ptr[][0].children_ptr[]) == 1
+        ):
+            class_node = ast.children_ptr[][0].children_ptr[][0]
         else:
-            class_node = ast.children[0]  # fallback
+            class_node = ast.children_ptr[][0]  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:
@@ -1077,13 +1081,13 @@ fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
     if ast.type == START or ast.type == END:
         return True
     elif ast.type == RE:
-        if len(ast.children) == 0:
+        if len(ast.children_ptr[]) == 0:
             return False
-        return _is_pure_anchor_pattern(ast.children[0])
+        return _is_pure_anchor_pattern(ast.children_ptr[][0])
     elif ast.type == GROUP:
         # Check if group contains only anchors
-        for i in range(len(ast.children)):
-            if not _is_pure_anchor_pattern(ast.children[i]):
+        for i in range(len(ast.children_ptr[])):
+            if not _is_pure_anchor_pattern(ast.children_ptr[][i]):
                 return False
         return True
     else:
@@ -1101,21 +1105,21 @@ fn _is_sequential_character_class_pattern(ast: ASTNode) -> Bool:
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP
 
-    if ast.type != RE or len(ast.children) != 1:
+    if ast.type != RE or len(ast.children_ptr[]) != 1:
         return False
 
-    var child = ast.children[0]
+    var child = ast.children_ptr[][0]
     if child.type != GROUP:
         return False
 
     # Check if all children are character classes (RANGE or DIGIT)
-    for i in range(len(child.children)):
-        var element = child.children[i]
+    for i in range(len(child.children_ptr[])):
+        var element = child.children_ptr[][i]
         if element.type != RANGE and element.type != DIGIT:
             return False
 
     # Must have at least 2 elements to be considered sequential
-    return len(child.children) >= 2
+    return len(child.children_ptr[]) >= 2
 
 
 fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
@@ -1134,12 +1138,12 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
     # Check for anchors at root level
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and len(ast.children_ptr[]) == 1:
+        var child = ast.children_ptr[][0]
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children)):
-                var element = child.children[i]
+            for i in range(len(child.children_ptr[])):
+                var element = child.children_ptr[][i]
                 var char_class: String
 
                 if element.type == DIGIT:
@@ -1170,21 +1174,21 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
 
-    if ast.type != RE or len(ast.children) != 1:
+    if ast.type != RE or len(ast.children_ptr[]) != 1:
         return False
 
-    var child = ast.children[0]
+    var child = ast.children_ptr[][0]
     if child.type != GROUP:
         return False
 
     # Check if all children are character classes with quantifiers
     # Must have at least 2 elements to be considered a sequence
-    if len(child.children) < 2:
+    if len(child.children_ptr[]) < 2:
         return False
 
     var char_class_count = 0
-    for i in range(len(child.children)):
-        ref element = child.children[i]
+    for i in range(len(child.children_ptr[])):
+        ref element = child.children_ptr[][i]
         if (
             element.type == RANGE
             or element.type == DIGIT
@@ -1199,7 +1203,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
             return False
 
     # Must be all character classes
-    return char_class_count == len(child.children)
+    return char_class_count == len(child.children_ptr[])
 
 
 fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
@@ -1218,12 +1222,12 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
     # Check for anchors at root level
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and len(ast.children_ptr[]) == 1:
+        var child = ast.children_ptr[][0]
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children)):
-                ref element = child.children[i]
+            for i in range(len(child.children_ptr[])):
+                ref element = child.children_ptr[][i]
                 var char_class: String
 
                 if element.type == DIGIT:
