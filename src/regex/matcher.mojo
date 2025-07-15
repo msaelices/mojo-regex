@@ -6,6 +6,7 @@ and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
 from memory import UnsafePointer
+from time import monotonic
 from sys.ffi import _Global
 
 from regex.ast import ASTNode
@@ -245,8 +246,7 @@ struct CompiledRegex(Copyable, Movable):
         """
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
-        # TODO: Add actual timestamp when time module is available
-        self.compiled_at = 0
+        self.compiled_at = monotonic()
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
