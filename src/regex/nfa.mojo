@@ -401,7 +401,7 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
-        if len(ast.children_ptr[]) < 2:
+        if ast.children_len() < 2:
             return (False, str_i)
 
         # Try left branch first
@@ -690,7 +690,7 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
-        if len(ast.children_ptr[]) == 0:
+        if ast.children_len() == 0:
             return (True, str_i)
 
         return self._match_node(

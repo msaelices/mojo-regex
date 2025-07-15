@@ -45,7 +45,6 @@ struct ASTNode(
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
-        owned children: List[ASTNode] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
@@ -55,7 +54,28 @@ struct ASTNode(
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_ptr = UnsafePointer(to=children^)
+        self.children_ptr = UnsafePointer[List[ASTNode]]()
+
+    fn __init__(
+        out self,
+        owned children: List[ASTNode],
+        type: Int = 0,
+        owned value: String = "",
+        capturing: Bool = False,
+        owned group_name: String = "",
+        min: Int = 0,
+        max: Int = 0,
+        positive_logic: Bool = True,
+    ):
+        """Initialize an ASTNode with a specific type and match string."""
+        self.type = type
+        self.capturing = capturing
+        self.value = value^
+        self.group_name = group_name^
+        self.min = min
+        self.max = max
+        self.positive_logic = positive_logic
+        self.children_ptr = UnsafePointer(to=children)
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode):
@@ -169,6 +189,17 @@ struct ASTNode(
     fn is_capturing(self) -> Bool:
         """Check if the node is capturing."""
         return self.capturing
+
+    @always_inline
+    fn children_len(self) -> Int:
+        if self.children_ptr:
+            return len(self.children_ptr[])
+        else:
+            return 0
+
+    @always_inline
+    fn has_children(self) -> Bool:
+        return Bool(self.children_ptr)
 
 
 @always_inline

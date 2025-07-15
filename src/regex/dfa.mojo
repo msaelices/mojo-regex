@@ -987,11 +987,11 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
     if _is_multi_character_class_sequence(ast):
         return False
 
-    if ast.type == RE and len(ast.children_ptr[]) == 1:
+    if ast.type == RE and ast.children_len() == 1:
         var child = ast.children_ptr[][0]
         if child.type == DIGIT or child.type == RANGE:
             return True
-        elif child.type == GROUP and len(child.children_ptr[]) == 1:
+        elif child.type == GROUP and child.children_len() == 1:
             # Check if group contains single digit or range element
             var inner = child.children_ptr[][0]
             return inner.type == DIGIT or inner.type == RANGE
@@ -1025,7 +1025,7 @@ fn _extract_character_class_info(
     var class_node: ASTNode
     if ast.type == DIGIT or ast.type == RANGE:
         class_node = ast
-    elif ast.type == RE and len(ast.children_ptr[]) == 1:
+    elif ast.type == RE and ast.children_len() == 1:
         if (
             ast.children_ptr[][0].type == DIGIT
             or ast.children_ptr[][0].type == RANGE
@@ -1142,7 +1142,7 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
         var child = ast.children_ptr[][0]
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children_ptr[])):
+            for i in range(child.children_len()):
                 var element = child.children_ptr[][i]
                 var char_class: String
 
@@ -1187,7 +1187,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
         return False
 
     var char_class_count = 0
-    for i in range(len(child.children_ptr[])):
+    for i in range(child.children_len()):
         ref element = child.children_ptr[][i]
         if (
             element.type == RANGE
@@ -1226,7 +1226,7 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
         var child = ast.children_ptr[][0]
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children_ptr[])):
+            for i in range(child.children_len()):
                 ref element = child.children_ptr[][i]
                 var char_class: String
 
