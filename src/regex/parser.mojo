@@ -433,5 +433,4 @@ fn parse(regex: String) raises -> ASTNode:
                 raise Error("Unexpected token: " + token.char)
 
         i += 1
-
     return RENode(GroupNode(elements^))

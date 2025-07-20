@@ -105,9 +105,9 @@ struct PatternAnalyzer:
         """
         if ast.type == RE:
             # Analyze root node - delegate to children
-            if not ast.has_children():
+            if ast.get_children_len() == 0:
                 return PatternComplexity(PatternComplexity.SIMPLE)
-            return self._analyze_node(ast.get_child(0), depth)
+            return self._analyze_node(ast.children_ptr[0], depth)
 
         elif ast.type == ELEMENT:
             # Literal character - always simple
@@ -199,9 +199,9 @@ struct PatternAnalyzer:
         var max_complexity = PatternComplexity(PatternComplexity.SIMPLE)
 
         # Analyze all branches of the alternation
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             var branch_complexity = self._analyze_node(
-                ast.get_child(i), depth + 1
+                ast.children_ptr[i], depth + 1
             )
             if branch_complexity.value == PatternComplexity.COMPLEX:
                 return PatternComplexity(PatternComplexity.COMPLEX)
@@ -211,7 +211,7 @@ struct PatternAnalyzer:
         # Simple alternation between simple patterns can often be handled by DFA
         if (
             max_complexity.value == PatternComplexity.SIMPLE
-            and ast.children_len() <= 5
+            and ast.get_children_len() <= 5
         ):
             return PatternComplexity(PatternComplexity.SIMPLE)
         else:
@@ -242,7 +242,7 @@ struct PatternAnalyzer:
 
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             var child_complexity = self._analyze_node(
                 ast.get_child(i), depth + 1
             )
@@ -261,7 +261,7 @@ struct PatternAnalyzer:
             # For literal groups (like "hello" parsed as group of chars), be more generous
             # Check if all children are literal elements or anchors
             var all_literal = True
-            for i in range(ast.children_len()):
+            for i in range(ast.get_children_len()):
                 var child = ast.get_child(i)
                 if not (
                     (
@@ -276,10 +276,10 @@ struct PatternAnalyzer:
                     break
 
             if (
-                all_literal and ast.children_len() <= 20
+                all_literal and ast.get_children_len() <= 20
             ):  # Allow longer literal strings
                 return PatternComplexity(PatternComplexity.SIMPLE)
-            elif ast.children_len() <= 3:
+            elif ast.get_children_len() <= 3:
                 return PatternComplexity(PatternComplexity.SIMPLE)
             else:
                 return PatternComplexity(PatternComplexity.MEDIUM)
@@ -299,11 +299,11 @@ struct PatternAnalyzer:
             return False
 
         # Must have at least 2 elements to be a sequence
-        if ast.children_len() < 2:
+        if ast.get_children_len() < 2:
             return False
 
         # All children must be character classes (RANGE, DIGIT, SPACE)
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             ref element = ast.get_child(i)
             if not (
                 element.type == RANGE
@@ -355,7 +355,7 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         if ast.capturing:
             return False
         # Non-capturing group must contain only literal elements
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             if not _is_literal_sequence(ast.get_child(i)):
                 return False
         return True
@@ -376,7 +376,7 @@ fn get_literal_string(ast: ASTNode) -> String:
     Note:
         Should only be called on patterns where is_literal_pattern() returns True.
     """
-    if ast.type == RE and ast.children_len() > 0:
+    if ast.type == RE and ast.get_children_len() > 0:
         return _extract_literal_chars(ast.get_child(0))
     else:
         return ""
@@ -395,7 +395,7 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
         return ast.value
     elif ast.type == GROUP:
         var result = String("")
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             result += _extract_literal_chars(ast.get_child(i))
         return result
     elif ast.type == START or ast.type == END:
@@ -417,7 +417,7 @@ fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     var has_start = False
     var has_end = False
 
-    if ast.type == RE and ast.children_len() > 0:
+    if ast.type == RE and ast.has_children():
         var child = ast.get_child(0)
         has_start, has_end = _check_anchors_recursive(child)
 
@@ -440,7 +440,7 @@ fn _check_anchors_recursive(ast: ASTNode) -> Tuple[Bool, Bool]:
     elif ast.type == GROUP:
         var has_start = False
         var has_end = False
-        for i in range(ast.children_len()):
+        for i in range(ast.get_children_len()):
             var child_start, child_end = _check_anchors_recursive(
                 ast.get_child(i)
             )

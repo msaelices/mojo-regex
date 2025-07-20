@@ -1,3 +1,5 @@
+from memory import UnsafePointer
+
 from regex.ast import ASTNode, RENode
 from regex.constants import ZERO_CODE, NINE_CODE
 from regex.engine import Engine
@@ -401,7 +403,7 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
-        if ast.children_len() < 2:
+        if ast.get_children_len() < 2:
             return (False, str_i)
 
         # Try left branch first
@@ -418,7 +420,7 @@ struct NFAEngine(Engine):
 
         # If left fails, try right branch
         var right_result = self._match_node(
-            ast.children_ptr[][1],
+            ast.get_child(1),
             string,
             str_i,
             matches,
@@ -453,8 +455,9 @@ struct NFAEngine(Engine):
 
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(
-            ast.children_ptr[],
+            ast.children_ptr,
             0,
+            ast.get_children_len(),
             string,
             str_i,
             matches,
@@ -493,8 +496,9 @@ struct NFAEngine(Engine):
         # Use regular greedy matching with conservative early termination
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                ast.children_ptr[],
+                ast.children_ptr,
                 0,
+                ast.get_children_len(),
                 string,
                 current_pos,
                 matches,
@@ -525,8 +529,9 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children: List[ASTNode],
+        children_ptr: UnsafePointer[ASTNode],
         child_index: Int,
+        children_len: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -534,12 +539,12 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
-        if child_index >= len(children):
+        if child_index >= children_len:
             return (True, str_i)
 
-        if child_index == len(children) - 1:
+        if child_index == children_len - 1:
             return self._match_node(
-                children[child_index],
+                children_ptr[child_index],
                 string,
                 str_i,
                 matches,
@@ -548,14 +553,15 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        ref first_child = children[child_index]
+        ref first_child = children_ptr[child_index]
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
             return self._match_with_backtracking(
                 first_child,
-                children,
+                children_ptr,
                 child_index + 1,
+                children_len,
                 string,
                 str_i,
                 matches,
@@ -575,8 +581,9 @@ struct NFAEngine(Engine):
             if not result[0]:
                 return (False, str_i)
             return self._match_sequence(
-                children,
+                children_ptr,
                 child_index + 1,
+                children_len,
                 string,
                 result[1],
                 matches,
@@ -593,8 +600,9 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children: List[ASTNode],
+        children_ptr: UnsafePointer[ASTNode],
         remaining_index: Int,
+        children_len: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -631,8 +639,9 @@ struct NFAEngine(Engine):
                     return (False, str_i)
                 # Try to match the remaining children
                 var result = self._match_sequence(
-                    children,
+                    children_ptr,
                     remaining_index,
+                    children_len,
                     string,
                     new_pos,
                     matches,
