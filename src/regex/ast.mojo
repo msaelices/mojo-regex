@@ -1,4 +1,4 @@
-from memory import Pointer, UnsafePointer
+from memory import Pointer, UnsafePointer, memcpy
 from builtin._location import __call_location
 from memory import UnsafePointer
 from os import abort
@@ -89,16 +89,15 @@ struct ASTNode(
             var dst = UnsafePointer(to=self.children_ptr[i])
             src.move_pointee_into(dst)
 
-    fn __del__(owned self):
-        """Destroy all the children and free its memory."""
-        pass
-        # var call_location = __call_location()
-        # print("Deleting ASTNode:", self, "in ", call_location)
-
-        # TODO: This is causing the parsing to hang
-        # for i in range(self.children_len):
-        #     (self.children_ptr + i).destroy_pointee()
-        # self.children_ptr.free()
+    # @always_inline
+    # fn __del__(owned self):
+    #     """Destroy all the children and free its memory."""
+    #     var call_location = __call_location()
+    #     print("Deleting ASTNode:", self, "in ", call_location)
+    #     # TODO: This is causing the parsing to hang
+    #     # for i in range(self.children_len):
+    #     #     (self.children_ptr + i).destroy_pointee()
+    #     # self.children_ptr.free()
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode):
@@ -110,9 +109,19 @@ struct ASTNode(
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        # TODO: Check if we can live without copying here
-        self.children_ptr = other.children_ptr
         self.children_len = other.children_len
+
+        # TODO: Check if we can substitute this with the following commented block
+        self.children_ptr = other.children_ptr
+
+        # TODO: This is causing core dumps
+        # if not other.children_ptr:
+        #     self.children_ptr = UnsafePointer[ASTNode, mut=False]()
+        # else:
+        #     # Allocate memory for children and copy them
+        #     self.children_ptr = UnsafePointer[ASTNode].alloc(other.children_len)
+        #     memcpy(self.children_ptr, other.children_ptr, other.children_len)
+
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 
