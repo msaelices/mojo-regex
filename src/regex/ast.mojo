@@ -89,8 +89,16 @@ struct ASTNode(
             var dst = UnsafePointer(to=self.children_ptr[i])
             src.move_pointee_into(dst)
 
-    # fn __del__(owned self):
-    #     print("Deleted: ", self)
+    fn __del__(owned self):
+        """Destroy all the children and free its memory."""
+        pass
+        # var call_location = __call_location()
+        # print("Deleting ASTNode:", self, "in ", call_location)
+
+        # TODO: This is causing the parsing to hang
+        # for i in range(self.children_len):
+        #     (self.children_ptr + i).destroy_pointee()
+        # self.children_ptr.free()
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode):
