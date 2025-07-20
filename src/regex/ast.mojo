@@ -82,12 +82,17 @@ struct ASTNode(
         self.positive_logic = positive_logic
         self.children_len = len(children)
 
-        self.children_ptr = UnsafePointer[ASTNode].alloc(self.children_len)
+        self.children_ptr = children.unsafe_ptr()
+        # TODO: Better way as this could be LEAKING memory
+        __disable_del children
 
-        for i in range(self.children_len):
-            var src = UnsafePointer(to=children[i])
-            var dst = UnsafePointer(to=self.children_ptr[i])
-            src.move_pointee_into(dst)
+        # Slower alternative
+        # self.children_ptr = UnsafePointer[ASTNode].alloc(self.children_len)
+        #
+        # for i in range(self.children_len):
+        #     var src = UnsafePointer(to=children[i])
+        #     var dst = UnsafePointer(to=self.children_ptr[i])
+        #     src.move_pointee_into(dst)
 
     # @always_inline
     # fn __del__(owned self):
