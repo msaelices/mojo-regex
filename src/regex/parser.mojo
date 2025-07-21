@@ -108,11 +108,20 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
-fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
+fn parse_token_list(
+    owned tokens: List[Token],
+) raises -> ASTNode[MutableAnyOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
-        return GroupNode(List[ASTNode](), True, "", 0)
+        var empty_str = String("")
+        return GroupNode(
+            List[ASTNode[MutableAnyOrigin]](),
+            value=empty_str,
+            capturing=True,
+            group_name="",
+            group_id=0,
+        )._origin_cast[origin=MutableAnyOrigin]()
 
     # Handle OR at the top level by finding the first OR token outside of groups
     var paren_depth = 0
@@ -127,17 +136,37 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             var right_tokens = tokens[k + 1 :]
 
             # Parse both sides
-            var left_ast = parse_token_list(left_tokens^) if len(
-                left_tokens
-            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
-            var right_ast = parse_token_list(right_tokens^) if len(
-                right_tokens
-            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
+            var left_ast: ASTNode[MutableAnyOrigin]
+            if len(left_tokens) > 0:
+                left_ast = parse_token_list(left_tokens^)
+            else:
+                left_ast = GroupNode(
+                    List[ASTNode[MutableAnyOrigin]](),
+                    value="",
+                    capturing=True,
+                    group_name="",
+                    group_id=0,
+                )._origin_cast[origin=MutableAnyOrigin]()
 
-            return OrNode(left_ast, right_ast)
+            var right_ast: ASTNode[MutableAnyOrigin]
+            if len(right_tokens) > 0:
+                right_ast = parse_token_list(right_tokens^)
+            else:
+                right_ast = GroupNode(
+                    List[ASTNode[MutableAnyOrigin]](),
+                    value="",
+                    capturing=True,
+                    group_name="",
+                    group_id=0,
+                )._origin_cast[origin=MutableAnyOrigin]()
+
+            var or_value = String("")
+            return OrNode(left_ast, right_ast, value=or_value)._origin_cast[
+                origin=MutableAnyOrigin
+            ]()
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode](capacity=len(tokens))
+    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -148,29 +177,33 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.WILDCARD:
-            var elem = WildcardElement()
+            var elem = WildcardElement(value="")
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.SPACE:
-            var elem = SpaceElement()
+            var elem = SpaceElement(value="")
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.DIGIT:
-            var elem = DigitElement()
+            var elem = DigitElement(value="")
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.START:
-            elements.append(StartElement())
+            elements.append(
+                StartElement(value="")._origin_cast[origin=MutableAnyOrigin]()
+            )
         elif token.type == Token.END:
-            elements.append(EndElement())
+            elements.append(
+                EndElement(value="")._origin_cast[origin=MutableAnyOrigin]()
+            )
         elif token.type == Token.LEFTBRACKET:
             # Handle character ranges
             i += 1
@@ -209,7 +242,7 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, range_elem, tokens^)
-            elements.append(range_elem)
+            elements.append(range_elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
             i += 1
@@ -245,25 +278,35 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
 
             # Recursively parse the tokens inside the group
             var group_ast = parse_token_list(group_tokens)
-            var group: ASTNode
+            var group: ASTNode[MutableAnyOrigin]
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
                 group = group_ast
                 group.capturing = is_capturing
             else:
                 # Otherwise wrap in a group
-                group = GroupNode([group_ast], is_capturing, "", 0)
+                group = GroupNode(
+                    List[ASTNode[MutableAnyOrigin]](
+                        group_ast._origin_cast[origin=MutableAnyOrigin]()
+                    ),
+                    value="",
+                    capturing=is_capturing,
+                    group_name="",
+                    group_id=0,
+                )._origin_cast[origin=MutableAnyOrigin]()
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, group, tokens)
-            elements.append(group)
+            elements.append(group._origin_cast[origin=MutableAnyOrigin]())
 
         i += 1
 
-    return GroupNode(elements^, True, "", 0)
+    return GroupNode(
+        elements^, value="", capturing=True, group_name="", group_id=0
+    )._origin_cast[origin=MutableAnyOrigin]()
 
 
-fn parse(regex: String) raises -> ASTNode:
+fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
@@ -278,43 +321,48 @@ fn parse(regex: String) raises -> ASTNode:
     var tokens = scan(regex)
     if len(tokens) == 0:
         # Empty pattern - create an empty RE node
-        return ASTNode(RE)
+        var empty_str = String("")
+        return ASTNode[MutableAnyOrigin](type=RE, value=empty_str)
 
     # Simple implementation for basic parsing
-    var elements = List[ASTNode](capacity=len(tokens))
+    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
         var token = tokens[i]
 
         if token.type == Token.START:
-            elements.append(StartElement())
+            elements.append(
+                StartElement(value="")._origin_cast[origin=MutableAnyOrigin]()
+            )
         elif token.type == Token.END:
-            elements.append(EndElement())
+            elements.append(
+                EndElement(value="")._origin_cast[origin=MutableAnyOrigin]()
+            )
         elif token.type == Token.ELEMENT:
             var elem = Element(token.char)
             # Check for quantifiers
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.WILDCARD:
-            var elem = WildcardElement()
+            var elem = WildcardElement(value="")
             # Check for quantifiers
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.SPACE:
-            var elem = SpaceElement()
+            var elem = SpaceElement(value="")
             # Check for quantifiers
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.DIGIT:
-            var elem = DigitElement()
+            var elem = DigitElement(value="")
             # Check for quantifiers
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+            elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.LEFTBRACKET:
             # Simple range parsing
             i += 1
@@ -353,7 +401,7 @@ fn parse(regex: String) raises -> ASTNode:
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, range_elem, tokens)
-            elements.append(range_elem)
+            elements.append(range_elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle grouping - check for non-capturing group (?:...)
             i += 1
@@ -389,21 +437,35 @@ fn parse(regex: String) raises -> ASTNode:
 
             # Recursively parse the tokens inside the group
             var group_ast = parse_token_list(group_tokens)
-            var group: ASTNode
+            var group: ASTNode[MutableAnyOrigin]
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
                 group = group_ast
                 group.capturing = is_capturing
             else:
                 # Otherwise wrap in a group
-                group = GroupNode([group_ast], is_capturing, "", 0)
+                group = GroupNode(
+                    List[ASTNode[MutableAnyOrigin]](
+                        group_ast._origin_cast[origin=MutableAnyOrigin]()
+                    ),
+                    value="",
+                    capturing=is_capturing,
+                    group_name="",
+                    group_id=0,
+                )._origin_cast[origin=MutableAnyOrigin]()
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, group, tokens)
-            elements.append(group)
+            elements.append(group._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.VERTICALBAR:
             # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements^, True, "", 0)
+            var left_group = GroupNode(
+                elements^,
+                value="",
+                capturing=True,
+                group_name="",
+                group_id=0,
+            )._origin_cast[origin=MutableAnyOrigin]()
             i += 1
 
             # Parse right side - collect remaining tokens
@@ -414,13 +476,23 @@ fn parse(regex: String) raises -> ASTNode:
 
             # Recursively parse the right side
             var right_group_ast = parse_token_list(right_tokens^)
-            var right_group: ASTNode
+            var right_group: ASTNode[MutableAnyOrigin]
             if right_group_ast.type == GROUP:
                 right_group = right_group_ast
             else:
-                right_group = GroupNode([right_group_ast], True, "", 0)
+                right_group = GroupNode(
+                    List[ASTNode[MutableAnyOrigin]](
+                        right_group_ast._origin_cast[origin=MutableAnyOrigin]()
+                    ),
+                    value="",
+                    capturing=True,
+                    group_name="",
+                    group_id=0,
+                )._origin_cast[origin=MutableAnyOrigin]()
 
-            return RENode(OrNode(left_group, right_group))
+            return RENode(
+                OrNode(left_group, right_group, value=""), value=""
+            )._origin_cast[origin=MutableAnyOrigin]()
         else:
             # Check for unescaped special characters
             if token.type == Token.RIGHTPARENTHESIS:
@@ -433,4 +505,9 @@ fn parse(regex: String) raises -> ASTNode:
                 raise Error("Unexpected token: " + token.char)
 
         i += 1
-    return RENode(GroupNode(elements^))
+    return RENode(
+        GroupNode(
+            elements^, value="", capturing=True, group_name="", group_id=0
+        ),
+        value="",
+    )._origin_cast[origin=MutableAnyOrigin]()
