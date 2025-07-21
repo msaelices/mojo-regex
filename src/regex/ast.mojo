@@ -230,9 +230,16 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         Args:
             writer: The writer instance to output the representation to.
         """
-        writer.write(
-            "ASTNode(type=", self.type, ", value=", self.get_value(), ")"
-        )
+        if self.get_value():
+            writer.write(
+                "ASTNode(type=",
+                self.type,
+                ", value=",
+                self.get_value().value(),
+                ")",
+            )
+        else:
+            writer.write("ASTNode(type=", self.type, ", value=None)")
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
@@ -244,7 +251,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
         if self.type == ELEMENT:
-            return self.get_value() == value
+            return self.get_value() and (self.get_value().value() == value)
         elif self.type == WILDCARD:
             return value != "\n"
         elif self.type == SPACE:
@@ -265,7 +272,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
-            var ch_found = self.get_value().find(value) != -1
+            var ch_found = (
+                self.get_value() and self.get_value().value().find(value) != -1
+            )
             return not (
                 ch_found ^ self.positive_logic
             )  # positive_logic determines if it's [abc] or [^abc]
@@ -294,7 +303,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         return self.children_ptr[i]
 
     @always_inline
-    fn get_value(self) -> String:
+    fn get_value(self) -> Optional[String]:
+        if not self.value_ptr:
+            return None
         return self.value_ptr[]
 
 
