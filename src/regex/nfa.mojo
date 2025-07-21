@@ -12,8 +12,8 @@ struct NFAEngine(Engine):
 
     var pattern: String
     var prev_re: String
-    var prev_ast: Optional[ASTNode]
-    var regex: Optional[ASTNode]
+    var prev_ast: Optional[ASTNode[MutableAnyOrigin]]
+    var regex: Optional[ASTNode[MutableAnyOrigin]]
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -52,7 +52,7 @@ struct NFAEngine(Engine):
             matched.
         """
         # Parse the regex if it's different from the cached one
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
         elif self.regex:
@@ -112,7 +112,7 @@ struct NFAEngine(Engine):
         """
         var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -154,7 +154,7 @@ struct NFAEngine(Engine):
         """
         var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -282,7 +282,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        if ast.value == ch:
+        if ast.get_value() and ast.get_value().value() == ch:
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
             )
@@ -366,7 +366,9 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        var ch_found = ast.value.find(ch) != -1
+        var ch_found = (
+            ast.get_value() and ast.get_value().value().find(ch) != -1
+        )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -529,7 +531,7 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children_ptr: UnsafePointer[ASTNode],
+        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
         child_index: Int,
         children_len: Int,
         string: String,
@@ -600,7 +602,7 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children_ptr: UnsafePointer[ASTNode],
+        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
         remaining_index: Int,
         children_len: Int,
         string: String,
