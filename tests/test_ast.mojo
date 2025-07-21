@@ -26,30 +26,32 @@ from regex.ast import (
 
 
 fn test_ASTNode() raises:
-    var ast_node = ASTNode()
+    var ast_node = ASTNode(type=ELEMENT, value="")
     assert_true(Bool(ast_node))
 
 
 fn test_RE() raises:
     var element = Element("e")
-    var re = RENode(element)
+    var re = RENode(child=element, value="")
     assert_true(Bool(re))
     assert_equal(re.type, RE)
-    assert_equal(len(re.children), 1)
-    assert_equal(re.children[0], element)
+    assert_equal(re.get_children_len(), 1)
+    assert_equal(
+        re.get_child(0).get_value().value(), element.get_value().value()
+    )
 
 
 fn test_Element() raises:
     var elem = Element("a")
     assert_true(Bool(elem))
     assert_equal(elem.type, ELEMENT)
-    assert_equal(elem.value, "a")
+    assert_equal(elem.get_value().value(), "a")
     assert_true(elem.is_match("a"))
     assert_false(elem.is_match("b"))
 
 
 fn test_WildcardElement() raises:
-    var we = WildcardElement()
+    var we = WildcardElement(value="")
     assert_true(Bool(we))
     assert_equal(we.type, WILDCARD)
     assert_true(we.is_match("a"))
