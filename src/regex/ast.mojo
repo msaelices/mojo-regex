@@ -360,7 +360,7 @@ fn RangeElement[
     value_origin
 ]:
     """Create a RangeElement node."""
-    return ASTNode(
+    return ASTNode[value_origin](
         type=RANGE,
         value=value,
         min=1,
@@ -392,7 +392,7 @@ fn OrNode[
     owned left: ASTNode[value_origin], owned right: ASTNode[value_origin]
 ) -> ASTNode[value_origin]:
     """Create an OrNode with left and right children."""
-    return ASTNode(
+    return ASTNode[value_origin](
         type=OR, children=List[ASTNode[value_origin]](left, right), min=1, max=1
     )
 
@@ -402,7 +402,9 @@ fn NotNode[
     value_origin: Origin
 ](owned child: ASTNode[value_origin]) -> ASTNode[value_origin]:
     """Create a NotNode with a child."""
-    return ASTNode(type=NOT, children=List[ASTNode[value_origin]](child))
+    return ASTNode[value_origin](
+        type=NOT, children=List[ASTNode[value_origin]](child)
+    )
 
 
 @always_inline
@@ -418,7 +420,7 @@ fn GroupNode[
     var final_group_name = (
         group_name if group_name != "" else "Group " + String(group_id)
     )
-    return ASTNode(
+    return ASTNode[value_origin](
         type=GROUP,
         children=children,
         capturing=capturing,
