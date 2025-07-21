@@ -19,7 +19,8 @@ alias NOT = 9
 alias GROUP = 10
 
 
-struct ASTNode[mut: Bool, //, value_origin: Origin[mut],](
+@fieldwise_init
+struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
@@ -88,8 +89,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut],](
         self.max = max
         self.positive_logic = positive_logic
         self.children_len = 1
-
-        self.children_ptr = UnsafePointer[ASTNode[child_value_origin]](to=child)
+        self.children_ptr = UnsafePointer[ASTNode[MutableAnyOrigin]](
+            to=child._origin_cast[origin=MutableAnyOrigin](),
+        )
 
     fn __init__(
         out self,
@@ -200,6 +202,23 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut],](
         """Returns a user-friendly string representation of the PhoneNumberDesc.
         """
         return String.write(self)
+
+    # Thanks to @martinvuyk for this trick
+    @always_inline
+    fn _origin_cast[origin: Origin](owned self) -> ASTNode[origin]:
+        return ASTNode[origin](
+            type=self.type,
+            value_ptr=self.value_ptr.origin_cast[
+                mut = origin.mut, origin=origin
+            ](),
+            children_ptr=self.children_ptr,
+            children_len=self.children_len,
+            capturing=self.capturing,
+            group_name=self.group_name,
+            min=self.min,
+            max=self.max,
+            positive_logic=self.positive_logic,
+        )
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
