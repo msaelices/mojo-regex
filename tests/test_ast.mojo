@@ -60,7 +60,7 @@ fn test_WildcardElement() raises:
 
 
 fn test_SpaceElement() raises:
-    var se = SpaceElement()
+    var se = SpaceElement(value="")
     assert_true(Bool(se))
     assert_equal(se.type, SPACE)
     assert_true(se.is_match(" "))
@@ -96,7 +96,7 @@ fn test_RangeElement_negative_logic() raises:
 
 
 fn test_StartElement() raises:
-    var start = StartElement()
+    var start = StartElement(value="")
     assert_true(Bool(start))
     assert_equal(start.type, START)
     assert_true(start.is_match("", 0, 10))
@@ -104,7 +104,7 @@ fn test_StartElement() raises:
 
 
 fn test_EndElement() raises:
-    var end = EndElement()
+    var end = EndElement(value="")
     assert_true(Bool(end))
     assert_equal(end.type, END)
     assert_true(end.is_match("", 10, 10))
@@ -114,57 +114,63 @@ fn test_EndElement() raises:
 fn test_OrNode() raises:
     var left = Element("a")
     var right = Element("b")
-    var or_node = OrNode(left, right)
+    var or_node = OrNode(left, right, value="")
     assert_true(Bool(or_node))
     assert_equal(or_node.type, OR)
-    assert_equal(len(or_node.children), 2)
-    assert_equal(or_node.children[0], left)
-    assert_equal(or_node.children[1], right)
+    assert_equal(or_node.get_children_len(), 2)
+    assert_equal(
+        or_node.get_child(0).get_value().value(), left.get_value().value()
+    )
+    assert_equal(
+        or_node.get_child(1).get_value().value(), right.get_value().value()
+    )
 
 
 fn test_NotNode() raises:
     var element = Element("e")
-    var not_node = NotNode(element)
+    var not_node = NotNode(element, value="")
     assert_true(Bool(not_node))
     assert_equal(not_node.type, NOT)
-    assert_equal(len(not_node.children), 1)
-    assert_equal(not_node.children[0], element)
+    assert_equal(not_node.get_children_len(), 1)
+    assert_equal(
+        not_node.get_child(0).get_value().value(), element.get_value().value()
+    )
 
 
 fn test_GroupNode() raises:
     var elem1 = Element("a")
     var elem2 = Element("b")
-    var children = List[ASTNode]()
-    children.append(elem1)
-    children.append(elem2)
+    var children = List[ASTNode[MutableAnyOrigin]]()
+    children.append(elem1._origin_cast[origin=MutableAnyOrigin]())
+    children.append(elem2._origin_cast[origin=MutableAnyOrigin]())
 
     var group = GroupNode(
-        children^, capturing=True, group_name="test_group", group_id=1
+        children^, value="", capturing=True, group_name="test_group", group_id=1
     )
     assert_true(Bool(group))
     assert_equal(group.type, GROUP)
     assert_true(group.is_capturing())
     assert_equal(group.group_name, "test_group")
-    assert_equal(len(group.children), 2)
+    assert_equal(group.get_children_len(), 2)
 
 
 fn test_GroupNode_default_name() raises:
     var elem = Element("a")
-    var children = List[ASTNode]()
-    children.append(elem)
+    var children = List[ASTNode[MutableAnyOrigin]]()
+    children.append(elem._origin_cast[origin=MutableAnyOrigin]())
 
-    var group = GroupNode(children^, group_id=5)
+    var group = GroupNode(children^, value="", group_id=5)
     assert_equal(group.group_name, "Group 5")
 
 
 fn test_is_leaf() raises:
     var element = Element("a")
-    var wildcard = WildcardElement()
-    var start_elem = StartElement()
-    var end_elem = EndElement()
+    var wildcard = WildcardElement(value="")
+    var start_elem = StartElement(value="")
+    var end_elem = EndElement(value="")
     var range_elem = RangeElement("abc")
-    var or_node = OrNode(element, wildcard)
-    var group = GroupNode(List[ASTNode]())
+    var or_node = OrNode(element, wildcard, value="")
+    var group = GroupNode(List[ASTNode[MutableAnyOrigin]](), value="")
 
     assert_true(element.is_leaf())
     assert_true(wildcard.is_leaf())  # WILDCARD is now in leaf list
