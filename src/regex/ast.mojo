@@ -302,20 +302,18 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 fn RENode[
     value_origin: Origin,
     child_origin: Origin,
+    child_value_origin: Origin,
 ](
-    ref [child_origin]child: ASTNode[MutableAnyOrigin],
-    ref [value_origin]value: String = "",
+    ref [child_origin]child: ASTNode[child_value_origin],
+    ref [value_origin]value: String,
     capturing: Bool = False,
     group_name: String = "RegEx",
-) -> ASTNode[__origin_of(value_origin, child_origin)]:
+) -> ASTNode[value_origin]:
     """Create a RE node with a child."""
-    children = List[ASTNode[MutableAnyOrigin]]()
-    children.append(child)
-
-    return ASTNode[__origin_of(value_origin, child_origin)](
+    return ASTNode[value_origin](
         type=RE,
         value=value,
-        children=children,
+        child=child,
         capturing=capturing,
         group_name=group_name,
     )
@@ -387,23 +385,44 @@ fn EndElement[
 
 @always_inline
 fn OrNode[
-    value_origin: Origin
+    value_origin: Origin,
+    left_origin: Origin,
+    right_origin: Origin,
+    left_value_origin: Origin,
+    right_value_origin: Origin,
 ](
-    owned left: ASTNode[value_origin], owned right: ASTNode[value_origin]
+    ref [left_origin]left: ASTNode[left_value_origin],
+    ref [right_origin]right: ASTNode[right_value_origin],
+    ref [value_origin]value: String,
 ) -> ASTNode[value_origin]:
     """Create an OrNode with left and right children."""
+
+    var left_casted = left._origin_cast[origin=MutableAnyOrigin]()
+    var right_casted = right._origin_cast[origin=MutableAnyOrigin]()
+
     return ASTNode[value_origin](
-        type=OR, children=List[ASTNode[value_origin]](left, right), min=1, max=1
+        type=OR,
+        children=List[ASTNode[MutableAnyOrigin]](left_casted, right_casted),
+        value=value,
+        min=1,
+        max=1,
     )
 
 
 @always_inline
 fn NotNode[
-    value_origin: Origin
-](owned child: ASTNode[value_origin]) -> ASTNode[value_origin]:
+    value_origin: Origin,
+    child_origin: Origin,
+    child_value_origin: Origin,
+](
+    ref [child_origin]child: ASTNode[child_value_origin],
+    ref [value_origin]value: String,
+) -> ASTNode[value_origin]:
     """Create a NotNode with a child."""
     return ASTNode[value_origin](
-        type=NOT, children=List[ASTNode[value_origin]](child)
+        type=NOT,
+        child=child,
+        value=value,
     )
 
 
@@ -411,7 +430,8 @@ fn NotNode[
 fn GroupNode[
     value_origin: Origin
 ](
-    owned children: List[ASTNode[value_origin]],
+    owned children: List[ASTNode[MutableAnyOrigin]],
+    ref [value_origin]value: String,
     capturing: Bool = False,
     group_name: String = "",
     group_id: Int = -1,
@@ -422,6 +442,7 @@ fn GroupNode[
     )
     return ASTNode[value_origin](
         type=GROUP,
+        value=value,
         children=children,
         capturing=capturing,
         group_name=final_group_name,
