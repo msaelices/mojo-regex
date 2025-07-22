@@ -118,6 +118,8 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
         self.children_ptr = children.unsafe_ptr()
 
+        __disable_del children
+
         # Slower alternative
         # self.children_ptr = UnsafePointer[ASTNode].alloc(self.children_len)
         #
@@ -206,7 +208,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     # Thanks to @martinvuyk for this trick
     @always_inline
     fn _origin_cast[origin: Origin](owned self) -> ASTNode[origin]:
-        return ASTNode[origin](
+        var result = ASTNode[origin](
             type=self.type,
             value_ptr=self.value_ptr.origin_cast[
                 mut = origin.mut, origin=origin
@@ -219,6 +221,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             max=self.max,
             positive_logic=self.positive_logic,
         )
+        # We stole the elements, don't destroy them.
+        __disable_del self
+        return result^
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
