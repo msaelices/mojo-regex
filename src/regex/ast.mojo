@@ -157,11 +157,17 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     # Thanks to @martinvuyk for this trick
     @always_inline
     fn _origin_cast[origin: Origin](owned self) -> ASTNode[origin]:
+        var value_ptr: UnsafePointer[String, mut = origin.mut, origin=origin]
+        if self.value_ptr:
+            value_ptr = UnsafePointer[String]().alloc(1)
+            value_ptr.init_pointee_copy(self.value_ptr[])
+        else:
+            value_ptr = UnsafePointer[String]().origin_cast[
+                mut = origin.mut, origin=origin
+            ]()
         var result = ASTNode[origin](
             type=self.type,
-            value_ptr=self.value_ptr.origin_cast[
-                mut = origin.mut, origin=origin
-            ](),
+            value_ptr=value_ptr,
             capturing=self.capturing,
             min=self.min,
             max=self.max,
@@ -171,6 +177,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
         # We stole the elements, don't destroy them.
         __disable_del self
+        __disable_del value_ptr
         return result
 
     @no_inline
