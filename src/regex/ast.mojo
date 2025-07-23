@@ -113,6 +113,20 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     #     var call_location = __call_location()
     #     print("Deleting ASTNode:", self, "in ", call_location)
 
+    @always_inline
+    fn __copyinit__(out self, other: ASTNode[value_origin]):
+        """Copy constructor for ASTNode."""
+        self.type = other.type
+        self.value_ptr = other.value_ptr
+        self.capturing = other.capturing
+        self.min = other.min
+        self.max = other.max
+        self.positive_logic = other.positive_logic
+        self.children = other.children
+        # var call_location = __call_location()
+        # print("Copying ASTNode:", self, "in ", call_location)
+
+    @always_inline
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
         return True
