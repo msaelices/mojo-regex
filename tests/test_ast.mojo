@@ -144,13 +144,10 @@ fn test_GroupNode() raises:
     children.append(elem1._origin_cast[origin=MutableAnyOrigin]())
     children.append(elem2._origin_cast[origin=MutableAnyOrigin]())
 
-    var group = GroupNode(
-        children^, value="", capturing=True, group_name="test_group", group_id=1
-    )
+    var group = GroupNode(children^, value="", capturing=True, group_id=1)
     assert_true(Bool(group))
     assert_equal(group.type, GROUP)
     assert_true(group.is_capturing())
-    assert_equal(group.group_name, "test_group")
     assert_equal(group.get_children_len(), 2)
 
 
@@ -160,7 +157,6 @@ fn test_GroupNode_default_name() raises:
     children.append(elem._origin_cast[origin=MutableAnyOrigin]())
 
     var group = GroupNode(children^, value="", group_id=5)
-    assert_equal(group.group_name, "Group 5")
 
 
 fn test_is_leaf() raises:

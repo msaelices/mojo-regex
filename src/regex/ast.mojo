@@ -32,10 +32,8 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
     var type: Int
     var value_ptr: UnsafePointer[String, mut=mut, origin=value_origin]
-    var children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]]
-    var children_len: Int
+    var children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
     var capturing: Bool
-    var group_name: String
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
@@ -46,7 +44,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         type: Int,
         ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -54,15 +51,13 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.children_ptr = UnsafePointer[ASTNode[MutableAnyOrigin]]()
-        self.children_len = 0
+        self.children = []
 
     fn __init__[
         child_origin: Origin,
@@ -84,22 +79,19 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_len = 1
-        self.children_ptr = UnsafePointer[ASTNode[MutableAnyOrigin]](
-            to=child._origin_cast[origin=MutableAnyOrigin](),
+        self.children = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            child._origin_cast[origin=MutableAnyOrigin](),
         )
 
     fn __init__(
         out self,
         type: Int,
-        owned children: List[ASTNode[MutableAnyOrigin]],
+        owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
         ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -110,60 +102,16 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_len = len(children)
-
-        self.children_ptr = children.unsafe_ptr()
-
-        # Do not destroy the children, we are just borrowing them.
-        __disable_del children
-
-        # Slower alternative
-        # self.children_ptr = UnsafePointer[ASTNode].alloc(self.children_len)
-        #
-        # for i in range(self.children_len):
-        #     var src = UnsafePointer(to=children[i])
-        #     var dst = UnsafePointer(to=self.children_ptr[i])
-        #     src.move_pointee_into(dst)
+        self.children = children^
 
     # @always_inline
     # fn __del__(owned self):
     #     """Destroy all the children and free its memory."""
     #     var call_location = __call_location()
     #     print("Deleting ASTNode:", self, "in ", call_location)
-    #     # TODO: This is causing the parsing to hang
-    #     # for i in range(self.children_len):
-    #     #     (self.children_ptr + i).destroy_pointee()
-    #     # self.children_ptr.free()
-
-    @always_inline
-    fn __copyinit__(out self, other: ASTNode[value_origin]):
-        """Copy constructor for ASTNode."""
-        self.type = other.type
-        self.capturing = other.capturing
-        self.group_name = other.group_name
-        self.min = other.min
-        self.max = other.max
-        self.positive_logic = other.positive_logic
-        self.children_len = other.children_len
-
-        # TODO: Check if we can substitute this with the following commented block
-        self.children_ptr = other.children_ptr
-        self.value_ptr = other.value_ptr
-
-        # TODO: This is causing core dumps
-        # if not other.children_ptr:
-        #     self.children_ptr = UnsafePointer[ASTNode, mut=False]()
-        # else:
-        #     # Allocate memory for children and copy them
-        #     self.children_ptr = UnsafePointer[ASTNode].alloc(other.children_len)
-        #     memcpy(self.children_ptr, other.children_ptr, other.children_len)
-
-        # var call_location = __call_location()
-        # print("Copying ASTNode:", self, "in ", call_location)
 
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
@@ -179,11 +127,11 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             self.type == other.type
             and self.value_ptr == other.value_ptr
             and self.capturing == other.capturing
-            and self.group_name == other.group_name
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
-            and self.children_ptr == other.children_ptr
+            and self.get_children_len() == other.get_children_len()
+            # TODO: Compare children if they exist
         )
 
     fn __ne__(self, other: ASTNode[value_origin]) -> Bool:
@@ -196,7 +144,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             "ASTNode(type=",
             self.type,
             ", value=",
-            self.get_value(),
+            self.get_value().value() if self.get_value() else "None",
             ")",
             sep="",
         )
@@ -214,17 +162,16 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             value_ptr=self.value_ptr.origin_cast[
                 mut = origin.mut, origin=origin
             ](),
-            children_ptr=self.children_ptr,
-            children_len=self.children_len,
             capturing=self.capturing,
-            group_name=self.group_name,
             min=self.min,
             max=self.max,
             positive_logic=self.positive_logic,
+            children=self.children^,
         )
+
         # We stole the elements, don't destroy them.
         __disable_del self
-        return result^
+        return result
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -297,7 +244,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
     @always_inline
     fn get_children_len(self) -> Int:
-        return self.children_len
+        return len(self.children)
 
     @always_inline
     fn has_children(self) -> Bool:
@@ -306,7 +253,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
         """Get the children of the AST node."""
-        return self.children_ptr[i]
+        return self.children[i]
 
     @always_inline
     fn get_value(self) -> Optional[String]:
@@ -332,7 +279,6 @@ fn RENode[
         value=value,
         child=child,
         capturing=capturing,
-        group_name=group_name,
     )
 
 
@@ -419,7 +365,9 @@ fn OrNode[
 
     return ASTNode[value_origin](
         type=OR,
-        children=List[ASTNode[MutableAnyOrigin]](left_casted, right_casted),
+        children=List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            left_casted, right_casted
+        ),
         value=value,
         min=1,
         max=1,
@@ -447,22 +395,18 @@ fn NotNode[
 fn GroupNode[
     value_origin: Origin
 ](
-    owned children: List[ASTNode[MutableAnyOrigin]],
+    owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
     ref [value_origin]value: String,
     capturing: Bool = False,
-    group_name: String = "",
     group_id: Int = -1,
 ) -> ASTNode[value_origin]:
     """Create a GroupNode with children."""
-    var final_group_name = (
-        group_name if group_name != "" else "Group " + String(group_id)
-    )
+    print("GroupNode", len(children), children[1])
     return ASTNode[value_origin](
         type=GROUP,
         value=value,
         children=children,
         capturing=capturing,
-        group_name=final_group_name,
         min=1,
         max=1,
     )

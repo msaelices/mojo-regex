@@ -107,7 +107,7 @@ struct PatternAnalyzer:
             # Analyze root node - delegate to children
             if ast.get_children_len() == 0:
                 return PatternComplexity(PatternComplexity.SIMPLE)
-            return self._analyze_node(ast.children_ptr[0], depth)
+            return self._analyze_node(ast.get_child(0), depth)
 
         elif ast.type == ELEMENT:
             # Literal character - always simple
@@ -201,7 +201,7 @@ struct PatternAnalyzer:
         # Analyze all branches of the alternation
         for i in range(ast.get_children_len()):
             var branch_complexity = self._analyze_node(
-                ast.children_ptr[i], depth + 1
+                ast.get_child(i), depth + 1
             )
             if branch_complexity.value == PatternComplexity.COMPLEX:
                 return PatternComplexity(PatternComplexity.COMPLEX)
@@ -304,7 +304,7 @@ struct PatternAnalyzer:
 
         # All children must be character classes (RANGE, DIGIT, SPACE)
         for i in range(ast.get_children_len()):
-            ref element = ast.get_child(i)
+            var element = ast.get_child(i)
             if not (
                 element.type == RANGE
                 or element.type == DIGIT

@@ -498,7 +498,7 @@ struct NFAEngine(Engine):
         # Use regular greedy matching with conservative early termination
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                ast.children_ptr,
+                ast.children,
                 0,
                 ast.get_children_len(),
                 string,
@@ -531,7 +531,7 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
+        children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
         child_index: Int,
         children_len: Int,
         string: String,
@@ -546,7 +546,7 @@ struct NFAEngine(Engine):
 
         if child_index == children_len - 1:
             return self._match_node(
-                children_ptr[child_index],
+                children[child_index],
                 string,
                 str_i,
                 matches,
@@ -555,13 +555,13 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        ref first_child = children_ptr[child_index]
+        ref first_child = children[child_index]
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
             return self._match_with_backtracking(
                 first_child,
-                children_ptr,
+                children,
                 child_index + 1,
                 children_len,
                 string,
@@ -583,7 +583,7 @@ struct NFAEngine(Engine):
             if not result[0]:
                 return (False, str_i)
             return self._match_sequence(
-                children_ptr,
+                children,
                 child_index + 1,
                 children_len,
                 string,
@@ -602,7 +602,7 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
+        children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
         remaining_index: Int,
         children_len: Int,
         string: String,
