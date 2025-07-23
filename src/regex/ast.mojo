@@ -118,6 +118,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
         self.children_ptr = children.unsafe_ptr()
 
+        # Do not destroy the children, we are just borrowing them.
         __disable_del children
 
         # Slower alternative
