@@ -231,7 +231,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         # We stole the elements, don't destroy them.
         __disable_del self
         __disable_del value_ptr
-        return result
+        return result^
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
