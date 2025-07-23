@@ -119,7 +119,6 @@ fn parse_token_list(
             List[ASTNode[MutableAnyOrigin]](),
             value=empty_str,
             capturing=True,
-            group_name="",
             group_id=0,
         )._origin_cast[origin=MutableAnyOrigin]()
 
@@ -144,7 +143,6 @@ fn parse_token_list(
                     List[ASTNode[MutableAnyOrigin]](),
                     value="",
                     capturing=True,
-                    group_name="",
                     group_id=0,
                 )._origin_cast[origin=MutableAnyOrigin]()
 
@@ -156,7 +154,6 @@ fn parse_token_list(
                     List[ASTNode[MutableAnyOrigin]](),
                     value="",
                     capturing=True,
-                    group_name="",
                     group_id=0,
                 )._origin_cast[origin=MutableAnyOrigin]()
 
@@ -291,7 +288,6 @@ fn parse_token_list(
                     ),
                     value="",
                     capturing=is_capturing,
-                    group_name="",
                     group_id=0,
                 )._origin_cast[origin=MutableAnyOrigin]()
             # Check for quantifiers after the group
@@ -302,7 +298,7 @@ fn parse_token_list(
         i += 1
 
     return GroupNode(
-        elements^, value="", capturing=True, group_name="", group_id=0
+        elements^, value="", capturing=True, group_id=0
     )._origin_cast[origin=MutableAnyOrigin]()
 
 
@@ -450,7 +446,6 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
                     ),
                     value="",
                     capturing=is_capturing,
-                    group_name="",
                     group_id=0,
                 )._origin_cast[origin=MutableAnyOrigin]()
             # Check for quantifiers after the group
@@ -463,7 +458,6 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
                 elements^,
                 value="",
                 capturing=True,
-                group_name="",
                 group_id=0,
             )._origin_cast[origin=MutableAnyOrigin]()
             i += 1
@@ -486,7 +480,6 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
                     ),
                     value="",
                     capturing=True,
-                    group_name="",
                     group_id=0,
                 )._origin_cast[origin=MutableAnyOrigin]()
 
@@ -506,8 +499,6 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
 
         i += 1
     return RENode(
-        GroupNode(
-            elements^, value="", capturing=True, group_name="", group_id=0
-        ),
+        GroupNode(elements^, value="", capturing=True, group_id=0),
         value="",
     )._origin_cast[origin=MutableAnyOrigin]()

@@ -35,7 +35,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     var children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]]
     var children_len: Int
     var capturing: Bool
-    var group_name: String
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
@@ -46,7 +45,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         type: Int,
         ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -54,7 +52,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
@@ -73,7 +70,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         ref [child_origin]child: ASTNode[child_value_origin],
         ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -84,7 +80,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
@@ -99,7 +94,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         owned children: List[ASTNode[MutableAnyOrigin]],
         ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -110,7 +104,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
@@ -144,7 +137,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Copy constructor for ASTNode."""
         self.type = other.type
         self.capturing = other.capturing
-        self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
@@ -179,7 +171,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             self.type == other.type
             and self.value_ptr == other.value_ptr
             and self.capturing == other.capturing
-            and self.group_name == other.group_name
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
@@ -223,7 +214,6 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             children_ptr=self.children_ptr,
             children_len=self.children_len,
             capturing=self.capturing,
-            group_name=self.group_name,
             min=self.min,
             max=self.max,
             positive_logic=self.positive_logic,
@@ -331,7 +321,6 @@ fn RENode[
     ref [child_origin]child: ASTNode[child_value_origin],
     ref [value_origin]value: String,
     capturing: Bool = False,
-    group_name: String = "RegEx",
 ) -> ASTNode[value_origin]:
     """Create a RE node with a child."""
     return ASTNode[value_origin](
@@ -339,7 +328,6 @@ fn RENode[
         value=value,
         child=child,
         capturing=capturing,
-        group_name=group_name,
     )
 
 
@@ -457,19 +445,14 @@ fn GroupNode[
     owned children: List[ASTNode[MutableAnyOrigin]],
     ref [value_origin]value: String,
     capturing: Bool = False,
-    group_name: String = "",
     group_id: Int = -1,
 ) -> ASTNode[value_origin]:
     """Create a GroupNode with children."""
-    var final_group_name = (
-        group_name if group_name != "" else "Group " + String(group_id)
-    )
     return ASTNode[value_origin](
         type=GROUP,
         value=value,
         children=children,
         capturing=capturing,
-        group_name=final_group_name,
         min=1,
         max=1,
     )

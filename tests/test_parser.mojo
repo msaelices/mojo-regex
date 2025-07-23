@@ -464,7 +464,6 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert isinstance(ast.child, OrNode)
 #     assert isinstance(ast.child.left, GroupNode)
 #     assert isinstance(ast.child.right, GroupNode)
-#     assert ast.child.left.group_name == ast.child.right.group_name
 #     assert ast.child.left.group_id == ast.child.right.group_id
 #
 #
@@ -475,16 +474,13 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert isinstance(ast.child, OrNode)
 #     assert isinstance(ast.child.left, GroupNode)
 #     leftmost_gid = ast.child.left.group_id
-#     leftmost_gname = ast.child.left.group_name
 #
 #     assert isinstance(ast.child.right, OrNode)
 #     assert isinstance(ast.child.right.left, GroupNode)
 #     central_gid = ast.child.right.left.group_id
-#     central_gname = ast.child.right.left.group_name
 #
 #     assert isinstance(ast.child.right.right, GroupNode)
 #     rightmost_gid = ast.child.right.right.group_id
-#     rightmost_gname = ast.child.right.right.group_name
 #
 #     assert leftmost_gid == central_gid
 #     assert central_gid == rightmost_gid
