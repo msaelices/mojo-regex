@@ -340,12 +340,10 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
                 EndElement(value="")._origin_cast[origin=MutableAnyOrigin]()
             )
         elif token.type == Token.ELEMENT:
-            print("Element:", token.char)
             elem = Element(token.char)
             # Check for quantifiers
             if i + 1 < len(tokens):
                 check_for_quantifiers(i, elem, tokens)
-            print("KKK: ", elem._origin_cast[origin=MutableAnyOrigin]())
             elements.append(elem._origin_cast[origin=MutableAnyOrigin]())
         elif token.type == Token.WILDCARD:
             elem = WildcardElement(value=token.char)
@@ -503,14 +501,6 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
             else:
                 raise Error("Unexpected token: " + token.char)
 
-        print("Round ", i)
-        for i in range(len(elements)):
-            print(
-                "Element:",
-                elements[i].type,
-                "Value:",
-                elements[i].get_value().value(),
-            )
         i += 1
     return RENode(
         GroupNode(elements^, value="", capturing=True, group_id=0),

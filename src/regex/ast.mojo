@@ -408,7 +408,6 @@ fn GroupNode[
     group_id: Int = -1,
 ) -> ASTNode[value_origin]:
     """Create a GroupNode with children."""
-    print("GroupNode", len(children), children[1])
     return ASTNode[value_origin](
         type=GROUP,
         value=value,

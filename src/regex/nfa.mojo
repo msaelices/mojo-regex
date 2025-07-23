@@ -457,7 +457,7 @@ struct NFAEngine(Engine):
 
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(
-            ast.children_ptr,
+            ast.children,
             0,
             ast.get_children_len(),
             string,
@@ -641,7 +641,7 @@ struct NFAEngine(Engine):
                     return (False, str_i)
                 # Try to match the remaining children
                 var result = self._match_sequence(
-                    children_ptr,
+                    children,
                     remaining_index,
                     children_len,
                     string,
