@@ -20,6 +20,7 @@ alias GROUP = 10
 
 
 @fieldwise_init
+@register_passable("trivial")
 struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     Copyable,
     EqualityComparable,
@@ -142,33 +143,24 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     #     #     (self.children_ptr + i).destroy_pointee()
     #     # self.children_ptr.free()
 
-    @always_inline
-    fn __copyinit__(out self, other: ASTNode[value_origin]):
-        """Copy constructor for ASTNode."""
-        self.type = other.type
-        self.capturing = other.capturing
-        self.min = other.min
-        self.max = other.max
-        self.positive_logic = other.positive_logic
-        self.children_len = other.children_len
-
-        # TODO: Check if we can substitute this with the following commented block
-        self.children_ptr = UnsafePointer[
-            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
-        ].alloc(1)
-        self.children_ptr.init_pointee_copy(other.children_ptr[])
-        self.value_ptr = other.value_ptr
-
-        # TODO: This is causing core dumps
-        # if not other.children_ptr:
-        #     self.children_ptr = UnsafePointer[ASTNode, mut=False]()
-        # else:
-        #     # Allocate memory for children and copy them
-        #     self.children_ptr = UnsafePointer[ASTNode].alloc(other.children_len)
-        #     memcpy(self.children_ptr, other.children_ptr, other.children_len)
-
-        # var call_location = __call_location()
-        # print("Copying ASTNode:", self, "in ", call_location)
+    # @always_inline
+    # fn __copyinit__(out self, other: ASTNode[value_origin]):
+    #     """Copy constructor for ASTNode."""
+    #     self.type = other.type
+    #     self.capturing = other.capturing
+    #     self.min = other.min
+    #     self.max = other.max
+    #     self.positive_logic = other.positive_logic
+    #     self.children_len = other.children_len
+    #
+    #     # TODO: Check if we can substitute this with the following commented block
+    #     self.children_ptr = UnsafePointer[
+    #         List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+    #     ].alloc(1)
+    #     self.children_ptr.init_pointee_copy(other.children_ptr[])
+    #     self.value_ptr = other.value_ptr
+    #     var call_location = __call_location()
+    #     print("Copying ASTNode:", self, "in ", call_location)
 
     fn __bool__(self) -> Bool:
         """Return True if the node is not None."""
