@@ -116,7 +116,7 @@ fn parse_token_list(
     if len(tokens) == 0:
         var empty_str = String("")
         return GroupNode(
-            List[ASTNode[MutableAnyOrigin]](),
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](),
             value=empty_str,
             capturing=True,
             group_id=0,
@@ -140,7 +140,7 @@ fn parse_token_list(
                 left_ast = parse_token_list(left_tokens^)
             else:
                 left_ast = GroupNode(
-                    List[ASTNode[MutableAnyOrigin]](),
+                    List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](),
                     value="",
                     capturing=True,
                     group_id=0,
@@ -151,7 +151,7 @@ fn parse_token_list(
                 right_ast = parse_token_list(right_tokens^)
             else:
                 right_ast = GroupNode(
-                    List[ASTNode[MutableAnyOrigin]](),
+                    List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](),
                     value="",
                     capturing=True,
                     group_id=0,
@@ -163,7 +163,9 @@ fn parse_token_list(
             ]()
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
+    var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+        capacity=len(tokens)
+    )
     var i = 0
 
     while i < len(tokens):
@@ -283,7 +285,7 @@ fn parse_token_list(
             else:
                 # Otherwise wrap in a group
                 group = GroupNode(
-                    List[ASTNode[MutableAnyOrigin]](
+                    List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
                         group_ast._origin_cast[origin=MutableAnyOrigin]()
                     ),
                     value="",
@@ -321,7 +323,9 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
         return ASTNode[MutableAnyOrigin](type=RE, value=empty_str)
 
     # Simple implementation for basic parsing
-    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
+    var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+        capacity=len(tokens)
+    )
     var i = 0
 
     while i < len(tokens):
@@ -441,7 +445,7 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
             else:
                 # Otherwise wrap in a group
                 group = GroupNode(
-                    List[ASTNode[MutableAnyOrigin]](
+                    List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
                         group_ast._origin_cast[origin=MutableAnyOrigin]()
                     ),
                     value="",
@@ -475,7 +479,7 @@ fn parse(regex: String) raises -> ASTNode[MutableAnyOrigin]:
                 right_group = right_group_ast
             else:
                 right_group = GroupNode(
-                    List[ASTNode[MutableAnyOrigin]](
+                    List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
                         right_group_ast._origin_cast[origin=MutableAnyOrigin]()
                     ),
                     value="",

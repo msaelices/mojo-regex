@@ -32,7 +32,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
     var type: Int
     var value_ptr: UnsafePointer[String, mut=mut, origin=value_origin]
-    var children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]]
+    var children_ptr: UnsafePointer[
+        List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+    ]
     var children_len: Int
     var capturing: Bool
     var min: Int
@@ -58,7 +60,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
             to=value
         )
-        self.children_ptr = UnsafePointer[ASTNode[MutableAnyOrigin]]()
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ]()
         self.children_len = 0
 
     fn __init__[
@@ -84,14 +88,18 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.max = max
         self.positive_logic = positive_logic
         self.children_len = 1
-        self.children_ptr = UnsafePointer[ASTNode[MutableAnyOrigin]](
-            to=child._origin_cast[origin=MutableAnyOrigin](),
+        var children = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            capacity=1
         )
+        children.append(child._origin_cast[origin=MutableAnyOrigin]())
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ](to=children)
 
     fn __init__(
         out self,
         type: Int,
-        owned children: List[ASTNode[MutableAnyOrigin]],
+        owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
         ref [value_origin]value: String = "",
         capturing: Bool = False,
         min: Int = 0,
@@ -109,7 +117,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.positive_logic = positive_logic
         self.children_len = len(children)
 
-        self.children_ptr = children.unsafe_ptr()
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ](to=children)
 
         # Do not destroy the children, we are just borrowing them.
         __disable_del children
@@ -143,7 +153,10 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         self.children_len = other.children_len
 
         # TODO: Check if we can substitute this with the following commented block
-        self.children_ptr = other.children_ptr
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ].alloc(1)
+        self.children_ptr.init_pointee_copy(other.children_ptr[])
         self.value_ptr = other.value_ptr
 
         # TODO: This is causing core dumps
@@ -303,7 +316,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
         """Get the children of the AST node."""
-        return self.children_ptr[i]
+        return self.children_ptr[][i]
 
     @always_inline
     fn get_value(self) -> Optional[String]:
@@ -414,7 +427,9 @@ fn OrNode[
 
     return ASTNode[value_origin](
         type=OR,
-        children=List[ASTNode[MutableAnyOrigin]](left_casted, right_casted),
+        children=List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            left_casted, right_casted
+        ),
         value=value,
         min=1,
         max=1,
@@ -442,7 +457,7 @@ fn NotNode[
 fn GroupNode[
     value_origin: Origin
 ](
-    owned children: List[ASTNode[MutableAnyOrigin]],
+    owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
     ref [value_origin]value: String,
     capturing: Bool = False,
     group_id: Int = -1,
