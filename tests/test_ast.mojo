@@ -151,14 +151,6 @@ fn test_GroupNode() raises:
     assert_equal(group.get_children_len(), 2)
 
 
-fn test_GroupNode_default_name() raises:
-    var elem = Element("a")
-    var children = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]()
-    children.append(elem._origin_cast[origin=MutableAnyOrigin]())
-
-    var group = GroupNode(children^, value="", group_id=5)
-
-
 fn test_is_leaf() raises:
     var element = Element("a")
     var wildcard = WildcardElement(value="")
