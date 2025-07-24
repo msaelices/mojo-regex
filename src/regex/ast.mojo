@@ -19,20 +19,18 @@ alias NOT = 9
 alias GROUP = 10
 
 
-struct Regex[
-    pattern_origin: Origin[mut=False],
-](Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
     var pattern: String
     var children: List[
-        ASTNode[regex_origin=pattern_origin],
+        ASTNode[ImmutableAnyOrigin],
         hint_trivial_type=True,
     ]
 
-    fn __init__(out self, ref [pattern_origin]pattern: String):
+    fn __init__(out self, pattern: String):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children = List[
-            ASTNode[regex_origin=pattern_origin], hint_trivial_type=True
+            ASTNode[regex_origin=ImmutableAnyOrigin], hint_trivial_type=True
         ]()
 
     fn __str__(self) -> String:
@@ -77,7 +75,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     """Struct for all the Regex AST nodes."""
 
     var type: Int
-    var regex_ptr: UnsafePointer[Regex[regex_origin]]
+    var regex_ptr: UnsafePointer[Regex, mut=False, origin=regex_origin]
     var start_idx: Int
     var end_idx: Int
     var capturing: Bool
@@ -102,7 +100,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
-        self.regex_ptr = UnsafePointer[Regex, origin=regex_origin](to=regex)
+        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
+            to=regex
+        )
         self.capturing = capturing
         self.start_idx = start_idx
         self.end_idx = end_idx
@@ -115,6 +115,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
     fn __init__(
         out self,
+        ref [regex_origin]regex: Regex,
         type: Int,
         child_index: UInt8,
         start_idx: Int,
@@ -126,6 +127,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
+        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
+            to=regex
+        )
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -137,15 +141,20 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
     fn __init__(
         out self,
+        ref [regex_origin]regex: Regex,
         type: Int,
-        owned children_indexes: List[Int]capturing: Bool = False,
+        owned children_indexes: List[UInt8],
         start_idx: Int,
         end_idx: Int,
+        capturing: Bool = False,
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
+        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
+            to=regex
+        )
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -163,12 +172,13 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     #     print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
-    fn __copyinit__(out self, other: ASTNode[regex_origin]):
+    fn __copyinit__(out self, other: ASTNode[regex_origin, max_children]):
         """Copy constructor for ASTNode."""
         self.type = other.type
         self.regex_ptr = other.regex_ptr
-        self.value_ptr = other.value_ptr
         self.capturing = other.capturing
+        self.start_idx = other.start_idx
+        self.end_idx = other.end_idx
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
@@ -185,19 +195,18 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode[regex_origin]) -> Bool:
+    fn __eq__(self, other: ASTNode[regex_origin, max_children]) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
-            and self.value_ptr == other.value_ptr
             and self.capturing == other.capturing
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
-            and self.children_indexes == other.children_indexes
+            and (self.children_indexes == other.children_indexes).reduce_and()
         )
 
-    fn __ne__(self, other: ASTNode[regex_origin]) -> Bool:
+    fn __ne__(self, other: ASTNode[regex_origin, max_children]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
@@ -216,32 +225,6 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         """Returns a user-friendly string representation of the PhoneNumberDesc.
         """
         return String.write(self)
-
-    # Thanks to @martinvuyk for this trick
-    @always_inline
-    fn _origin_cast[origin: Origin](owned self) -> ASTNode[origin]:
-        var value_ptr: UnsafePointer[String, mut = origin.mut, origin=origin]
-        if self.value_ptr:
-            value_ptr = UnsafePointer[String]().alloc(1)
-            value_ptr.init_pointee_copy(self.value_ptr[])
-        else:
-            value_ptr = UnsafePointer[String]().origin_cast[
-                mut = origin.mut, origin=origin
-            ]()
-        var result = ASTNode[origin](
-            type=self.type,
-            value_ptr=value_ptr,
-            capturing=self.capturing,
-            min=self.min,
-            max=self.max,
-            positive_logic=self.positive_logic,
-            children=self.children^,
-        )
-
-        # We stole the elements, don't destroy them.
-        __disable_del self
-        __disable_del value_ptr
-        return result
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -314,7 +297,11 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
     @always_inline
     fn get_children_len(self) -> Int:
-        return rebind[DType.bool, max_children](self).reduce_add()
+        # return rebind[DType.bool, max_children](self).reduce_add()
+        for i in range(max_children):
+            if self.children_indexes[i] == 0:
+                return i
+        return max_children
 
     @always_inline
     fn has_children(self) -> Bool:
@@ -323,10 +310,12 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
         """Get the children of the AST node."""
-        return self.children[i]
+        return self.regex_ptr[].children[self.children_indexes[i]]
 
     @always_inline
-    fn get_value(self) -> Optional[StringSlice]:
+    fn get_value(
+        self,
+    ) -> Optional[StringSlice[__origin_of(self.regex_ptr[].pattern)]]:
         if self.start_idx == self.end_idx:
             return None
         return StringSlice[__origin_of(self.regex_ptr[].pattern)](
@@ -337,7 +326,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
 @always_inline
 fn Element[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](ref [regex_origin]regex: Regex, start_idx: Int, end_idx: Int) -> ASTNode[
     regex_origin
 ]:
@@ -354,7 +343,7 @@ fn Element[
 
 @always_inline
 fn WildcardElement[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -370,7 +359,7 @@ fn WildcardElement[
 
 @always_inline
 fn SpaceElement[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -391,7 +380,7 @@ fn SpaceElement[
 
 @always_inline
 fn DigitElement[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -412,7 +401,7 @@ fn DigitElement[
 
 @always_inline
 fn RangeElement[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -433,7 +422,7 @@ fn RangeElement[
 
 @always_inline
 fn StartElement[
-    regex_origin: Origin
+    regex_origin: Origin[mut=False]
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -454,7 +443,7 @@ fn StartElement[
 
 @always_inline
 fn EndElement[
-    regex_origin: Origin
+    regex_origin: Origin[mut=False]
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -475,7 +464,7 @@ fn EndElement[
 
 @always_inline
 fn OrNode[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     left_child_index: UInt8,
@@ -488,9 +477,7 @@ fn OrNode[
     return ASTNode[regex_origin](
         regex=regex,
         type=OR,
-        children_indexes=SIMD[DType.uint8, 256](
-            left_child_index, right_child_index
-        ),
+        children_indexes=List[UInt8](left_child_index, right_child_index),
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -500,7 +487,7 @@ fn OrNode[
 
 @always_inline
 fn NotNode[
-    regex_origin: Origin,
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
     child_index: UInt8,
@@ -511,7 +498,7 @@ fn NotNode[
     return ASTNode[regex_origin](
         regex=regex,
         type=NOT,
-        children_indexes=[child_index],
+        children_indexes=List[UInt8](child_index),
         start_idx=start_idx,
         end_idx=end_idx,
     )
@@ -519,10 +506,10 @@ fn NotNode[
 
 @always_inline
 fn GroupNode[
-    regex_origin: Origin
+    regex_origin: Origin[mut=False],
 ](
     ref [regex_origin]regex: Regex,
-    children_indexes: List[Int],
+    children_indexes: List[UInt8],
     start_idx: Int,
     end_idx: Int,
     capturing: Bool = False,
@@ -532,7 +519,8 @@ fn GroupNode[
     return ASTNode[regex_origin](
         regex=regex,
         type=GROUP,
-        value=value,
+        start_idx=start_idx,
+        end_idx=end_idx,
         children_indexes=children_indexes,
         capturing=capturing,
         min=1,
