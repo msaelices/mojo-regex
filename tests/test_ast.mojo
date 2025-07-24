@@ -3,7 +3,6 @@ from testing import assert_equal, assert_true, assert_false
 from regex.ast import (
     Regex,
     ASTNode,
-    RENode,
     Element,
     WildcardElement,
     SpaceElement,
@@ -28,22 +27,22 @@ from regex.ast import (
 
 fn test_ASTNode() raises:
     var regex = Regex("")
-    var ast_node = ASTNode(regex=regex, type=ELEMENT, value="")
+    var ast_node = ASTNode(regex=regex, type=ELEMENT, start_idx=0, end_idx=0)
     assert_true(Bool(ast_node))
 
 
-fn test_RE() raises:
-    var regex = Regex("e")
-    var element = Element(regex=regex, value="e")
-    var re = RENode(regex=regex, child=element, value="")
-    assert_true(Bool(re))
-    assert_equal(re.type, RE)
-    assert_equal(re.get_children_len(), 1)
-    assert_equal(
-        re.get_child(0).get_value().value(), element.get_value().value()
-    )
-
-
+# fn test_RE() raises:
+#     var regex = Regex("e")
+#     var element = Element(regex=regex, value="e")
+#     var re = RENode(regex=regex, child=element, value="")
+#     assert_true(Bool(re))
+#     assert_equal(re.type, RE)
+#     assert_equal(re.get_children_len(), 1)
+#     assert_equal(
+#         re.get_child(0).get_value().value(), element.get_value().value()
+#     )
+#
+#
 # fn test_Element() raises:
 #     var elem = Element("a")
 #     assert_true(Bool(elem))
