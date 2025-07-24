@@ -531,7 +531,9 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
+        children_ptr: UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ],
         child_index: Int,
         children_len: Int,
         string: String,
@@ -546,7 +548,7 @@ struct NFAEngine(Engine):
 
         if child_index == children_len - 1:
             return self._match_node(
-                children_ptr[child_index],
+                children_ptr[][child_index],
                 string,
                 str_i,
                 matches,
@@ -555,7 +557,7 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        ref first_child = children_ptr[child_index]
+        ref first_child = children_ptr[][child_index]
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
@@ -602,7 +604,9 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children_ptr: UnsafePointer[ASTNode[MutableAnyOrigin]],
+        children_ptr: UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ],
         remaining_index: Int,
         children_len: Int,
         string: String,
