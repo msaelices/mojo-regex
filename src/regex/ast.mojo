@@ -20,6 +20,41 @@ alias GROUP = 10
 
 
 @fieldwise_init
+struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
+    var pattern: String
+
+    fn __str__(self) -> String:
+        """Return a string representation of the Regex."""
+        return String("Regex(pattern=", self.pattern, ")")
+
+    fn __repr__(self) -> String:
+        """Return a string representation of the Regex."""
+        return String("Regex(pattern=", self.pattern, ")")
+
+    @always_inline
+    fn __eq__(self, other: Regex) -> Bool:
+        """Check if two Regex instances are equal."""
+        return self.pattern == other.pattern
+
+    @always_inline
+    fn __ne__(self, other: Regex) -> Bool:
+        """Check if two Regex instances are not equal."""
+        return not self.__eq__(other)
+
+    @no_inline
+    fn write_to[W: Writer, //](self, mut writer: W):
+        """Writes a string representation of the Regex to the writer.
+
+        Parameters:
+            W: The type of the writer, conforming to the `Writer` trait.
+
+        Args:
+            writer: The writer instance to output the representation to.
+        """
+        writer.write("Regex(pattern=", self.pattern, ")")
+
+
+@fieldwise_init
 struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     Copyable,
     EqualityComparable,
