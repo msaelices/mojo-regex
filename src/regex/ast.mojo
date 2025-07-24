@@ -1,3 +1,11 @@
+from memory import Pointer, UnsafePointer, memcpy
+from builtin._location import __call_location
+from memory import UnsafePointer
+from os import abort
+
+from regex.constants import ZERO_CODE, NINE_CODE
+
+
 alias RE = 0
 alias ELEMENT = 1
 alias WILDCARD = 2
@@ -10,11 +18,9 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
-from builtin._location import __call_location
-from regex.constants import ZERO_CODE, NINE_CODE
 
-
-struct ASTNode(
+@fieldwise_init
+struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
@@ -25,46 +31,133 @@ struct ASTNode(
     """Struct for all the Regex AST nodes."""
 
     var type: Int
-    var value: String
-    var children: List[ASTNode]
+    var value_ptr: UnsafePointer[String, mut=mut, origin=value_origin]
+    var children_ptr: UnsafePointer[
+        List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+    ]
+    var children_len: Int
     var capturing: Bool
-    var group_name: String
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
 
+    @always_inline
     fn __init__(
         out self,
-        type: Int = 0,
-        owned value: String = "",
+        type: Int,
+        ref [value_origin]value: String = "",
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
-        owned children: List[ASTNode] = [],
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.value = value^
-        self.group_name = group_name^
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children = children^
+        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
+            to=value
+        )
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ]()
+        self.children_len = 0
+
+    fn __init__[
+        child_origin: Origin,
+        child_value_origin: Origin,
+    ](
+        out self,
+        type: Int,
+        ref [child_origin]child: ASTNode[child_value_origin],
+        ref [value_origin]value: String = "",
+        capturing: Bool = False,
+        min: Int = 0,
+        max: Int = 0,
+        positive_logic: Bool = True,
+    ):
+        """Initialize an ASTNode with a specific type and match string."""
+        self.type = type
+        self.capturing = capturing
+        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
+            to=value
+        )
+        self.min = min
+        self.max = max
+        self.positive_logic = positive_logic
+        self.children_len = 1
+        var children = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            capacity=1
+        )
+        children.append(child._origin_cast[origin=MutableAnyOrigin]())
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ](to=children)
+
+    fn __init__(
+        out self,
+        type: Int,
+        owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
+        ref [value_origin]value: String = "",
+        capturing: Bool = False,
+        min: Int = 0,
+        max: Int = 0,
+        positive_logic: Bool = True,
+    ):
+        """Initialize an ASTNode with a specific type and match string."""
+        self.type = type
+        self.capturing = capturing
+        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
+            to=value
+        )
+        self.min = min
+        self.max = max
+        self.positive_logic = positive_logic
+        self.children_len = len(children)
+
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ](to=children)
+
+        # Do not destroy the children, we are just borrowing them.
+        __disable_del children
+
+        # Slower alternative
+        # self.children_ptr = UnsafePointer[ASTNode].alloc(self.children_len)
+        #
+        # for i in range(self.children_len):
+        #     var src = UnsafePointer(to=children[i])
+        #     var dst = UnsafePointer(to=self.children_ptr[i])
+        #     src.move_pointee_into(dst)
+
+    # @always_inline
+    # fn __del__(owned self):
+    #     """Destroy all the children and free its memory."""
+    #     var call_location = __call_location()
+    #     print("Deleting ASTNode:", self, "in ", call_location)
+    #     # TODO: This is causing the parsing to hang
+    #     # for i in range(self.children_len):
+    #     #     (self.children_ptr + i).destroy_pointee()
+    #     # self.children_ptr.free()
 
     @always_inline
-    fn __copyinit__(out self, other: ASTNode):
+    fn __copyinit__(out self, other: ASTNode[value_origin]):
         """Copy constructor for ASTNode."""
         self.type = other.type
-        self.value = other.value
         self.capturing = other.capturing
-        self.group_name = other.group_name
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        self.children = other.children
+        self.children_len = other.children_len
+
+        # TODO: Check if we can substitute this with the following commented block
+        self.children_ptr = UnsafePointer[
+            List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+        ].alloc(1)
+        self.children_ptr.init_pointee_copy(other.children_ptr[])
+        self.value_ptr = other.value_ptr
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 
@@ -76,21 +169,19 @@ struct ASTNode(
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode) -> Bool:
+    fn __eq__(self, other: ASTNode[value_origin]) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
-            and self.value == other.value
+            and self.value_ptr == other.value_ptr
             and self.capturing == other.capturing
-            and self.group_name == other.group_name
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
-            and len(self.children) == len(other.children)
-            and self.children == other.children
+            and self.children_ptr == other.children_ptr
         )
 
-    fn __ne__(self, other: ASTNode) -> Bool:
+    fn __ne__(self, other: ASTNode[value_origin]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
@@ -100,7 +191,7 @@ struct ASTNode(
             "ASTNode(type=",
             self.type,
             ", value=",
-            self.value,
+            self.get_value(),
             ")",
             sep="",
         )
@@ -109,6 +200,32 @@ struct ASTNode(
         """Returns a user-friendly string representation of the PhoneNumberDesc.
         """
         return String.write(self)
+
+    # Thanks to @martinvuyk for this trick
+    @always_inline
+    fn _origin_cast[origin: Origin](owned self) -> ASTNode[origin]:
+        var value_ptr: UnsafePointer[String, mut = origin.mut, origin=origin]
+        if self.value_ptr:
+            value_ptr = UnsafePointer[String]().alloc(1)
+            value_ptr.init_pointee_copy(self.value_ptr[])
+        else:
+            value_ptr = UnsafePointer[String]().origin_cast[
+                mut = origin.mut, origin=origin
+            ]()
+        var result = ASTNode[origin](
+            type=self.type,
+            value_ptr=value_ptr,
+            children_ptr=self.children_ptr,
+            children_len=self.children_len,
+            capturing=self.capturing,
+            min=self.min,
+            max=self.max,
+            positive_logic=self.positive_logic,
+        )
+        # We stole the elements, don't destroy them.
+        __disable_del self
+        __disable_del value_ptr
+        return result^
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -120,7 +237,16 @@ struct ASTNode(
         Args:
             writer: The writer instance to output the representation to.
         """
-        writer.write("ASTNode(type=", self.type, ", value=", self.value, ")")
+        if self.get_value():
+            writer.write(
+                "ASTNode(type=",
+                self.type,
+                ", value=",
+                self.get_value().value(),
+                ")",
+            )
+        else:
+            writer.write("ASTNode(type=", self.type, ", value=None)")
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
@@ -132,7 +258,7 @@ struct ASTNode(
     fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
         if self.type == ELEMENT:
-            return self.value == value
+            return self.get_value() and (self.get_value().value() == value)
         elif self.type == WILDCARD:
             return value != "\n"
         elif self.type == SPACE:
@@ -153,7 +279,9 @@ struct ASTNode(
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
-            var ch_found = self.value.find(value) != -1
+            var ch_found = (
+                self.get_value() and self.get_value().value().find(value) != -1
+            )
             return not (
                 ch_found ^ self.positive_logic
             )  # positive_logic determines if it's [abc] or [^abc]
@@ -168,47 +296,87 @@ struct ASTNode(
         """Check if the node is capturing."""
         return self.capturing
 
+    @always_inline
+    fn get_children_len(self) -> Int:
+        return self.children_len
+
+    @always_inline
+    fn has_children(self) -> Bool:
+        return self.get_children_len() > 0
+
+    @always_inline
+    fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
+        """Get the children of the AST node."""
+        return self.children_ptr[][i]
+
+    @always_inline
+    fn get_value(self) -> Optional[String]:
+        if not self.value_ptr:
+            return None
+        return self.value_ptr[]
+
 
 @always_inline
-fn RENode(
-    owned child: ASTNode, capturing: Bool = False, group_name: String = "RegEx"
-) -> ASTNode:
+fn RENode[
+    value_origin: Origin,
+    child_origin: Origin,
+    child_value_origin: Origin,
+](
+    ref [child_origin]child: ASTNode[child_value_origin],
+    ref [value_origin]value: String,
+    capturing: Bool = False,
+) -> ASTNode[value_origin]:
     """Create a RE node with a child."""
-    return ASTNode(
-        type=RE, children=[child^], capturing=capturing, group_name=group_name
+    return ASTNode[value_origin](
+        type=RE,
+        value=value,
+        child=child,
+        capturing=capturing,
     )
 
 
 @always_inline
-fn Element(owned value: String) -> ASTNode:
+fn Element[
+    value_origin: Origin
+](ref [value_origin]value: String) -> ASTNode[value_origin]:
     """Create an Element node with a value string."""
-    return ASTNode(type=ELEMENT, value=value^, min=1, max=1)
+    return ASTNode[value_origin](type=ELEMENT, value=value, min=1, max=1)
 
 
 @always_inline
-fn WildcardElement() -> ASTNode:
+fn WildcardElement[
+    value_origin: Origin,
+](ref [value_origin]value: String = "anything",) -> ASTNode[value_origin]:
     """Create a WildcardElement node."""
-    return ASTNode(type=WILDCARD, value="anything", min=1, max=1)
+    return ASTNode[value_origin](type=WILDCARD, value=value, min=1, max=1)
 
 
 @always_inline
-fn SpaceElement() -> ASTNode:
+fn SpaceElement[
+    value_origin: Origin,
+](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
     """Create a SpaceElement node."""
-    return ASTNode(type=SPACE, value="", min=1, max=1)
+    return ASTNode[value_origin](type=SPACE, value=value, min=1, max=1)
 
 
 @always_inline
-fn DigitElement() -> ASTNode:
+fn DigitElement[
+    value_origin: Origin,
+](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
     """Create a DigitElement node."""
-    return ASTNode(type=DIGIT, value="", min=1, max=1)
+    return ASTNode[value_origin](type=DIGIT, value=value, min=1, max=1)
 
 
 @always_inline
-fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
+fn RangeElement[
+    value_origin: Origin
+](ref [value_origin]value: String, is_positive_logic: Bool = True) -> ASTNode[
+    value_origin
+]:
     """Create a RangeElement node."""
-    return ASTNode(
+    return ASTNode[value_origin](
         type=RANGE,
-        value=value^,
+        value=value,
         min=1,
         max=1,
         positive_logic=is_positive_logic,
@@ -216,45 +384,81 @@ fn RangeElement(owned value: String, is_positive_logic: Bool = True) -> ASTNode:
 
 
 @always_inline
-fn StartElement() -> ASTNode:
+fn StartElement[
+    value_origin: Origin
+](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
     """Create a StartElement node."""
-    return ASTNode(type=START, value="", min=1, max=1)
+    return ASTNode[value_origin](type=START, value=value, min=1, max=1)
 
 
 @always_inline
-fn EndElement() -> ASTNode:
+fn EndElement[
+    value_origin: Origin
+](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
     """Create an EndElement node."""
-    return ASTNode(type=END, value="", min=1, max=1)
+    return ASTNode[value_origin](type=END, value=value, min=1, max=1)
 
 
 @always_inline
-fn OrNode(owned left: ASTNode, owned right: ASTNode) -> ASTNode:
+fn OrNode[
+    value_origin: Origin,
+    left_origin: Origin,
+    right_origin: Origin,
+    left_value_origin: Origin,
+    right_value_origin: Origin,
+](
+    ref [left_origin]left: ASTNode[left_value_origin],
+    ref [right_origin]right: ASTNode[right_value_origin],
+    ref [value_origin]value: String,
+) -> ASTNode[value_origin]:
     """Create an OrNode with left and right children."""
-    return ASTNode(type=OR, children=[left, right], min=1, max=1)
 
+    var left_casted = left._origin_cast[origin=MutableAnyOrigin]()
+    var right_casted = right._origin_cast[origin=MutableAnyOrigin]()
 
-@always_inline
-fn NotNode(owned child: ASTNode) -> ASTNode:
-    """Create a NotNode with a child."""
-    return ASTNode(type=NOT, children=[child])
-
-
-@always_inline
-fn GroupNode(
-    owned children: List[ASTNode],
-    capturing: Bool = False,
-    group_name: String = "",
-    group_id: Int = -1,
-) -> ASTNode:
-    """Create a GroupNode with children."""
-    var final_group_name = (
-        group_name if group_name != "" else "Group " + String(group_id)
+    return ASTNode[value_origin](
+        type=OR,
+        children=List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+            left_casted, right_casted
+        ),
+        value=value,
+        min=1,
+        max=1,
     )
-    return ASTNode(
+
+
+@always_inline
+fn NotNode[
+    value_origin: Origin,
+    child_origin: Origin,
+    child_value_origin: Origin,
+](
+    ref [child_origin]child: ASTNode[child_value_origin],
+    ref [value_origin]value: String,
+) -> ASTNode[value_origin]:
+    """Create a NotNode with a child."""
+    return ASTNode[value_origin](
+        type=NOT,
+        child=child,
+        value=value,
+    )
+
+
+@always_inline
+fn GroupNode[
+    value_origin: Origin
+](
+    owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
+    ref [value_origin]value: String,
+    capturing: Bool = False,
+    group_id: Int = -1,
+) -> ASTNode[value_origin]:
+    """Create a GroupNode with children."""
+    return ASTNode[value_origin](
         type=GROUP,
-        children=children^,
+        value=value,
+        children=children,
         capturing=capturing,
-        group_name=final_group_name,
         min=1,
         max=1,
     )
