@@ -19,9 +19,21 @@ alias NOT = 9
 alias GROUP = 10
 
 
-@fieldwise_init
-struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct Regex[
+    pattern_origin: Origin[mut=False],
+](Copyable, EqualityComparable, Movable, Stringable, Writable):
     var pattern: String
+    var children: List[
+        ASTNode[regex_origin=pattern_origin],
+        hint_trivial_type=True,
+    ]
+
+    fn __init__(out self, ref [pattern_origin]pattern: String):
+        """Initialize a Regex with a pattern."""
+        self.pattern = pattern
+        self.children = List[
+            ASTNode[regex_origin=pattern_origin], hint_trivial_type=True
+        ]()
 
     fn __str__(self) -> String:
         """Return a string representation of the Regex."""
@@ -54,8 +66,7 @@ struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
         writer.write("Regex(pattern=", self.pattern, ")")
 
 
-@fieldwise_init
-struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
+struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
@@ -66,9 +77,13 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     """Struct for all the Regex AST nodes."""
 
     var type: Int
-    var value_ptr: UnsafePointer[String, mut=mut, origin=value_origin]
-    var children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]
+    var regex_ptr: UnsafePointer[Regex[regex_origin]]
+    var start_idx: Int
+    var end_idx: Int
     var capturing: Bool
+    var children_indexes: SIMD[
+        DType.uint8, max_children
+    ]  # Bit vector for each ASCII character
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
@@ -77,7 +92,9 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     fn __init__(
         out self,
         type: Int,
-        ref [value_origin]value: String = "",
+        ref [regex_origin]regex: Regex,
+        start_idx: Int,
+        end_idx: Int,
         capturing: Bool = False,
         min: Int = 0,
         max: Int = 0,
@@ -85,23 +102,23 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
+        self.regex_ptr = UnsafePointer[Regex, origin=regex_origin](to=regex)
         self.capturing = capturing
+        self.start_idx = start_idx
+        self.end_idx = end_idx
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
-            to=value
-        )
-        self.children = []
+        self.children_indexes = SIMD[DType.uint8, max_children](
+            0
+        )  # Initialize with all bits set to 0
 
-    fn __init__[
-        child_origin: Origin,
-        child_value_origin: Origin,
-    ](
+    fn __init__(
         out self,
         type: Int,
-        ref [child_origin]child: ASTNode[child_value_origin],
-        ref [value_origin]value: String = "",
+        child_index: UInt8,
+        start_idx: Int,
+        end_idx: Int,
         capturing: Bool = False,
         owned group_name: String = "",
         min: Int = 0,
@@ -111,22 +128,19 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
-            to=value
-        )
+        self.start_idx = start_idx
+        self.end_idx = end_idx
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
-            child._origin_cast[origin=MutableAnyOrigin](),
-        )
+        self.children_indexes[0] = child_index  # Set the first child index
 
     fn __init__(
         out self,
         type: Int,
-        owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
-        ref [value_origin]value: String = "",
-        capturing: Bool = False,
+        owned children_indexes: List[Int]capturing: Bool = False,
+        start_idx: Int,
+        end_idx: Int,
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -134,13 +148,13 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.capturing = capturing
-        self.value_ptr = UnsafePointer[String, mut=mut, origin=value_origin](
-            to=value
-        )
+        self.start_idx = start_idx
+        self.end_idx = end_idx
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children = children^
+        for i in range(len(children_indexes)):
+            self.children_indexes[i] = children_indexes[i]
 
     # @always_inline
     # fn __del__(owned self):
@@ -149,15 +163,16 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
     #     print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
-    fn __copyinit__(out self, other: ASTNode[value_origin]):
+    fn __copyinit__(out self, other: ASTNode[regex_origin]):
         """Copy constructor for ASTNode."""
         self.type = other.type
+        self.regex_ptr = other.regex_ptr
         self.value_ptr = other.value_ptr
         self.capturing = other.capturing
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
-        self.children = other.children
+        self.children_indexes = other.children_indexes
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 
@@ -170,7 +185,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode[value_origin]) -> Bool:
+    fn __eq__(self, other: ASTNode[regex_origin]) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
@@ -179,11 +194,10 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
-            and self.get_children_len() == other.get_children_len()
-            # TODO: Compare children if they exist
+            and self.children_indexes == other.children_indexes
         )
 
-    fn __ne__(self, other: ASTNode[value_origin]) -> Bool:
+    fn __ne__(self, other: ASTNode[regex_origin]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
@@ -300,7 +314,7 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
 
     @always_inline
     fn get_children_len(self) -> Int:
-        return len(self.children)
+        return rebind[DType.bool, max_children](self).reduce_add()
 
     @always_inline
     fn has_children(self) -> Bool:
@@ -312,74 +326,105 @@ struct ASTNode[mut: Bool, //, value_origin: Origin[mut]](
         return self.children[i]
 
     @always_inline
-    fn get_value(self) -> Optional[String]:
-        if not self.value_ptr:
+    fn get_value(self) -> Optional[StringSlice]:
+        if self.start_idx == self.end_idx:
             return None
-        return self.value_ptr[]
-
-
-@always_inline
-fn RENode[
-    value_origin: Origin,
-    child_origin: Origin,
-    child_value_origin: Origin,
-](
-    ref [child_origin]child: ASTNode[child_value_origin],
-    ref [value_origin]value: String,
-    capturing: Bool = False,
-    group_name: String = "RegEx",
-) -> ASTNode[value_origin]:
-    """Create a RE node with a child."""
-    return ASTNode[value_origin](
-        type=RE,
-        value=value,
-        child=child,
-        capturing=capturing,
-    )
+        return StringSlice[__origin_of(self.regex_ptr[].pattern)](
+            ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
+            length=self.end_idx - self.start_idx,
+        )
 
 
 @always_inline
 fn Element[
-    value_origin: Origin
-](ref [value_origin]value: String) -> ASTNode[value_origin]:
+    regex_origin: Origin,
+](ref [regex_origin]regex: Regex, start_idx: Int, end_idx: Int) -> ASTNode[
+    regex_origin
+]:
     """Create an Element node with a value string."""
-    return ASTNode[value_origin](type=ELEMENT, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        type=ELEMENT,
+        regex=regex,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
 
 
 @always_inline
 fn WildcardElement[
-    value_origin: Origin,
-](ref [value_origin]value: String = "anything",) -> ASTNode[value_origin]:
+    regex_origin: Origin,
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[
+    regex_origin
+]:
     """Create a WildcardElement node."""
-    return ASTNode[value_origin](type=WILDCARD, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        type=WILDCARD, start_idx=start_idx, end_idx=end_idx, min=1, max=1
+    )
 
 
 @always_inline
 fn SpaceElement[
-    value_origin: Origin,
-](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
+    regex_origin: Origin,
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[
+    regex_origin
+]:
     """Create a SpaceElement node."""
-    return ASTNode[value_origin](type=SPACE, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        regex=regex,
+        type=SPACE,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
 
 
 @always_inline
 fn DigitElement[
-    value_origin: Origin,
-](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
+    regex_origin: Origin,
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[
+    regex_origin
+]:
     """Create a DigitElement node."""
-    return ASTNode[value_origin](type=DIGIT, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        regex=regex,
+        type=DIGIT,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
 
 
 @always_inline
 fn RangeElement[
-    value_origin: Origin
-](ref [value_origin]value: String, is_positive_logic: Bool = True) -> ASTNode[
-    value_origin
-]:
+    regex_origin: Origin,
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+    is_positive_logic: Bool = True,
+) -> ASTNode[regex_origin]:
     """Create a RangeElement node."""
-    return ASTNode[value_origin](
+    return ASTNode[regex_origin](
+        regex=regex,
         type=RANGE,
-        value=value,
+        start_idx=start_idx,
+        end_idx=end_idx,
         min=1,
         max=1,
         positive_logic=is_positive_logic,
@@ -388,43 +433,66 @@ fn RangeElement[
 
 @always_inline
 fn StartElement[
-    value_origin: Origin
-](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
+    regex_origin: Origin
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[
+    regex_origin
+]:
     """Create a StartElement node."""
-    return ASTNode[value_origin](type=START, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        regex=regex,
+        type=START,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
 
 
 @always_inline
 fn EndElement[
-    value_origin: Origin
-](ref [value_origin]value: String = "",) -> ASTNode[value_origin]:
+    regex_origin: Origin
+](
+    ref [regex_origin]regex: Regex,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[
+    regex_origin
+]:
     """Create an EndElement node."""
-    return ASTNode[value_origin](type=END, value=value, min=1, max=1)
+    return ASTNode[regex_origin](
+        regex=regex,
+        type=END,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
 
 
 @always_inline
 fn OrNode[
-    value_origin: Origin,
-    left_origin: Origin,
-    right_origin: Origin,
-    left_value_origin: Origin,
-    right_value_origin: Origin,
+    regex_origin: Origin,
 ](
-    ref [left_origin]left: ASTNode[left_value_origin],
-    ref [right_origin]right: ASTNode[right_value_origin],
-    ref [value_origin]value: String,
-) -> ASTNode[value_origin]:
+    ref [regex_origin]regex: Regex,
+    left_child_index: UInt8,
+    right_child_index: UInt8,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[regex_origin]:
     """Create an OrNode with left and right children."""
 
-    var left_casted = left._origin_cast[origin=MutableAnyOrigin]()
-    var right_casted = right._origin_cast[origin=MutableAnyOrigin]()
-
-    return ASTNode[value_origin](
+    return ASTNode[regex_origin](
+        regex=regex,
         type=OR,
-        children=List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
-            left_casted, right_casted
+        children_indexes=SIMD[DType.uint8, 256](
+            left_child_index, right_child_index
         ),
-        value=value,
+        start_idx=start_idx,
+        end_idx=end_idx,
         min=1,
         max=1,
     )
@@ -432,35 +500,40 @@ fn OrNode[
 
 @always_inline
 fn NotNode[
-    value_origin: Origin,
-    child_origin: Origin,
-    child_value_origin: Origin,
+    regex_origin: Origin,
 ](
-    ref [child_origin]child: ASTNode[child_value_origin],
-    ref [value_origin]value: String,
-) -> ASTNode[value_origin]:
+    ref [regex_origin]regex: Regex,
+    child_index: UInt8,
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[regex_origin]:
     """Create a NotNode with a child."""
-    return ASTNode[value_origin](
+    return ASTNode[regex_origin](
+        regex=regex,
         type=NOT,
-        child=child,
-        value=value,
+        children_indexes=[child_index],
+        start_idx=start_idx,
+        end_idx=end_idx,
     )
 
 
 @always_inline
 fn GroupNode[
-    value_origin: Origin
+    regex_origin: Origin
 ](
-    owned children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
-    ref [value_origin]value: String,
+    ref [regex_origin]regex: Regex,
+    children_indexes: List[Int],
+    start_idx: Int,
+    end_idx: Int,
     capturing: Bool = False,
     group_id: Int = -1,
-) -> ASTNode[value_origin]:
+) -> ASTNode[regex_origin]:
     """Create a GroupNode with children."""
-    return ASTNode[value_origin](
+    return ASTNode[regex_origin](
+        regex=regex,
         type=GROUP,
         value=value,
-        children=children,
+        children_indexes=children_indexes,
         capturing=capturing,
         min=1,
         max=1,
