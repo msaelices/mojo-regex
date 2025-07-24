@@ -353,7 +353,12 @@ fn WildcardElement[
 ]:
     """Create a WildcardElement node."""
     return ASTNode[regex_origin](
-        type=WILDCARD, start_idx=start_idx, end_idx=end_idx, min=1, max=1
+        regex=regex,
+        type=WILDCARD,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
     )
 
 
