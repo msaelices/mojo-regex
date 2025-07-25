@@ -26,14 +26,18 @@ from regex.ast import (
 
 
 fn test_ASTNode() raises:
-    var regex = Regex("")
-    var ast_node = ASTNode(regex=regex, type=ELEMENT, start_idx=0, end_idx=0)
+    var pattern = String("")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var ast_node = ASTNode[ImmutableAnyOrigin](
+        type=ELEMENT, regex=regex, start_idx=0, end_idx=0
+    )
     assert_true(Bool(ast_node))
 
 
 fn test_Element() raises:
-    var regex = Regex("a")
-    var elem = Element(regex=regex, start_idx=0, end_idx=1)
+    var pattern = String("a")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var elem = Element[ImmutableAnyOrigin](regex=regex, start_idx=0, end_idx=1)
     assert_true(Bool(elem))
     assert_equal(elem.type, ELEMENT)
     assert_equal(elem.get_value().value(), "a")
@@ -42,8 +46,11 @@ fn test_Element() raises:
 
 
 fn test_WildcardElement() raises:
-    var regex = Regex(".")
-    var we = WildcardElement(regex=regex, start_idx=0, end_idx=1)
+    var pattern = String(".")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var we = WildcardElement[ImmutableAnyOrigin](
+        regex=regex, start_idx=0, end_idx=1
+    )
     assert_true(Bool(we))
     assert_equal(we.type, WILDCARD)
     assert_true(we.is_match("a"))
@@ -52,8 +59,11 @@ fn test_WildcardElement() raises:
 
 
 fn test_SpaceElement() raises:
-    var regex = Regex("\\s")
-    var se = SpaceElement(regex=regex, start_idx=0, end_idx=2)
+    var pattern = String("\\s")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var se = SpaceElement[ImmutableAnyOrigin](
+        regex=regex, start_idx=0, end_idx=2
+    )
     assert_true(Bool(se))
     assert_equal(se.type, SPACE)
     assert_true(se.is_match(" "))
@@ -65,8 +75,9 @@ fn test_SpaceElement() raises:
 
 
 fn test_RangeElement_positive_logic() raises:
-    var regex = Regex("[abc]")
-    var re = RangeElement(
+    var pattern = String("[abc]")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var re = RangeElement[ImmutableAnyOrigin](
         regex=regex, start_idx=1, end_idx=4, is_positive_logic=True
     )
     assert_true(Bool(re))
@@ -80,8 +91,9 @@ fn test_RangeElement_positive_logic() raises:
 
 
 fn test_RangeElement_negative_logic() raises:
-    var regex = Regex("[^abc]")
-    var nre = RangeElement(
+    var pattern = String("[^abc]")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var nre = RangeElement[ImmutableAnyOrigin](
         regex=regex, start_idx=2, end_idx=5, is_positive_logic=False
     )
     assert_true(Bool(nre))
@@ -95,8 +107,11 @@ fn test_RangeElement_negative_logic() raises:
 
 
 fn test_StartElement() raises:
-    var regex = Regex("^")
-    var start = StartElement(regex=regex, start_idx=0, end_idx=1)
+    var pattern = String("^")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var start = StartElement[ImmutableAnyOrigin](
+        regex=regex, start_idx=0, end_idx=1
+    )
     assert_true(Bool(start))
     assert_equal(start.type, START)
     assert_true(start.is_match("", 0, 10))
@@ -104,8 +119,11 @@ fn test_StartElement() raises:
 
 
 fn test_EndElement() raises:
-    var regex = Regex("$")
-    var end = EndElement(regex=regex, start_idx=0, end_idx=1)
+    var pattern = String("$")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
+    var end = EndElement[ImmutableAnyOrigin](
+        regex=regex, start_idx=0, end_idx=1
+    )
     assert_true(Bool(end))
     assert_equal(end.type, END)
     assert_true(end.is_match("", 10, 10))
@@ -113,13 +131,14 @@ fn test_EndElement() raises:
 
 
 fn test_OrNode() raises:
-    var regex = Regex("a|b")
+    var pattern = String("a|b")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
     var left = Element[ImmutableAnyOrigin](regex=regex, start_idx=0, end_idx=1)
     var right = Element[ImmutableAnyOrigin](regex=regex, start_idx=2, end_idx=3)
 
     # Add children to regex
-    regex.children.append(left)
-    regex.children.append(right)
+    regex.append_child(left)
+    regex.append_child(right)
 
     var or_node = OrNode[ImmutableAnyOrigin](
         regex=regex,
@@ -140,13 +159,14 @@ fn test_OrNode() raises:
 
 
 fn test_NotNode() raises:
-    var regex = Regex("^e")
+    var pattern = String("^e")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
     var element = Element[ImmutableAnyOrigin](
         regex=regex, start_idx=1, end_idx=2
     )
 
     # Add child to regex
-    regex.children.append(element)
+    regex.append_child(element)
 
     var not_node = NotNode[ImmutableAnyOrigin](
         regex=regex, child_index=1, start_idx=0, end_idx=2
@@ -160,13 +180,14 @@ fn test_NotNode() raises:
 
 
 fn test_GroupNode() raises:
-    var regex = Regex("(ab)")
+    var pattern = String("(ab)")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
     var elem1 = Element[ImmutableAnyOrigin](regex=regex, start_idx=1, end_idx=2)
     var elem2 = Element[ImmutableAnyOrigin](regex=regex, start_idx=2, end_idx=3)
 
     # Add children to regex
-    regex.children.append(elem1)
-    regex.children.append(elem2)
+    regex.append_child(elem1)
+    regex.append_child(elem2)
 
     var children_indexes = List[UInt8](1, 2)
     var group = GroupNode[ImmutableAnyOrigin](
@@ -184,11 +205,12 @@ fn test_GroupNode() raises:
 
 
 fn test_GroupNode_default_name() raises:
-    var regex = Regex("(a)")
+    var pattern = String("(a)")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
     var elem = Element[ImmutableAnyOrigin](regex=regex, start_idx=1, end_idx=2)
 
     # Add child to regex
-    regex.children.append(elem)
+    regex.append_child(elem)
 
     var children_indexes = List[UInt8](1)
     var group = GroupNode[ImmutableAnyOrigin](
@@ -203,7 +225,8 @@ fn test_GroupNode_default_name() raises:
 
 
 fn test_is_leaf() raises:
-    var regex = Regex("a.^$[abc]a|b()")
+    var pattern = String("a.^$[abc]a|b()")
+    var regex = Regex[ImmutableAnyOrigin](pattern)
     var element = Element[ImmutableAnyOrigin](
         regex=regex, start_idx=0, end_idx=1
     )
@@ -221,8 +244,8 @@ fn test_is_leaf() raises:
     )
 
     # Add children to regex for complex nodes
-    regex.children.append(element)
-    regex.children.append(wildcard)
+    regex.append_child(element)
+    regex.append_child(wildcard)
 
     var or_node = OrNode[ImmutableAnyOrigin](
         regex=regex,
