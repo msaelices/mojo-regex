@@ -26,7 +26,7 @@ struct Regex[origin: Origin](
     alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
     var children: List[
-        ASTNode[regex_origin = Self.ImmOrigin],
+        ASTNode[ImmutableAnyOrigin],
         hint_trivial_type=True,
     ]
     """Immutable Regex struct for representing a regular expression pattern."""
@@ -35,7 +35,7 @@ struct Regex[origin: Origin](
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children = List[
-            ASTNode[regex_origin = Self.ImmOrigin], hint_trivial_type=True
+            ASTNode[ImmutableAnyOrigin], hint_trivial_type=True
         ]()
 
     fn __str__(self) -> String:
@@ -77,7 +77,7 @@ struct Regex[origin: Origin](
         """
         return rebind[Self.Immutable](self)
 
-    fn append_child(mut self, child: ASTNode[regex_origin = Self.ImmOrigin]):
+    fn append_child(mut self, child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
         self.children.append(child)
 
@@ -331,7 +331,9 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[regex_origin]:
         """Get the children of the AST node."""
-        return self.regex_ptr[].children[self.children_indexes[i] - 1]
+        return rebind[ASTNode[regex_origin]](
+            self.regex_ptr[].children[self.children_indexes[i] - 1]
+        )
 
     @always_inline
     fn get_value(
@@ -387,12 +389,10 @@ fn WildcardElement[
 fn SpaceElement[
     regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[
-    regex_origin
-]:
+) -> ASTNode[regex_origin]:
     """Create a SpaceElement node."""
     return ASTNode[regex_origin](
         regex=regex,
@@ -408,12 +408,10 @@ fn SpaceElement[
 fn DigitElement[
     regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[
-    regex_origin
-]:
+) -> ASTNode[regex_origin]:
     """Create a DigitElement node."""
     return ASTNode[regex_origin](
         regex=regex,
@@ -429,7 +427,7 @@ fn DigitElement[
 fn RangeElement[
     regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
     is_positive_logic: Bool = True,
@@ -450,12 +448,10 @@ fn RangeElement[
 fn StartElement[
     regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[
-    regex_origin
-]:
+) -> ASTNode[regex_origin]:
     """Create a StartElement node."""
     return ASTNode[regex_origin](
         regex=regex,
@@ -471,12 +467,10 @@ fn StartElement[
 fn EndElement[
     regex_origin: ImmutableOrigin
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[
-    regex_origin
-]:
+) -> ASTNode[regex_origin]:
     """Create an EndElement node."""
     return ASTNode[regex_origin](
         regex=regex,
