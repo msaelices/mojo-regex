@@ -116,8 +116,9 @@ fn parse_token_list[
 ) raises -> ASTNode[ImmutableOrigin.cast_from[regex_origin]]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
-    var regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
+    var regex_immutable: Regex[ImmutableAnyOrigin]
     if len(tokens) == 0:
+        regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
         var group_node = GroupNode[ImmutableAnyOrigin](
             regex=regex_immutable,
             children_indexes=List[UInt8](),
@@ -148,6 +149,7 @@ fn parse_token_list[
                 var left_result = parse_token_list(regex, left_tokens^)
                 left_ast = rebind[ASTNode[MutableAnyOrigin]](left_result)
             else:
+                regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
                 var empty_group = GroupNode[ImmutableAnyOrigin](
                     regex=regex_immutable,
                     children_indexes=List[UInt8](),
@@ -163,6 +165,7 @@ fn parse_token_list[
                 var right_result = parse_token_list(regex, right_tokens^)
                 right_ast = rebind[ASTNode[MutableAnyOrigin]](right_result)
             else:
+                regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
                 var empty_group_2 = GroupNode[ImmutableAnyOrigin](
                     regex=regex_immutable,
                     children_indexes=List[UInt8](),
@@ -183,6 +186,7 @@ fn parse_token_list[
             )  # +1 because we use 1-based indexing
             regex.append_child(right_ast)
 
+            regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
             var or_node = OrNode[ImmutableAnyOrigin](
                 regex=regex_immutable,
                 left_child_index=left_index,
@@ -203,6 +207,7 @@ fn parse_token_list[
     while i < len(tokens):
         var token = tokens[i]
 
+        regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
         if token.type == Token.ELEMENT:
             var elem = Element[ImmutableAnyOrigin](
                 regex=regex_immutable,
@@ -373,6 +378,7 @@ fn parse_token_list[
         )  # +1 because we use 1-based indexing
         regex.append_child(element)
 
+    regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
     var final_group = GroupNode[ImmutableAnyOrigin](
         regex=regex_immutable,
         children_indexes=children_indexes,
