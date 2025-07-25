@@ -19,18 +19,23 @@ alias NOT = 9
 alias GROUP = 10
 
 
-struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
+struct Regex[origin: Origin](
+    Copyable, EqualityComparable, Movable, Stringable, Writable
+):
+    alias ImmOrigin = ImmutableOrigin.cast_from[origin]
+    alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
     var children: List[
-        ASTNode[ImmutableAnyOrigin],
+        ASTNode[regex_origin = Self.ImmOrigin],
         hint_trivial_type=True,
     ]
+    """Immutable Regex struct for representing a regular expression pattern."""
 
-    fn __init__(out self, pattern: String):
+    fn __init__(out self, ref [origin]pattern: String):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children = List[
-            ASTNode[regex_origin=ImmutableAnyOrigin], hint_trivial_type=True
+            ASTNode[regex_origin = Self.ImmOrigin], hint_trivial_type=True
         ]()
 
     fn __str__(self) -> String:
@@ -42,12 +47,12 @@ struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
         return String("Regex(pattern=", self.pattern, ")")
 
     @always_inline
-    fn __eq__(self, other: Regex) -> Bool:
+    fn __eq__(self, other: Regex[origin=origin]) -> Bool:
         """Check if two Regex instances are equal."""
         return self.pattern == other.pattern
 
     @always_inline
-    fn __ne__(self, other: Regex) -> Bool:
+    fn __ne__(self, other: Regex[origin=origin]) -> Bool:
         """Check if two Regex instances are not equal."""
         return not self.__eq__(other)
 
@@ -63,8 +68,21 @@ struct Regex(Copyable, EqualityComparable, Movable, Stringable, Writable):
         """
         writer.write("Regex(pattern=", self.pattern, ")")
 
+    @always_inline
+    fn get_immutable(self) -> Self.Immutable:
+        """Return an immutable version of this `Span`.
 
-struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
+        Returns:
+            An immutable version of the same `Span`.
+        """
+        return rebind[Self.Immutable](self)
+
+    fn append_child(mut self, child: ASTNode[regex_origin = Self.ImmOrigin]):
+        """Append a child ASTNode to the Regex."""
+        self.children.append(child)
+
+
+struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
@@ -75,7 +93,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     """Struct for all the Regex AST nodes."""
 
     var type: Int
-    var regex_ptr: UnsafePointer[Regex, mut=False, origin=regex_origin]
+    var regex_ptr: UnsafePointer[
+        Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
+    ]
     var start_idx: Int
     var end_idx: Int
     var capturing: Bool
@@ -90,7 +110,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     fn __init__(
         out self,
         type: Int,
-        ref [regex_origin]regex: Regex,
+        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
         start_idx: Int,
         end_idx: Int,
         capturing: Bool = False,
@@ -100,9 +120,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
-        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
-            to=regex
-        )
+        self.regex_ptr = UnsafePointer[
+            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
+        ](to=regex)
         self.capturing = capturing
         self.start_idx = start_idx
         self.end_idx = end_idx
@@ -115,7 +135,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
     fn __init__(
         out self,
-        ref [regex_origin]regex: Regex,
+        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
         type: Int,
         child_index: UInt8,
         start_idx: Int,
@@ -126,9 +146,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
-        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
-            to=regex
-        )
+        self.regex_ptr = UnsafePointer[
+            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
+        ](to=regex)
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -141,7 +161,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
     fn __init__(
         out self,
-        ref [regex_origin]regex: Regex,
+        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
         type: Int,
         owned children_indexes: List[UInt8],
         start_idx: Int,
@@ -152,9 +172,9 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
-        self.regex_ptr = UnsafePointer[Regex, mut=False, origin=regex_origin](
-            to=regex
-        )
+        self.regex_ptr = UnsafePointer[
+            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
+        ](to=regex)
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -217,7 +237,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
             "ASTNode(type=",
             self.type,
             ", value=",
-            self.get_value().value() if self.get_value() else "None",
+            String(self.get_value().value()) if self.get_value() else "None",
             ")",
             sep="",
         )
@@ -309,7 +329,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         return self.get_children_len() > 0
 
     @always_inline
-    fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
+    fn get_child(self, i: Int) -> ASTNode[regex_origin]:
         """Get the children of the AST node."""
         return self.regex_ptr[].children[self.children_indexes[i] - 1]
 
@@ -327,10 +347,12 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
 
 @always_inline
 fn Element[
-    regex_origin: Origin[mut=False],
-](ref [regex_origin]regex: Regex, start_idx: Int, end_idx: Int) -> ASTNode[
-    regex_origin
-]:
+    regex_origin: ImmutableOrigin,
+](
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[regex_origin]:
     """Create an Element node with a value string."""
     return ASTNode[regex_origin](
         type=ELEMENT,
@@ -344,14 +366,12 @@ fn Element[
 
 @always_inline
 fn WildcardElement[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[
-    regex_origin
-]:
+) -> ASTNode[regex_origin]:
     """Create a WildcardElement node."""
     return ASTNode[regex_origin](
         regex=regex,
@@ -365,7 +385,7 @@ fn WildcardElement[
 
 @always_inline
 fn SpaceElement[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -386,7 +406,7 @@ fn SpaceElement[
 
 @always_inline
 fn DigitElement[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -407,7 +427,7 @@ fn DigitElement[
 
 @always_inline
 fn RangeElement[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -428,7 +448,7 @@ fn RangeElement[
 
 @always_inline
 fn StartElement[
-    regex_origin: Origin[mut=False]
+    regex_origin: ImmutableOrigin,
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -449,7 +469,7 @@ fn StartElement[
 
 @always_inline
 fn EndElement[
-    regex_origin: Origin[mut=False]
+    regex_origin: ImmutableOrigin
 ](
     ref [regex_origin]regex: Regex,
     start_idx: Int,
@@ -470,9 +490,9 @@ fn EndElement[
 
 @always_inline
 fn OrNode[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     left_child_index: UInt8,
     right_child_index: UInt8,
     start_idx: Int,
@@ -493,9 +513,9 @@ fn OrNode[
 
 @always_inline
 fn NotNode[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     child_index: UInt8,
     start_idx: Int,
     end_idx: Int,
@@ -512,9 +532,9 @@ fn NotNode[
 
 @always_inline
 fn GroupNode[
-    regex_origin: Origin[mut=False],
+    regex_origin: ImmutableOrigin,
 ](
-    ref [regex_origin]regex: Regex,
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     children_indexes: List[UInt8],
     start_idx: Int,
     end_idx: Int,
