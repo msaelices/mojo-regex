@@ -22,7 +22,7 @@ from regex.tokens import (
 )
 from regex.ast import (
     ASTNode,
-    RENode,
+    Regex,
     Element,
     WildcardElement,
     SpaceElement,
@@ -108,19 +108,24 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
-fn parse_token_list(
+fn parse_token_list[
+    regex_origin: Origin[mut=True]
+](
+    ref [regex_origin]regex: Regex,
     owned tokens: List[Token],
-) raises -> ASTNode[MutableAnyOrigin]:
+) raises -> ASTNode[
+    ImmutableOrigin.cast_from[regex_origin]
+]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
         var empty_str = String("")
-        return GroupNode(
+        return GroupNode[ImmutableOrigin.cast_from[regex_origin]](
             List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](),
             value=empty_str,
             capturing=True,
             group_id=0,
-        )._origin_cast[origin=MutableAnyOrigin]()
+        )
 
     # Handle OR at the top level by finding the first OR token outside of groups
     var paren_depth = 0
