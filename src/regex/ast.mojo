@@ -137,6 +137,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.children_indexes = SIMD[DType.uint8, max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
 
     fn __init__(
@@ -162,6 +163,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.children_indexes = SIMD[DType.uint8, max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
 
@@ -310,7 +312,7 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[MutableAnyOrigin]:
         """Get the children of the AST node."""
-        return self.regex_ptr[].children[self.children_indexes[i]]
+        return self.regex_ptr[].children[self.children_indexes[i] - 1]
 
     @always_inline
     fn get_value(
