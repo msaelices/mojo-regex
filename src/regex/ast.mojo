@@ -121,7 +121,6 @@ struct ASTNode[regex_origin: Origin[mut=False], max_children: Int = 256,](
         start_idx: Int,
         end_idx: Int,
         capturing: Bool = False,
-        owned group_name: String = "",
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
