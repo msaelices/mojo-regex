@@ -350,13 +350,14 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         # Anchors are fine in literal patterns
         return True
     elif ast.type == GROUP:
-        # Only non-capturing groups (implicit sequence groups) can be literal
-        # Explicit capturing groups are not considered literal patterns
-        if ast.capturing:
-            return False
-        # Non-capturing group must contain only literal elements
+        # For literal pattern detection, check if this group contains nested GROUP nodes
+        # If it does, it means there are explicit capturing groups, making it non-literal
         for i in range(ast.get_children_len()):
-            if not _is_literal_sequence(ast.get_child(i)):
+            var child = ast.get_child(i)
+            if child.type == GROUP:
+                # Nested groups make the pattern non-literal (explicit capturing groups)
+                return False
+            elif not _is_literal_sequence(child):
                 return False
         return True
     else:
