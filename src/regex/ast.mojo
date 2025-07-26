@@ -114,7 +114,7 @@ struct Regex[origin: Origin](
         self.children_len += 1
 
 
-struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
+struct ASTNode[regex_origin: ImmutableOrigin](
     Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
@@ -124,6 +124,8 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
 ):
     """Struct for all the Regex AST nodes."""
 
+    alias max_children = 256
+
     var type: Int
     var regex_ptr: UnsafePointer[
         Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
@@ -132,7 +134,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     var end_idx: Int
     var capturing: Bool
     var children_indexes: SIMD[
-        DType.uint8, max_children
+        DType.uint8, Self.max_children
     ]  # Bit vector for each ASCII character
     var children_len: Int
     var min: Int
@@ -160,7 +162,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_indexes = SIMD[DType.uint8, max_children](
+        self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
         self.children_len = 0
@@ -186,7 +188,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_indexes = SIMD[DType.uint8, max_children](0)
+        self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
 
@@ -211,7 +213,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
-        self.children_indexes = SIMD[DType.uint8, max_children](0)
+        self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
         self.children_len = len(children_indexes)
@@ -223,7 +225,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
-    fn __copyinit__(out self, other: ASTNode[regex_origin, max_children]):
+    fn __copyinit__(out self, other: ASTNode[regex_origin]):
         """Copy constructor for ASTNode."""
         self.type = other.type
         self.regex_ptr = other.regex_ptr
@@ -247,7 +249,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode[regex_origin, max_children]) -> Bool:
+    fn __eq__(self, other: ASTNode[regex_origin]) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
@@ -259,7 +261,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
             and (self.children_indexes == other.children_indexes).reduce_and()
         )
 
-    fn __ne__(self, other: ASTNode[regex_origin, max_children]) -> Bool:
+    fn __ne__(self, other: ASTNode[regex_origin]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
