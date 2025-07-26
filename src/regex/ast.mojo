@@ -93,7 +93,7 @@ struct Regex[origin: Origin](
         return self.children_len
 
     @always_inline
-    fn append_child(mut self, child: ASTNode[ImmutableAnyOrigin]):
+    fn append_child(mut self, owned child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
         print(
             "Appending child to Regex at ",
@@ -101,7 +101,7 @@ struct Regex[origin: Origin](
             ": ",
             child,
         )
-        self.children_ptr[self.children_len] = child
+        (self.children_ptr + self.children_len).init_pointee_move(child^)
         self.children_len += 1
 
 
