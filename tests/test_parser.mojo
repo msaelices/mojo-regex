@@ -16,7 +16,7 @@ from regex.parser import parse
 
 fn test_simple_regex() raises:
     var ast = parse("a")
-    assert_true(Bool(ast))
+    assert_true(ast.__bool__())
     assert_equal(ast.type, RE)
     assert_equal(ast.get_children_len(), 1)
     var child = ast.get_child(0)
@@ -41,6 +41,7 @@ fn test_grouping() raises:
     var nested_group = top_group.get_child(1)
     assert_equal(nested_group.get_children_len(), 1)
     assert_equal(nested_group.get_child(0).type, ELEMENT)
+    # Group content parsing should contain "b"
     assert_equal(nested_group.get_child(0).get_value().value(), "b")
 
 
@@ -82,6 +83,7 @@ fn test_range_positive() raises:
     var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_equal(element.min, 1)  # Positive logic
+    assert_true(element.positive_logic)  # Check positive logic flag
     assert_true(element.is_match("a"))
     assert_false(element.is_match("x"))
 
@@ -94,6 +96,7 @@ fn test_range_negative() raises:
     assert_equal(
         element.min, 1
     )  # Both positive and negative logic should match 1 character
+    assert_false(element.positive_logic)  # Check negative logic flag
     assert_false(element.is_match("a"))
     assert_true(element.is_match("x"))
 
@@ -220,11 +223,13 @@ fn test_parse_fail_missing_closing_bracket() raises:
 
 
 fn test_parse_fail_unescaped_closing_bracket() raises:
+    # Parser validation should raise error for unescaped closing bracket
     with assert_raises():
         _ = parse("abc]")
 
 
 fn test_parse_fail_unescaped_closing_parenthesis() raises:
+    # Parser validation should raise error for unescaped closing parenthesis
     with assert_raises():
         _ = parse("a)")
 

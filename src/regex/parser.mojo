@@ -189,6 +189,30 @@ fn parse_token_list[
             )
             return or_node
 
+    # Validate tokens for unescaped closing brackets and parentheses
+    var bracket_depth = 0
+    var paren_depth_validation = 0
+    for validation_i in range(len(tokens)):
+        var validation_token = tokens[validation_i]
+        if validation_token.type == Token.LEFTBRACKET:
+            bracket_depth += 1
+        elif validation_token.type == Token.RIGHTBRACKET:
+            bracket_depth -= 1
+            if bracket_depth < 0:
+                raise Error(
+                    "Unescaped closing bracket ']' at position "
+                    + String(validation_token.start_pos)
+                )
+        elif validation_token.type == Token.LEFTPARENTHESIS:
+            paren_depth_validation += 1
+        elif validation_token.type == Token.RIGHTPARENTHESIS:
+            paren_depth_validation -= 1
+            if paren_depth_validation < 0:
+                raise Error(
+                    "Unescaped closing parenthesis ')' at position "
+                    + String(validation_token.start_pos)
+                )
+
     # No OR found, parse elements sequentially
     var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
         capacity=len(tokens)
@@ -201,8 +225,8 @@ fn parse_token_list[
         if token.type == Token.ELEMENT:
             var elem = Element[regex_origin](
                 regex=regex,
-                start_idx=i,  # Placeholder - would need proper token position tracking
-                end_idx=i + 1,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + len(token.char),
             )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
@@ -211,8 +235,8 @@ fn parse_token_list[
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + 1,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
             )
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
@@ -221,8 +245,9 @@ fn parse_token_list[
         elif token.type == Token.SPACE:
             var elem = SpaceElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + 2,  # Space tokens like \s are 2 characters
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Space tokens like \s are 2 characters
             )
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
@@ -231,8 +256,9 @@ fn parse_token_list[
         elif token.type == Token.DIGIT:
             var elem = DigitElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + 2,  # Digit tokens like \d are 2 characters
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Digit tokens like \d are 2 characters
             )
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
@@ -241,19 +267,20 @@ fn parse_token_list[
         elif token.type == Token.START:
             var start_elem = StartElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + 1,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
             )
             elements.append(start_elem^)
         elif token.type == Token.END:
             var end_elem = EndElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + 1,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
             )
             elements.append(end_elem^)
         elif token.type == Token.LEFTBRACKET:
             # Handle character ranges
+            var bracket_start_pos = token.start_pos
             i += 1
             var range_str = String("")
             var positive_logic = True
@@ -286,10 +313,13 @@ fn parse_token_list[
             if i >= len(tokens):
                 raise Error("Missing closing ']'.")
 
+            # Calculate proper end position - should be after the closing bracket
+            var bracket_end_pos = tokens[i].start_pos + 1
+
             var range_elem = RangeElement[ImmutableAnyOrigin](
                 regex=regex,
-                start_idx=i,
-                end_idx=i + len(range_str),
+                start_idx=bracket_start_pos,
+                end_idx=bracket_end_pos,
                 is_positive_logic=positive_logic,
             )
             # Check for quantifiers after the range
@@ -298,8 +328,10 @@ fn parse_token_list[
             elements.append(range_elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
+            var paren_start_pos = token.start_pos
             i += 1
             var is_capturing = True
+            var group_content_start_pos = paren_start_pos + 1
 
             # Check if this is a non-capturing group (?:...)
             if (
@@ -310,6 +342,7 @@ fn parse_token_list[
             ):
                 is_capturing = False
                 i += 2  # Skip ? and :
+                group_content_start_pos = paren_start_pos + 3  # After (?:
 
             var group_tokens = List[Token](capacity=len(tokens) - i)
             var paren_count = 1
@@ -329,6 +362,9 @@ fn parse_token_list[
             if paren_count > 0:
                 raise Error("Missing closing parenthesis ')'.")
 
+            # Calculate proper end position - should be just before the closing parenthesis
+            var paren_end_pos = tokens[i].start_pos
+
             # Recursively parse the tokens inside the group
             var group_ast = parse_token_list(regex, group_tokens^)
             var group: ASTNode[MutableAnyOrigin]
@@ -336,6 +372,8 @@ fn parse_token_list[
                 # If it's already a group, use it directly
                 group = rebind[ASTNode[MutableAnyOrigin]](group_ast)
                 group.capturing = is_capturing
+                group.start_idx = group_content_start_pos
+                group.end_idx = paren_end_pos
             else:
                 # Otherwise wrap in a group - add to regex.get_children_len() and create group node
                 var group_ast_mut = rebind[ASTNode[MutableAnyOrigin]](group_ast)
@@ -347,8 +385,8 @@ fn parse_token_list[
                 var group_node = GroupNode[ImmutableAnyOrigin](
                     regex=regex,
                     children_indexes=List[UInt8](child_index),
-                    start_idx=0,
-                    end_idx=len(regex.pattern),
+                    start_idx=group_content_start_pos,
+                    end_idx=paren_end_pos,
                     capturing=is_capturing,
                     group_id=0,
                 )

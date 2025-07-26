@@ -3,6 +3,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
 
     var type: Int
     var char: String
+    var start_pos: Int  # Position in original pattern where this token starts
 
     alias ELEMENT = 0
     """Token that are not associated to special meaning."""
@@ -105,6 +106,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
             char = ""
         self.type = type
         self.char = char
+        self.start_pos = 0  # Default to 0, will be set by lexer
 
     fn __init__(out self, type: Int, char: String):
         """Initialize a Token with a specific type and character.
@@ -114,6 +116,18 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
         """
         self.type = type
         self.char = char
+        self.start_pos = 0  # Default to 0, will be set by lexer
+
+    fn __init__(out self, type: Int, char: String, start_pos: Int):
+        """Initialize a Token with a specific type, character and position.
+        Args:
+            type: The type of the token.
+            char: The character associated with the token.
+            start_pos: Position in original pattern where this token starts.
+        """
+        self.type = type
+        self.char = char
+        self.start_pos = start_pos
 
     fn __eq__(self, other: Self) -> Bool:
         """Equality operator for Token."""
