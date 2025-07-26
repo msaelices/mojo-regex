@@ -933,7 +933,10 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
             ast
         )
         dfa.compile_character_class_with_logic(
-            char_class, min_matches, max_matches, positive_logic
+            String(char_class.value()) if char_class else String(""),
+            min_matches,
+            max_matches,
+            positive_logic,
         )
         dfa.has_start_anchor = has_start
         dfa.has_end_anchor = has_end
@@ -1002,8 +1005,10 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_character_class_info(
-    ast: ASTNode,
-) -> Tuple[String, Int, Int, Bool, Bool, Bool]:
+    ast: ASTNode[ImmutableAnyOrigin],
+) -> Tuple[
+    Optional[StringSlice[ImmutableAnyOrigin]], Int, Int, Bool, Bool, Bool
+]:
     """Extract character class information from AST.
 
     Args:
@@ -1014,7 +1019,7 @@ fn _extract_character_class_info(
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP
 
-    var char_class = String("")
+    var char_class: Optional[StringSlice[ImmutableAnyOrigin]] = None
     var min_matches = 1
     var max_matches = 1
     var has_start = False
@@ -1022,36 +1027,23 @@ fn _extract_character_class_info(
     var positive_logic = True
 
     # Find the character class node (DIGIT or RANGE)
-    var class_node: ASTNode[MutableAnyOrigin]
+    var class_node: ASTNode[ImmutableAnyOrigin]
     if ast.type == DIGIT or ast.type == RANGE:
-        class_node = ast._origin_cast[origin=MutableAnyOrigin]()
+        class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
         if ast.get_child(0).type == DIGIT or ast.get_child(0).type == RANGE:
-            class_node = (
-                ast._origin_cast[origin=MutableAnyOrigin]()
-                .get_child(0)
-                ._origin_cast[origin=MutableAnyOrigin]()
-            )
+            class_node = ast.get_child(0)
         elif (
             ast.get_child(0).type == GROUP
             and ast.get_child(0).get_children_len() == 1
         ):
-            class_node = (
-                ast._origin_cast[origin=MutableAnyOrigin]()
-                .get_child(0)
-                .get_child(0)
-                ._origin_cast[origin=MutableAnyOrigin]()
-            )
+            class_node = ast.get_child(0).get_child(0)
         else:
-            class_node = (
-                ast._origin_cast[origin=MutableAnyOrigin]()
-                .get_child(0)
-                ._origin_cast[origin=MutableAnyOrigin]()
-            )  # fallback
+            class_node = ast.get_child(0)  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:
-        class_node = ast._origin_cast[origin=MutableAnyOrigin]()  # fallback
+        class_node = ast
 
     # Extract quantifier information and character class
     if class_node.type == DIGIT:
@@ -1059,15 +1051,13 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = "0123456789"
+        char_class = class_node.get_value()
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Use the range value directly as character class
-        char_class = (
-            class_node.get_value().value() if class_node.get_value() else ""
-        )
+        char_class = class_node.get_value()
 
     return (
         char_class^,
@@ -1165,9 +1155,9 @@ fn _extract_sequential_pattern_info(
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = (
-                        element.get_value().value() if element.get_value() else ""
-                    )
+                    char_class = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
                 else:
                     continue  # Skip unknown elements
 
@@ -1253,9 +1243,9 @@ fn _extract_multi_class_sequence_info(
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = (
-                        element.get_value().value() if element.get_value() else ""
-                    )
+                    char_class = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
                 elif element.type == WILDCARD:
