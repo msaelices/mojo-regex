@@ -392,7 +392,7 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
         String containing the literal characters
     """
     if ast.type == ELEMENT:
-        return ast.get_value().value() if ast.get_value() else ""
+        return String(ast.get_value().value()) if ast.get_value() else ""
     elif ast.type == GROUP:
         var result = String("")
         for i in range(ast.get_children_len()):
