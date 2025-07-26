@@ -25,18 +25,17 @@ struct Regex[origin: Origin](
     alias ImmOrigin = ImmutableOrigin.cast_from[origin]
     alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
-    var children: List[
-        ASTNode[ImmutableAnyOrigin],
-        hint_trivial_type=True,
-    ]
+    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin],]
+    var children_len: Int
     """Immutable Regex struct for representing a regular expression pattern."""
 
     fn __init__(out self, ref [origin]pattern: String):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
-        self.children = List[
-            ASTNode[ImmutableAnyOrigin], hint_trivial_type=True
-        ]()
+        self.children_len = 0
+        self.children_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]].alloc(
+            len(pattern) * 2
+        )  # Allocate enough space for children
 
     fn __str__(self) -> String:
         """Return a string representation of the Regex."""
@@ -55,6 +54,12 @@ struct Regex[origin: Origin](
     fn __ne__(self, other: Regex[origin=origin]) -> Bool:
         """Check if two Regex instances are not equal."""
         return not self.__eq__(other)
+
+    @always_inline
+    fn __del__(owned self):
+        """Destroy all the children and free its memory."""
+        var call_location = __call_location()
+        print("Deleting Regex:", self, "in ", call_location)
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -77,9 +82,27 @@ struct Regex[origin: Origin](
         """
         return rebind[Self.Immutable](self)
 
+    @always_inline
+    fn get_child(self, i: Int) -> ASTNode[ImmutableAnyOrigin]:
+        """Get the child ASTNode at index `i`."""
+        return self.children_ptr[i]
+
+    @always_inline
+    fn get_children_len(self) -> Int:
+        """Get the number of children in the Regex."""
+        return self.children_len
+
+    @always_inline
     fn append_child(mut self, child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
-        self.children.append(child)
+        print(
+            "Appending child to Regex at ",
+            __call_location(),
+            ": ",
+            child,
+        )
+        self.children_ptr[self.children_len] = child
+        self.children_len += 1
 
 
 struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
@@ -186,11 +209,11 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
 
-    # @always_inline
-    # fn __del__(owned self):
-    #     """Destroy all the children and free its memory."""
-    #     var call_location = __call_location()
-    #     print("Deleting ASTNode:", self, "in ", call_location)
+    @always_inline
+    fn __del__(owned self):
+        """Destroy all the children and free its memory."""
+        var call_location = __call_location()
+        print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode[regex_origin, max_children]):
@@ -329,11 +352,9 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         return self.get_children_len() > 0
 
     @always_inline
-    fn get_child(self, i: Int) -> ASTNode[regex_origin]:
+    fn get_child(self, i: Int) -> ASTNode[ImmutableAnyOrigin]:
         """Get the children of the AST node."""
-        return rebind[ASTNode[regex_origin]](
-            self.regex_ptr[].children[self.children_indexes[i] - 1]
-        )
+        return self.regex_ptr[].get_child(Int(self.children_indexes[i] - 1))
 
     @always_inline
     fn get_value(

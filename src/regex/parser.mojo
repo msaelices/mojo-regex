@@ -178,11 +178,11 @@ fn parse_token_list[
 
             # Add children to regex and get their indices
             var left_index = UInt8(
-                len(regex.children) + 1
+                regex.get_children_len() + 1
             )  # +1 because we use 1-based indexing
             regex.append_child(left_ast)
             var right_index = UInt8(
-                len(regex.children) + 1
+                regex.get_children_len() + 1
             )  # +1 because we use 1-based indexing
             regex.append_child(right_ast)
 
@@ -347,10 +347,10 @@ fn parse_token_list[
                 group = rebind[ASTNode[MutableAnyOrigin]](group_ast)
                 group.capturing = is_capturing
             else:
-                # Otherwise wrap in a group - add to regex children and create group node
+                # Otherwise wrap in a group - add to regex.get_children_len() and create group node
                 var group_ast_mut = rebind[ASTNode[MutableAnyOrigin]](group_ast)
                 var child_index = UInt8(
-                    len(regex.children) + 1
+                    regex.get_children_len() + 1
                 )  # +1 because we use 1-based indexing
                 regex.append_child(group_ast_mut)
 
@@ -370,11 +370,11 @@ fn parse_token_list[
 
         i += 1
 
-    # Add all elements to regex children and collect indices
+    # Add all elements to regex.get_children_len() and collect indices
     var children_indexes = List[UInt8](capacity=len(elements))
     for element in elements:
         children_indexes.append(
-            UInt8(len(regex.children) + 1)
+            UInt8(regex.get_children_len() + 1)
         )  # +1 because we use 1-based indexing
         regex.append_child(element)
 
@@ -390,7 +390,7 @@ fn parse_token_list[
     return rebind[ASTNode[ImmutableOrigin.cast_from[regex_origin]]](final_group)
 
 
-fn parse(pattern: String) raises -> ASTNode[MutableAnyOrigin]:
+fn parse(pattern: String) raises -> ASTNode[ImmutableAnyOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
@@ -417,7 +417,7 @@ fn parse(pattern: String) raises -> ASTNode[MutableAnyOrigin]:
     # The tests expect the root to be of type RE with a GROUP child
     var parsed_ast_immutable = rebind[ASTNode[ImmutableAnyOrigin]](parsed_ast)
     var root_child_index = UInt8(
-        len(regex.children) + 1
+        regex.get_children_len() + 1
     )  # +1 because we use 1-based indexing
     regex.append_child(parsed_ast_immutable)
 
@@ -430,4 +430,12 @@ fn parse(pattern: String) raises -> ASTNode[MutableAnyOrigin]:
         children_indexes=List[UInt8](root_child_index),
     )
 
-    return rebind[ASTNode[MutableAnyOrigin]](re_root)
+    print("regex.get_children_len() count:", regex.get_children_len())
+    for i in range(regex.get_children_len()):
+        ref child = regex.get_child(i)
+        print(
+            "Child",
+            i + 1,
+            String(child),
+        )
+    return re_root
