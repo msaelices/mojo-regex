@@ -402,9 +402,12 @@ fn WildcardElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a WildcardElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=WILDCARD,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -421,9 +424,12 @@ fn SpaceElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a SpaceElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=SPACE,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -440,9 +446,12 @@ fn DigitElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a DigitElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=DIGIT,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -460,9 +469,12 @@ fn RangeElement[
     is_positive_logic: Bool = True,
 ) -> ASTNode[regex_origin]:
     """Create a RangeElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=RANGE,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -480,9 +492,12 @@ fn StartElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a StartElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=START,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -499,9 +514,12 @@ fn EndElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create an EndElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=END,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -520,10 +538,12 @@ fn OrNode[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create an OrNode with left and right children."""
-
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=OR,
+        regex_ptr=regex_ptr,
         children_indexes=List[UInt8](left_child_index, right_child_index),
         start_idx=start_idx,
         end_idx=end_idx,
@@ -542,9 +562,12 @@ fn NotNode[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a NotNode with a child."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=NOT,
+        regex_ptr=regex_ptr,
         children_indexes=List[UInt8](child_index),
         start_idx=start_idx,
         end_idx=end_idx,
@@ -563,9 +586,12 @@ fn GroupNode[
     group_id: Int = -1,
 ) -> ASTNode[regex_origin]:
     """Create a GroupNode with children."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
     return ASTNode[regex_origin](
-        regex=regex,
         type=GROUP,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         children_indexes=children_indexes,
