@@ -16,38 +16,39 @@ from regex.parser import parse
 
 fn test_simple_regex() raises:
     var ast = parse("a")
-    assert_true(Bool(ast))
+    assert_true(ast.__bool__())
     assert_equal(ast.type, RE)
-    assert_equal(len(ast.children), 1)
-    var child = ast.children[0]
+    assert_equal(ast.get_children_len(), 1)
+    var child = ast.get_child(0)
     assert_equal(child.type, GROUP)
-    assert_equal(len(child.children), 1)
-    var element = child.children[0]
+    assert_equal(child.get_children_len(), 1)
+    var element = child.get_child(0)
     assert_equal(element.type, ELEMENT)
-    assert_equal(element.value, "a")
+    assert_equal(element.get_value().value(), "a")
 
 
 fn test_grouping() raises:
     var ast = parse("a(b)c")
 
     # Top level group
-    var top_group = ast.children[0]
-    assert_equal(len(top_group.children), 3)
-    assert_equal(top_group.children[0].type, ELEMENT)
-    assert_equal(top_group.children[1].type, GROUP)
-    assert_equal(top_group.children[2].type, ELEMENT)
+    var top_group = ast.get_child(0)
+    assert_equal(top_group.get_children_len(), 3)
+    assert_equal(top_group.get_child(0).type, ELEMENT)
+    assert_equal(top_group.get_child(1).type, GROUP)
+    assert_equal(top_group.get_child(2).type, ELEMENT)
 
     # Nested group
-    var nested_group = top_group.children[1]
-    assert_equal(len(nested_group.children), 1)
-    assert_equal(nested_group.children[0].type, ELEMENT)
-    assert_equal(nested_group.children[0].value, "b")
+    var nested_group = top_group.get_child(1)
+    assert_equal(nested_group.get_children_len(), 1)
+    assert_equal(nested_group.get_child(0).type, ELEMENT)
+    # Group content parsing should contain "b"
+    assert_equal(nested_group.get_child(0).get_value().value(), "b")
 
 
 fn test_quantifiers() raises:
     var ast = parse("a*")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, ELEMENT)
     assert_equal(element.min, 0)
     assert_equal(element.max, -1)  # -1 represents infinity
@@ -55,82 +56,84 @@ fn test_quantifiers() raises:
 
 fn test_match_start_end() raises:
     var ast = parse("^a$")
-    var top_group = ast.children[0]
-    assert_equal(len(top_group.children), 3)
-    assert_equal(top_group.children[0].type, START)
-    assert_equal(top_group.children[1].type, ELEMENT)
-    assert_equal(top_group.children[2].type, END)
+    var top_group = ast.get_child(0)
+    assert_equal(top_group.get_children_len(), 3)
+    assert_equal(top_group.get_child(0).type, START)
+    assert_equal(top_group.get_child(1).type, ELEMENT)
+    assert_equal(top_group.get_child(2).type, END)
 
 
 fn test_wildcard() raises:
     var ast = parse(".")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, WILDCARD)
 
 
 fn test_space_element() raises:
     var ast = parse("\\s")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, SPACE)
 
 
 fn test_range_positive() raises:
     var ast = parse("[abc]")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_equal(element.min, 1)  # Positive logic
+    assert_true(element.positive_logic)  # Check positive logic flag
     assert_true(element.is_match("a"))
     assert_false(element.is_match("x"))
 
 
 fn test_range_negative() raises:
     var ast = parse("[^abc]")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_equal(
         element.min, 1
     )  # Both positive and negative logic should match 1 character
+    assert_false(element.positive_logic)  # Check negative logic flag
     assert_false(element.is_match("a"))
     assert_true(element.is_match("x"))
 
 
 fn test_or_operation() raises:
     var ast = parse("a|b")
-    var top_node = ast.children[0]
+    var top_node = ast.get_child(0)
     assert_equal(top_node.type, OR)
-    assert_equal(len(top_node.children), 2)
+    assert_equal(top_node.get_children_len(), 2)
 
 
 fn test_curly_exact() raises:
     var ast = parse("a{3}")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.min, 3)
     assert_equal(element.max, 3)
 
 
 fn test_curly_range() raises:
     var ast = parse("a{2,5}")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.min, 2)
     assert_equal(element.max, 5)
 
 
 fn test_curly_braces_1() raises:
     var ast = parse("a{5}b")
-    var top_group = ast.children[0]
-    assert_equal(len(top_group.children), 2)
+    var top_group = ast.get_child(0)
+    assert_equal(top_group.get_children_len(), 2)
 
 
 fn test_parse_curly_2() raises:
     var ast = parse("a{,2}")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, ELEMENT)
     assert_equal(element.min, 0)
     assert_equal(element.max, 2)
@@ -138,8 +141,8 @@ fn test_parse_curly_2() raises:
 
 fn test_parse_curly_3() raises:
     var ast = parse("a{2,}")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, ELEMENT)
     assert_equal(element.min, 2)
     assert_equal(element.max, -1)  # -1 represents infinity
@@ -147,8 +150,8 @@ fn test_parse_curly_3() raises:
 
 fn test_parse_curly_4() raises:
     var ast = parse("a{,}")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, ELEMENT)
     assert_equal(element.min, 0)
     assert_equal(element.max, -1)  # -1 represents infinity
@@ -156,37 +159,37 @@ fn test_parse_curly_4() raises:
 
 fn test_parse_match_start_end() raises:
     var ast = parse("^aaaa.*a$")
-    var top_group = ast.children[0]
-    assert_equal(len(top_group.children), 8)
+    var top_group = ast.get_child(0)
+    assert_equal(top_group.get_children_len(), 8)
 
 
 fn test_complex_regex() raises:
     var ast = parse("^[a-zA-Z]{1,20}@[a-zA-Z]\\.[a-z]{1,3}$")
-    var top_group = ast.children[0]
+    var top_group = ast.get_child(0)
     # Our parser correctly produces 7 elements:
     # ^, [a-zA-Z]{1,20}, @, [a-zA-Z], \., [a-z]{1,3}, $
-    assert_equal(len(top_group.children), 7)
+    assert_equal(top_group.get_children_len(), 7)
 
     # Verify structure: START, RANGE, ELEMENT, RANGE, ELEMENT, RANGE, END
-    assert_equal(top_group.children[0].type, START)
-    assert_equal(top_group.children[1].type, RANGE)
-    assert_equal(top_group.children[2].type, ELEMENT)
-    assert_equal(top_group.children[3].type, RANGE)
-    assert_equal(top_group.children[4].type, ELEMENT)
-    assert_equal(top_group.children[5].type, RANGE)
-    assert_equal(top_group.children[6].type, END)
+    assert_equal(top_group.get_child(0).type, START)
+    assert_equal(top_group.get_child(1).type, RANGE)
+    assert_equal(top_group.get_child(2).type, ELEMENT)
+    assert_equal(top_group.get_child(3).type, RANGE)
+    assert_equal(top_group.get_child(4).type, ELEMENT)
+    assert_equal(top_group.get_child(5).type, RANGE)
+    assert_equal(top_group.get_child(6).type, END)
 
     # Verify quantifiers on ranges
-    assert_equal(top_group.children[1].min, 1)  # [a-zA-Z]{1,20}
-    assert_equal(top_group.children[1].max, 20)
-    assert_equal(top_group.children[5].min, 1)  # [a-z]{1,3}
-    assert_equal(top_group.children[5].max, 3)
+    assert_equal(top_group.get_child(1).min, 1)  # [a-zA-Z]{1,20}
+    assert_equal(top_group.get_child(1).max, 20)
+    assert_equal(top_group.get_child(5).min, 1)  # [a-z]{1,3}
+    assert_equal(top_group.get_child(5).max, 3)
 
 
 fn test_range_1() raises:
     var ast = parse("[^a-z]")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_equal(
         element.min, 1
@@ -196,8 +199,8 @@ fn test_range_1() raises:
 
 fn test_range_2() raises:
     var ast = parse("[^a-z-\\s-]")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_false(element.is_match("a"))
     assert_false(element.is_match("-"))
@@ -206,8 +209,8 @@ fn test_range_2() raises:
 
 fn test_range_3() raises:
     var ast = parse("[a-z-\\s-]")
-    var top_group = ast.children[0]
-    var element = top_group.children[0]
+    var top_group = ast.get_child(0)
+    var element = top_group.get_child(0)
     assert_equal(element.type, RANGE)
     assert_true(element.is_match("a"))
     assert_true(element.is_match("-"))
@@ -220,11 +223,13 @@ fn test_parse_fail_missing_closing_bracket() raises:
 
 
 fn test_parse_fail_unescaped_closing_bracket() raises:
+    # Parser validation should raise error for unescaped closing bracket
     with assert_raises():
         _ = parse("abc]")
 
 
 fn test_parse_fail_unescaped_closing_parenthesis() raises:
+    # Parser validation should raise error for unescaped closing parenthesis
     with assert_raises():
         _ = parse("a)")
 
