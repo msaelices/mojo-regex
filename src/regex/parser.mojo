@@ -111,7 +111,7 @@ fn get_range_str(start: String, end: String) -> String:
 fn parse_token_list[
     regex_origin: Origin[mut=True]
 ](
-    ref [regex_origin]regex: Regex[regex_origin],
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     owned tokens: List[Token],
 ) raises -> ASTNode[ImmutableOrigin.cast_from[regex_origin]]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
@@ -209,8 +209,8 @@ fn parse_token_list[
 
         regex_immutable = rebind[Regex[ImmutableAnyOrigin]](regex)
         if token.type == Token.ELEMENT:
-            var elem = Element[ImmutableAnyOrigin](
-                regex=regex_immutable,
+            var elem = Element[regex_origin](
+                regex=regex,
                 start_idx=i,  # Placeholder - would need proper token position tracking
                 end_idx=i + 1,
             )
@@ -403,9 +403,7 @@ fn parse(pattern: String) raises -> ASTNode[ImmutableAnyOrigin]:
         The root node of the regular expression's AST.
     """
     # Create a Regex object to hold the pattern and children
-    # Use MutableOrigin since parse_token_list requires Origin[mut=True]
-    var pattern_copy = pattern
-    var regex = Regex[MutableAnyOrigin](pattern_copy)
+    var regex = Regex[ImmutableAnyOrigin](pattern)
 
     # Tokenize the pattern
     var tokens = scan(pattern)

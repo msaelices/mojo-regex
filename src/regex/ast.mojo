@@ -56,6 +56,15 @@ struct Regex[origin: Origin](
         return not self.__eq__(other)
 
     @always_inline
+    fn __copyinit__(out self, other: Self):
+        """Copy constructor for ASTNode."""
+        self.pattern = other.pattern
+        self.children_ptr = other.children_ptr
+        self.children_len = other.children_len
+        var call_location = __call_location()
+        print("Copying Regex:", self, "in ", call_location)
+
+    @always_inline
     fn __del__(owned self):
         """Destroy all the children and free its memory."""
         var call_location = __call_location()
@@ -133,7 +142,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     fn __init__(
         out self,
         type: Int,
-        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+        regex_ptr: UnsafePointer[Regex[ImmutableAnyOrigin]],
         start_idx: Int,
         end_idx: Int,
         capturing: Bool = False,
@@ -143,9 +152,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
-        self.regex_ptr = UnsafePointer[
-            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
-        ](to=regex)
+        self.regex_ptr = regex_ptr
         self.capturing = capturing
         self.start_idx = start_idx
         self.end_idx = end_idx
@@ -158,7 +165,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
 
     fn __init__(
         out self,
-        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+        regex_ptr: UnsafePointer[Regex[ImmutableAnyOrigin]],
         type: Int,
         child_index: UInt8,
         start_idx: Int,
@@ -169,9 +176,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
-        self.regex_ptr = UnsafePointer[
-            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
-        ](to=regex)
+        self.regex_ptr = regex_ptr
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -184,7 +189,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
 
     fn __init__(
         out self,
-        ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+        regex_ptr: UnsafePointer[Regex[ImmutableAnyOrigin]],
         type: Int,
         owned children_indexes: List[UInt8],
         start_idx: Int,
@@ -195,9 +200,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         positive_logic: Bool = True,
     ):
         """Initialize an ASTNode with a specific type and match string."""
-        self.regex_ptr = UnsafePointer[
-            Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
-        ](to=regex)
+        self.regex_ptr = regex_ptr
         self.type = type
         self.capturing = capturing
         self.start_idx = start_idx
@@ -370,16 +373,19 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
 
 @always_inline
 fn Element[
-    regex_origin: ImmutableOrigin,
+    regex_origin: MutableOrigin,
 ](
     ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutableAnyOrigin]:
     """Create an Element node with a value string."""
-    return ASTNode[regex_origin](
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
+    return ASTNode[ImmutableAnyOrigin](
         type=ELEMENT,
-        regex=regex,
+        regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
