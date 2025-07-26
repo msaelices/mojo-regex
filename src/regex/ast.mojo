@@ -134,6 +134,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
     var children_indexes: SIMD[
         DType.uint8, max_children
     ]  # Bit vector for each ASCII character
+    var children_len: Int
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
@@ -162,6 +163,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.children_indexes = SIMD[DType.uint8, max_children](
             0
         )  # Initialize with all bits set to 0
+        self.children_len = 0
 
     fn __init__(
         out self,
@@ -186,6 +188,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.positive_logic = positive_logic
         self.children_indexes = SIMD[DType.uint8, max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
+        self.children_len = 1
 
     fn __init__(
         out self,
@@ -211,6 +214,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.children_indexes = SIMD[DType.uint8, max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
+        self.children_len = len(children_indexes)
 
     @always_inline
     fn __del__(owned self):
@@ -230,6 +234,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
         self.max = other.max
         self.positive_logic = other.positive_logic
         self.children_indexes = other.children_indexes
+        self.children_len = other.children_len
         # var call_location = __call_location()
         # print("Copying ASTNode:", self, "in ", call_location)
 
@@ -250,6 +255,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
+            and self.children_len == other.children_len
             and (self.children_indexes == other.children_indexes).reduce_and()
         )
 
@@ -344,11 +350,7 @@ struct ASTNode[regex_origin: ImmutableOrigin, max_children: Int = 256,](
 
     @always_inline
     fn get_children_len(self) -> Int:
-        # return rebind[DType.bool, max_children](self).reduce_add()
-        for i in range(max_children):
-            if self.children_indexes[i] == 0:
-                return i
-        return max_children
+        return self.children_len
 
     @always_inline
     fn has_children(self) -> Bool:
