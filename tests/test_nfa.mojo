@@ -967,7 +967,7 @@ def test_findall_one_match():
     assert_equal(len(matches), 1)
     assert_equal(matches[0].start_idx, 0)
     assert_equal(matches[0].end_idx, 3)
-    assert_equal(matches[0].get_match_text(), "ban")
+    assert_equal(matches[0].get_match_string(), "ban")
 
 
 def test_findall_overlapping_avoided():
@@ -984,10 +984,10 @@ def test_findall_with_quantifiers():
     """Test findall with quantifiers."""
     var matches = findall("[0-9]+", "abc123def456ghi")
     assert_equal(len(matches), 2)
-    assert_equal(matches[0].get_match_text(), "123")
+    assert_equal(matches[0].get_match_string(), "123")
     assert_equal(matches[0].start_idx, 3)
     assert_equal(matches[0].end_idx, 6)
-    assert_equal(matches[1].get_match_text(), "456")
+    assert_equal(matches[1].get_match_string(), "456")
     assert_equal(matches[1].start_idx, 9)
     assert_equal(matches[1].end_idx, 12)
 
@@ -996,9 +996,9 @@ def test_findall_wildcard():
     """Test findall with wildcard pattern."""
     var matches = findall(".", "abc")
     assert_equal(len(matches), 3)
-    assert_equal(matches[0].get_match_text(), "a")
-    assert_equal(matches[1].get_match_text(), "b")
-    assert_equal(matches[2].get_match_text(), "c")
+    assert_equal(matches[0].get_match_string(), "a")
+    assert_equal(matches[1].get_match_string(), "b")
+    assert_equal(matches[2].get_match_string(), "c")
 
 
 def test_findall_empty_string():
@@ -1036,7 +1036,7 @@ def test_phone_numbers():
     pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
     result = match_first(pattern, "+1-541-236-5432")
     assert_true(result.__bool__())
-    assert_equal(result.value().get_match_text(), "+1-541-236-5432")
+    assert_equal(result.value().get_match_string(), "+1-541-236-5432")
 
 
 def test_es_phone_numbers():
@@ -1044,11 +1044,11 @@ def test_es_phone_numbers():
     phone = "810123456"
     var result = match_first(es_pattern, phone)
     assert_true(result.__bool__())
-    assert_equal(result.value().get_match_text(), phone)
+    assert_equal(result.value().get_match_string(), phone)
     es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
     var result2 = match_first(es_fixed_line_pattern, phone)
     assert_true(result2.__bool__())
-    assert_equal(result2.value().get_match_text(), phone)
+    assert_equal(result2.value().get_match_string(), phone)
 
 
 def test_comprehensive_spanish_phone_patterns():
@@ -1067,7 +1067,7 @@ def test_comprehensive_spanish_phone_patterns():
         var number = mobile_numbers[i]
         var result = match_first(mobile_pattern, number)
         assert_true(result.__bool__())
-        assert_equal(result.value().get_match_text(), number)
+        assert_equal(result.value().get_match_string(), number)
 
     # Test invalid mobile numbers (should not match)
     var invalid_numbers = List[String]()
@@ -1086,22 +1086,22 @@ def test_non_capturing_groups_comprehensive():
     # Test simple non-capturing group
     var result1 = match_first("(?:ab)+", "ababab")
     assert_true(result1.__bool__())
-    assert_equal(result1.value().get_match_text(), "ababab")
+    assert_equal(result1.value().get_match_string(), "ababab")
 
     # Test non-capturing groups with simple alternation
     var result2 = match_first("(?:cat|dog)", "cat")
     assert_true(result2.__bool__())
-    assert_equal(result2.value().get_match_text(), "cat")
+    assert_equal(result2.value().get_match_string(), "cat")
 
     # Test non-capturing groups with alternation and quantifier
     var result3 = match_first("(?:a|b)+", "ababab")
     assert_true(result3.__bool__())
-    assert_equal(result3.value().get_match_text(), "ababab")
+    assert_equal(result3.value().get_match_string(), "ababab")
 
     # Test nested non-capturing groups with alternation
     var result4 = match_first("(?:(?:a|b)(?:c|d))+", "acbdac")
     assert_true(result4.__bool__())
-    assert_equal(result4.value().get_match_text(), "acbdac")
+    assert_equal(result4.value().get_match_string(), "acbdac")
 
 
 def test_complex_alternation_patterns():
@@ -1109,16 +1109,16 @@ def test_complex_alternation_patterns():
     # Test multiple character class alternations
     var result1 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "81")
     assert_true(result1.__bool__())
-    assert_equal(result1.value().get_match_text(), "81")
+    assert_equal(result1.value().get_match_string(), "81")
 
     # Test different branches
     var result2 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "15")
     assert_true(result2.__bool__())
-    assert_equal(result2.value().get_match_text(), "15")
+    assert_equal(result2.value().get_match_string(), "15")
 
     var result3 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "41")
     assert_true(result3.__bool__())
-    assert_equal(result3.value().get_match_text(), "41")
+    assert_equal(result3.value().get_match_string(), "41")
 
     # Test pattern that should not match
     var result4 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "09")
@@ -1142,7 +1142,7 @@ def test_match_first_vs_search_behavior():
     var match2 = result2.value()
     assert_equal(match2.start_idx, 0)
     assert_equal(match2.end_idx, 5)
-    assert_equal(match2.get_match_text(), "hello")
+    assert_equal(match2.get_match_string(), "hello")
 
     # Test case: pattern should not match if there's prefix
     var result3 = match_first("hello", "say hello")
@@ -1157,7 +1157,7 @@ def test_match_first_anchored_patterns():
     var result1 = match_first("^hello", "hello world")
     assert_true(result1.__bool__())
     var match1 = result1.value()
-    assert_equal(match1.get_match_text(), "hello")
+    assert_equal(match1.get_match_string(), "hello")
 
     # Test that it fails when not at start
     var result2 = match_first("^hello", "say hello")
@@ -1171,7 +1171,7 @@ def test_match_first_empty_pattern():
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
     assert_equal(match1.end_idx, 0)
-    assert_equal(match1.get_match_text(), "")
+    assert_equal(match1.get_match_string(), "")
 
 
 def test_specific_user_issue():

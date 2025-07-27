@@ -63,19 +63,19 @@ fn expand_character_range(range_str: String) -> String:
         if ord(start_char) >= ord("a") and ord(end_char) <= ord("z"):
             var start_idx = ord(start_char) - ord("a")
             var end_idx = ord(end_char) - ord("a") + 1
-            return LOWERCASE_LETTERS[start_idx:end_idx]
+            return String(LOWERCASE_LETTERS)[start_idx:end_idx]
 
         # Handle uppercase letter ranges
         elif ord(start_char) >= ord("A") and ord(end_char) <= ord("Z"):
             var start_idx = ord(start_char) - ord("A")
             var end_idx = ord(end_char) - ord("A") + 1
-            return UPPERCASE_LETTERS[start_idx:end_idx]
+            return String(UPPERCASE_LETTERS)[start_idx:end_idx]
 
         # Handle digit ranges
         elif ord(start_char) >= ord("0") and ord(end_char) <= ord("9"):
             var start_idx = ord(start_char) - ord("0")
             var end_idx = ord(end_char) - ord("0") + 1
-            return DIGITS[start_idx:end_idx]
+            return String(DIGITS)[start_idx:end_idx]
 
     # Fallback for complex cases
     var result = String(capacity=len(inner) * 2)  # Pre-allocate enough space
