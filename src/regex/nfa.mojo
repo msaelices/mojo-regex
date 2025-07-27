@@ -1,6 +1,6 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode, RENode
+from regex.ast import ASTNode
 from regex.constants import ZERO_CODE, NINE_CODE
 from regex.engine import Engine
 from regex.matching import Match
@@ -303,7 +303,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = string[str_i]
-        if ch != "\n":
+        if String(ch) != "\n":
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
             )
@@ -456,8 +456,9 @@ struct NFAEngine(Engine):
             )
 
         # Simple case: no quantifier on the group itself
+        var children_list = self._get_children_list(ast)
         var result = self._match_sequence(
-            ast.children,
+            children_list,
             0,
             ast.get_children_len(),
             string,
@@ -496,9 +497,10 @@ struct NFAEngine(Engine):
             max_matches = len(string) - str_i
 
         # Use regular greedy matching with conservative early termination
+        var children_list = self._get_children_list(ast)
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                ast.children,
+                children_list,
                 0,
                 ast.get_children_len(),
                 string,
@@ -528,6 +530,20 @@ struct NFAEngine(Engine):
             return (True, current_pos)
         else:
             return (False, str_i)
+
+    fn _get_children_list(
+        self, ast: ASTNode
+    ) -> List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]:
+        """Helper method to convert AST children to a List for _match_sequence compatibility.
+        """
+        var children_list = List[
+            ASTNode[MutableAnyOrigin], hint_trivial_type=True
+        ]()
+        for i in range(ast.get_children_len()):
+            var child = ast.get_child(i)
+            # Since get_child returns ASTNode[ImmutableAnyOrigin], we need to rebind to MutableAnyOrigin
+            children_list.append(rebind[ASTNode[MutableAnyOrigin]](child))
+        return children_list
 
     fn _match_sequence(
         self,
@@ -680,7 +696,7 @@ struct NFAEngine(Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match(string[pos], pos, len(string)):
+            if ast.is_match(String(string[pos]), pos, len(string)):
                 matched += 1
                 pos += 1
             else:
@@ -745,7 +761,9 @@ struct NFAEngine(Engine):
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
 
-            if ast.is_match(string[current_pos], current_pos, len(string)):
+            if ast.is_match(
+                String(string[current_pos]), current_pos, len(string)
+            ):
                 matches_count += 1
                 current_pos += 1
             else:
