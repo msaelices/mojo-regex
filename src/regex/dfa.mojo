@@ -19,6 +19,11 @@ from regex.optimizer import (
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
+# Pre-defined character sets for efficient lookup
+alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+alias DIGITS = "0123456789"
+
 
 fn expand_character_range(range_str: String) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
@@ -33,15 +38,47 @@ fn expand_character_range(range_str: String) -> String:
     if not range_str.startswith("[") or not range_str.endswith("]"):
         return range_str
 
+    # Handle common cases efficiently with pre-defined aliases
+    if range_str == "[a-z]":
+        return LOWERCASE_LETTERS
+    elif range_str == "[A-Z]":
+        return UPPERCASE_LETTERS
+    elif range_str == "[0-9]":
+        return DIGITS
+
     # Extract the inner part: [a-z] -> a-z
     var inner = range_str[1:-1]
-    var result = String("")
 
     # Handle negated ranges like [^a-z]
     var negated = inner.startswith("^")
     if negated:
         inner = inner[1:]
 
+    # For simple single ranges, use slicing from pre-defined sets
+    if len(inner) == 3 and inner[1] == "-":
+        var start_char = inner[0]
+        var end_char = inner[2]
+
+        # Handle lowercase letter ranges
+        if ord(start_char) >= ord("a") and ord(end_char) <= ord("z"):
+            var start_idx = ord(start_char) - ord("a")
+            var end_idx = ord(end_char) - ord("a") + 1
+            return LOWERCASE_LETTERS[start_idx:end_idx]
+
+        # Handle uppercase letter ranges
+        elif ord(start_char) >= ord("A") and ord(end_char) <= ord("Z"):
+            var start_idx = ord(start_char) - ord("A")
+            var end_idx = ord(end_char) - ord("A") + 1
+            return UPPERCASE_LETTERS[start_idx:end_idx]
+
+        # Handle digit ranges
+        elif ord(start_char) >= ord("0") and ord(end_char) <= ord("9"):
+            var start_idx = ord(start_char) - ord("0")
+            var end_idx = ord(end_char) - ord("0") + 1
+            return DIGITS[start_idx:end_idx]
+
+    # Fallback for complex cases
+    var result = String(capacity=len(inner) * 2)  # Pre-allocate enough space
     var i = 0
     while i < len(inner):
         if i + 2 < len(inner) and inner[i + 1] == "-":
