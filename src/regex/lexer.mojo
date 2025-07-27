@@ -47,7 +47,7 @@ fn scan(regex: String) raises -> List[Token]:
     var escape_found = False
 
     while i < len(regex):
-        ref ch = regex[i]
+        var ch = String(regex[i])
 
         if escape_found:
             if ch == "t":
@@ -78,7 +78,7 @@ fn scan(regex: String) raises -> List[Token]:
             tokens.append(LeftCurlyBrace())
             i += 1
             while i < len(regex):
-                ch = regex[i]
+                ch = String(regex[i])
                 if ch == ",":
                     tokens.append(Comma())
                 elif _is_digit(ch):
