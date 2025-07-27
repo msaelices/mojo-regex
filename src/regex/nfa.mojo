@@ -456,11 +456,9 @@ struct NFAEngine(Engine):
             )
 
         # Simple case: no quantifier on the group itself
-        var children_list = self._get_children_list(ast)
         var result = self._match_sequence(
-            children_list,
+            ast,
             0,
-            ast.get_children_len(),
             string,
             str_i,
             matches,
@@ -497,12 +495,10 @@ struct NFAEngine(Engine):
             max_matches = len(string) - str_i
 
         # Use regular greedy matching with conservative early termination
-        var children_list = self._get_children_list(ast)
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                children_list,
+                ast,
                 0,
-                ast.get_children_len(),
                 string,
                 current_pos,
                 matches,
@@ -531,25 +527,10 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
-    fn _get_children_list(
-        self, ast: ASTNode
-    ) -> List[ASTNode[MutableAnyOrigin], hint_trivial_type=True]:
-        """Helper method to convert AST children to a List for _match_sequence compatibility.
-        """
-        var children_list = List[
-            ASTNode[MutableAnyOrigin], hint_trivial_type=True
-        ]()
-        for i in range(ast.get_children_len()):
-            var child = ast.get_child(i)
-            # Since get_child returns ASTNode[ImmutableAnyOrigin], we need to rebind to MutableAnyOrigin
-            children_list.append(rebind[ASTNode[MutableAnyOrigin]](child))
-        return children_list
-
     fn _match_sequence(
         self,
-        children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
+        ast_parent: ASTNode,
         child_index: Int,
-        children_len: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -557,12 +538,13 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
+        var children_len = ast_parent.get_children_len()
         if child_index >= children_len:
             return (True, str_i)
 
         if child_index == children_len - 1:
             return self._match_node(
-                children[child_index],
+                ast_parent.get_child(child_index),
                 string,
                 str_i,
                 matches,
@@ -571,15 +553,14 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        ref first_child = children[child_index]
+        var first_child = ast_parent.get_child(child_index)
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
             return self._match_with_backtracking(
                 first_child,
-                children,
+                ast_parent,
                 child_index + 1,
-                children_len,
                 string,
                 str_i,
                 matches,
@@ -599,9 +580,8 @@ struct NFAEngine(Engine):
             if not result[0]:
                 return (False, str_i)
             return self._match_sequence(
-                children,
+                ast_parent,
                 child_index + 1,
-                children_len,
                 string,
                 result[1],
                 matches,
@@ -618,9 +598,8 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children: List[ASTNode[MutableAnyOrigin], hint_trivial_type=True],
+        ast_parent: ASTNode,
         remaining_index: Int,
-        children_len: Int,
         string: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
@@ -657,9 +636,8 @@ struct NFAEngine(Engine):
                     return (False, str_i)
                 # Try to match the remaining children
                 var result = self._match_sequence(
-                    children,
+                    ast_parent,
                     remaining_index,
-                    children_len,
                     string,
                     new_pos,
                     matches,
