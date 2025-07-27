@@ -20,6 +20,51 @@ alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
 
+fn expand_character_range(range_str: String) -> String:
+    """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
+
+    Args:
+        range_str: Range string like '[a-z]' or '[0-9]' or 'abcd'.
+
+    Returns:
+        Expanded character set string.
+    """
+    # If it's already expanded (doesn't contain '-' in brackets), return as is
+    if not range_str.startswith("[") or not range_str.endswith("]"):
+        return range_str
+
+    # Extract the inner part: [a-z] -> a-z
+    var inner = range_str[1:-1]
+    var result = String("")
+
+    # Handle negated ranges like [^a-z]
+    var negated = inner.startswith("^")
+    if negated:
+        inner = inner[1:]
+
+    var i = 0
+    while i < len(inner):
+        if i + 2 < len(inner) and inner[i + 1] == "-":
+            # Found a range like a-z
+            var start_char = inner[i]
+            var end_char = inner[i + 2]
+            var start_code = ord(start_char)
+            var end_code = ord(end_char)
+
+            # Add all characters in the range
+            for char_code in range(start_code, end_code + 1):
+                result += chr(char_code)
+            i += 3
+        else:
+            # Single character
+            result += inner[i]
+            i += 1
+
+    # TODO: Handle negated ranges properly if needed
+    # For now, just return the expanded positive range
+    return result
+
+
 struct SequentialPatternElement(Copyable, Movable):
     """Information about a single element in a sequential pattern."""
 
@@ -420,7 +465,7 @@ struct DFAEngine(Engine):
             if element.min_matches == 0:
                 # Optional element (e.g., [a-z]*)
                 if element_idx == 0:
-                    # First element is optional - start state can accept or transition
+                    # First element is optional - start state should not be accepting unless this is the only element
                     var start_state = DFAState(is_accepting=is_last_element)
                     self.states.append(start_state)
                     current_state_index = 0
@@ -447,7 +492,18 @@ struct DFAEngine(Engine):
                         element.positive_logic,
                     )
 
-                current_state_index = match_state_index
+                # For the first optional element, we need epsilon transitions to subsequent elements
+                # The current state should remain the start state so the next element can transition from it
+                if element_idx == 0:
+                    # Keep current_state_index as the start state for epsilon transitions to next elements
+                    # But we also track the match state for this element
+                    current_state_index = (
+                        0  # Start state index for epsilon transitions
+                    )
+                    # Store the match state index for potential transitions too (unused for now)
+                    var _ = match_state_index
+                else:
+                    current_state_index = match_state_index
 
             elif element.min_matches == 1:
                 # Required element with + or {1,n} quantifier
@@ -470,6 +526,20 @@ struct DFAEngine(Engine):
                     element.char_class,
                     element.positive_logic,
                 )
+
+                # If the previous element was optional (element_idx == 1 and current_state_index == 0),
+                # we also need to add transitions from the optional element's match state
+                if element_idx == 1 and current_state_index == 0:
+                    # The previous element was optional, add transitions from its match state too
+                    var prev_element = sequence_info.elements[0]
+                    if prev_element.min_matches == 0:
+                        # Add transitions from the optional element's match state (which should be state 1)
+                        self._add_character_class_transitions_with_logic(
+                            1,  # Match state of the optional element
+                            match_state_index,
+                            element.char_class,
+                            element.positive_logic,
+                        )
 
                 # Handle additional matches
                 if element.max_matches == -1:
@@ -932,8 +1002,12 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         var char_class, min_matches, max_matches, has_start, has_end, positive_logic = _extract_character_class_info(
             ast
         )
+        var char_class_str = String(
+            char_class.value()
+        ) if char_class else String("")
+        var expanded_char_class = expand_character_range(char_class_str)
         dfa.compile_character_class_with_logic(
-            String(char_class.value()) if char_class else String(""),
+            expanded_char_class,
             min_matches,
             max_matches,
             positive_logic,
@@ -1056,7 +1130,7 @@ fn _extract_character_class_info(
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
-        # Use the range value directly as character class
+        # Use the range value directly - expansion will be done when used
         char_class = class_node.get_value()
 
     return (
@@ -1155,9 +1229,10 @@ fn _extract_sequential_pattern_info(
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = String(
+                    var range_value = String(
                         element.get_value().value()
                     ) if element.get_value() else ""
+                    char_class = expand_character_range(range_value)
                 else:
                     continue  # Skip unknown elements
 
@@ -1243,9 +1318,10 @@ fn _extract_multi_class_sequence_info(
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = String(
+                    var range_value = String(
                         element.get_value().value()
                     ) if element.get_value() else ""
+                    char_class = expand_character_range(range_value)
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
                 elif element.type == WILDCARD:
