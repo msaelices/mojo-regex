@@ -55,20 +55,20 @@ struct Regex[origin: Origin](
         """Check if two Regex instances are not equal."""
         return not self.__eq__(other)
 
-    @always_inline
-    fn __copyinit__(out self, other: Self):
-        """Copy constructor for ASTNode."""
-        self.pattern = other.pattern
-        self.children_ptr = other.children_ptr
-        self.children_len = other.children_len
-        var call_location = __call_location()
-        print("Copying Regex:", self, "in ", call_location)
+    # @always_inline
+    # fn __copyinit__(out self, other: Self):
+    #     """Copy constructor for ASTNode."""
+    #     self.pattern = other.pattern
+    #     self.children_ptr = other.children_ptr
+    #     self.children_len = other.children_len
+    #     var call_location = __call_location()
+    #     print("Copying Regex:", self, "in ", call_location)
 
-    @always_inline
-    fn __del__(owned self):
-        """Destroy all the children and free its memory."""
-        var call_location = __call_location()
-        print("Deleting Regex:", self, "in ", call_location)
+    # @always_inline
+    # fn __del__(owned self):
+    #     """Destroy all the children and free its memory."""
+    #     var call_location = __call_location()
+    #     print("Deleting Regex:", self, "in ", call_location)
 
     @no_inline
     fn write_to[W: Writer, //](self, mut writer: W):
@@ -104,12 +104,12 @@ struct Regex[origin: Origin](
     @always_inline
     fn append_child(mut self, owned child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
-        print(
-            "Appending child to Regex at ",
-            __call_location(),
-            ": ",
-            child,
-        )
+        # print(
+        #     "Appending child to Regex at ",
+        #     __call_location(),
+        #     ": ",
+        #     child,
+        # )
         (self.children_ptr + self.children_len).init_pointee_move(child^)
         self.children_len += 1
 
@@ -218,11 +218,11 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             self.children_indexes[i] = children_indexes[i]
         self.children_len = len(children_indexes)
 
-    @always_inline
-    fn __del__(owned self):
-        """Destroy all the children and free its memory."""
-        var call_location = __call_location()
-        print("Deleting ASTNode:", self, "in ", call_location)
+    # @always_inline
+    # fn __del__(owned self):
+    #     """Destroy all the children and free its memory."""
+    #     var call_location = __call_location()
+    #     print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
     fn __copyinit__(out self, other: ASTNode[regex_origin]):

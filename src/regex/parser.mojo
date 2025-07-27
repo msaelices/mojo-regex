@@ -459,12 +459,4 @@ fn parse(pattern: String) raises -> ASTNode[ImmutableAnyOrigin]:
         children_indexes=List[UInt8](root_child_index),
     )
 
-    print("regex.get_children_len() count:", children_len)
-    for i in range(regex_ptr[].get_children_len()):
-        ref child = regex_ptr[].get_child(i)
-        print(
-            "Child",
-            i + 1,
-            String(child),
-        )
     return re_root
