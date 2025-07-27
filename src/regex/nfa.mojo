@@ -300,7 +300,7 @@ struct NFAEngine(Engine):
         if str_i >= len(string):
             return (False, str_i)
 
-        var ch = string[str_i]
+        var ch = String(string[str_i])
         if ch != "\n":
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
@@ -669,7 +669,7 @@ struct NFAEngine(Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match(string[pos], pos, len(string)):
+            if ast.is_match(String(string[pos]), pos, len(string)):
                 matched += 1
                 pos += 1
             else:
@@ -734,7 +734,9 @@ struct NFAEngine(Engine):
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
 
-            if ast.is_match(string[current_pos], current_pos, len(string)):
+            if ast.is_match(
+                String(string[current_pos]), current_pos, len(string)
+            ):
                 matches_count += 1
                 current_pos += 1
             else:
