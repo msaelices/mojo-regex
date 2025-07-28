@@ -333,9 +333,10 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
-            var ch_found = (
-                self.get_value() and self.get_value().value().find(value) != -1
-            )
+            var ch_found = False
+            if self.get_value():
+                var range_pattern = String(self.get_value().value())
+                ch_found = self._is_char_in_range(value, range_pattern)
             return not (
                 ch_found ^ self.positive_logic
             )  # positive_logic determines if it's [abc] or [^abc]
@@ -345,6 +346,44 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             return str_i == str_len
         else:
             return False
+
+    fn _is_char_in_range(self, ch: String, range_pattern: String) -> Bool:
+        """Check if a character is in a range pattern like '[a-z]' or 'abcxyz'.
+        """
+        # If the range_pattern starts with '[', it's the original pattern like "[a-z]"
+        # We need to parse it. Otherwise, it's already expanded like "abcdefghijklmnopqrstuvwxyz"
+        if range_pattern.startswith("["):
+            # Remove brackets and parse the range
+            var inner_pattern = range_pattern[1:-1]  # Remove [ and ]
+            return self._char_matches_range_syntax(ch, inner_pattern)
+        else:
+            # It's already expanded, just check if char is in the string
+            return range_pattern.find(ch) != -1
+
+    fn _char_matches_range_syntax(
+        self, ch: String, range_syntax: String
+    ) -> Bool:
+        """Check if a character matches range syntax like 'a-z' or 'abc'."""
+        var i = 0
+        # Skip negation character if present
+        if len(range_syntax) > 0 and range_syntax[0] == "^":
+            i = 1
+
+        while i < len(range_syntax):
+            # Check for range pattern like 'a-z'
+            if i + 2 < len(range_syntax) and range_syntax[i + 1] == "-":
+                var start_char = range_syntax[i]
+                var end_char = range_syntax[i + 2]
+                var ch_ord = ord(ch)
+                if ord(start_char) <= ch_ord <= ord(end_char):
+                    return True
+                i += 3  # Skip start, dash, and end
+            else:
+                # Single character match
+                if range_syntax[i] == ch:
+                    return True
+                i += 1
+        return False
 
     fn is_capturing(self) -> Bool:
         """Check if the node is capturing."""
