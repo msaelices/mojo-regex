@@ -279,7 +279,7 @@ struct NFAEngine(Engine):
         if str_i >= len(string):
             return (False, str_i)
 
-        var ch = string[str_i]
+        var ch = String(string[str_i])
         if ast.value == ch:
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
@@ -321,7 +321,7 @@ struct NFAEngine(Engine):
         if str_i >= len(string):
             return (False, str_i)
 
-        var ch = string[str_i]
+        var ch = String(string[str_i])
         if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
@@ -342,7 +342,7 @@ struct NFAEngine(Engine):
         if str_i >= len(string):
             return (False, str_i)
 
-        var ch = string[str_i]
+        var ch = String(string[str_i])
         if ZERO_CODE <= ord(ch) <= NINE_CODE:
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
@@ -363,7 +363,7 @@ struct NFAEngine(Engine):
         if str_i >= len(string):
             return (False, str_i)
 
-        var ch = string[str_i]
+        var ch = String(string[str_i])
         var ch_found = ast.value.find(ch) != -1
 
         if ch_found == ast.positive_logic:
