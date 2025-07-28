@@ -23,6 +23,7 @@ alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 alias DIGITS = "0123456789"
+alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
 fn expand_character_range(range_str: String) -> String:
@@ -45,6 +46,12 @@ fn expand_character_range(range_str: String) -> String:
         return UPPERCASE_LETTERS
     elif range_str == "[0-9]":
         return DIGITS
+    elif range_str == "[a-zA-Z0-9]":
+        # Common pattern for alphanumeric - return pre-computed string
+        return ALPHANUMERIC
+    elif range_str == "[a-zA-Z]":
+        # Common pattern for letters only
+        return LOWERCASE_LETTERS + UPPERCASE_LETTERS
 
     # Extract the inner part: [a-z] -> a-z
     var inner = range_str[1:-1]
@@ -77,8 +84,8 @@ fn expand_character_range(range_str: String) -> String:
             var end_idx = ord(end_char) - ord("0") + 1
             return String(DIGITS)[start_idx:end_idx]
 
-    # Fallback for complex cases
-    var result = String(capacity=len(inner) * 2)  # Pre-allocate enough space
+    # Fallback for complex cases - expand all ranges and characters
+    var result = String(capacity=256)  # Pre-allocate for worst case
     var i = 0
     while i < len(inner):
         if i + 2 < len(inner) and inner[i + 1] == "-":
@@ -97,8 +104,6 @@ fn expand_character_range(range_str: String) -> String:
             result += inner[i]
             i += 1
 
-    # TODO: Handle negated ranges properly if needed
-    # For now, just return the expanded positive range
     return result
 
 
@@ -705,27 +710,42 @@ struct DFAEngine(Engine):
 
         ref state = self.states[from_state]
 
+        # For very large character classes, use a more efficient approach
+        var char_class_len = len(char_class)
+
         if positive_logic:
             # Positive logic: [abc] - add transitions for characters in char_class
-            for i in range(len(char_class)):
-                var char_code = ord(char_class[i])
-                state.add_transition(char_code, to_state)
+            # For common patterns, use optimized handling
+            if char_class == ALPHANUMERIC and char_class_len == 62:
+                # Optimize for [a-zA-Z0-9] - add transitions in batches
+                # Add lowercase letters
+                for i in range(26):
+                    state.add_transition(ord("a") + i, to_state)
+                # Add uppercase letters
+                for i in range(26):
+                    state.add_transition(ord("A") + i, to_state)
+                # Add digits
+                for i in range(10):
+                    state.add_transition(ord("0") + i, to_state)
+            else:
+                # General case - iterate through each character
+                for i in range(char_class_len):
+                    var char_code = ord(char_class[i])
+                    state.add_transition(char_code, to_state)
         else:
             # Negative logic: [^abc] - add transitions for all characters NOT in char_class
-            # Create a lookup set for fast character checking
-            var char_set = List[Bool](capacity=256)
-            for _ in range(256):
-                char_set.append(False)
+            # Create a bitmap for fast lookup
+            var char_bitmap = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](0)
 
-            # Mark characters in char_class as True
-            for i in range(len(char_class)):
+            # Mark characters in char_class as 1 in bitmap
+            for i in range(char_class_len):
                 var char_code = ord(char_class[i])
-                if char_code >= 0 and char_code < 256:
-                    char_set[char_code] = True
+                if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
+                    char_bitmap[char_code] = 1
 
             # Add transitions for all characters NOT in the class
-            for char_code in range(256):
-                if not char_set[char_code]:
+            for char_code in range(DEFAULT_DFA_TRANSITIONS):
+                if char_bitmap[char_code] == 0:
                     state.add_transition(char_code, to_state)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
@@ -1292,7 +1312,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     Returns:
         True if pattern is a multi-character class sequence.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
 
     if ast.type != RE or ast.get_children_len() != 1:
         return False
@@ -1307,6 +1327,8 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         return False
 
     var char_class_count = 0
+    var literal_count = 0
+
     for i in range(child.get_children_len()):
         ref element = child.get_child(i)
         if (
@@ -1318,12 +1340,16 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         elif element.type == WILDCARD:
             # Wildcard can be considered a character class
             char_class_count += 1
+        elif element.type == ELEMENT and element.min == 1 and element.max == 1:
+            # Single literal characters are OK (like @ and . in email patterns)
+            literal_count += 1
         else:
-            # Non-character class element found
+            # Other types make it non-sequential
             return False
 
-    # Must be all character classes
-    return char_class_count == child.get_children_len()
+    # It's a multi-char sequence if it has at least 2 character classes
+    # and any number of single literals
+    return char_class_count >= 2
 
 
 fn _extract_multi_class_sequence_info(
@@ -1337,7 +1363,7 @@ fn _extract_multi_class_sequence_info(
     Returns:
         SequentialPatternInfo with details about each character class element.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
 
     var info = SequentialPatternInfo()
 
@@ -1364,6 +1390,11 @@ fn _extract_multi_class_sequence_info(
                 elif element.type == WILDCARD:
                     # Wildcard matches any character except newline
                     char_class = ALL_EXCEPT_NEWLINE
+                elif element.type == ELEMENT:
+                    # Single literal character (like @ or .)
+                    char_class = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
                 else:
                     continue  # Skip unknown elements
 

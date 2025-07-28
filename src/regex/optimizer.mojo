@@ -302,18 +302,33 @@ struct PatternAnalyzer:
         if ast.get_children_len() < 2:
             return False
 
-        # All children must be character classes (RANGE, DIGIT, SPACE)
+        # Check if it's mostly character classes with some literals
+        var char_class_count = 0
+        var literal_count = 0
+
         for i in range(ast.get_children_len()):
             var element = ast.get_child(i)
-            if not (
+            if (
                 element.type == RANGE
                 or element.type == DIGIT
                 or element.type == SPACE
                 or element.type == WILDCARD
             ):
+                char_class_count += 1
+            elif (
+                element.type == ELEMENT
+                and element.min == 1
+                and element.max == 1
+            ):
+                # Single literal characters are OK
+                literal_count += 1
+            else:
+                # Other types make it non-sequential
                 return False
 
-        return True
+        # It's a multi-char sequence if it has at least 2 character classes
+        # and any number of single literals (like @ and .)
+        return char_class_count >= 2
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
