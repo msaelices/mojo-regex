@@ -18,6 +18,8 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
+
 
 struct Regex[origin: Origin](
     Copyable, EqualityComparable, Movable, Stringable, Writable
@@ -196,7 +198,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         out self,
         regex_ptr: UnsafePointer[Regex[ImmutableAnyOrigin]],
         type: Int,
-        owned children_indexes: List[UInt8],
+        children_indexes: ChildrenIndexes,
         start_idx: Int,
         end_idx: Int,
         capturing: Bool = False,
@@ -587,7 +589,7 @@ fn OrNode[
     return ASTNode[regex_origin](
         type=OR,
         regex_ptr=regex_ptr,
-        children_indexes=List[UInt8](left_child_index, right_child_index),
+        children_indexes=ChildrenIndexes(left_child_index, right_child_index),
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
@@ -611,7 +613,7 @@ fn NotNode[
     return ASTNode[regex_origin](
         type=NOT,
         regex_ptr=regex_ptr,
-        children_indexes=List[UInt8](child_index),
+        children_indexes=ChildrenIndexes(child_index),
         start_idx=start_idx,
         end_idx=end_idx,
     )
@@ -622,7 +624,7 @@ fn GroupNode[
     regex_origin: ImmutableOrigin,
 ](
     ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
-    children_indexes: List[UInt8],
+    children_indexes: ChildrenIndexes,
     start_idx: Int,
     end_idx: Int,
     capturing: Bool = False,

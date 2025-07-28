@@ -22,6 +22,7 @@ from regex.tokens import (
 )
 from regex.ast import (
     ASTNode,
+    ChildrenIndexes,
     Regex,
     Element,
     WildcardElement,
@@ -119,7 +120,7 @@ fn parse_token_list[
     if len(tokens) == 0:
         var group_node = GroupNode[ImmutableAnyOrigin](
             regex=regex,
-            children_indexes=List[UInt8](),
+            children_indexes=ChildrenIndexes(),
             start_idx=0,
             end_idx=0,
             capturing=True,
@@ -147,7 +148,7 @@ fn parse_token_list[
             else:
                 var empty_group = GroupNode[ImmutableAnyOrigin](
                     regex=regex,
-                    children_indexes=List[UInt8](),
+                    children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
                     capturing=True,
@@ -162,7 +163,7 @@ fn parse_token_list[
             else:
                 var empty_group_2 = GroupNode[ImmutableAnyOrigin](
                     regex=regex,
-                    children_indexes=List[UInt8](),
+                    children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
                     capturing=True,
@@ -384,7 +385,7 @@ fn parse_token_list[
 
                 var group_node = GroupNode[ImmutableAnyOrigin](
                     regex=regex,
-                    children_indexes=List[UInt8](child_index),
+                    children_indexes=ChildrenIndexes(child_index),
                     start_idx=group_content_start_pos,
                     end_idx=paren_end_pos,
                     capturing=is_capturing,
@@ -399,7 +400,7 @@ fn parse_token_list[
         i += 1
 
     # Add all elements to regex.get_children_len() and collect indices
-    var children_indexes = List[UInt8](capacity=len(elements))
+    var children_indexes = ChildrenIndexes(capacity=len(elements))
     for ref element in elements:
         children_indexes.append(
             UInt8(regex.get_children_len() + 1)
@@ -456,7 +457,7 @@ fn parse(pattern: String) raises -> ASTNode[ImmutableAnyOrigin]:
         regex_ptr=regex_ptr,
         start_idx=0,
         end_idx=len(pattern),
-        children_indexes=List[UInt8](root_child_index),
+        children_indexes=ChildrenIndexes(root_child_index),
     )
 
     return re_root
