@@ -501,19 +501,30 @@ struct DFAEngine(Engine):
             var element = sequence_info.elements[element_idx]
             var is_last_element = element_idx == len(sequence_info.elements) - 1
 
+            # Check if all remaining elements are optional
+            var all_remaining_optional = True
+            for i in range(element_idx + 1, len(sequence_info.elements)):
+                if sequence_info.elements[i].min_matches > 0:
+                    all_remaining_optional = False
+                    break
+
             # For multi-character sequences, SIMD optimization is applied per character class
             # but not globally since we have multiple different character classes
 
             if element.min_matches == 0:
                 # Optional element (e.g., [a-z]*)
                 if element_idx == 0:
-                    # First element is optional - start state should not be accepting unless this is the only element
-                    var start_state = DFAState(is_accepting=is_last_element)
+                    # First element is optional - start state should be accepting if all elements are optional
+                    var start_state = DFAState(
+                        is_accepting=all_remaining_optional
+                    )
                     self.states.append(start_state)
                     current_state_index = 0
 
                 # Create state for matching this element
-                var match_state = DFAState(is_accepting=is_last_element)
+                var match_state = DFAState(
+                    is_accepting=is_last_element or all_remaining_optional
+                )
                 self.states.append(match_state)
                 var match_state_index = len(self.states) - 1
 
@@ -556,7 +567,8 @@ struct DFAEngine(Engine):
                     current_state_index = 0
 
                 # Create accepting state for this element
-                var is_accepting = is_last_element
+                # State is accepting if this is the last element OR all remaining elements are optional
+                var is_accepting = is_last_element or all_remaining_optional
                 var match_state = DFAState(is_accepting=is_accepting)
                 self.states.append(match_state)
                 var match_state_index = len(self.states) - 1
@@ -1083,6 +1095,12 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         dfa.compile_sequential_pattern(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
+    elif _is_mixed_sequential_pattern(ast):
+        # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
+        var sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        dfa.compile_multi_character_class_sequence(sequence_info)
+        dfa.has_start_anchor = sequence_info.has_start_anchor
+        dfa.has_end_anchor = sequence_info.has_end_anchor
     else:
         # Pattern too complex for current DFA implementation
         raise Error("Pattern too complex for current DFA implementation")
@@ -1407,3 +1425,60 @@ fn _extract_multi_class_sequence_info(
                 info.elements.append(pattern_element)
 
     return info^
+
+
+fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a mixed sequential pattern with optional literals.
+
+    Examples: [0-9]+\\.?[0-9]*, [a-z]+@[a-z]+\\.[a-z]+
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a mixed sequential pattern.
+    """
+    from regex.ast import RE, DIGIT, RANGE, GROUP, ELEMENT
+
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var child = ast.get_child(0)
+    if child.type != GROUP:
+        return False
+
+    # Must have at least 3 elements (char class, optional literal, char class)
+    if child.get_children_len() < 3:
+        return False
+
+    var has_char_class = False
+    var has_optional_literal = False
+
+    for i in range(child.get_children_len()):
+        ref element = child.get_child(i)
+
+        if element.type == RANGE or element.type == DIGIT:
+            has_char_class = True
+        elif element.type == ELEMENT:
+            # Check if it's an optional literal (min=0, max=1)
+            if element.min == 0 and element.max == 1:
+                has_optional_literal = True
+
+    # It's a mixed pattern if it has both character classes and optional literals
+    return has_char_class and has_optional_literal
+
+
+fn _extract_mixed_sequential_pattern_info(
+    ast: ASTNode[MutableAnyOrigin],
+) -> SequentialPatternInfo:
+    """Extract information about a mixed sequential pattern.
+
+    Args:
+        ast: AST node representing a mixed sequential pattern.
+
+    Returns:
+        SequentialPatternInfo with details about each element.
+    """
+    # For now, reuse the multi-class sequence extraction logic
+    # It already handles ELEMENT types correctly
+    return _extract_multi_class_sequence_info(ast)
