@@ -50,16 +50,15 @@ struct CharacterClassSIMD(Copyable, Movable):
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
 
-    fn contains(self, ch: String) -> Bool:
+    fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
 
         Args:
-            ch: Character to check.
+            char_code: Character code to check (0-255).
 
         Returns:
             True if character is in the class.
         """
-        var char_code = ord(ch)
         if char_code >= 0 and char_code < 256:
             return self.lookup_table[char_code] == 1
         return False
@@ -89,7 +88,7 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         # Handle remaining characters
         while pos < text_len:
-            if self.contains(text[pos]):
+            if self.contains(ord(text[pos])):
                 return pos
             pos += 1
 
@@ -115,7 +114,7 @@ struct CharacterClassSIMD(Copyable, Movable):
                 for j in range(width):
                     if chunk_matches[j]:
                         matches.append(pos + i + j)
-            elif self.contains(text[pos + i]):
+            elif self.contains(ord(text[pos + i])):
                 matches.append(pos + i)
 
         vectorize[closure, SIMD_WIDTH](text_len - pos)
@@ -142,7 +141,7 @@ struct CharacterClassSIMD(Copyable, Movable):
             if width != 1:
                 var matches = self._check_chunk_simd(text, pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
-            elif self.contains(text[pos + i]):
+            elif self.contains(ord(text[pos + i])):
                 count += 1
 
         vectorize[closure, SIMD_WIDTH](actual_end - pos)
@@ -299,7 +298,7 @@ struct SIMDStringSearch:
             return False
 
         for i in range(self.pattern_length):
-            if text[pos + i] != self.pattern[i]:
+            if String(text[pos + i]) != String(self.pattern[i]):
                 return False
 
         return True
@@ -396,7 +395,7 @@ fn simd_count_char(text: String, target_char: String) -> Int:
 
     # Handle remaining characters
     while pos < text_len:
-        if text[pos] == target_char:
+        if String(text[pos]) == target_char:
             count += 1
         pos += 1
 

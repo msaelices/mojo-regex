@@ -806,7 +806,7 @@ struct DFAEngine(Engine):
             last_accepting_pos = pos
 
         while pos < len(text):
-            var ch = text[pos]
+            var ch = String(text[pos])
             var char_code = ord(ch)
 
             if current_state >= len(self.states):
@@ -975,7 +975,7 @@ struct BoyerMoore:
             var j = m - 1
 
             # Compare pattern from right to left
-            while j >= 0 and self.pattern[j] == text[s + j]:
+            while j >= 0 and String(self.pattern[j]) == String(text[s + j]):
                 j -= 1
 
             if j < 0:
@@ -983,7 +983,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = ord(text[s + j])
+                var bad_char = ord(String(text[s + j]))
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 

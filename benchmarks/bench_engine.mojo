@@ -183,7 +183,8 @@ fn bench_match_all[
     fn call_fn() raises:
         for _ in range(10):  # Fewer iterations since findall is more expensive
             var results = findall(pattern, test_text)
-            keep(len(results))
+            var count = len(results)
+            keep(count)
 
     b.iter[call_fn]()
     keep(Bool(test_text))
@@ -198,14 +199,15 @@ fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
     var base_text = make_test_string[text_length // 2]()
     var emails = " user@example.com more text john@test.org "
     var email_text = base_text + emails + base_text + emails
-    var pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    alias pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
 
     @always_inline
     @parameter
     fn call_fn() raises:
         for _ in range(2):
             var results = findall(pattern, email_text)
-            keep(len(results))
+            var count = len(results)
+            keep(count)
 
     b.iter[call_fn]()
     keep(Bool(email_text))
@@ -218,14 +220,15 @@ fn bench_complex_number_extraction[text_length: Int](mut b: Bencher) raises:
     var number_text = (
         base_number_text + " 123 price 456.78 quantity 789 " + base_number_text
     )
-    var pattern = "[0-9]+\\.?[0-9]*"
+    alias pattern = "[0-9]+\\.?[0-9]*"
 
     @always_inline
     @parameter
     fn call_fn() raises:
         for _ in range(25):
             var results = findall(pattern, number_text)
-            keep(len(results))
+            var count = len(results)
+            keep(count)
 
     b.iter[call_fn]()
     keep(Bool(number_text))
