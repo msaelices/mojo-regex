@@ -27,7 +27,7 @@ struct Regex[origin: Origin](
     var pattern: String
     var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin],]
     var children_len: Int
-    """Immutable Regex struct for representing a regular expression pattern."""
+    """Regex struct for representing a regular expression pattern."""
 
     fn __init__(out self, ref [origin]pattern: String):
         """Initialize a Regex with a pattern."""
