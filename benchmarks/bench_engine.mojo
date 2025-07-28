@@ -199,7 +199,7 @@ fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
     var base_text = make_test_string[text_length // 2]()
     var emails = " user@example.com more text john@test.org "
     var email_text = base_text + emails + base_text + emails
-    alias pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+    alias pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}"
 
     @always_inline
     @parameter
@@ -220,7 +220,7 @@ fn bench_complex_number_extraction[text_length: Int](mut b: Bencher) raises:
     var number_text = (
         base_number_text + " 123 price 456.78 quantity 789 " + base_number_text
     )
-    alias pattern = "[0-9]+\\.?[0-9]*"
+    alias pattern = "[0-9]+[.]?[0-9]*"
 
     @always_inline
     @parameter
