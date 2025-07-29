@@ -168,7 +168,7 @@ def test_multiple_patterns():
         assert_equal(result.value().get_match_text(), pattern)
 
 
-def test_empty_pattern():
+fn test_empty_pattern() raises:
     """Test handling of empty patterns."""
     var regex = CompiledRegex("")
 
