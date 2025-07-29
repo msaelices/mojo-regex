@@ -891,8 +891,11 @@ struct DFAEngine(Engine):
             return matches
 
         var pos = 0
-        while pos <= len(text):
-            var match_result = self.match_next(text, pos)
+        var text_len = len(text)
+
+        while pos <= text_len:
+            # Try to match at current position directly
+            var match_result = self._try_match_at_position(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)
@@ -903,6 +906,7 @@ struct DFAEngine(Engine):
                 else:
                     pos = match_obj.end_idx
             else:
+                # No match at this position, try next
                 pos += 1
 
         return matches
