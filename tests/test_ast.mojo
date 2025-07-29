@@ -1,6 +1,7 @@
 from testing import assert_equal, assert_true, assert_false
 
 from regex.ast import (
+    ChildrenIndexes,
     Regex,
     ASTNode,
     Element,
@@ -183,7 +184,7 @@ fn test_GroupNode() raises:
     mut_regex.append_child(elem1)
     mut_regex.append_child(elem2)
 
-    var children_indexes = List[UInt8](1, 2)
+    var children_indexes = ChildrenIndexes(1, 2)
     var group = GroupNode[MutableAnyOrigin](
         regex,
         children_indexes=children_indexes,
@@ -206,7 +207,7 @@ fn test_GroupNode_default_name() raises:
     # Add child to mutable regex
     mut_regex.append_child(elem)
 
-    var children_indexes = List[UInt8](1)
+    var children_indexes = ChildrenIndexes(1)
     var group = GroupNode[MutableAnyOrigin](
         regex,
         children_indexes=children_indexes,
@@ -244,7 +245,7 @@ fn test_is_leaf() raises:
         start_idx=9,
         end_idx=12,
     )
-    var empty_children_indexes = List[UInt8]()
+    var empty_children_indexes = ChildrenIndexes()
     var group = GroupNode[MutableAnyOrigin](
         regex,
         children_indexes=empty_children_indexes,
