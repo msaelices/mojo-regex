@@ -18,11 +18,11 @@ def test_character_class_simd_basic():
     var char_class = CharacterClassSIMD("abc")
 
     # Test contains method
-    assert_true(char_class.contains("a"))
-    assert_true(char_class.contains("b"))
-    assert_true(char_class.contains("c"))
-    assert_false(char_class.contains("d"))
-    assert_false(char_class.contains("1"))
+    assert_true(char_class.contains(ord("a")))
+    assert_true(char_class.contains(ord("b")))
+    assert_true(char_class.contains(ord("c")))
+    assert_false(char_class.contains(ord("d")))
+    assert_false(char_class.contains(ord("1")))
 
 
 def test_character_class_simd_range():
@@ -30,14 +30,14 @@ def test_character_class_simd_range():
     var char_class = CharacterClassSIMD("a", "z")
 
     # Test range boundaries
-    assert_true(char_class.contains("a"))
-    assert_true(char_class.contains("z"))
-    assert_true(char_class.contains("m"))
+    assert_true(char_class.contains(ord("a")))
+    assert_true(char_class.contains(ord("z")))
+    assert_true(char_class.contains(ord("m")))
 
     # Test outside range
-    assert_false(char_class.contains("A"))
-    assert_false(char_class.contains("1"))
-    assert_false(char_class.contains("@"))
+    assert_false(char_class.contains(ord("A")))
+    assert_false(char_class.contains(ord("1")))
+    assert_false(char_class.contains(ord("@")))
 
 
 def test_character_class_find_first():
@@ -82,39 +82,39 @@ def test_ascii_lowercase():
     """Test predefined ASCII lowercase character class."""
     var lowercase = create_ascii_lowercase()
 
-    assert_true(lowercase.contains("a"))
-    assert_true(lowercase.contains("z"))
-    assert_true(lowercase.contains("m"))
+    assert_true(lowercase.contains(ord("a")))
+    assert_true(lowercase.contains(ord("z")))
+    assert_true(lowercase.contains(ord("m")))
 
-    assert_false(lowercase.contains("A"))
-    assert_false(lowercase.contains("1"))
-    assert_false(lowercase.contains("@"))
+    assert_false(lowercase.contains(ord("A")))
+    assert_false(lowercase.contains(ord("1")))
+    assert_false(lowercase.contains(ord("@")))
 
 
 def test_ascii_uppercase():
     """Test predefined ASCII uppercase character class."""
     var uppercase = create_ascii_uppercase()
 
-    assert_true(uppercase.contains("A"))
-    assert_true(uppercase.contains("Z"))
-    assert_true(uppercase.contains("M"))
+    assert_true(uppercase.contains(ord("A")))
+    assert_true(uppercase.contains(ord("Z")))
+    assert_true(uppercase.contains(ord("M")))
 
-    assert_false(uppercase.contains("a"))
-    assert_false(uppercase.contains("1"))
-    assert_false(uppercase.contains("@"))
+    assert_false(uppercase.contains(ord("a")))
+    assert_false(uppercase.contains(ord("1")))
+    assert_false(uppercase.contains(ord("@")))
 
 
 def test_ascii_digits():
     """Test predefined ASCII digits character class."""
     var digits = create_ascii_digits()
 
-    assert_true(digits.contains("0"))
-    assert_true(digits.contains("9"))
-    assert_true(digits.contains("5"))
+    assert_true(digits.contains(ord("0")))
+    assert_true(digits.contains(ord("9")))
+    assert_true(digits.contains(ord("5")))
 
-    assert_false(digits.contains("a"))
-    assert_false(digits.contains("A"))
-    assert_false(digits.contains("@"))
+    assert_false(digits.contains(ord("a")))
+    assert_false(digits.contains(ord("A")))
+    assert_false(digits.contains(ord("@")))
 
 
 def test_ascii_alphanumeric():
@@ -122,30 +122,30 @@ def test_ascii_alphanumeric():
     var alnum = create_ascii_alphanumeric()
 
     # Test letters
-    assert_true(alnum.contains("a"))
-    assert_true(alnum.contains("Z"))
+    assert_true(alnum.contains(ord("a")))
+    assert_true(alnum.contains(ord("Z")))
 
     # Test digits
-    assert_true(alnum.contains("0"))
-    assert_true(alnum.contains("9"))
+    assert_true(alnum.contains(ord("0")))
+    assert_true(alnum.contains(ord("9")))
 
     # Test non-alphanumeric
-    assert_false(alnum.contains("@"))
-    assert_false(alnum.contains(" "))
-    assert_false(alnum.contains("!"))
+    assert_false(alnum.contains(ord("@")))
+    assert_false(alnum.contains(ord(" ")))
+    assert_false(alnum.contains(ord("!")))
 
 
 def test_whitespace():
     """Test predefined whitespace character class."""
     var whitespace = create_whitespace()
 
-    assert_true(whitespace.contains(" "))
-    assert_true(whitespace.contains("\t"))
-    assert_true(whitespace.contains("\n"))
-    assert_true(whitespace.contains("\r"))
+    assert_true(whitespace.contains(ord(" ")))
+    assert_true(whitespace.contains(ord("\t")))
+    assert_true(whitespace.contains(ord("\n")))
+    assert_true(whitespace.contains(ord("\r")))
 
-    assert_false(whitespace.contains("a"))
-    assert_false(whitespace.contains("1"))
+    assert_false(whitespace.contains(ord("a")))
+    assert_false(whitespace.contains(ord("1")))
 
 
 def test_simd_string_search():
