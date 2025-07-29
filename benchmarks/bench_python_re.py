@@ -6,7 +6,6 @@ This mirrors the benchmarks/bench_engine.mojo file for direct comparison.
 
 import re
 import time
-import statistics
 from typing import Callable
 
 
@@ -21,50 +20,72 @@ class Benchmark:
     def __init__(self, num_repetitions: int = 5):
         self.num_repetitions = num_repetitions
         self.results = {}
+        self.iterations = {}
 
     def bench_function(
         self, name: str, fn: Callable[[], None], warmup_iterations: int = 3
     ):
         """Benchmark a function with warmup and multiple repetitions."""
-        print(f"Benchmarking: {name}")
-
-        # Warmup
+        # Warmup silently
         for _ in range(warmup_iterations):
             fn()
 
-        # Actual benchmarking
-        times = []
-        for _ in range(self.num_repetitions):
-            start_time = time.perf_counter()
+        # Determine target runtime and calculate iterations
+        target_runtime = 100_000_000  # 100ms target
+
+        # Run the actual benchmark
+        total_time = 0
+        actual_iterations = 0
+
+        while total_time < target_runtime and actual_iterations < 100_000:
+            start_time = time.perf_counter_ns()
             fn()
-            end_time = time.perf_counter()
-            times.append(end_time - start_time)
+            end_time = time.perf_counter_ns()
+            fn_time = end_time - start_time
+            # print(f"Function {name} took {fn_time} ns")
+            total_time += fn_time
+            actual_iterations += 1
 
-        # Calculate statistics
-        mean_time = statistics.mean(times)
-        min_time = min(times)
-        max_time = max(times)
+        # Calculate mean time per run
+        mean_time = total_time / actual_iterations
 
-        self.results[name] = {
-            "mean": mean_time,
-            "min": min_time,
-            "max": max_time,
-            "times": times,
+        # Get internal iteration count for accurate per-operation timing
+        iterations_map = {
+            "literal_match": 100,
+            "wildcard_match": 50,
+            "range_": 50,
+            "anchor_": 100,
+            "alternation_": 50,
+            "group_": 50,
+            "match_all_": 10,
+            "complex_email": 2,
+            "complex_number": 25,
+            "simd_": 10,
         }
 
-        print(
-            f"  Mean: {mean_time * 1000:.3f}ms, Min: {min_time * 1000:.3f}ms, Max: {max_time * 1000:.3f}ms"
-        )
+        internal_iterations = 1
+        for prefix, iters in iterations_map.items():
+            if name.startswith(prefix):
+                internal_iterations = iters
+                break
+
+        # Store results
+        self.results[name] = mean_time / internal_iterations
+        self.iterations[name] = actual_iterations * internal_iterations
 
     def dump_report(self):
-        """Print summary report of all benchmarks."""
-        print("\n" + "=" * 60)
-        print("BENCHMARK SUMMARY REPORT")
-        print("=" * 60)
-        for name, stats in self.results.items():
-            print(
-                f"{name:30} | {stats['mean'] * 1000:8.3f}ms ± {statistics.stdev(stats['times']) * 1000:6.3f}ms"
-            )
+        """Print summary report of all benchmarks in Mojo format."""
+        print("\n=== Benchmark Results ===")
+        print("| name                      | met (ms)              | iters  |")
+        print("|---------------------------|-----------------------|--------|")
+
+        for name in self.results:
+            # Format time in milliseconds with proper precision
+            time_ms = self.results[name] / 1000
+            iters = self.iterations[name]
+
+            # Right-align values to match Mojo format
+            print(f"| {name:<25} | {time_ms:>21.17f} | {iters:>6} |")
 
 
 # ===-----------------------------------------------------------------------===#
@@ -278,11 +299,6 @@ def bench_simd_heavy_filtering(test_text: str, pattern: str) -> Callable[[], Non
 
 def main():
     """Run all benchmarks and display results."""
-    print("Python RE Module Benchmark Suite")
-    print("=" * 50)
-    print(f"Python version: {re.__doc__}")
-    print()
-
     m = Benchmark(num_repetitions=5)
 
     # Pre-create test strings to avoid measurement overhead
@@ -303,31 +319,28 @@ def main():
     )
 
     # Basic literal matching
-    print("=== Literal Matching Benchmarks ===")
     m.bench_function(
         "literal_match_short",
         bench_literal_match(
             text_1000,
-            "abcdefghijklmn",
+            "hello",
         ),
     )
     m.bench_function(
         "literal_match_long",
         bench_literal_match(
             text_10000,
-            "abcdefghijklmn",
+            "hello",
         ),
     )
 
     # Wildcard and quantifiers
-    print("\n=== Wildcard and Quantifier Benchmarks ===")
     m.bench_function("wildcard_match_any", bench_wildcard_match(text_1000, ".*"))
     m.bench_function("quantifier_zero_or_more", bench_wildcard_match(text_1000, "a*"))
     m.bench_function("quantifier_one_or_more", bench_wildcard_match(text_1000, "a+"))
     m.bench_function("quantifier_zero_or_one", bench_wildcard_match(text_1000, "a?"))
 
     # Character ranges
-    print("\n=== Character Range Benchmarks ===")
     m.bench_function("range_lowercase", bench_range_match(text_range_1000, "[a-z]+"))
     m.bench_function("range_digits", bench_range_match(text_range_1000, "[0-9]+"))
     m.bench_function(
@@ -335,12 +348,10 @@ def main():
     )
 
     # Anchors
-    print("\n=== Anchor Benchmarks ===")
     m.bench_function("anchor_start", bench_anchor_match(text_1000, "^abc"))
     m.bench_function("anchor_end", bench_anchor_match(text_1000, "xyz$"))
 
     # Alternation
-    print("\n=== Alternation Benchmarks ===")
     m.bench_function(
         "alternation_simple", bench_alternation_match(text_alternation_1000, "a|b|c")
     )
@@ -350,24 +361,20 @@ def main():
     )
 
     # Groups
-    print("\n=== Group Benchmarks ===")
     m.bench_function("group_quantified", bench_group_match(text_group_1000, "(abc)+"))
     m.bench_function("group_alternation", bench_group_match(text_group_1000, "(a|b)*"))
 
     # Global matching (unique to our implementation)
-    print("\n=== Global Matching Benchmarks ===")
     m.bench_function("match_all_simple", bench_match_all(text_1000, "a"))
     m.bench_function("match_all_pattern", bench_match_all(text_1000, "[a-z]+"))
 
     # Complex real-world patterns
-    print("\n=== Complex Pattern Benchmarks ===")
     m.bench_function("complex_email_extraction", bench_complex_email_match(email_text))
     m.bench_function(
         "complex_number_extraction", bench_complex_number_extraction(number_text)
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit in Mojo comparison)
-    print("\n=== SIMD-Optimized Character Filtering Benchmarks ===")
     large_mixed_text = make_mixed_content_text(10000)
     xlarge_mixed_text = make_mixed_content_text(50000)
 
@@ -390,13 +397,6 @@ def main():
 
     # Results summary
     m.dump_report()
-
-    print("\nNote: This benchmark uses Python's re module")
-    print("for optimal performance comparison with the Mojo regex implementation.")
-    print("Run the Mojo benchmark with: pixi run mojo benchmarks/bench_engine.mojo")
-    print(
-        "Run the Mojo SIMD comparison with: pixi run mojo benchmarks/comparative_benchmark.mojo"
-    )
 
 
 if __name__ == "__main__":

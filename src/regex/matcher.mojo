@@ -51,7 +51,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
 
     var engine: DFAEngine
 
-    fn __init__(out self, owned ast: ASTNode) raises:
+    fn __init__(out self, owned ast: ASTNode[MutableAnyOrigin]) raises:
         """Initialize DFA matcher by compiling the AST.
 
         Args:
@@ -86,9 +86,9 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """NFA-based matcher using the existing regex engine."""
 
     var engine: NFAEngine
-    var ast: ASTNode
+    var ast: ASTNode[MutableAnyOrigin]
 
-    fn __init__(out self, ast: ASTNode, pattern: String):
+    fn __init__(out self, ast: ASTNode[MutableAnyOrigin], pattern: String):
         """Initialize NFA matcher with the existing engine.
 
         Args:

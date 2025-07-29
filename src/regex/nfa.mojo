@@ -1,4 +1,6 @@
-from regex.ast import ASTNode, RENode
+from memory import UnsafePointer
+
+from regex.ast import ASTNode
 from regex.constants import ZERO_CODE, NINE_CODE
 from regex.engine import Engine
 from regex.matching import Match
@@ -10,8 +12,8 @@ struct NFAEngine(Engine):
 
     var pattern: String
     var prev_re: String
-    var prev_ast: Optional[ASTNode]
-    var regex: Optional[ASTNode]
+    var prev_ast: Optional[ASTNode[MutableAnyOrigin]]
+    var regex: Optional[ASTNode[MutableAnyOrigin]]
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -50,7 +52,7 @@ struct NFAEngine(Engine):
             matched.
         """
         # Parse the regex if it's different from the cached one
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
         elif self.regex:
@@ -110,7 +112,7 @@ struct NFAEngine(Engine):
         """
         var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -152,7 +154,7 @@ struct NFAEngine(Engine):
         """
         var matches = List[Match, hint_trivial_type=True]()
         var str_i = start
-        var ast: ASTNode
+        var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -280,7 +282,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = String(string[str_i])
-        if ast.value == ch:
+        if ast.get_value() and ast.get_value().value() == ch:
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
             )
@@ -364,7 +366,11 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = String(string[str_i])
-        var ch_found = ast.value.find(ch) != -1
+        var ch_found = False
+
+        if ast.get_value():
+            var range_pattern = String(ast.get_value().value())
+            ch_found = ast._is_char_in_range(ch, range_pattern)
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -401,12 +407,12 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
-        if len(ast.children) < 2:
+        if ast.get_children_len() < 2:
             return (False, str_i)
 
         # Try left branch first
         var left_result = self._match_node(
-            ast.children[0],
+            ast.get_child(0),
             string,
             str_i,
             matches,
@@ -418,7 +424,7 @@ struct NFAEngine(Engine):
 
         # If left fails, try right branch
         var right_result = self._match_node(
-            ast.children[1],
+            ast.get_child(1),
             string,
             str_i,
             matches,
@@ -453,7 +459,7 @@ struct NFAEngine(Engine):
 
         # Simple case: no quantifier on the group itself
         var result = self._match_sequence(
-            ast.children,
+            ast,
             0,
             string,
             str_i,
@@ -493,7 +499,7 @@ struct NFAEngine(Engine):
         # Use regular greedy matching with conservative early termination
         while group_matches < max_matches and current_pos <= len(string):
             var group_result = self._match_sequence(
-                ast.children,
+                ast,
                 0,
                 string,
                 current_pos,
@@ -525,7 +531,7 @@ struct NFAEngine(Engine):
 
     fn _match_sequence(
         self,
-        children: List[ASTNode],
+        ast_parent: ASTNode,
         child_index: Int,
         string: String,
         str_i: Int,
@@ -534,12 +540,13 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
-        if child_index >= len(children):
+        var children_len = ast_parent.get_children_len()
+        if child_index >= children_len:
             return (True, str_i)
 
-        if child_index == len(children) - 1:
+        if child_index == children_len - 1:
             return self._match_node(
-                children[child_index],
+                ast_parent.get_child(child_index),
                 string,
                 str_i,
                 matches,
@@ -548,13 +555,13 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        ref first_child = children[child_index]
+        var first_child = ast_parent.get_child(child_index)
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
             return self._match_with_backtracking(
                 first_child,
-                children,
+                ast_parent,
                 child_index + 1,
                 string,
                 str_i,
@@ -575,7 +582,7 @@ struct NFAEngine(Engine):
             if not result[0]:
                 return (False, str_i)
             return self._match_sequence(
-                children,
+                ast_parent,
                 child_index + 1,
                 string,
                 result[1],
@@ -593,7 +600,7 @@ struct NFAEngine(Engine):
     fn _match_with_backtracking(
         self,
         quantified_node: ASTNode,
-        children: List[ASTNode],
+        ast_parent: ASTNode,
         remaining_index: Int,
         string: String,
         str_i: Int,
@@ -631,7 +638,7 @@ struct NFAEngine(Engine):
                     return (False, str_i)
                 # Try to match the remaining children
                 var result = self._match_sequence(
-                    children,
+                    ast_parent,
                     remaining_index,
                     string,
                     new_pos,
@@ -690,11 +697,11 @@ struct NFAEngine(Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
-        if len(ast.children) == 0:
+        if not ast.has_children():
             return (True, str_i)
 
         return self._match_node(
-            ast.children[0],
+            ast.get_child(0),
             string,
             str_i,
             matches,

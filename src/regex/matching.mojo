@@ -25,3 +25,7 @@ struct Match(Copyable, Movable):
     fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
         """Returns the text that was matched."""
         return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
+
+    fn get_match_string(self) -> String:
+        """Returns the text that was matched as a String."""
+        return String(self.get_match_text())

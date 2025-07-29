@@ -51,63 +51,109 @@ fn scan(regex: String) raises -> List[Token]:
 
         if escape_found:
             if ch == "t":
-                tokens.append(ElementToken(char="\t"))
+                var token = ElementToken(char="\t")
+                token.start_pos = i - 1  # -1 because escape char is at i-1
+                tokens.append(token)
             elif ch == "s":
-                tokens.append(SpaceToken(char=ch))
+                var token = SpaceToken(char=ch)
+                token.start_pos = i - 1  # -1 because escape char is at i-1
+                tokens.append(token)
             elif ch == "d":
-                tokens.append(DigitToken(char=ch))
+                var token = DigitToken(char=ch)
+                token.start_pos = i - 1  # -1 because escape char is at i-1
+                tokens.append(token)
             else:
-                tokens.append(ElementToken(char=ch))
+                var token = ElementToken(char=ch)
+                token.start_pos = i - 1  # -1 because escape char is at i-1
+                tokens.append(token)
         elif ch == "\\":
             escape_found = True
             i += 1
             continue
         elif ch == ".":
-            tokens.append(Wildcard())
+            var token = Wildcard()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "(":
-            tokens.append(LeftParenthesis())
+            var token = LeftParenthesis()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == ")":
-            tokens.append(RightParenthesis())
+            var token = RightParenthesis()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "[":
-            tokens.append(LeftBracket())
+            var token = LeftBracket()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "-":
-            tokens.append(Dash())
+            var token = Dash()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "]":
-            tokens.append(RightBracket())
+            var token = RightBracket()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "{":
-            tokens.append(LeftCurlyBrace())
+            var token = LeftCurlyBrace()
+            token.start_pos = i
+            tokens.append(token)
             i += 1
             while i < len(regex):
                 ch = String(regex[i])
                 if ch == ",":
-                    tokens.append(Comma())
+                    var comma_token = Comma()
+                    comma_token.start_pos = i
+                    tokens.append(comma_token)
                 elif _is_digit(ch):
-                    tokens.append(ElementToken(char=ch))
+                    var digit_token = ElementToken(char=ch)
+                    digit_token.start_pos = i
+                    tokens.append(digit_token)
                 elif ch == "}":
-                    tokens.append(RightCurlyBrace())
+                    var brace_token = RightCurlyBrace()
+                    brace_token.start_pos = i
+                    tokens.append(brace_token)
                     break
                 else:
                     raise Error("Bad token at index " + String(i) + ".")
                 i += 1
         elif ch == "^":
             if i == 0:
-                tokens.append(Start())
+                var token = Start()
+                token.start_pos = i
+                tokens.append(token)
             else:
-                tokens.append(Circumflex())
+                var token = Circumflex()
+                token.start_pos = i
+                tokens.append(token)
         elif ch == "$":
-            tokens.append(End())
+            var token = End()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "?":
-            tokens.append(QuestionMark())
+            var token = QuestionMark()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "*":
-            tokens.append(Asterisk())
+            var token = Asterisk()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "+":
-            tokens.append(Plus())
+            var token = Plus()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "|":
-            tokens.append(VerticalBar())
+            var token = VerticalBar()
+            token.start_pos = i
+            tokens.append(token)
         elif ch == "}":
-            tokens.append(RightCurlyBrace())
+            var token = RightCurlyBrace()
+            token.start_pos = i
+            tokens.append(token)
         else:
-            tokens.append(ElementToken(char=ch))
+            var token = ElementToken(char=ch)
+            token.start_pos = i
+            tokens.append(token)
 
         escape_found = False
         i += 1

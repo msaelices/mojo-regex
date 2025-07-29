@@ -22,7 +22,8 @@ from regex.tokens import (
 )
 from regex.ast import (
     ASTNode,
-    RENode,
+    ChildrenIndexes,
+    Regex,
     Element,
     WildcardElement,
     SpaceElement,
@@ -46,9 +47,9 @@ from regex.ast import (
 
 
 @always_inline
-fn check_for_quantifiers(
-    mut i: Int, mut elem: ASTNode, read tokens: List[Token]
-) raises:
+fn check_for_quantifiers[
+    regex_origin: ImmutableOrigin
+](mut i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]) raises:
     """Check for quantifiers after an element and set min/max accordingly."""
     var next_token = tokens[i + 1]
     if next_token.type == Token.ASTERISK:
@@ -108,11 +109,24 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
-fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
+fn parse_token_list[
+    regex_origin: Origin[mut=True]
+](
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+    owned tokens: List[Token],
+) raises -> ASTNode[MutableAnyOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
-        return GroupNode(List[ASTNode](), True, "", 0)
+        var group_node = GroupNode[ImmutableAnyOrigin](
+            regex=regex,
+            children_indexes=ChildrenIndexes(),
+            start_idx=0,
+            end_idx=0,
+            capturing=True,
+            group_id=0,
+        )
+        return group_node
 
     # Handle OR at the top level by finding the first OR token outside of groups
     var paren_depth = 0
@@ -127,52 +141,147 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             var right_tokens = tokens[k + 1 :]
 
             # Parse both sides
-            var left_ast = parse_token_list(left_tokens^) if len(
-                left_tokens
-            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
-            var right_ast = parse_token_list(right_tokens^) if len(
-                right_tokens
-            ) > 0 else GroupNode(List[ASTNode](), True, "", 0)
+            var left_ast: ASTNode[MutableAnyOrigin]
+            if len(left_tokens) > 0:
+                var left_result = parse_token_list(regex, left_tokens^)
+                left_ast = rebind[ASTNode[MutableAnyOrigin]](left_result)
+            else:
+                var empty_group = GroupNode[ImmutableAnyOrigin](
+                    regex=regex,
+                    children_indexes=ChildrenIndexes(),
+                    start_idx=0,
+                    end_idx=0,
+                    capturing=True,
+                    group_id=0,
+                )
+                left_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group)
 
-            return OrNode(left_ast, right_ast)
+            var right_ast: ASTNode[MutableAnyOrigin]
+            if len(right_tokens) > 0:
+                var right_result = parse_token_list(regex, right_tokens^)
+                right_ast = rebind[ASTNode[MutableAnyOrigin]](right_result)
+            else:
+                var empty_group_2 = GroupNode[ImmutableAnyOrigin](
+                    regex=regex,
+                    children_indexes=ChildrenIndexes(),
+                    start_idx=0,
+                    end_idx=0,
+                    capturing=True,
+                    group_id=0,
+                )
+                right_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group_2)
+
+            # Add children to regex and get their indices
+            var left_index = UInt8(
+                regex.get_children_len() + 1
+            )  # +1 because we use 1-based indexing
+            regex.append_child(left_ast)
+            var right_index = UInt8(
+                regex.get_children_len() + 1
+            )  # +1 because we use 1-based indexing
+            regex.append_child(right_ast)
+
+            var or_node = OrNode[ImmutableAnyOrigin](
+                regex=regex,
+                left_child_index=left_index,
+                right_child_index=right_index,
+                start_idx=0,
+                end_idx=len(regex.pattern),
+            )
+            return or_node
+
+    # Validate tokens for unescaped closing brackets and parentheses
+    var bracket_depth = 0
+    var paren_depth_validation = 0
+    for validation_i in range(len(tokens)):
+        var validation_token = tokens[validation_i]
+        if validation_token.type == Token.LEFTBRACKET:
+            bracket_depth += 1
+        elif validation_token.type == Token.RIGHTBRACKET:
+            bracket_depth -= 1
+            if bracket_depth < 0:
+                raise Error(
+                    "Unescaped closing bracket ']' at position "
+                    + String(validation_token.start_pos)
+                )
+        elif validation_token.type == Token.LEFTPARENTHESIS:
+            paren_depth_validation += 1
+        elif validation_token.type == Token.RIGHTPARENTHESIS:
+            paren_depth_validation -= 1
+            if paren_depth_validation < 0:
+                raise Error(
+                    "Unescaped closing parenthesis ')' at position "
+                    + String(validation_token.start_pos)
+                )
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode](capacity=len(tokens))
+    var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+        capacity=len(tokens)
+    )
     var i = 0
 
     while i < len(tokens):
         var token = tokens[i]
 
         if token.type == Token.ELEMENT:
-            var elem = Element(token.char)
+            var elem = Element[regex_origin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + len(token.char),
+            )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
         elif token.type == Token.WILDCARD:
-            var elem = WildcardElement()
+            var elem = WildcardElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
+            )
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
         elif token.type == Token.SPACE:
-            var elem = SpaceElement()
+            var elem = SpaceElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Space tokens like \s are 2 characters
+            )
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
         elif token.type == Token.DIGIT:
-            var elem = DigitElement()
+            var elem = DigitElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Digit tokens like \d are 2 characters
+            )
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
         elif token.type == Token.START:
-            elements.append(StartElement())
+            var start_elem = StartElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
+            )
+            elements.append(start_elem^)
         elif token.type == Token.END:
-            elements.append(EndElement())
+            var end_elem = EndElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
+            )
+            elements.append(end_elem^)
         elif token.type == Token.LEFTBRACKET:
             # Handle character ranges
+            var bracket_start_pos = token.start_pos
             i += 1
             var range_str = String("")
             var positive_logic = True
@@ -205,15 +314,25 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             if i >= len(tokens):
                 raise Error("Missing closing ']'.")
 
-            var range_elem = RangeElement(range_str, positive_logic)
+            # Calculate proper end position - should be after the closing bracket
+            var bracket_end_pos = tokens[i].start_pos + 1
+
+            var range_elem = RangeElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=bracket_start_pos,
+                end_idx=bracket_end_pos,
+                is_positive_logic=positive_logic,
+            )
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, range_elem, tokens^)
-            elements.append(range_elem)
+                check_for_quantifiers[ImmutableAnyOrigin](i, range_elem, tokens)
+            elements.append(range_elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
+            var paren_start_pos = token.start_pos
             i += 1
             var is_capturing = True
+            var group_content_start_pos = paren_start_pos + 1
 
             # Check if this is a non-capturing group (?:...)
             if (
@@ -224,6 +343,7 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             ):
                 is_capturing = False
                 i += 2  # Skip ? and :
+                group_content_start_pos = paren_start_pos + 3  # After (?:
 
             var group_tokens = List[Token](capacity=len(tokens) - i)
             var paren_count = 1
@@ -243,195 +363,101 @@ fn parse_token_list(owned tokens: List[Token]) raises -> ASTNode:
             if paren_count > 0:
                 raise Error("Missing closing parenthesis ')'.")
 
+            # Calculate proper end position - should be just before the closing parenthesis
+            var paren_end_pos = tokens[i].start_pos
+
             # Recursively parse the tokens inside the group
-            var group_ast = parse_token_list(group_tokens)
-            var group: ASTNode
+            var group_ast = parse_token_list(regex, group_tokens^)
+            var group: ASTNode[MutableAnyOrigin]
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
-                group = group_ast
+                group = rebind[ASTNode[MutableAnyOrigin]](group_ast)
                 group.capturing = is_capturing
+                group.start_idx = group_content_start_pos
+                group.end_idx = paren_end_pos
             else:
-                # Otherwise wrap in a group
-                group = GroupNode([group_ast], is_capturing, "", 0)
+                # Otherwise wrap in a group - add to regex.get_children_len() and create group node
+                var group_ast_mut = rebind[ASTNode[MutableAnyOrigin]](group_ast)
+                var child_index = UInt8(
+                    regex.get_children_len() + 1
+                )  # +1 because we use 1-based indexing
+                regex.append_child(group_ast_mut^)
+
+                var group_node = GroupNode[ImmutableAnyOrigin](
+                    regex=regex,
+                    children_indexes=ChildrenIndexes(child_index),
+                    start_idx=group_content_start_pos,
+                    end_idx=paren_end_pos,
+                    capturing=is_capturing,
+                    group_id=0,
+                )
+                group = rebind[ASTNode[MutableAnyOrigin]](group_node)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
-                check_for_quantifiers(i, group, tokens)
+                check_for_quantifiers[MutableAnyOrigin](i, group, tokens)
             elements.append(group)
 
         i += 1
 
-    return GroupNode(elements^, True, "", 0)
+    # Add all elements to regex.get_children_len() and collect indices
+    var children_indexes = ChildrenIndexes(capacity=len(elements))
+    for ref element in elements:
+        children_indexes.append(
+            UInt8(regex.get_children_len() + 1)
+        )  # +1 because we use 1-based indexing
+        regex.append_child(element)
+
+    var final_group = GroupNode[ImmutableAnyOrigin](
+        regex=regex,
+        children_indexes=children_indexes,
+        start_idx=0,
+        end_idx=len(regex.pattern),
+        capturing=True,
+        group_id=0,
+    )
+    return final_group^
 
 
-fn parse(regex: String) raises -> ASTNode:
+fn parse(pattern: String) raises -> ASTNode[ImmutableAnyOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
     If the regex contains errors raises an Exception.
 
     Args:
-        regex: A regular expression.
+        pattern: A regular expression pattern string.
 
     Returns:
         The root node of the regular expression's AST.
     """
-    var tokens = scan(regex)
-    if len(tokens) == 0:
-        # Empty pattern - create an empty RE node
-        return ASTNode(RE)
+    # Create a persistent Regex object to hold the pattern and children
+    # Allocate on heap to ensure it survives function return
+    var regex_ptr = UnsafePointer[Regex[ImmutableAnyOrigin]].alloc(1)
+    regex_ptr.init_pointee_move(Regex[ImmutableAnyOrigin](pattern))
 
-    # Simple implementation for basic parsing
-    var elements = List[ASTNode](capacity=len(tokens))
-    var i = 0
+    # Tokenize the pattern
+    var tokens = scan(pattern)
 
-    while i < len(tokens):
-        var token = tokens[i]
+    # Use parse_token_list to do the actual parsing
+    var parsed_ast = parse_token_list[MutableAnyOrigin](regex_ptr[], tokens^)
 
-        if token.type == Token.START:
-            elements.append(StartElement())
-        elif token.type == Token.END:
-            elements.append(EndElement())
-        elif token.type == Token.ELEMENT:
-            var elem = Element(token.char)
-            # Check for quantifiers
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
-        elif token.type == Token.WILDCARD:
-            var elem = WildcardElement()
-            # Check for quantifiers
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
-        elif token.type == Token.SPACE:
-            var elem = SpaceElement()
-            # Check for quantifiers
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
-        elif token.type == Token.DIGIT:
-            var elem = DigitElement()
-            # Check for quantifiers
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, elem, tokens)
-            elements.append(elem)
-        elif token.type == Token.LEFTBRACKET:
-            # Simple range parsing
-            i += 1
-            var range_str = String("")
-            var positive_logic = True
+    var children_len = regex_ptr[].get_children_len()
 
-            if i < len(tokens) and (
-                tokens[i].type == Token.NOTTOKEN
-                or tokens[i].type == Token.CIRCUMFLEX
-            ):
-                positive_logic = False
-                i += 1
+    # Create a RE root node that wraps the parsed result
+    # The tests expect the root to be of type RE with a GROUP child
+    var parsed_ast_immutable = rebind[ASTNode[ImmutableAnyOrigin]](parsed_ast)
+    var root_child_index = UInt8(
+        children_len + 1
+    )  # +1 because we use 1-based indexing
+    regex_ptr[].append_child(parsed_ast_immutable)
 
-            while i < len(tokens) and tokens[i].type != Token.RIGHTBRACKET:
-                var current_token = tokens[i]
-                # Check for range pattern like 'a-z'
-                if (
-                    i + 2 < len(tokens)
-                    and tokens[i + 1].type == Token.DASH
-                    and tokens[i + 2].type == Token.ELEMENT
-                ):
-                    # We have a range like 'a-z'
-                    var start_char = current_token.char
-                    var end_char = tokens[i + 2].char
-                    range_str += get_range_str(start_char, end_char)
-                    i += 3  # Skip start, dash, and end
-                else:
-                    # Single character
-                    range_str += current_token.char
-                    i += 1
+    # Use the heap-allocated regex pointer directly
+    var re_root = ASTNode[ImmutableAnyOrigin](
+        type=RE,
+        regex_ptr=regex_ptr,
+        start_idx=0,
+        end_idx=len(pattern),
+        children_indexes=ChildrenIndexes(root_child_index),
+    )
 
-            if i >= len(tokens):
-                raise Error("Missing closing ']'.")
-
-            var range_elem = RangeElement(range_str, positive_logic)
-            # Check for quantifiers after the range
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, range_elem, tokens)
-            elements.append(range_elem)
-        elif token.type == Token.LEFTPARENTHESIS:
-            # Handle grouping - check for non-capturing group (?:...)
-            i += 1
-            var is_capturing = True
-
-            # Check if this is a non-capturing group (?:...)
-            if (
-                i + 1 < len(tokens)
-                and tokens[i].type == Token.QUESTIONMARK
-                and tokens[i + 1].type == Token.ELEMENT
-                and tokens[i + 1].char == ":"
-            ):
-                is_capturing = False
-                i += 2  # Skip ? and :
-
-            var group_tokens = List[Token](capacity=len(tokens) - i)
-            var paren_count = 1
-
-            # Extract tokens inside the parentheses
-            while i < len(tokens) and paren_count > 0:
-                if tokens[i].type == Token.LEFTPARENTHESIS:
-                    paren_count += 1
-                elif tokens[i].type == Token.RIGHTPARENTHESIS:
-                    paren_count -= 1
-                    if paren_count == 0:
-                        break
-
-                group_tokens.append(tokens[i])
-                i += 1
-
-            if paren_count > 0:
-                raise Error("Missing closing parenthesis ')'.")
-
-            # Recursively parse the tokens inside the group
-            var group_ast = parse_token_list(group_tokens)
-            var group: ASTNode
-            if group_ast.type == GROUP:
-                # If it's already a group, use it directly
-                group = group_ast
-                group.capturing = is_capturing
-            else:
-                # Otherwise wrap in a group
-                group = GroupNode([group_ast], is_capturing, "", 0)
-            # Check for quantifiers after the group
-            if i + 1 < len(tokens):
-                check_for_quantifiers(i, group, tokens)
-            elements.append(group)
-        elif token.type == Token.VERTICALBAR:
-            # OR handling - create OrNode with left and right parts
-            var left_group = GroupNode(elements^, True, "", 0)
-            i += 1
-
-            # Parse right side - collect remaining tokens
-            var right_tokens = List[Token](capacity=len(tokens) - i)
-            while i < len(tokens):
-                right_tokens.append(tokens[i])
-                i += 1
-
-            # Recursively parse the right side
-            var right_group_ast = parse_token_list(right_tokens^)
-            var right_group: ASTNode
-            if right_group_ast.type == GROUP:
-                right_group = right_group_ast
-            else:
-                right_group = GroupNode([right_group_ast], True, "", 0)
-
-            return RENode(OrNode(left_group, right_group))
-        else:
-            # Check for unescaped special characters
-            if token.type == Token.RIGHTPARENTHESIS:
-                raise Error("Unescaped closing parenthesis ')'.")
-            elif token.type == Token.RIGHTBRACKET:
-                raise Error("Unescaped closing bracket ']'.")
-            elif token.type == Token.RIGHTCURLYBRACE:
-                raise Error("Unescaped closing curly brace '}'.")
-            else:
-                raise Error("Unexpected token: " + token.char)
-
-        i += 1
-
-    return RENode(GroupNode(elements^))
+    return re_root

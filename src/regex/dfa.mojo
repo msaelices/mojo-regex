@@ -19,6 +19,93 @@ from regex.optimizer import (
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
+# Pre-defined character sets for efficient lookup
+alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+alias DIGITS = "0123456789"
+alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
+
+
+fn expand_character_range(range_str: String) -> String:
+    """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
+
+    Args:
+        range_str: Range string like '[a-z]' or '[0-9]' or 'abcd'.
+
+    Returns:
+        Expanded character set string.
+    """
+    # If it's already expanded (doesn't contain '-' in brackets), return as is
+    if not range_str.startswith("[") or not range_str.endswith("]"):
+        return range_str
+
+    # Handle common cases efficiently with pre-defined aliases
+    if range_str == "[a-z]":
+        return LOWERCASE_LETTERS
+    elif range_str == "[A-Z]":
+        return UPPERCASE_LETTERS
+    elif range_str == "[0-9]":
+        return DIGITS
+    elif range_str == "[a-zA-Z0-9]":
+        # Common pattern for alphanumeric - return pre-computed string
+        return ALPHANUMERIC
+    elif range_str == "[a-zA-Z]":
+        # Common pattern for letters only
+        return LOWERCASE_LETTERS + UPPERCASE_LETTERS
+
+    # Extract the inner part: [a-z] -> a-z
+    var inner = range_str[1:-1]
+
+    # Handle negated ranges like [^a-z]
+    var negated = inner.startswith("^")
+    if negated:
+        inner = inner[1:]
+
+    # For simple single ranges, use slicing from pre-defined sets
+    if len(inner) == 3 and inner[1] == "-":
+        var start_char = inner[0]
+        var end_char = inner[2]
+
+        # Handle lowercase letter ranges
+        if ord(start_char) >= ord("a") and ord(end_char) <= ord("z"):
+            var start_idx = ord(start_char) - ord("a")
+            var end_idx = ord(end_char) - ord("a") + 1
+            return String(LOWERCASE_LETTERS)[start_idx:end_idx]
+
+        # Handle uppercase letter ranges
+        elif ord(start_char) >= ord("A") and ord(end_char) <= ord("Z"):
+            var start_idx = ord(start_char) - ord("A")
+            var end_idx = ord(end_char) - ord("A") + 1
+            return String(UPPERCASE_LETTERS)[start_idx:end_idx]
+
+        # Handle digit ranges
+        elif ord(start_char) >= ord("0") and ord(end_char) <= ord("9"):
+            var start_idx = ord(start_char) - ord("0")
+            var end_idx = ord(end_char) - ord("0") + 1
+            return String(DIGITS)[start_idx:end_idx]
+
+    # Fallback for complex cases - expand all ranges and characters
+    var result = String(capacity=256)  # Pre-allocate for worst case
+    var i = 0
+    while i < len(inner):
+        if i + 2 < len(inner) and inner[i + 1] == "-":
+            # Found a range like a-z
+            var start_char = inner[i]
+            var end_char = inner[i + 2]
+            var start_code = ord(start_char)
+            var end_code = ord(end_char)
+
+            # Add all characters in the range
+            for char_code in range(start_code, end_code + 1):
+                result += chr(char_code)
+            i += 3
+        else:
+            # Single character
+            result += inner[i]
+            i += 1
+
+    return result
+
 
 struct SequentialPatternElement(Copyable, Movable):
     """Information about a single element in a sequential pattern."""
@@ -414,19 +501,30 @@ struct DFAEngine(Engine):
             var element = sequence_info.elements[element_idx]
             var is_last_element = element_idx == len(sequence_info.elements) - 1
 
+            # Check if all remaining elements are optional
+            var all_remaining_optional = True
+            for i in range(element_idx + 1, len(sequence_info.elements)):
+                if sequence_info.elements[i].min_matches > 0:
+                    all_remaining_optional = False
+                    break
+
             # For multi-character sequences, SIMD optimization is applied per character class
             # but not globally since we have multiple different character classes
 
             if element.min_matches == 0:
                 # Optional element (e.g., [a-z]*)
                 if element_idx == 0:
-                    # First element is optional - start state can accept or transition
-                    var start_state = DFAState(is_accepting=is_last_element)
+                    # First element is optional - start state should be accepting if all elements are optional
+                    var start_state = DFAState(
+                        is_accepting=all_remaining_optional
+                    )
                     self.states.append(start_state)
                     current_state_index = 0
 
                 # Create state for matching this element
-                var match_state = DFAState(is_accepting=is_last_element)
+                var match_state = DFAState(
+                    is_accepting=is_last_element or all_remaining_optional
+                )
                 self.states.append(match_state)
                 var match_state_index = len(self.states) - 1
 
@@ -447,7 +545,18 @@ struct DFAEngine(Engine):
                         element.positive_logic,
                     )
 
-                current_state_index = match_state_index
+                # For the first optional element, we need epsilon transitions to subsequent elements
+                # The current state should remain the start state so the next element can transition from it
+                if element_idx == 0:
+                    # Keep current_state_index as the start state for epsilon transitions to next elements
+                    # But we also track the match state for this element
+                    current_state_index = (
+                        0  # Start state index for epsilon transitions
+                    )
+                    # Store the match state index for potential transitions too (unused for now)
+                    var _ = match_state_index
+                else:
+                    current_state_index = match_state_index
 
             elif element.min_matches == 1:
                 # Required element with + or {1,n} quantifier
@@ -458,7 +567,8 @@ struct DFAEngine(Engine):
                     current_state_index = 0
 
                 # Create accepting state for this element
-                var is_accepting = is_last_element
+                # State is accepting if this is the last element OR all remaining elements are optional
+                var is_accepting = is_last_element or all_remaining_optional
                 var match_state = DFAState(is_accepting=is_accepting)
                 self.states.append(match_state)
                 var match_state_index = len(self.states) - 1
@@ -470,6 +580,20 @@ struct DFAEngine(Engine):
                     element.char_class,
                     element.positive_logic,
                 )
+
+                # If the previous element was optional (element_idx == 1 and current_state_index == 0),
+                # we also need to add transitions from the optional element's match state
+                if element_idx == 1 and current_state_index == 0:
+                    # The previous element was optional, add transitions from its match state too
+                    var prev_element = sequence_info.elements[0]
+                    if prev_element.min_matches == 0:
+                        # Add transitions from the optional element's match state (which should be state 1)
+                        self._add_character_class_transitions_with_logic(
+                            1,  # Match state of the optional element
+                            match_state_index,
+                            element.char_class,
+                            element.positive_logic,
+                        )
 
                 # Handle additional matches
                 if element.max_matches == -1:
@@ -598,27 +722,42 @@ struct DFAEngine(Engine):
 
         ref state = self.states[from_state]
 
+        # For very large character classes, use a more efficient approach
+        var char_class_len = len(char_class)
+
         if positive_logic:
             # Positive logic: [abc] - add transitions for characters in char_class
-            for i in range(len(char_class)):
-                var char_code = ord(char_class[i])
-                state.add_transition(char_code, to_state)
+            # For common patterns, use optimized handling
+            if char_class == ALPHANUMERIC and char_class_len == 62:
+                # Optimize for [a-zA-Z0-9] - add transitions in batches
+                # Add lowercase letters
+                for i in range(26):
+                    state.add_transition(ord("a") + i, to_state)
+                # Add uppercase letters
+                for i in range(26):
+                    state.add_transition(ord("A") + i, to_state)
+                # Add digits
+                for i in range(10):
+                    state.add_transition(ord("0") + i, to_state)
+            else:
+                # General case - iterate through each character
+                for i in range(char_class_len):
+                    var char_code = ord(char_class[i])
+                    state.add_transition(char_code, to_state)
         else:
             # Negative logic: [^abc] - add transitions for all characters NOT in char_class
-            # Create a lookup set for fast character checking
-            var char_set = List[Bool](capacity=256)
-            for _ in range(256):
-                char_set.append(False)
+            # Create a bitmap for fast lookup
+            var char_bitmap = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](0)
 
-            # Mark characters in char_class as True
-            for i in range(len(char_class)):
+            # Mark characters in char_class as 1 in bitmap
+            for i in range(char_class_len):
                 var char_code = ord(char_class[i])
-                if char_code >= 0 and char_code < 256:
-                    char_set[char_code] = True
+                if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
+                    char_bitmap[char_code] = 1
 
             # Add transitions for all characters NOT in the class
-            for char_code in range(256):
-                if not char_set[char_code]:
+            for char_code in range(DEFAULT_DFA_TRANSITIONS):
+                if char_bitmap[char_code] == 0:
                     state.add_transition(char_code, to_state)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
@@ -752,8 +891,11 @@ struct DFAEngine(Engine):
             return matches
 
         var pos = 0
-        while pos <= len(text):
-            var match_result = self.match_next(text, pos)
+        var text_len = len(text)
+
+        while pos <= text_len:
+            # Try to match at current position directly
+            var match_result = self._try_match_at_position(text, pos)
             if match_result:
                 var match_obj = match_result.value()
                 matches.append(match_obj)
@@ -764,6 +906,7 @@ struct DFAEngine(Engine):
                 else:
                     pos = match_obj.end_idx
             else:
+                # No match at this position, try next
                 pos += 1
 
         return matches
@@ -904,7 +1047,7 @@ struct BoyerMoore:
         return positions
 
 
-fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
+fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -932,8 +1075,15 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
         var char_class, min_matches, max_matches, has_start, has_end, positive_logic = _extract_character_class_info(
             ast
         )
+        var char_class_str = String(
+            char_class.value()
+        ) if char_class else String("")
+        var expanded_char_class = expand_character_range(char_class_str)
         dfa.compile_character_class_with_logic(
-            char_class, min_matches, max_matches, positive_logic
+            expanded_char_class,
+            min_matches,
+            max_matches,
+            positive_logic,
         )
         dfa.has_start_anchor = has_start
         dfa.has_end_anchor = has_end
@@ -949,6 +1099,12 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
         dfa.compile_sequential_pattern(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
+    elif _is_mixed_sequential_pattern(ast):
+        # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
+        var sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        dfa.compile_multi_character_class_sequence(sequence_info)
+        dfa.has_start_anchor = sequence_info.has_start_anchor
+        dfa.has_end_anchor = sequence_info.has_end_anchor
     else:
         # Pattern too complex for current DFA implementation
         raise Error("Pattern too complex for current DFA implementation")
@@ -956,7 +1112,7 @@ fn compile_ast_pattern(ast: ASTNode) raises -> DFAEngine:
     return dfa^
 
 
-fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
+fn compile_simple_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     """Compile a simple pattern AST into a DFA engine.
 
     Args:
@@ -972,7 +1128,7 @@ fn compile_simple_pattern(ast: ASTNode) raises -> DFAEngine:
     return compile_ast_pattern(ast)
 
 
-fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
+fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, [a-z]+, etc.).
 
     Args:
@@ -987,13 +1143,13 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
     if _is_multi_character_class_sequence(ast):
         return False
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and ast.get_children_len() == 1:
+        var child = ast.get_child(0)
         if child.type == DIGIT or child.type == RANGE:
             return True
-        elif child.type == GROUP and len(child.children) == 1:
+        elif child.type == GROUP and child.get_children_len() == 1:
             # Check if group contains single digit or range element
-            var inner = child.children[0]
+            var inner = child.get_child(0)
             return inner.type == DIGIT or inner.type == RANGE
     elif ast.type == DIGIT or ast.type == RANGE:
         return True
@@ -1002,8 +1158,10 @@ fn _is_simple_character_class_pattern(ast: ASTNode) -> Bool:
 
 
 fn _extract_character_class_info(
-    ast: ASTNode,
-) -> Tuple[String, Int, Int, Bool, Bool, Bool]:
+    ast: ASTNode[ImmutableAnyOrigin],
+) -> Tuple[
+    Optional[StringSlice[ImmutableAnyOrigin]], Int, Int, Bool, Bool, Bool
+]:
     """Extract character class information from AST.
 
     Args:
@@ -1014,7 +1172,7 @@ fn _extract_character_class_info(
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP
 
-    var char_class = String("")
+    var char_class: Optional[StringSlice[ImmutableAnyOrigin]] = None
     var min_matches = 1
     var max_matches = 1
     var has_start = False
@@ -1022,22 +1180,23 @@ fn _extract_character_class_info(
     var positive_logic = True
 
     # Find the character class node (DIGIT or RANGE)
-    var class_node: ASTNode
+    var class_node: ASTNode[ImmutableAnyOrigin]
     if ast.type == DIGIT or ast.type == RANGE:
         class_node = ast
-    elif ast.type == RE and len(ast.children) == 1:
-        if ast.children[0].type == DIGIT or ast.children[0].type == RANGE:
-            class_node = ast.children[0]
+    elif ast.type == RE and ast.get_children_len() == 1:
+        if ast.get_child(0).type == DIGIT or ast.get_child(0).type == RANGE:
+            class_node = ast.get_child(0)
         elif (
-            ast.children[0].type == GROUP and len(ast.children[0].children) == 1
+            ast.get_child(0).type == GROUP
+            and ast.get_child(0).get_children_len() == 1
         ):
-            class_node = ast.children[0].children[0]
+            class_node = ast.get_child(0).get_child(0)
         else:
-            class_node = ast.children[0]  # fallback
+            class_node = ast.get_child(0)  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:
-        class_node = ast  # fallback
+        class_node = ast
 
     # Extract quantifier information and character class
     if class_node.type == DIGIT:
@@ -1045,13 +1204,13 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = "0123456789"
+        char_class = class_node.get_value()
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
-        # Use the range value directly as character class
-        char_class = class_node.value
+        # Use the range value directly - expansion will be done when used
+        char_class = class_node.get_value()
 
     return (
         char_class^,
@@ -1063,7 +1222,7 @@ fn _extract_character_class_info(
     )
 
 
-fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
+fn _is_pure_anchor_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if pattern is just anchors (^, $, or ^$).
 
     Args:
@@ -1077,20 +1236,22 @@ fn _is_pure_anchor_pattern(ast: ASTNode) -> Bool:
     if ast.type == START or ast.type == END:
         return True
     elif ast.type == RE:
-        if len(ast.children) == 0:
+        if not ast.has_children():
             return False
-        return _is_pure_anchor_pattern(ast.children[0])
+        return _is_pure_anchor_pattern(ast.get_child(0))
     elif ast.type == GROUP:
         # Check if group contains only anchors
-        for i in range(len(ast.children)):
-            if not _is_pure_anchor_pattern(ast.children[i]):
+        for i in range(ast.get_children_len()):
+            if not _is_pure_anchor_pattern(ast.get_child(i)):
                 return False
         return True
     else:
         return False
 
 
-fn _is_sequential_character_class_pattern(ast: ASTNode) -> Bool:
+fn _is_sequential_character_class_pattern(
+    ast: ASTNode[MutableAnyOrigin],
+) -> Bool:
     """Check if pattern is a sequence of character classes with quantifiers.
 
     Args:
@@ -1101,24 +1262,26 @@ fn _is_sequential_character_class_pattern(ast: ASTNode) -> Bool:
     """
     from regex.ast import RE, DIGIT, RANGE, GROUP
 
-    if ast.type != RE or len(ast.children) != 1:
+    if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.children[0]
+    var child = ast.get_child(0)
     if child.type != GROUP:
         return False
 
     # Check if all children are character classes (RANGE or DIGIT)
-    for i in range(len(child.children)):
-        var element = child.children[i]
+    for i in range(child.get_children_len()):
+        var element = child.get_child(i)
         if element.type != RANGE and element.type != DIGIT:
             return False
 
     # Must have at least 2 elements to be considered sequential
-    return len(child.children) >= 2
+    return child.get_children_len() >= 2
 
 
-fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
+fn _extract_sequential_pattern_info(
+    ast: ASTNode[MutableAnyOrigin],
+) -> SequentialPatternInfo:
     """Extract information about a sequential pattern.
 
     Args:
@@ -1134,18 +1297,21 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
     # Check for anchors at root level
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and ast.get_children_len() == 1:
+        var child = ast.get_child(0)
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children)):
-                var element = child.children[i]
+            for i in range(child.get_children_len()):
+                var element = child.get_child(i)
                 var char_class: String
 
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = element.value
+                    var range_value = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
+                    char_class = expand_character_range(range_value)
                 else:
                     continue  # Skip unknown elements
 
@@ -1157,7 +1323,7 @@ fn _extract_sequential_pattern_info(ast: ASTNode) -> SequentialPatternInfo:
     return info^
 
 
-fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
+fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if pattern is a sequence of multiple character classes.
 
     Examples: [a-z]+[0-9]+, digit+word+, [A-Z][a-z]*[0-9]{2,4}
@@ -1168,23 +1334,25 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
     Returns:
         True if pattern is a multi-character class sequence.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
 
-    if ast.type != RE or len(ast.children) != 1:
+    if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.children[0]
+    var child = ast.get_child(0)
     if child.type != GROUP:
         return False
 
     # Check if all children are character classes with quantifiers
     # Must have at least 2 elements to be considered a sequence
-    if len(child.children) < 2:
+    if child.get_children_len() < 2:
         return False
 
     var char_class_count = 0
-    for i in range(len(child.children)):
-        ref element = child.children[i]
+    var literal_count = 0
+
+    for i in range(child.get_children_len()):
+        ref element = child.get_child(i)
         if (
             element.type == RANGE
             or element.type == DIGIT
@@ -1194,15 +1362,21 @@ fn _is_multi_character_class_sequence(ast: ASTNode) -> Bool:
         elif element.type == WILDCARD:
             # Wildcard can be considered a character class
             char_class_count += 1
+        elif element.type == ELEMENT and element.min == 1 and element.max == 1:
+            # Single literal characters are OK (like @ and . in email patterns)
+            literal_count += 1
         else:
-            # Non-character class element found
+            # Other types make it non-sequential
             return False
 
-    # Must be all character classes
-    return char_class_count == len(child.children)
+    # It's a multi-char sequence if it has at least 2 character classes
+    # and any number of single literals
+    return char_class_count >= 2
 
 
-fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
+fn _extract_multi_class_sequence_info(
+    ast: ASTNode[MutableAnyOrigin],
+) -> SequentialPatternInfo:
     """Extract information about a multi-character class sequence.
 
     Args:
@@ -1211,30 +1385,38 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
     Returns:
         SequentialPatternInfo with details about each character class element.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD
+    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
 
     var info = SequentialPatternInfo()
 
     # Check for anchors at root level
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
-    if ast.type == RE and len(ast.children) == 1:
-        var child = ast.children[0]
+    if ast.type == RE and ast.get_children_len() == 1:
+        var child = ast.get_child(0)
         if child.type == GROUP:
             # Extract each character class element
-            for i in range(len(child.children)):
-                ref element = child.children[i]
+            for i in range(child.get_children_len()):
+                ref element = child.get_child(i)
                 var char_class: String
 
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    char_class = element.value
+                    var range_value = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
+                    char_class = expand_character_range(range_value)
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
                 elif element.type == WILDCARD:
                     # Wildcard matches any character except newline
                     char_class = ALL_EXCEPT_NEWLINE
+                elif element.type == ELEMENT:
+                    # Single literal character (like @ or .)
+                    char_class = String(
+                        element.get_value().value()
+                    ) if element.get_value() else ""
                 else:
                     continue  # Skip unknown elements
 
@@ -1247,3 +1429,60 @@ fn _extract_multi_class_sequence_info(ast: ASTNode) -> SequentialPatternInfo:
                 info.elements.append(pattern_element)
 
     return info^
+
+
+fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a mixed sequential pattern with optional literals.
+
+    Examples: [0-9]+\\.?[0-9]*, [a-z]+@[a-z]+\\.[a-z]+
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a mixed sequential pattern.
+    """
+    from regex.ast import RE, DIGIT, RANGE, GROUP, ELEMENT
+
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var child = ast.get_child(0)
+    if child.type != GROUP:
+        return False
+
+    # Must have at least 3 elements (char class, optional literal, char class)
+    if child.get_children_len() < 3:
+        return False
+
+    var has_char_class = False
+    var has_optional_literal = False
+
+    for i in range(child.get_children_len()):
+        ref element = child.get_child(i)
+
+        if element.type == RANGE or element.type == DIGIT:
+            has_char_class = True
+        elif element.type == ELEMENT:
+            # Check if it's an optional literal (min=0, max=1)
+            if element.min == 0 and element.max == 1:
+                has_optional_literal = True
+
+    # It's a mixed pattern if it has both character classes and optional literals
+    return has_char_class and has_optional_literal
+
+
+fn _extract_mixed_sequential_pattern_info(
+    ast: ASTNode[MutableAnyOrigin],
+) -> SequentialPatternInfo:
+    """Extract information about a mixed sequential pattern.
+
+    Args:
+        ast: AST node representing a mixed sequential pattern.
+
+    Returns:
+        SequentialPatternInfo with details about each element.
+    """
+    # For now, reuse the multi-class sequence extraction logic
+    # It already handles ELEMENT types correctly
+    return _extract_multi_class_sequence_info(ast)
