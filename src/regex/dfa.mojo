@@ -94,7 +94,9 @@ fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
             return DIGITS[start_idx:end_idx]
 
     # Fallback for complex cases - expand all ranges and characters
-    var result = String(capacity=256)  # Pre-allocate for worst case
+    var result = String(
+        capacity=String.INLINE_CAPACITY
+    )  # Pre-allocate for worst case
     var i = 0
     while i < len(inner):
         if i + 2 < len(inner) and inner[i + 1] == "-":
@@ -1190,15 +1192,13 @@ fn _extract_character_class_info(
     if ast.type == DIGIT or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
-        if ast.get_child(0).type == DIGIT or ast.get_child(0).type == RANGE:
-            class_node = ast.get_child(0)
-        elif (
-            ast.get_child(0).type == GROUP
-            and ast.get_child(0).get_children_len() == 1
-        ):
-            class_node = ast.get_child(0).get_child(0)
+        ref ast_child = ast.get_child(0)
+        if ast_child.type == DIGIT or ast_child.type == RANGE:
+            class_node = ast_child
+        elif ast_child.type == GROUP and ast_child.get_children_len() == 1:
+            class_node = ast_child.get_child(0)
         else:
-            class_node = ast.get_child(0)  # fallback
+            class_node = ast_child  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:
