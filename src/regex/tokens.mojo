@@ -2,6 +2,7 @@ alias DIGITS: String = "0123456789"
 alias CHAR_TAB = ord("t")
 alias CHAR_SPACE = ord("s")
 alias CHAR_DIGIT = ord("d")
+alias CHAR_COLON = ord(":")
 alias CHAR_DOT = ord(".")
 alias CHAR_SLASH = ord("\\")
 alias CHAR_LEFT_PAREN = ord("(")

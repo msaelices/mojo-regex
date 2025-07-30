@@ -1,5 +1,6 @@
 from regex.lexer import scan
 from regex.tokens import (
+    CHAR_COLON,
     Token,
     ElementToken,
     SpaceToken,
@@ -44,8 +45,6 @@ from regex.ast import (
     OR,
     GROUP,
 )
-
-alias CHAR_COLON = ord(":")
 
 
 @always_inline

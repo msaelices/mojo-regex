@@ -4,9 +4,9 @@ from regex.lexer import scan
 
 
 @always_inline
-fn assert_char_equal(actual: Codepoint, expected: String) raises:
+fn assert_char_equal(actual: Int, expected: String) raises:
     """Helper to compare Codepoint with expected string."""
-    assert_equal(actual, Codepoint.ord(StringSlice(expected)))
+    assert_equal(actual, ord(StringSlice(expected)))
 
 
 from regex.tokens import (
