@@ -838,8 +838,7 @@ struct DFAEngine(Engine):
             last_accepting_pos = pos
 
         while pos < len(text):
-            var ch = String(text[pos])
-            var char_code = ord(ch)
+            var char_code = ord(text[pos])
 
             if current_state >= len(self.states):
                 break
