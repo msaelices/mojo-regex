@@ -23,14 +23,34 @@ from regex.tokens import (
     ElementToken,
     SpaceToken,
     DigitToken,
+    DIGITS,
+    CHAR_TAB,
+    CHAR_SPACE,
+    CHAR_DIGIT,
+    CHAR_DOT,
+    CHAR_SLASH,
+    CHAR_LEFT_PAREN,
+    CHAR_RIGHT_PAREN,
+    CHAR_LEFT_BRACKET,
+    CHAR_RIGHT_BRACKET,
+    CHAR_LEFT_CURLY,
+    CHAR_RIGHT_CURLY,
+    CHAR_CIRCUMFLEX,
+    CHAR_VERTICAL_BAR,
+    CHAR_DASH,
+    CHAR_COMMA,
+    CHAR_ASTERISK,
+    CHAR_PLUS,
+    CHAR_QUESTION_MARK,
+    CHAR_END,
+    CHAR_ZERO,
+    CHAR_NINE,
 )
-
-alias DIGITS: String = "0123456789"
 
 
 @always_inline
-fn _is_digit(ch: String) -> Bool:
-    return DIGITS.find(ch) > -1
+fn _is_digit(ch: Int) -> Bool:
+    return ch >= CHAR_ZERO and ch <= CHAR_NINE
 
 
 fn scan(regex: String) raises -> List[Token]:
@@ -45,79 +65,82 @@ fn scan(regex: String) raises -> List[Token]:
     var tokens = List[Token](capacity=len(regex))
     var i = 0
     var escape_found = False
+    var regex_bytes = regex.as_bytes()
 
     while i < len(regex):
-        var ch = String(regex[i])
+        var ch_codepoint = Int(regex_bytes[i])
 
         if escape_found:
-            if ch == "t":
-                var token = ElementToken(char="\t")
+            if ch_codepoint == CHAR_TAB:
+                var token = ElementToken(char=ord(StringSlice("\t")))
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
-            elif ch == "s":
-                var token = SpaceToken(char=ch)
+            elif ch_codepoint == CHAR_SPACE:
+                var token = SpaceToken(char=ch_codepoint)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
-            elif ch == "d":
-                var token = DigitToken(char=ch)
+            elif ch_codepoint == CHAR_DIGIT:
+                var token = DigitToken(char=ch_codepoint)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
             else:
-                var token = ElementToken(char=ch)
+                var token = ElementToken(char=ch_codepoint)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
-        elif ch == "\\":
+        elif ch_codepoint == CHAR_SLASH:
             escape_found = True
             i += 1
             continue
-        elif ch == ".":
+        elif ch_codepoint == CHAR_DOT:
             var token = Wildcard()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "(":
+        elif ch_codepoint == CHAR_LEFT_PAREN:
             var token = LeftParenthesis()
             token.start_pos = i
             tokens.append(token)
-        elif ch == ")":
+        elif ch_codepoint == CHAR_RIGHT_PAREN:
             var token = RightParenthesis()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "[":
+        elif ch_codepoint == CHAR_LEFT_BRACKET:
             var token = LeftBracket()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "-":
+        elif ch_codepoint == CHAR_DASH:
             var token = Dash()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "]":
+        elif ch_codepoint == CHAR_RIGHT_BRACKET:
             var token = RightBracket()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "{":
+        elif ch_codepoint == CHAR_LEFT_CURLY:
             var token = LeftCurlyBrace()
             token.start_pos = i
             tokens.append(token)
             i += 1
             while i < len(regex):
-                ch = String(regex[i])
-                if ch == ",":
+                var inner_ch_codepoint = Int(regex_bytes[i])
+                if inner_ch_codepoint == CHAR_COMMA:
                     var comma_token = Comma()
                     comma_token.start_pos = i
                     tokens.append(comma_token)
-                elif _is_digit(ch):
-                    var digit_token = ElementToken(char=ch)
+                elif _is_digit(inner_ch_codepoint):
+                    var digit_token = ElementToken(char=inner_ch_codepoint)
                     digit_token.start_pos = i
                     tokens.append(digit_token)
-                elif ch == "}":
+                elif inner_ch_codepoint == CHAR_RIGHT_CURLY:
                     var brace_token = RightCurlyBrace()
                     brace_token.start_pos = i
                     tokens.append(brace_token)
                     break
                 else:
-                    raise Error("Bad token at index " + String(i) + ".")
+                    raise Error(
+                        "Bad token at index ", i, ".", chr(ch_codepoint)
+                    )
                 i += 1
-        elif ch == "^":
+        elif ch_codepoint == CHAR_CIRCUMFLEX:
             if i == 0:
                 var token = Start()
                 token.start_pos = i
@@ -126,32 +149,32 @@ fn scan(regex: String) raises -> List[Token]:
                 var token = Circumflex()
                 token.start_pos = i
                 tokens.append(token)
-        elif ch == "$":
+        elif ch_codepoint == CHAR_END:
             var token = End()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "?":
+        elif ch_codepoint == CHAR_QUESTION_MARK:
             var token = QuestionMark()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "*":
+        elif ch_codepoint == CHAR_ASTERISK:
             var token = Asterisk()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "+":
+        elif ch_codepoint == CHAR_PLUS:
             var token = Plus()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "|":
+        elif ch_codepoint == CHAR_VERTICAL_BAR:
             var token = VerticalBar()
             token.start_pos = i
             tokens.append(token)
-        elif ch == "}":
+        elif ch_codepoint == CHAR_RIGHT_CURLY:
             var token = RightCurlyBrace()
             token.start_pos = i
             tokens.append(token)
         else:
-            var token = ElementToken(char=ch)
+            var token = ElementToken(char=ch_codepoint)
             token.start_pos = i
             tokens.append(token)
 

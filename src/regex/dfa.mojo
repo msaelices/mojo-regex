@@ -15,6 +15,15 @@ from regex.optimizer import (
     get_literal_string,
     pattern_has_anchors,
 )
+from regex.tokens import (
+    CHAR_A,
+    CHAR_A_UPPER,
+    CHAR_Z,
+    CHAR_Z_UPPER,
+    CHAR_ZERO,
+    CHAR_NINE,
+    DIGITS,
+)
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -22,11 +31,11 @@ alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 # Pre-defined character sets for efficient lookup
 alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-alias DIGITS = "0123456789"
+alias ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
 alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
-fn expand_character_range(range_str: String) -> String:
+fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
     Args:
@@ -37,7 +46,7 @@ fn expand_character_range(range_str: String) -> String:
     """
     # If it's already expanded (doesn't contain '-' in brackets), return as is
     if not range_str.startswith("[") or not range_str.endswith("]"):
-        return range_str
+        return String(range_str)
 
     # Handle common cases efficiently with pre-defined aliases
     if range_str == "[a-z]":
@@ -51,7 +60,7 @@ fn expand_character_range(range_str: String) -> String:
         return ALPHANUMERIC
     elif range_str == "[a-zA-Z]":
         # Common pattern for letters only
-        return LOWERCASE_LETTERS + UPPERCASE_LETTERS
+        return ALL_LETTERS
 
     # Extract the inner part: [a-z] -> a-z
     var inner = range_str[1:-1]
@@ -67,22 +76,22 @@ fn expand_character_range(range_str: String) -> String:
         var end_char = inner[2]
 
         # Handle lowercase letter ranges
-        if ord(start_char) >= ord("a") and ord(end_char) <= ord("z"):
-            var start_idx = ord(start_char) - ord("a")
-            var end_idx = ord(end_char) - ord("a") + 1
-            return String(LOWERCASE_LETTERS)[start_idx:end_idx]
+        if ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z:
+            var start_idx = ord(start_char) - CHAR_A
+            var end_idx = ord(end_char) - CHAR_A + 1
+            return LOWERCASE_LETTERS[start_idx:end_idx]
 
         # Handle uppercase letter ranges
-        elif ord(start_char) >= ord("A") and ord(end_char) <= ord("Z"):
-            var start_idx = ord(start_char) - ord("A")
-            var end_idx = ord(end_char) - ord("A") + 1
-            return String(UPPERCASE_LETTERS)[start_idx:end_idx]
+        elif ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z_UPPER:
+            var start_idx = ord(start_char) - CHAR_A_UPPER
+            var end_idx = ord(end_char) - CHAR_A_UPPER + 1
+            return UPPERCASE_LETTERS[start_idx:end_idx]
 
         # Handle digit ranges
-        elif ord(start_char) >= ord("0") and ord(end_char) <= ord("9"):
-            var start_idx = ord(start_char) - ord("0")
-            var end_idx = ord(end_char) - ord("0") + 1
-            return String(DIGITS)[start_idx:end_idx]
+        elif ord(start_char) >= CHAR_ZERO and ord(end_char) <= CHAR_NINE:
+            var start_idx = ord(start_char) - CHAR_ZERO
+            var end_idx = ord(end_char) - CHAR_ZERO + 1
+            return DIGITS[start_idx:end_idx]
 
     # Fallback for complex cases - expand all ranges and characters
     var result = String(capacity=256)  # Pre-allocate for worst case
@@ -732,13 +741,13 @@ struct DFAEngine(Engine):
                 # Optimize for [a-zA-Z0-9] - add transitions in batches
                 # Add lowercase letters
                 for i in range(26):
-                    state.add_transition(ord("a") + i, to_state)
+                    state.add_transition(CHAR_A + i, to_state)
                 # Add uppercase letters
                 for i in range(26):
-                    state.add_transition(ord("A") + i, to_state)
+                    state.add_transition(CHAR_A_UPPER + i, to_state)
                 # Add digits
                 for i in range(10):
-                    state.add_transition(ord("0") + i, to_state)
+                    state.add_transition(CHAR_ZERO + i, to_state)
             else:
                 # General case - iterate through each character
                 for i in range(char_class_len):
@@ -838,8 +847,7 @@ struct DFAEngine(Engine):
             last_accepting_pos = pos
 
         while pos < len(text):
-            var ch = String(text[pos])
-            var char_code = ord(ch)
+            var char_code = ord(text[pos])
 
             if current_state >= len(self.states):
                 break
@@ -1011,7 +1019,7 @@ struct BoyerMoore:
             var j = m - 1
 
             # Compare pattern from right to left
-            while j >= 0 and String(self.pattern[j]) == String(text[s + j]):
+            while j >= 0 and self.pattern[j] == text[s + j]:
                 j -= 1
 
             if j < 0:
@@ -1019,7 +1027,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = ord(String(text[s + j]))
+                var bad_char = ord(text[s + j])
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 
@@ -1075,9 +1083,7 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         var char_class, min_matches, max_matches, has_start, has_end, positive_logic = _extract_character_class_info(
             ast
         )
-        var char_class_str = String(
-            char_class.value()
-        ) if char_class else String("")
+        var char_class_str = char_class.value()
         var expanded_char_class = expand_character_range(char_class_str)
         dfa.compile_character_class_with_logic(
             expanded_char_class,
@@ -1306,12 +1312,11 @@ fn _extract_sequential_pattern_info(
                 var char_class: String
 
                 if element.type == DIGIT:
-                    char_class = "0123456789"
+                    char_class = DIGITS
                 elif element.type == RANGE:
-                    var range_value = String(
+                    char_class = expand_character_range(
                         element.get_value().value()
-                    ) if element.get_value() else ""
-                    char_class = expand_character_range(range_value)
+                    )
                 else:
                     continue  # Skip unknown elements
 
@@ -1403,10 +1408,9 @@ fn _extract_multi_class_sequence_info(
                 if element.type == DIGIT:
                     char_class = "0123456789"
                 elif element.type == RANGE:
-                    var range_value = String(
+                    char_class = expand_character_range(
                         element.get_value().value()
-                    ) if element.get_value() else ""
-                    char_class = expand_character_range(range_value)
+                    )
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
                 elif element.type == WILDCARD:

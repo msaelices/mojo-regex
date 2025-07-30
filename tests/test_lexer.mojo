@@ -1,6 +1,9 @@
 from testing import assert_equal, assert_raises, assert_true
+from testutils import assert_char_equal
 
 from regex.lexer import scan
+
+
 from regex.tokens import (
     Token,
     ElementToken,
@@ -25,26 +28,26 @@ from regex.tokens import (
 
 fn test_simple_re_lexing() raises:
     var tokens = scan("a")
-    assert_equal(tokens[0].char, "a")
+    assert_char_equal(tokens[0].char, "a")
     assert_equal(tokens[0].type, Token.ELEMENT)
 
 
 fn test_escaping_char() raises:
     var tokens = scan("a\\\\a\\\\t\\.")
     assert_equal(tokens[1].type, Token.ELEMENT)
-    assert_equal(tokens[1].char, "\\")
+    assert_char_equal(tokens[1].char, "\\")
 
 
 fn test_escaping_get_tab() raises:
     var tokens = scan("a\\h\\t")
     assert_equal(tokens[2].type, Token.ELEMENT)
-    assert_equal(tokens[2].char, "\t")
+    assert_char_equal(tokens[2].char, "\t")
 
 
 fn test_escaping_wildcard() raises:
     var tokens = scan("\\.")
     assert_equal(tokens[0].type, Token.ELEMENT)
-    assert_equal(tokens[0].char, ".")
+    assert_char_equal(tokens[0].char, ".")
 
 
 fn test_get_comma() raises:
@@ -85,7 +88,7 @@ fn test_lexer_1() raises:
 fn test_wildcard_lexing() raises:
     var tokens = scan(".")
     assert_equal(tokens[0].type, Token.WILDCARD)
-    assert_equal(tokens[0].char, ".")
+    assert_char_equal(tokens[0].char, ".")
 
 
 fn test_parenthesis_lexing() raises:

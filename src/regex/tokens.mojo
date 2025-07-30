@@ -1,8 +1,37 @@
+alias DIGITS: String = "0123456789"
+alias CHAR_TAB = ord("t")
+alias CHAR_SPACE = ord("s")
+alias CHAR_DIGIT = ord("d")
+alias CHAR_COLON = ord(":")
+alias CHAR_DOT = ord(".")
+alias CHAR_SLASH = ord("\\")
+alias CHAR_LEFT_PAREN = ord("(")
+alias CHAR_RIGHT_PAREN = ord(")")
+alias CHAR_LEFT_BRACKET = ord("[")
+alias CHAR_RIGHT_BRACKET = ord("]")
+alias CHAR_LEFT_CURLY = ord("{")
+alias CHAR_RIGHT_CURLY = ord("}")
+alias CHAR_CIRCUMFLEX = ord("^")
+alias CHAR_VERTICAL_BAR = ord("|")
+alias CHAR_DASH = ord("-")
+alias CHAR_COMMA = ord(",")
+alias CHAR_ASTERISK = ord("*")
+alias CHAR_PLUS = ord("+")
+alias CHAR_QUESTION_MARK = ord("?")
+alias CHAR_END = ord("$")
+alias CHAR_ZERO = ord("0")
+alias CHAR_NINE = ord("9")
+alias CHAR_A = ord("a")
+alias CHAR_Z = ord("z")
+alias CHAR_A_UPPER = ord("A")
+alias CHAR_Z_UPPER = ord("Z")
+
+
 struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token struct."""
 
     var type: Int
-    var char: String
+    var char: Int
     var start_pos: Int  # Position in original pattern where this token starts
 
     alias ELEMENT = 0
@@ -65,50 +94,50 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token of the dash '-'."""
 
     fn __init__(out self, type: Int):
-        var char: String
+        var char: Int
         if type == Self.WILDCARD:
-            char = "."
+            char = CHAR_DOT
         elif type == Self.START:
-            char = "^"
+            char = CHAR_CIRCUMFLEX
         elif type == Self.END:
-            char = "$"
+            char = CHAR_END
         elif type == Self.ESCAPE:
-            char = "\\"
+            char = CHAR_SLASH
         elif type == Self.COMMA:
-            char = ","
+            char = CHAR_COMMA
         elif type == Self.LEFTPARENTHESIS:
-            char = "("
+            char = CHAR_LEFT_PAREN
         elif type == Self.RIGHTPARENTHESIS:
-            char = ")"
+            char = CHAR_RIGHT_PAREN
         elif type == Self.LEFTCURLYBRACE:
-            char = "{"
+            char = CHAR_LEFT_CURLY
         elif type == Self.RIGHTCURLYBRACE:
-            char = "}"
+            char = CHAR_RIGHT_CURLY
         elif type == Self.LEFTBRACKET:
-            char = "["
+            char = CHAR_LEFT_BRACKET
         elif type == Self.RIGHTBRACKET:
-            char = "]"
+            char = CHAR_RIGHT_BRACKET
         elif type == Self.ASTERISK:
-            char = "*"
+            char = CHAR_ASTERISK
         elif type == Self.PLUS:
-            char = "+"
+            char = CHAR_PLUS
         elif type == Self.QUESTIONMARK:
-            char = "?"
+            char = CHAR_QUESTION_MARK
         elif type == Self.VERTICALBAR:
-            char = "|"
+            char = CHAR_VERTICAL_BAR
         elif type == Self.CIRCUMFLEX:
-            char = "^"
+            char = CHAR_CIRCUMFLEX
         elif type == Self.DASH:
-            char = "-"
+            char = CHAR_DASH
         elif type == Self.ORTOKEN:
-            char = "|"
+            char = CHAR_VERTICAL_BAR
         else:
-            char = ""
+            char = 0  # Null codepoint
         self.type = type
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: String):
+    fn __init__(out self, type: Int, char: Int):
         """Initialize a Token with a specific type and character.
         Args:
             type: The type of the token.
@@ -118,7 +147,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: String, start_pos: Int):
+    fn __init__(out self, type: Int, char: Int, start_pos: Int):
         """Initialize a Token with a specific type, character and position.
         Args:
             type: The type of the token.
@@ -139,7 +168,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
 
     fn __bool__(self: Self) -> Bool:
         """Boolean conversion for Token."""
-        return self.type != Self.ELEMENT or self.char != ""
+        return self.type != Self.ELEMENT or self.char != Int(0)
 
     fn __as_bool__(self) -> Bool:
         """Get the boolean representation of the value.
@@ -163,13 +192,13 @@ fn Wildcard() -> Token:
 
 
 @always_inline
-fn NotToken(char: String) -> Token:
+fn NotToken(char: Int) -> Token:
     """Token of the negation."""
     return Token(Token.NOTTOKEN, char=char)
 
 
 @always_inline
-fn StartToken(char: String) -> Token:
+fn StartToken(char: Int) -> Token:
     """Token of match start."""
     return Token(Token.START, char=char)
 
@@ -181,7 +210,7 @@ fn Start() -> Token:
 
 
 @always_inline
-fn EndToken(char: String) -> Token:
+fn EndToken(char: Int) -> Token:
     """Token of match end."""
     return Token(Token.END, char=char)
 
@@ -241,19 +270,19 @@ fn RightBracket() -> Token:
 
 
 @always_inline
-fn ZeroOrMore(char: String) -> Token:
+fn ZeroOrMore(char: Int) -> Token:
     """Quantifier 'zero or more' token."""
     return Token(type=Token.ZEROORMORE, char=char)
 
 
 @always_inline
-fn OneOrMore(char: String) -> Token:
+fn OneOrMore(char: Int) -> Token:
     """Quantifier 'one or more' token."""
     return Token(type=Token.ONEORMORE, char=char)
 
 
 @always_inline
-fn ZeroOrOne(char: String) -> Token:
+fn ZeroOrOne(char: Int) -> Token:
     """Quantifier 'zero or one' token."""
     return Token(type=Token.ZEROORONE, char=char)
 
@@ -271,7 +300,7 @@ fn QuestionMark() -> Token:
 
 
 @always_inline
-fn OrToken(char: String) -> Token:
+fn OrToken(char: Int) -> Token:
     """Token of the or."""
     return Token(type=Token.ORTOKEN, char=char)
 
@@ -295,18 +324,18 @@ fn Dash() -> Token:
 
 
 @always_inline
-fn ElementToken(char: String) -> Token:
+fn ElementToken(char: Int) -> Token:
     """Token that are not associated to special meaning."""
     return Token(type=Token.ELEMENT, char=char)
 
 
 @always_inline
-fn SpaceToken(char: String) -> Token:
+fn SpaceToken(char: Int) -> Token:
     """Token of a space."""
     return Token(type=Token.SPACE, char=char)
 
 
 @always_inline
-fn DigitToken(char: String) -> Token:
+fn DigitToken(char: Int) -> Token:
     """Token of a digit."""
     return Token(type=Token.DIGIT, char=char)

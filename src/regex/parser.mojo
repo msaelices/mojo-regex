@@ -1,5 +1,6 @@
 from regex.lexer import scan
 from regex.tokens import (
+    CHAR_COLON,
     Token,
     ElementToken,
     SpaceToken,
@@ -67,12 +68,16 @@ fn check_for_quantifiers[
     elif next_token.type == Token.LEFTCURLYBRACE:
         # Parse curly brace quantifiers
         i += 2  # Skip element and {
-        var min_val = String("")
-        var max_val = String("")
+        var min_val = String(
+            capacity=String.INLINE_CAPACITY
+        )  # Pre-allocate for min value
+        var max_val = String(
+            capacity=String.INLINE_CAPACITY
+        )  # Pre-allocate for max value
 
         # Parse min value
         while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-            min_val += tokens[i].char
+            min_val += String(chr(tokens[i].char))
             i += 1
 
         elem.min = atol(min_val) if min_val != "" else 0
@@ -82,7 +87,7 @@ fn check_for_quantifiers[
             i += 1  # Skip comma
             # Parse max value
             while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                max_val += tokens[i].char
+                max_val += String(chr(tokens[i].char))
                 i += 1
             elem.max = atol(max_val) if max_val != "" else -1
         else:
@@ -227,7 +232,7 @@ fn parse_token_list[
             var elem = Element[regex_origin](
                 regex=regex,
                 start_idx=token.start_pos,
-                end_idx=token.start_pos + len(token.char),
+                end_idx=token.start_pos + 1,  # Single codepoint
             )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
@@ -283,7 +288,6 @@ fn parse_token_list[
             # Handle character ranges
             var bracket_start_pos = token.start_pos
             i += 1
-            var range_str = String("")
             var positive_logic = True
 
             if i < len(tokens) and (
@@ -294,7 +298,6 @@ fn parse_token_list[
                 i += 1
 
             while i < len(tokens) and tokens[i].type != Token.RIGHTBRACKET:
-                var current_token = tokens[i]
                 # Check for range pattern like 'a-z'
                 if (
                     i + 2 < len(tokens)
@@ -302,13 +305,9 @@ fn parse_token_list[
                     and tokens[i + 2].type == Token.ELEMENT
                 ):
                     # We have a range like 'a-z'
-                    var start_char = current_token.char
-                    var end_char = tokens[i + 2].char
-                    range_str += get_range_str(start_char, end_char)
                     i += 3  # Skip start, dash, and end
                 else:
                     # Single character
-                    range_str += current_token.char
                     i += 1
 
             if i >= len(tokens):
@@ -339,7 +338,7 @@ fn parse_token_list[
                 i + 1 < len(tokens)
                 and tokens[i].type == Token.QUESTIONMARK
                 and tokens[i + 1].type == Token.ELEMENT
-                and tokens[i + 1].char == ":"
+                and tokens[i + 1].char == CHAR_COLON
             ):
                 is_capturing = False
                 i += 2  # Skip ? and :

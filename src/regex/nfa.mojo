@@ -369,7 +369,7 @@ struct NFAEngine(Engine):
         var ch_found = False
 
         if ast.get_value():
-            var range_pattern = String(ast.get_value().value())
+            var range_pattern = ast.get_value().value()
             ch_found = ast._is_char_in_range(ch, range_pattern)
 
         if ch_found == ast.positive_logic:
