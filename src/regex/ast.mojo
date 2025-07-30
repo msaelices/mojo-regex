@@ -337,7 +337,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = False
             if self.get_value():
-                var range_pattern = String(self.get_value().value())
+                var range_pattern = self.get_value().value()
                 ch_found = self._is_char_in_range(value, range_pattern)
             return not (
                 ch_found ^ self.positive_logic
@@ -349,7 +349,11 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         else:
             return False
 
-    fn _is_char_in_range(self, ch: String, range_pattern: String) -> Bool:
+    fn _is_char_in_range(
+        self,
+        ch: String,
+        range_pattern: StringSlice[__origin_of(self.regex_ptr[].pattern)],
+    ) -> Bool:
         """Check if a character is in a range pattern like '[a-z]' or 'abcxyz'.
         """
         # If the range_pattern starts with '[', it's the original pattern like "[a-z]"
@@ -363,7 +367,9 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             return range_pattern.find(ch) != -1
 
     fn _char_matches_range_syntax(
-        self, ch: String, range_syntax: String
+        self,
+        ch: String,
+        range_syntax: StringSlice[__origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
         """Check if a character matches range syntax like 'a-z' or 'abc'."""
         var i = 0
