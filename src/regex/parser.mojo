@@ -1,6 +1,6 @@
+from regex.constants import CHAR_COLON
 from regex.lexer import scan
 from regex.tokens import (
-    CHAR_COLON,
     Token,
     ElementToken,
     SpaceToken,
