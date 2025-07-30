@@ -15,6 +15,15 @@ from regex.optimizer import (
     get_literal_string,
     pattern_has_anchors,
 )
+from regex.tokens import (
+    CHAR_A,
+    CHAR_A_UPPER,
+    CHAR_Z,
+    CHAR_Z_UPPER,
+    CHAR_ZERO,
+    CHAR_NINE,
+    DIGITS,
+)
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -22,7 +31,6 @@ alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 # Pre-defined character sets for efficient lookup
 alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
 alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-alias DIGITS = "0123456789"
 alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
@@ -67,21 +75,21 @@ fn expand_character_range(range_str: String) -> String:
         var end_char = inner[2]
 
         # Handle lowercase letter ranges
-        if ord(start_char) >= ord("a") and ord(end_char) <= ord("z"):
-            var start_idx = ord(start_char) - ord("a")
-            var end_idx = ord(end_char) - ord("a") + 1
+        if ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z:
+            var start_idx = ord(start_char) - CHAR_A
+            var end_idx = ord(end_char) - CHAR_A + 1
             return String(LOWERCASE_LETTERS)[start_idx:end_idx]
 
         # Handle uppercase letter ranges
-        elif ord(start_char) >= ord("A") and ord(end_char) <= ord("Z"):
-            var start_idx = ord(start_char) - ord("A")
-            var end_idx = ord(end_char) - ord("A") + 1
+        elif ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z_UPPER:
+            var start_idx = ord(start_char) - CHAR_A_UPPER
+            var end_idx = ord(end_char) - CHAR_A_UPPER + 1
             return String(UPPERCASE_LETTERS)[start_idx:end_idx]
 
         # Handle digit ranges
-        elif ord(start_char) >= ord("0") and ord(end_char) <= ord("9"):
-            var start_idx = ord(start_char) - ord("0")
-            var end_idx = ord(end_char) - ord("0") + 1
+        elif ord(start_char) >= CHAR_ZERO and ord(end_char) <= CHAR_NINE:
+            var start_idx = ord(start_char) - CHAR_ZERO
+            var end_idx = ord(end_char) - CHAR_ZERO + 1
             return String(DIGITS)[start_idx:end_idx]
 
     # Fallback for complex cases - expand all ranges and characters
@@ -732,13 +740,13 @@ struct DFAEngine(Engine):
                 # Optimize for [a-zA-Z0-9] - add transitions in batches
                 # Add lowercase letters
                 for i in range(26):
-                    state.add_transition(ord("a") + i, to_state)
+                    state.add_transition(CHAR_A + i, to_state)
                 # Add uppercase letters
                 for i in range(26):
-                    state.add_transition(ord("A") + i, to_state)
+                    state.add_transition(CHAR_A_UPPER + i, to_state)
                 # Add digits
                 for i in range(10):
-                    state.add_transition(ord("0") + i, to_state)
+                    state.add_transition(CHAR_ZERO + i, to_state)
             else:
                 # General case - iterate through each character
                 for i in range(char_class_len):
@@ -1010,7 +1018,7 @@ struct BoyerMoore:
             var j = m - 1
 
             # Compare pattern from right to left
-            while j >= 0 and String(self.pattern[j]) == String(text[s + j]):
+            while j >= 0 and self.pattern[j] == text[s + j]:
                 j -= 1
 
             if j < 0:
@@ -1018,7 +1026,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = ord(String(text[s + j]))
+                var bad_char = ord(text[s + j])
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 
@@ -1305,7 +1313,7 @@ fn _extract_sequential_pattern_info(
                 var char_class: String
 
                 if element.type == DIGIT:
-                    char_class = "0123456789"
+                    char_class = DIGITS
                 elif element.type == RANGE:
                     var range_value = String(
                         element.get_value().value()

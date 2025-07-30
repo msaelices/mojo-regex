@@ -21,6 +21,10 @@ alias CHAR_QUESTION_MARK = ord("?")
 alias CHAR_END = ord("$")
 alias CHAR_ZERO = ord("0")
 alias CHAR_NINE = ord("9")
+alias CHAR_A = ord("a")
+alias CHAR_Z = ord("z")
+alias CHAR_A_UPPER = ord("A")
+alias CHAR_Z_UPPER = ord("Z")
 
 
 struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
