@@ -23,34 +23,34 @@ from regex.tokens import (
     ElementToken,
     SpaceToken,
     DigitToken,
+    DIGITS,
+    CHAR_TAB,
+    CHAR_SPACE,
+    CHAR_DIGIT,
+    CHAR_DOT,
+    CHAR_SLASH,
+    CHAR_LEFT_PAREN,
+    CHAR_RIGHT_PAREN,
+    CHAR_LEFT_BRACKET,
+    CHAR_RIGHT_BRACKET,
+    CHAR_LEFT_CURLY,
+    CHAR_RIGHT_CURLY,
+    CHAR_CIRCUMFLEX,
+    CHAR_VERTICAL_BAR,
+    CHAR_DASH,
+    CHAR_COMMA,
+    CHAR_ASTERISK,
+    CHAR_PLUS,
+    CHAR_QUESTION_MARK,
+    CHAR_END,
+    CHAR_ZERO,
+    CHAR_NINE,
 )
-
-alias DIGITS: String = "0123456789"
-alias CHAR_TAB = Codepoint.ord("t")
-alias CHAR_SPACE = Codepoint.ord("s")
-alias CHAR_DIGIT = Codepoint.ord("d")
-alias CHAR_DOT = Codepoint.ord(".")
-alias CHAR_SLASH = Codepoint.ord("\\")
-alias CHAR_LEFT_PAREN = Codepoint.ord("(")
-alias CHAR_RIGHT_PAREN = Codepoint.ord(")")
-alias CHAR_LEFT_BRACKET = Codepoint.ord("[")
-alias CHAR_RIGHT_BRACKET = Codepoint.ord("]")
-alias CHAR_LEFT_CURLY = Codepoint.ord("{")
-alias CHAR_RIGHT_CURLY = Codepoint.ord("}")
-alias CHAR_CIRCUMFLEX = Codepoint.ord("^")
-alias CHAR_VERTICAL_BAR = Codepoint.ord("|")
-alias CHAR_DASH = Codepoint.ord("-")
-alias CHAR_COMMA = Codepoint.ord(",")
-alias CHAR_ASTERISK = Codepoint.ord("*")
-alias CHAR_PLUS = Codepoint.ord("+")
-alias CHAR_QUESTION_MARK = Codepoint.ord("?")
-alias CHAR_END = Codepoint.ord("$")
 
 
 @always_inline
-fn _is_digit(ch: Codepoint) -> Bool:
-    var ch_int = ch.__int__()
-    return ch_int >= ord("0") and ch_int <= ord("9")
+fn _is_digit(ch: Int) -> Bool:
+    return ch >= CHAR_ZERO and ch <= CHAR_NINE
 
 
 fn scan(regex: String) raises -> List[Token]:
@@ -68,12 +68,11 @@ fn scan(regex: String) raises -> List[Token]:
     var regex_bytes = regex.as_bytes()
 
     while i < len(regex):
-        var ch_slice = StringSlice(unsafe_from_utf8=regex_bytes[i : i + 1])
-        var ch_codepoint = Codepoint.ord(ch_slice)
+        var ch_codepoint = Int(regex_bytes[i])
 
         if escape_found:
             if ch_codepoint == CHAR_TAB:
-                var token = ElementToken(char=Codepoint.ord(StringSlice("\t")))
+                var token = ElementToken(char=ord(StringSlice("\t")))
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
             elif ch_codepoint == CHAR_SPACE:
@@ -122,12 +121,8 @@ fn scan(regex: String) raises -> List[Token]:
             tokens.append(token)
             i += 1
             while i < len(regex):
-                var inner_ch_slice = StringSlice(
-                    unsafe_from_utf8=regex_bytes[i : i + 1]
-                )
-                var inner_ch_codepoint = Codepoint.ord(inner_ch_slice)
-                var inner_ch = String(regex[i])
-                if inner_ch == ",":
+                var inner_ch_codepoint = Int(regex_bytes[i])
+                if inner_ch_codepoint == CHAR_COMMA:
                     var comma_token = Comma()
                     comma_token.start_pos = i
                     tokens.append(comma_token)
@@ -135,13 +130,15 @@ fn scan(regex: String) raises -> List[Token]:
                     var digit_token = ElementToken(char=inner_ch_codepoint)
                     digit_token.start_pos = i
                     tokens.append(digit_token)
-                elif inner_ch == "}":
+                elif inner_ch_codepoint == CHAR_RIGHT_CURLY:
                     var brace_token = RightCurlyBrace()
                     brace_token.start_pos = i
                     tokens.append(brace_token)
                     break
                 else:
-                    raise Error("Bad token at index " + String(i) + ".")
+                    raise Error(
+                        "Bad token at index ", i, ".", chr(ch_codepoint)
+                    )
                 i += 1
         elif ch_codepoint == CHAR_CIRCUMFLEX:
             if i == 0:

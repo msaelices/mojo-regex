@@ -45,6 +45,8 @@ from regex.ast import (
     GROUP,
 )
 
+alias CHAR_COLON = ord(":")
+
 
 @always_inline
 fn check_for_quantifiers[
@@ -339,7 +341,7 @@ fn parse_token_list[
                 i + 1 < len(tokens)
                 and tokens[i].type == Token.QUESTIONMARK
                 and tokens[i + 1].type == Token.ELEMENT
-                and tokens[i + 1].char == Codepoint.ord(StringSlice(":"))
+                and tokens[i + 1].char == CHAR_COLON
             ):
                 is_capturing = False
                 i += 2  # Skip ? and :
