@@ -379,6 +379,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_start(
         self, ast: ASTNode, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
@@ -388,6 +389,7 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_end(
         self, ast: ASTNode, str: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
