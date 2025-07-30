@@ -1,10 +1,5 @@
 from testing import assert_equal, assert_not_equal, assert_true
-
-
-@always_inline
-fn assert_char_equal(actual: Codepoint, expected: String) raises:
-    """Helper to compare Codepoint with expected string."""
-    assert_equal(actual, Codepoint.ord(StringSlice(expected)))
+from testutils import assert_char_equal
 
 
 from regex.tokens import (
@@ -42,7 +37,7 @@ def test_Asterisk():
 
 
 def test_NotToken():
-    var nt = NotToken(char=Codepoint.ord(StringSlice("^")))
+    var nt = NotToken(char=ord("^"))
     assert_true(Bool(nt))
     assert_char_equal(nt.char, "^")
 
@@ -54,7 +49,7 @@ def test_Wildcard():
 
 
 def test_StartToken():
-    var st = StartToken(char=Codepoint.ord(StringSlice("^")))
+    var st = StartToken(char=ord("^"))
     assert_true(Bool(st))
     assert_char_equal(st.char, "^")
 
@@ -66,7 +61,7 @@ def test_Start():
 
 
 def test_EndToken():
-    var et = EndToken(char=Codepoint.ord(StringSlice("$")))
+    var et = EndToken(char=ord("$"))
     assert_true(Bool(et))
     assert_char_equal(et.char, "$")
 
@@ -126,19 +121,19 @@ def test_RightBracket():
 
 
 def test_ZeroOrMore():
-    var zom = ZeroOrMore(char=Codepoint.ord(StringSlice("*")))
+    var zom = ZeroOrMore(char=ord("*"))
     assert_true(Bool(zom))
     assert_char_equal(zom.char, "*")
 
 
 def test_OneOrMore():
-    var oom = OneOrMore(char=Codepoint.ord(StringSlice("+")))
+    var oom = OneOrMore(char=ord("+"))
     assert_true(Bool(oom))
     assert_char_equal(oom.char, "+")
 
 
 def test_ZeroOrOne():
-    var zoo = ZeroOrOne(char=Codepoint.ord(StringSlice("?")))
+    var zoo = ZeroOrOne(char=ord("?"))
     assert_true(Bool(zoo))
     assert_char_equal(zoo.char, "?")
 
@@ -156,7 +151,7 @@ def test_QuestionMark():
 
 
 def test_OrToken():
-    var ot = OrToken(char=Codepoint.ord(StringSlice("|")))
+    var ot = OrToken(char=ord("|"))
     assert_true(Bool(ot))
     assert_char_equal(ot.char, "|")
 

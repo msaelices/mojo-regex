@@ -1,12 +1,7 @@
 from testing import assert_equal, assert_raises, assert_true
+from testutils import assert_char_equal
 
 from regex.lexer import scan
-
-
-@always_inline
-fn assert_char_equal(actual: Int, expected: String) raises:
-    """Helper to compare Codepoint with expected string."""
-    assert_equal(actual, ord(StringSlice(expected)))
 
 
 from regex.tokens import (
