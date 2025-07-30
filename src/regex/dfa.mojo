@@ -6,7 +6,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
 from regex.ast import ASTNode
-from regex.constants import ALL_EXCEPT_NEWLINE
+from regex.aliases import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.optimizer import (
@@ -94,7 +94,9 @@ fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
             return DIGITS[start_idx:end_idx]
 
     # Fallback for complex cases - expand all ranges and characters
-    var result = String(capacity=256)  # Pre-allocate for worst case
+    var result = String(
+        capacity=String.INLINE_CAPACITY
+    )  # Pre-allocate for worst case
     var i = 0
     while i < len(inner):
         if i + 2 < len(inner) and inner[i + 1] == "-":
@@ -199,7 +201,6 @@ struct DFAEngine(Engine):
 
     var states: List[DFAState]
     var start_state: Int
-    var compiled_pattern: String  # The pattern this DFA was compiled from
     var has_start_anchor: Bool  # Pattern starts with ^
     var has_end_anchor: Bool  # Pattern ends with $
 
@@ -207,7 +208,6 @@ struct DFAEngine(Engine):
         """Initialize an empty DFA engine."""
         self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
-        self.compiled_pattern = ""
         self.has_start_anchor = False
         self.has_end_anchor = False
 
@@ -215,7 +215,6 @@ struct DFAEngine(Engine):
         """Move constructor."""
         self.states = other.states^
         self.start_state = other.start_state
-        self.compiled_pattern = other.compiled_pattern^
         self.has_start_anchor = other.has_start_anchor
         self.has_end_anchor = other.has_end_anchor
 
@@ -236,7 +235,6 @@ struct DFAEngine(Engine):
             has_end_anchor: Whether pattern has $ anchor.
         """
         var len_pattern = len(pattern)
-        self.compiled_pattern = pattern^
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
 
@@ -248,7 +246,7 @@ struct DFAEngine(Engine):
         # Set up transitions for each character in the pattern
         for i in range(len_pattern):
             var state = DFAState()
-            var char_code = ord(self.compiled_pattern[i])
+            var char_code = ord(pattern[i])
             state.add_transition(char_code, i + 1)
             self.states.append(state)
 
@@ -287,9 +285,6 @@ struct DFAEngine(Engine):
             max_matches: Maximum number of matches (-1 for unlimited).
             positive_logic: True for [a-z], False for [^a-z].
         """
-        var prefix = "[" if positive_logic else "[^"
-        self.compiled_pattern = String(prefix, char_class^, "]")
-
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
             var start_state = DFAState(is_accepting=True, match_length=0)
@@ -385,7 +380,6 @@ struct DFAEngine(Engine):
         Args:
             pattern_info: Information about the sequential pattern elements.
         """
-        self.compiled_pattern = "sequential_pattern"
         self.has_start_anchor = pattern_info.has_start_anchor
         self.has_end_anchor = pattern_info.has_end_anchor
 
@@ -495,7 +489,6 @@ struct DFAEngine(Engine):
         Args:
             sequence_info: Information about the character class sequence elements.
         """
-        self.compiled_pattern = "multi_char_class_sequence"
         self.has_start_anchor = sequence_info.has_start_anchor
         self.has_end_anchor = sequence_info.has_end_anchor
 
@@ -1190,15 +1183,13 @@ fn _extract_character_class_info(
     if ast.type == DIGIT or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
-        if ast.get_child(0).type == DIGIT or ast.get_child(0).type == RANGE:
-            class_node = ast.get_child(0)
-        elif (
-            ast.get_child(0).type == GROUP
-            and ast.get_child(0).get_children_len() == 1
-        ):
-            class_node = ast.get_child(0).get_child(0)
+        ref ast_child = ast.get_child(0)
+        if ast_child.type == DIGIT or ast_child.type == RANGE:
+            class_node = ast_child
+        elif ast_child.type == GROUP and ast_child.get_children_len() == 1:
+            class_node = ast_child.get_child(0)
         else:
-            class_node = ast.get_child(0)  # fallback
+            class_node = ast_child  # fallback
         # Check for anchors at root level
         has_start, has_end = pattern_has_anchors(ast)
     else:

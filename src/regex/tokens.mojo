@@ -1,30 +1,33 @@
-alias DIGITS: String = "0123456789"
-alias CHAR_TAB = ord("t")
-alias CHAR_SPACE = ord("s")
-alias CHAR_DIGIT = ord("d")
-alias CHAR_COLON = ord(":")
-alias CHAR_DOT = ord(".")
-alias CHAR_SLASH = ord("\\")
-alias CHAR_LEFT_PAREN = ord("(")
-alias CHAR_RIGHT_PAREN = ord(")")
-alias CHAR_LEFT_BRACKET = ord("[")
-alias CHAR_RIGHT_BRACKET = ord("]")
-alias CHAR_LEFT_CURLY = ord("{")
-alias CHAR_RIGHT_CURLY = ord("}")
-alias CHAR_CIRCUMFLEX = ord("^")
-alias CHAR_VERTICAL_BAR = ord("|")
-alias CHAR_DASH = ord("-")
-alias CHAR_COMMA = ord(",")
-alias CHAR_ASTERISK = ord("*")
-alias CHAR_PLUS = ord("+")
-alias CHAR_QUESTION_MARK = ord("?")
-alias CHAR_END = ord("$")
-alias CHAR_ZERO = ord("0")
-alias CHAR_NINE = ord("9")
-alias CHAR_A = ord("a")
-alias CHAR_Z = ord("z")
-alias CHAR_A_UPPER = ord("A")
-alias CHAR_Z_UPPER = ord("Z")
+from regex.aliases import (
+    DIGITS,
+    CHAR_TAB,
+    CHAR_SPACE,
+    CHAR_DIGIT,
+    CHAR_COLON,
+    CHAR_DOT,
+    CHAR_SLASH,
+    CHAR_LEFT_PAREN,
+    CHAR_RIGHT_PAREN,
+    CHAR_LEFT_BRACKET,
+    CHAR_RIGHT_BRACKET,
+    CHAR_LEFT_CURLY,
+    CHAR_RIGHT_CURLY,
+    CHAR_CIRCUMFLEX,
+    CHAR_VERTICAL_BAR,
+    CHAR_DASH,
+    CHAR_COMMA,
+    CHAR_ASTERISK,
+    CHAR_PLUS,
+    CHAR_QUESTION_MARK,
+    CHAR_END,
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_A,
+    CHAR_Z,
+    CHAR_A_UPPER,
+    CHAR_Z_UPPER,
+    CHAR_NEWLINE,
+)
 
 
 struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):

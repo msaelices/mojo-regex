@@ -1,7 +1,7 @@
 from memory import UnsafePointer
 
 from regex.ast import ASTNode
-from regex.constants import ZERO_CODE, NINE_CODE
+from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
@@ -182,7 +182,7 @@ struct NFAEngine(Engine):
     fn _match_node(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool = False,
@@ -192,7 +192,7 @@ struct NFAEngine(Engine):
 
         Args:
             ast: The AST node to match
-            string: The input string
+            str: The input string
             str_i: Current position in string
             matches: List to collect matched groups
             match_first_mode: If True, optimize for match_first() with early termination
@@ -216,32 +216,32 @@ struct NFAEngine(Engine):
 
         if ast.type == ELEMENT:
             return self._match_element(
-                ast, string, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == WILDCARD:
             return self._match_wildcard(
-                ast, string, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == SPACE:
             return self._match_space(
-                ast, string, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == DIGIT:
             return self._match_digit(
-                ast, string, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == RANGE:
             return self._match_range(
-                ast, string, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == START:
-            return self._match_start(ast, string, str_i)
+            return self._match_start(ast, str_i)
         elif ast.type == END:
-            return self._match_end(ast, string, str_i)
+            return self._match_end(ast, str, str_i)
         elif ast.type == OR:
             return self._match_or(
                 ast,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -250,7 +250,7 @@ struct NFAEngine(Engine):
         elif ast.type == GROUP:
             return self._match_group(
                 ast,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -259,7 +259,7 @@ struct NFAEngine(Engine):
         elif ast.type == RE:
             return self._match_re(
                 ast,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -272,19 +272,19 @@ struct NFAEngine(Engine):
     fn _match_element(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a literal character element."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
+        var ch = String(str[str_i])
         if ast.get_value() and ast.get_value().value() == ch:
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -293,19 +293,19 @@ struct NFAEngine(Engine):
     fn _match_wildcard(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match wildcard (.) - any character except newline."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
-        if ch != "\n":
+        var ch_code = ord(str[str_i])
+        if ch_code != CHAR_NEWLINE:  # Exclude newline
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -314,19 +314,19 @@ struct NFAEngine(Engine):
     fn _match_space(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match whitespace character (\\s)."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
+        var ch = String(str[str_i])
         if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -335,19 +335,19 @@ struct NFAEngine(Engine):
     fn _match_digit(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
-        if ZERO_CODE <= ord(ch) <= NINE_CODE:
+        var ch = String(str[str_i])
+        if CHAR_ZERO <= ord(ch) <= CHAR_NINE:
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -356,16 +356,16 @@ struct NFAEngine(Engine):
     fn _match_range(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match character range [abc] or [^abc]."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
+        var ch = String(str[str_i])
         var ch_found = False
 
         if ast.get_value():
@@ -374,13 +374,14 @@ struct NFAEngine(Engine):
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_start(
-        self, ast: ASTNode, string: String, str_i: Int
+        self, ast: ASTNode, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match start anchor (^)."""
         if str_i == 0:
@@ -388,11 +389,12 @@ struct NFAEngine(Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     fn _match_end(
-        self, ast: ASTNode, string: String, str_i: Int
+        self, ast: ASTNode, str: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match end anchor ($)."""
-        if str_i == len(string):
+        if str_i == len(str):
             return (True, str_i)
         else:
             return (False, str_i)
@@ -400,7 +402,7 @@ struct NFAEngine(Engine):
     fn _match_or(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -413,7 +415,7 @@ struct NFAEngine(Engine):
         # Try left branch first
         var left_result = self._match_node(
             ast.get_child(0),
-            string,
+            str,
             str_i,
             matches,
             match_first_mode,
@@ -425,7 +427,7 @@ struct NFAEngine(Engine):
         # If left fails, try right branch
         var right_result = self._match_node(
             ast.get_child(1),
-            string,
+            str,
             str_i,
             matches,
             match_first_mode,
@@ -436,7 +438,7 @@ struct NFAEngine(Engine):
     fn _match_group(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -450,7 +452,7 @@ struct NFAEngine(Engine):
         if self._has_quantifier(ast):
             return self._match_group_with_quantifier(
                 ast,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -461,7 +463,7 @@ struct NFAEngine(Engine):
         var result = self._match_sequence(
             ast,
             0,
-            string,
+            str,
             str_i,
             matches,
             match_first_mode,
@@ -472,7 +474,7 @@ struct NFAEngine(Engine):
 
         # If this is a capturing group, add the match
         if ast.is_capturing():
-            var matched = Match(0, start_pos, result[1], string)
+            var matched = Match(0, start_pos, result[1], str)
             matches.append(matched)
 
         return result
@@ -480,7 +482,7 @@ struct NFAEngine(Engine):
     fn _match_group_with_quantifier(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -489,19 +491,18 @@ struct NFAEngine(Engine):
         """Match a group that has a quantifier applied to it."""
         var min_matches = ast.min
         var max_matches = ast.max
-        var _ = str_i
         var current_pos = str_i
         var group_matches = 0
 
         if max_matches == -1:
-            max_matches = len(string) - str_i
+            max_matches = len(str) - str_i
 
         # Use regular greedy matching with conservative early termination
-        while group_matches < max_matches and current_pos <= len(string):
+        while group_matches < max_matches and current_pos <= len(str):
             var group_result = self._match_sequence(
                 ast,
                 0,
-                string,
+                str,
                 current_pos,
                 matches,
                 match_first_mode,
@@ -518,7 +519,7 @@ struct NFAEngine(Engine):
                 ):
                     break
                 if ast.is_capturing():
-                    var matched = Match(0, str_i, current_pos, string)
+                    var matched = Match(0, str_i, current_pos, str)
                     matches.append(matched)
             else:
                 break
@@ -533,7 +534,7 @@ struct NFAEngine(Engine):
         self,
         ast_parent: ASTNode,
         child_index: Int,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -547,7 +548,7 @@ struct NFAEngine(Engine):
         if child_index == children_len - 1:
             return self._match_node(
                 ast_parent.get_child(child_index),
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -555,7 +556,7 @@ struct NFAEngine(Engine):
             )
 
         # For multiple remaining children, we need to handle backtracking
-        var first_child = ast_parent.get_child(child_index)
+        ref first_child = ast_parent.get_child(child_index)
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
@@ -563,7 +564,7 @@ struct NFAEngine(Engine):
                 first_child,
                 ast_parent,
                 child_index + 1,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -573,7 +574,7 @@ struct NFAEngine(Engine):
             # Simple case: match first child normally, then recursively match rest
             var result = self._match_node(
                 first_child,
-                string,
+                str,
                 str_i,
                 matches,
                 match_first_mode,
@@ -584,7 +585,7 @@ struct NFAEngine(Engine):
             return self._match_sequence(
                 ast_parent,
                 child_index + 1,
-                string,
+                str,
                 result[1],
                 matches,
                 match_first_mode,
@@ -602,7 +603,7 @@ struct NFAEngine(Engine):
         quantified_node: ASTNode,
         ast_parent: ASTNode,
         remaining_index: Int,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -614,14 +615,14 @@ struct NFAEngine(Engine):
         var max_matches = quantified_node.max
 
         if max_matches == -1:
-            max_matches = len(string) - str_i
+            max_matches = len(str) - str_i
 
         # Use regular greedy backtracking but with conservative early termination
         var match_count = max_matches
         while match_count >= min_matches:
             var consumed = self._try_match_count(
                 quantified_node,
-                string,
+                str,
                 str_i,
                 match_count,
                 match_first_mode,
@@ -640,7 +641,7 @@ struct NFAEngine(Engine):
                 var result = self._match_sequence(
                     ast_parent,
                     remaining_index,
-                    string,
+                    str,
                     new_pos,
                     matches,
                     match_first_mode,
@@ -656,7 +657,7 @@ struct NFAEngine(Engine):
     fn _try_match_count(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         count: Int,
         match_first_mode: Bool,
@@ -667,7 +668,7 @@ struct NFAEngine(Engine):
         var pos = str_i
         var matched = 0
 
-        while matched < count and pos < len(string):
+        while matched < count and pos < len(str):
             # Conservative early termination for match_first_mode only in extreme cases
             if (
                 match_first_mode
@@ -676,7 +677,7 @@ struct NFAEngine(Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match(String(string[pos]), pos, len(string)):
+            if ast.is_match(String(str[pos]), pos, len(str)):
                 matched += 1
                 pos += 1
             else:
@@ -690,7 +691,7 @@ struct NFAEngine(Engine):
     fn _match_re(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
         match_first_mode: Bool,
@@ -702,7 +703,7 @@ struct NFAEngine(Engine):
 
         return self._match_node(
             ast.get_child(0),
-            string,
+            str,
             str_i,
             matches,
             match_first_mode,
@@ -712,7 +713,7 @@ struct NFAEngine(Engine):
     fn _apply_quantifier(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         char_consumed: Int,
         match_first_mode: Bool,
@@ -723,7 +724,7 @@ struct NFAEngine(Engine):
         var max_matches = ast.max
 
         if max_matches == -1:  # Unlimited
-            max_matches = len(string) - str_i
+            max_matches = len(str) - str_i
 
         # If we have a simple single match (min=1, max=1)
         if min_matches == 1 and max_matches == 1:
@@ -734,16 +735,14 @@ struct NFAEngine(Engine):
         var current_pos = str_i
 
         # Try to match as many times as possible (greedy)
-        while matches_count < max_matches and current_pos < len(string):
+        while matches_count < max_matches and current_pos < len(str):
             # Early termination for match_first_mode: if we're getting too far from start
             if match_first_mode and required_start_pos >= 0:
                 # Allow reasonable expansion but prevent excessive backtracking
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
 
-            if ast.is_match(
-                String(string[current_pos]), current_pos, len(string)
-            ):
+            if ast.is_match(String(str[current_pos]), current_pos, len(str)):
                 matches_count += 1
                 current_pos += 1
             else:

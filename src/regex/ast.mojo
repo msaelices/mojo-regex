@@ -3,7 +3,7 @@ from builtin._location import __call_location
 from memory import UnsafePointer
 from os import abort
 
-from regex.constants import ZERO_CODE, NINE_CODE
+from regex.aliases import CHAR_ZERO, CHAR_NINE
 
 
 alias RE = 0
@@ -331,7 +331,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         elif self.type == DIGIT:
             if len(value) == 1:
                 var ch_code = ord(value)
-                return ZERO_CODE <= ch_code <= NINE_CODE
+                return CHAR_ZERO <= ch_code <= CHAR_NINE
             return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
