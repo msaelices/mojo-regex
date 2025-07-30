@@ -68,12 +68,12 @@ fn check_for_quantifiers[
     elif next_token.type == Token.LEFTCURLYBRACE:
         # Parse curly brace quantifiers
         i += 2  # Skip element and {
-        var min_val = String(capacity=len(tokens) - i)
-        var max_val = String(capacity=len(tokens) - i)
+        var min_val = String("")
+        var max_val = String("")
 
         # Parse min value
         while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-            min_val += String(chr(tokens[i].char.__int__()))
+            min_val += String(chr(tokens[i].char))
             i += 1
 
         elem.min = atol(min_val) if min_val != "" else 0
@@ -83,7 +83,7 @@ fn check_for_quantifiers[
             i += 1  # Skip comma
             # Parse max value
             while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                max_val += String(chr(tokens[i].char.__int__()))
+                max_val += String(chr(tokens[i].char))
                 i += 1
             elem.max = atol(max_val) if max_val != "" else -1
         else:
