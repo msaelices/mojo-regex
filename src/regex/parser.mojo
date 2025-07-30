@@ -1,4 +1,4 @@
-from regex.constants import CHAR_COLON
+from regex.aliases import CHAR_COLON
 from regex.lexer import scan
 from regex.tokens import (
     Token,

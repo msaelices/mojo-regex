@@ -1,4 +1,4 @@
-from regex.constants import (
+from regex.aliases import (
     CHAR_ASTERISK,
     CHAR_CIRCUMFLEX,
     CHAR_COMMA,

@@ -3,7 +3,7 @@ from builtin._location import __call_location
 from memory import UnsafePointer
 from os import abort
 
-from regex.constants import CHAR_ZERO, CHAR_NINE
+from regex.aliases import CHAR_ZERO, CHAR_NINE
 
 
 alias RE = 0

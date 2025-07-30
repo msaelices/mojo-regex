@@ -1,4 +1,4 @@
-from regex.constants import (
+from regex.aliases import (
     DIGITS,
     CHAR_TAB,
     CHAR_SPACE,
