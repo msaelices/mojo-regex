@@ -6,7 +6,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
 from regex.ast import ASTNode
-from regex.constants import ALL_EXCEPT_NEWLINE
+from regex.aliases import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.optimizer import (

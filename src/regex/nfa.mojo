@@ -1,7 +1,7 @@
 from memory import UnsafePointer
 
 from regex.ast import ASTNode
-from regex.constants import ZERO_CODE, NINE_CODE
+from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
@@ -293,19 +293,19 @@ struct NFAEngine(Engine):
     fn _match_wildcard(
         self,
         ast: ASTNode,
-        string: String,
+        str: String,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match wildcard (.) - any character except newline."""
-        if str_i >= len(string):
+        if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(string[str_i])
-        if ch != "\n":
+        var ch_code = ord(str[str_i])
+        if ch_code != CHAR_NEWLINE:  # Exclude newline
             return self._apply_quantifier(
-                ast, string, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -345,7 +345,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         var ch = String(string[str_i])
-        if ZERO_CODE <= ord(ch) <= NINE_CODE:
+        if CHAR_ZERO <= ord(ch) <= CHAR_NINE:
             return self._apply_quantifier(
                 ast, string, str_i, 1, match_first_mode, required_start_pos
             )
