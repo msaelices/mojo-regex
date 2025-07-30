@@ -2,7 +2,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token struct."""
 
     var type: Int
-    var char: String
+    var char: Codepoint
     var start_pos: Int  # Position in original pattern where this token starts
 
     alias ELEMENT = 0
@@ -65,50 +65,50 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token of the dash '-'."""
 
     fn __init__(out self, type: Int):
-        var char: String
+        var char: Codepoint
         if type == Self.WILDCARD:
-            char = "."
+            char = Codepoint.ord(StringSlice("."))
         elif type == Self.START:
-            char = "^"
+            char = Codepoint.ord(StringSlice("^"))
         elif type == Self.END:
-            char = "$"
+            char = Codepoint.ord(StringSlice("$"))
         elif type == Self.ESCAPE:
-            char = "\\"
+            char = Codepoint.ord(StringSlice("\\"))
         elif type == Self.COMMA:
-            char = ","
+            char = Codepoint.ord(StringSlice(","))
         elif type == Self.LEFTPARENTHESIS:
-            char = "("
+            char = Codepoint.ord(StringSlice("("))
         elif type == Self.RIGHTPARENTHESIS:
-            char = ")"
+            char = Codepoint.ord(StringSlice(")"))
         elif type == Self.LEFTCURLYBRACE:
-            char = "{"
+            char = Codepoint.ord(StringSlice("{"))
         elif type == Self.RIGHTCURLYBRACE:
-            char = "}"
+            char = Codepoint.ord(StringSlice("}"))
         elif type == Self.LEFTBRACKET:
-            char = "["
+            char = Codepoint.ord(StringSlice("["))
         elif type == Self.RIGHTBRACKET:
-            char = "]"
+            char = Codepoint.ord(StringSlice("]"))
         elif type == Self.ASTERISK:
-            char = "*"
+            char = Codepoint.ord(StringSlice("*"))
         elif type == Self.PLUS:
-            char = "+"
+            char = Codepoint.ord(StringSlice("+"))
         elif type == Self.QUESTIONMARK:
-            char = "?"
+            char = Codepoint.ord(StringSlice("?"))
         elif type == Self.VERTICALBAR:
-            char = "|"
+            char = Codepoint.ord(StringSlice("|"))
         elif type == Self.CIRCUMFLEX:
-            char = "^"
+            char = Codepoint.ord(StringSlice("^"))
         elif type == Self.DASH:
-            char = "-"
+            char = Codepoint.ord(StringSlice("-"))
         elif type == Self.ORTOKEN:
-            char = "|"
+            char = Codepoint.ord(StringSlice("|"))
         else:
-            char = ""
+            char = Codepoint(0)  # Null codepoint
         self.type = type
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: String):
+    fn __init__(out self, type: Int, char: Codepoint):
         """Initialize a Token with a specific type and character.
         Args:
             type: The type of the token.
@@ -118,7 +118,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: String, start_pos: Int):
+    fn __init__(out self, type: Int, char: Codepoint, start_pos: Int):
         """Initialize a Token with a specific type, character and position.
         Args:
             type: The type of the token.
@@ -139,7 +139,7 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
 
     fn __bool__(self: Self) -> Bool:
         """Boolean conversion for Token."""
-        return self.type != Self.ELEMENT or self.char != ""
+        return self.type != Self.ELEMENT or self.char != Codepoint(0)
 
     fn __as_bool__(self) -> Bool:
         """Get the boolean representation of the value.
@@ -163,13 +163,13 @@ fn Wildcard() -> Token:
 
 
 @always_inline
-fn NotToken(char: String) -> Token:
+fn NotToken(char: Codepoint) -> Token:
     """Token of the negation."""
     return Token(Token.NOTTOKEN, char=char)
 
 
 @always_inline
-fn StartToken(char: String) -> Token:
+fn StartToken(char: Codepoint) -> Token:
     """Token of match start."""
     return Token(Token.START, char=char)
 
@@ -181,7 +181,7 @@ fn Start() -> Token:
 
 
 @always_inline
-fn EndToken(char: String) -> Token:
+fn EndToken(char: Codepoint) -> Token:
     """Token of match end."""
     return Token(Token.END, char=char)
 
@@ -241,19 +241,19 @@ fn RightBracket() -> Token:
 
 
 @always_inline
-fn ZeroOrMore(char: String) -> Token:
+fn ZeroOrMore(char: Codepoint) -> Token:
     """Quantifier 'zero or more' token."""
     return Token(type=Token.ZEROORMORE, char=char)
 
 
 @always_inline
-fn OneOrMore(char: String) -> Token:
+fn OneOrMore(char: Codepoint) -> Token:
     """Quantifier 'one or more' token."""
     return Token(type=Token.ONEORMORE, char=char)
 
 
 @always_inline
-fn ZeroOrOne(char: String) -> Token:
+fn ZeroOrOne(char: Codepoint) -> Token:
     """Quantifier 'zero or one' token."""
     return Token(type=Token.ZEROORONE, char=char)
 
@@ -271,7 +271,7 @@ fn QuestionMark() -> Token:
 
 
 @always_inline
-fn OrToken(char: String) -> Token:
+fn OrToken(char: Codepoint) -> Token:
     """Token of the or."""
     return Token(type=Token.ORTOKEN, char=char)
 
@@ -295,18 +295,18 @@ fn Dash() -> Token:
 
 
 @always_inline
-fn ElementToken(char: String) -> Token:
+fn ElementToken(char: Codepoint) -> Token:
     """Token that are not associated to special meaning."""
     return Token(type=Token.ELEMENT, char=char)
 
 
 @always_inline
-fn SpaceToken(char: String) -> Token:
+fn SpaceToken(char: Codepoint) -> Token:
     """Token of a space."""
     return Token(type=Token.SPACE, char=char)
 
 
 @always_inline
-fn DigitToken(char: String) -> Token:
+fn DigitToken(char: Codepoint) -> Token:
     """Token of a digit."""
     return Token(type=Token.DIGIT, char=char)
