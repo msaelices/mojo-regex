@@ -201,7 +201,6 @@ struct DFAEngine(Engine):
 
     var states: List[DFAState]
     var start_state: Int
-    var compiled_pattern: String  # The pattern this DFA was compiled from
     var has_start_anchor: Bool  # Pattern starts with ^
     var has_end_anchor: Bool  # Pattern ends with $
 
@@ -209,7 +208,6 @@ struct DFAEngine(Engine):
         """Initialize an empty DFA engine."""
         self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
-        self.compiled_pattern = ""
         self.has_start_anchor = False
         self.has_end_anchor = False
 
@@ -217,7 +215,6 @@ struct DFAEngine(Engine):
         """Move constructor."""
         self.states = other.states^
         self.start_state = other.start_state
-        self.compiled_pattern = other.compiled_pattern^
         self.has_start_anchor = other.has_start_anchor
         self.has_end_anchor = other.has_end_anchor
 
@@ -238,7 +235,6 @@ struct DFAEngine(Engine):
             has_end_anchor: Whether pattern has $ anchor.
         """
         var len_pattern = len(pattern)
-        self.compiled_pattern = pattern^
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
 
@@ -250,7 +246,7 @@ struct DFAEngine(Engine):
         # Set up transitions for each character in the pattern
         for i in range(len_pattern):
             var state = DFAState()
-            var char_code = ord(self.compiled_pattern[i])
+            var char_code = ord(pattern[i])
             state.add_transition(char_code, i + 1)
             self.states.append(state)
 
@@ -289,9 +285,6 @@ struct DFAEngine(Engine):
             max_matches: Maximum number of matches (-1 for unlimited).
             positive_logic: True for [a-z], False for [^a-z].
         """
-        var prefix = "[" if positive_logic else "[^"
-        self.compiled_pattern = String(prefix, char_class^, "]")
-
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
             var start_state = DFAState(is_accepting=True, match_length=0)
@@ -387,7 +380,6 @@ struct DFAEngine(Engine):
         Args:
             pattern_info: Information about the sequential pattern elements.
         """
-        self.compiled_pattern = "sequential_pattern"
         self.has_start_anchor = pattern_info.has_start_anchor
         self.has_end_anchor = pattern_info.has_end_anchor
 
@@ -497,7 +489,6 @@ struct DFAEngine(Engine):
         Args:
             sequence_info: Information about the character class sequence elements.
         """
-        self.compiled_pattern = "multi_char_class_sequence"
         self.has_start_anchor = sequence_info.has_start_anchor
         self.has_end_anchor = sequence_info.has_end_anchor
 
