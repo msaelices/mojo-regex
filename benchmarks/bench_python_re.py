@@ -42,7 +42,7 @@ class Benchmark:
             fn()
             end_time = time.perf_counter_ns()
             fn_time = end_time - start_time
-            print(f"Function {name} took {fn_time} ns")
+            # print(f"Function {name} took {fn_time} ns")
             total_time += fn_time
             actual_iterations += 1
 
