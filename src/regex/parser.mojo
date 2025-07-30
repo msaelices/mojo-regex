@@ -288,7 +288,6 @@ fn parse_token_list[
             # Handle character ranges
             var bracket_start_pos = token.start_pos
             i += 1
-            var range_str = String("")
             var positive_logic = True
 
             if i < len(tokens) and (
@@ -299,7 +298,6 @@ fn parse_token_list[
                 i += 1
 
             while i < len(tokens) and tokens[i].type != Token.RIGHTBRACKET:
-                var current_token = tokens[i]
                 # Check for range pattern like 'a-z'
                 if (
                     i + 2 < len(tokens)
@@ -307,13 +305,9 @@ fn parse_token_list[
                     and tokens[i + 2].type == Token.ELEMENT
                 ):
                     # We have a range like 'a-z'
-                    var start_char = String(chr(current_token.char.__int__()))
-                    var end_char = String(chr(tokens[i + 2].char.__int__()))
-                    range_str += get_range_str(start_char, end_char)
                     i += 3  # Skip start, dash, and end
                 else:
                     # Single character
-                    range_str += String(chr(current_token.char.__int__()))
                     i += 1
 
             if i >= len(tokens):
