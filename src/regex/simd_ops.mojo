@@ -166,8 +166,7 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         for i in range(SIMD_WIDTH):
             var char_code = Int(chunk[i])
-            if char_code >= 0 and char_code < 256:
-                matches[i] = self.lookup_table[char_code] == 1
+            matches[i] = self.lookup_table[char_code] == 1
 
         return matches
 
