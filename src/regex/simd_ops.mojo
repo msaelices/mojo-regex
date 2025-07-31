@@ -42,12 +42,11 @@ struct CharacterClassSIMD(Copyable, Movable):
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
 
-        var start_code = ord(start_char)
-        var end_code = ord(end_char)
+        var start_code = max(ord(start_char), 0)
+        var end_code = min(ord(end_char), 255)
 
         for char_code in range(start_code, end_code + 1):
-            if char_code >= 0 and char_code < 256:
-                self.lookup_table[char_code] = 1
+            self.lookup_table[char_code] = 1
 
     fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
