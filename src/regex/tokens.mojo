@@ -34,8 +34,11 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token struct."""
 
     var type: Int
+    """Type of the token (e.g., ELEMENT, WILDCARD, DIGIT, etc.)."""
     var char: Int
-    var start_pos: Int  # Position in original pattern where this token starts
+    """The character code associated with this token."""
+    var start_pos: Int
+    """Position in original pattern where this token starts."""
 
     alias ELEMENT = 0
     """Token that are not associated to special meaning."""
