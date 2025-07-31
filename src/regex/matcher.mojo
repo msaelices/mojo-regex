@@ -50,6 +50,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
     var engine: DFAEngine
+    """The underlying DFA engine for pattern matching."""
 
     fn __init__(out self, owned ast: ASTNode[MutableAnyOrigin]) raises:
         """Initialize DFA matcher by compiling the AST.
@@ -86,7 +87,9 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """NFA-based matcher using the existing regex engine."""
 
     var engine: NFAEngine
+    """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutableAnyOrigin]
+    """The parsed AST representation of the regex pattern."""
 
     fn __init__(out self, ast: ASTNode[MutableAnyOrigin], pattern: String):
         """Initialize NFA matcher with the existing engine.
@@ -128,8 +131,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """
 
     var dfa_matcher: Optional[DFAMatcher]
+    """Optional DFA matcher for simple patterns."""
     var nfa_matcher: NFAMatcher
+    """NFA matcher as fallback for complex patterns."""
     var complexity: PatternComplexity
+    """Analyzed complexity level of the regex pattern."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -235,8 +241,11 @@ struct CompiledRegex(Copyable, Movable):
     """High-level compiled regex object with caching and optimization."""
 
     var matcher: HybridMatcher
+    """The hybrid matcher instance for this compiled regex."""
     var pattern: String
-    var compiled_at: Int  # Timestamp for cache management
+    """The original regex pattern string."""
+    var compiled_at: Int
+    """Timestamp when the regex was compiled, used for cache management."""
 
     fn __init__(out self, pattern: String) raises:
         """Compile a regex pattern with automatic optimization.

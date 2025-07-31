@@ -6,9 +6,13 @@ struct Match(Copyable, Movable):
     """Contains the information of a match in a regular expression."""
 
     var group_id: Int
+    """The ID of the capturing group (0 for the whole match)."""
     var start_idx: Int
+    """Starting position of the match in the text."""
     var end_idx: Int
+    """Ending position of the match in the text (exclusive)."""
     var text_ptr: UnsafePointer[String, mut=False]
+    """Pointer to the original text being matched."""
 
     fn __init__(
         out self,

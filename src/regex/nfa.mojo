@@ -55,9 +55,13 @@ struct NFAEngine(Engine):
     """A regex engine that can match regex patterns against text."""
 
     var pattern: String
+    """The regex pattern string to match against."""
     var prev_re: String
+    """Previously parsed regex pattern for caching."""
     var prev_ast: Optional[ASTNode[MutableAnyOrigin]]
+    """Cached AST from previous regex compilation."""
     var regex: Optional[ASTNode[MutableAnyOrigin]]
+    """Compiled AST representation of the current regex pattern."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
