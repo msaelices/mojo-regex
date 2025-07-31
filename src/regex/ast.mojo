@@ -4,6 +4,11 @@ from memory import UnsafePointer
 from os import abort
 
 from regex.aliases import CHAR_ZERO, CHAR_NINE
+from regex.simd_ops import (
+    CharacterClassSIMD,
+    create_whitespace,
+    create_ascii_digits,
+)
 
 
 alias RE = 0
@@ -143,6 +148,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
     var enable_simd: Bool  # Flag to enable SIMD optimization for this node
+    var simd_matcher: Optional[CharacterClassSIMD]  # Cached SIMD matcher
 
     @always_inline
     fn __init__(
@@ -167,6 +173,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.enable_simd = enable_simd
+        self.simd_matcher = None
         self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
@@ -195,6 +202,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.enable_simd = enable_simd
+        self.simd_matcher = None
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
@@ -222,6 +230,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.enable_simd = enable_simd
+        self.simd_matcher = None
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
@@ -245,6 +254,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.max = other.max
         self.positive_logic = other.positive_logic
         self.enable_simd = other.enable_simd
+        self.simd_matcher = other.simd_matcher
         self.children_indexes = other.children_indexes
         self.children_len = other.children_len
         # var call_location = __call_location()
@@ -487,15 +497,18 @@ fn SpaceElement[
     var regex_ptr = UnsafePointer(to=regex).origin_cast[
         mut=False, origin=ImmutableAnyOrigin
     ]()
-    return ASTNode[regex_origin](
+    var node = ASTNode[regex_origin](
         type=SPACE,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
         max=1,
-        enable_simd=True,
+        enable_simd=False,  # Will be enabled selectively by parent
     )
+    # Pre-create SIMD matcher for potential use
+    node.simd_matcher = create_whitespace()
+    return node
 
 
 @always_inline
@@ -510,15 +523,18 @@ fn DigitElement[
     var regex_ptr = UnsafePointer(to=regex).origin_cast[
         mut=False, origin=ImmutableAnyOrigin
     ]()
-    return ASTNode[regex_origin](
+    var node = ASTNode[regex_origin](
         type=DIGIT,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,
         min=1,
         max=1,
-        enable_simd=True,
+        enable_simd=False,  # Will be enabled selectively by parent
     )
+    # Pre-create SIMD matcher for potential use
+    node.simd_matcher = create_ascii_digits()
+    return node
 
 
 @always_inline
@@ -534,7 +550,7 @@ fn RangeElement[
     var regex_ptr = UnsafePointer(to=regex).origin_cast[
         mut=False, origin=ImmutableAnyOrigin
     ]()
-    return ASTNode[regex_origin](
+    var node = ASTNode[regex_origin](
         type=RANGE,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -542,8 +558,11 @@ fn RangeElement[
         min=1,
         max=1,
         positive_logic=is_positive_logic,
-        enable_simd=True,
+        enable_simd=False,  # Will be enabled selectively by parent
     )
+    # SIMD matcher will be created lazily when needed
+    # since we need the actual range pattern from the value
+    return node
 
 
 @always_inline
