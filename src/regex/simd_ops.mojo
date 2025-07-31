@@ -16,9 +16,8 @@ alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 struct CharacterClassSIMD(Copyable, Movable):
     """SIMD-optimized character class matcher."""
 
-    var lookup_table: SIMD[
-        DType.uint8, 256
-    ]  # Bit vector for each ASCII character
+    var lookup_table: SIMD[DType.uint8, 256]
+    """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
 
     fn __init__(out self, owned char_class: String):
         """Initialize SIMD character class matcher.
@@ -223,8 +222,11 @@ struct SIMDStringSearch:
     """SIMD-optimized string search for literal patterns."""
 
     var pattern: String
+    """The literal string pattern to search for."""
     var pattern_length: Int
+    """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
+    """SIMD vector filled with the first character of the pattern for fast comparison."""
 
     fn __init__(out self, pattern: String):
         """Initialize SIMD string search.

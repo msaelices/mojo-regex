@@ -129,19 +129,27 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     alias max_children = 256
 
     var type: Int
+    """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
     var regex_ptr: UnsafePointer[
         Regex[ImmutableAnyOrigin], mut=False, origin=regex_origin
     ]
+    """Pointer to the parent regex object containing the pattern string."""
     var start_idx: Int
+    """Starting position of this node in the original pattern string."""
     var end_idx: Int
+    """Ending position of this node in the original pattern string."""
     var capturing: Bool
-    var children_indexes: SIMD[
-        DType.uint8, Self.max_children
-    ]  # Bit vector for each ASCII character
+    """Whether this node represents a capturing group."""
+    var children_indexes: SIMD[DType.uint8, Self.max_children]
+    """Bit vector for each ASCII character, used for efficient character class lookups."""
     var children_len: Int
+    """Number of child nodes this AST node contains."""
     var min: Int
+    """Minimum number of matches for quantifiers (e.g., 0 for *, 1 for +)."""
     var max: Int
-    var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
+    """Maximum number of matches for quantifiers (-1 for unlimited)."""
+    var positive_logic: Bool
+    """For character ranges: True for [abc], False for [^abc]."""
 
     @always_inline
     fn __init__(

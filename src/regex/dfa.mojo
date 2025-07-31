@@ -121,10 +121,14 @@ fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
 struct SequentialPatternElement(Copyable, Movable):
     """Information about a single element in a sequential pattern."""
 
-    var char_class: String  # Character class string (e.g., "0123456789" for \d)
-    var min_matches: Int  # Minimum matches for this element
-    var max_matches: Int  # Maximum matches for this element (-1 for unlimited)
-    var positive_logic: Bool  # True for [abc], False for [^abc]
+    var char_class: String
+    """Character class string (e.g., "0123456789" for \d)."""
+    var min_matches: Int
+    """Minimum matches for this element."""
+    var max_matches: Int
+    """Maximum matches for this element (-1 for unlimited)."""
+    var positive_logic: Bool
+    """True for [abc], False for [^abc]."""
 
     fn __init__(
         out self,
@@ -143,8 +147,11 @@ struct SequentialPatternInfo(Copyable, Movable):
     """Information about a sequential pattern like [+]*\\d+[-]*\\d+."""
 
     var elements: List[SequentialPatternElement]
+    """List of sequential pattern elements in the pattern."""
     var has_start_anchor: Bool
+    """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
+    """Whether the pattern ends with $ anchor."""
 
     fn __init__(out self):
         self.elements = List[SequentialPatternElement]()
@@ -201,9 +208,13 @@ struct DFAEngine(Engine):
     """DFA-based regex engine for O(n) pattern matching."""
 
     var states: List[DFAState]
+    """List of DFA states in the state machine."""
     var start_state: Int
-    var has_start_anchor: Bool  # Pattern starts with ^
-    var has_end_anchor: Bool  # Pattern ends with $
+    """Index of the starting state in the DFA."""
+    var has_start_anchor: Bool
+    """Whether the pattern starts with ^ anchor."""
+    var has_end_anchor: Bool
+    """Whether the pattern ends with $ anchor."""
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
@@ -972,7 +983,9 @@ struct BoyerMoore:
     """Boyer-Moore string search algorithm for fast literal string matching."""
 
     var pattern: String
-    var bad_char_table: List[Int]  # Bad character heuristic table
+    """The literal string pattern to search for."""
+    var bad_char_table: List[Int]
+    """Bad character heuristic table for Boyer-Moore algorithm."""
 
     fn __init__(out self, pattern: String):
         """Initialize Boyer-Moore with a pattern.
