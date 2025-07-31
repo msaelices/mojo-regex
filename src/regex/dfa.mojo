@@ -122,7 +122,7 @@ struct SequentialPatternElement(Copyable, Movable):
     """Information about a single element in a sequential pattern."""
 
     var char_class: String
-    """Character class string (e.g., "0123456789" for \d)."""
+    """Character class string (e.g., "0123456789" for \\d)."""
     var min_matches: Int
     """Minimum matches for this element."""
     var max_matches: Int
