@@ -156,11 +156,12 @@ struct SequentialPatternInfo(Copyable, Movable):
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
-    var transitions: SIMD[
-        DType.uint8, DEFAULT_DFA_TRANSITIONS
-    ]  # ASCII transition table (256 entries)
+    var transitions: SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS]
+    """Transition table for this state, indexed by character code (0-255)."""
     var is_accepting: Bool
+    """A state is accepting if it can end a match following this path."""
     var match_length: Int  # Length of match when this state is reached
+    """Length of the match when this state is reached, used for quantifiers."""
 
     fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
