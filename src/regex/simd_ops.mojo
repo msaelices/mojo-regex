@@ -20,7 +20,7 @@ struct CharacterClassSIMD(Copyable, Movable):
         DType.uint8, 256
     ]  # Bit vector for each ASCII character
 
-    fn __init__(out self, owned char_class: String):
+    fn __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
 
         Args:
@@ -34,7 +34,7 @@ struct CharacterClassSIMD(Copyable, Movable):
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
 
-    fn __init__(out self, start_char: String, end_char: String):
+    fn __init__(out self, start_char: StringSlice, end_char: StringSlice):
         """Initialize with a character range like 'a'-'z'.
 
         Args:

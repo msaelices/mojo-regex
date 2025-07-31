@@ -1,10 +1,53 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode
+from regex.ast import ASTNode, RANGE, DIGIT, SPACE
 from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
+from regex.simd_ops import (
+    CharacterClassSIMD,
+    create_whitespace,
+    create_ascii_digits,
+)
+
+
+fn _create_simd_matcher_from_range_pattern(
+    range_pattern: StringSlice,
+) -> CharacterClassSIMD:
+    """Create SIMD matcher from range pattern like '[a-z]' or 'abcxyz'.
+
+    Args:
+        range_pattern: Pattern that may contain range syntax like 'a-z' or explicit chars.
+
+    Returns:
+        A CharacterClassSIMD matcher configured for the pattern.
+    """
+    # If pattern starts with '[', it contains range syntax
+    if range_pattern.startswith("[") and range_pattern.endswith("]"):
+        # Remove brackets
+        var inner = range_pattern[1:-1]
+
+        # Check for negation and strip it
+        # The negation is handled by the AST node's positive_logic field
+        var actual_pattern = inner
+        if len(inner) > 0 and inner[0] == "^":
+            actual_pattern = inner[1:]
+
+        # Check if it's a simple range like 'a-z'
+        if len(actual_pattern) == 3 and actual_pattern[1] == "-":
+            # It's a range, use the range constructor
+            var start_char = actual_pattern[0:1]
+            var end_char = actual_pattern[2:3]
+            return CharacterClassSIMD(start_char, end_char)
+        else:
+            # It's a character set like 'abc' or complex pattern
+            # For now, just use the full actual pattern (without ^)
+            # TODO: Handle complex patterns like 'a-zA-Z0-9'
+            return CharacterClassSIMD(actual_pattern)
+    else:
+        # It's already an expanded character set
+        return CharacterClassSIMD(range_pattern)
 
 
 struct NFAEngine(Engine):
@@ -319,12 +362,28 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match whitespace character (\\s)."""
+        """Match whitespace character (\\s) with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
+        var is_space: Bool
+
+        # Use SIMD optimization if enabled
+        if ast.enable_simd:
+            var simd_matcher = create_whitespace()
+            is_space = simd_matcher.contains(ord(ch))
+        else:
+            # Fallback to traditional comparison
+            is_space = (
+                ch == " "
+                or ch == "\t"
+                or ch == "\n"
+                or ch == "\r"
+                or ch == "\f"
+            )
+
+        if is_space:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -340,12 +399,22 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match digit character (\\d)."""
+        """Match digit character (\\d) with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        if CHAR_ZERO <= ord(ch) <= CHAR_NINE:
+        var is_digit: Bool
+
+        # Use SIMD optimization if enabled
+        if ast.enable_simd:
+            var simd_matcher = create_ascii_digits()
+            is_digit = simd_matcher.contains(ord(ch))
+        else:
+            # Fallback to traditional comparison
+            is_digit = CHAR_ZERO <= ord(ch) <= CHAR_NINE
+
+        if is_digit:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -361,18 +430,30 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match character range [abc] or [^abc]."""
+        """Match character range [abc] or [^abc] with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        var ch_found = False
+        var match_found: Bool
 
-        if ast.get_value():
+        # Use SIMD optimization if enabled
+        if ast.enable_simd and ast.get_value():
             var range_pattern = ast.get_value().value()
-            ch_found = ast._is_char_in_range(ch, range_pattern)
+            var simd_matcher = _create_simd_matcher_from_range_pattern(
+                range_pattern
+            )
+            var simd_match = simd_matcher.contains(ord(ch))
+            match_found = simd_match if ast.positive_logic else not simd_match
+        else:
+            # Fallback to linear search
+            var ch_found = False
+            if ast.get_value():
+                var range_pattern = ast.get_value().value()
+                ch_found = ast._is_char_in_range(ch, range_pattern)
+            match_found = ch_found == ast.positive_logic
 
-        if ch_found == ast.positive_logic:
+        if match_found:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -730,23 +811,82 @@ struct NFAEngine(Engine):
         if min_matches == 1 and max_matches == 1:
             return (True, str_i + char_consumed)
 
-        # Use regular greedy matching, but with early termination for match_first_mode
+        # Use SIMD-optimized bulk matching for character classes when possible
         var matches_count = 0
         var current_pos = str_i
 
-        # Try to match as many times as possible (greedy)
-        while matches_count < max_matches and current_pos < len(str):
-            # Early termination for match_first_mode: if we're getting too far from start
+        # Use SIMD bulk matching for character classes with quantifiers
+        if ast.enable_simd and (
+            ast.type == RANGE or ast.type == DIGIT or ast.type == SPACE
+        ):
+            # Calculate the maximum search length
+            var search_len = min(max_matches, len(str) - current_pos)
             if match_first_mode and required_start_pos >= 0:
-                # Allow reasonable expansion but prevent excessive backtracking
-                if current_pos > required_start_pos + 50:  # Conservative limit
-                    break
+                search_len = min(
+                    search_len, required_start_pos + 50 - current_pos
+                )
 
-            if ast.is_match(String(str[current_pos]), current_pos, len(str)):
-                matches_count += 1
-                current_pos += 1
-            else:
-                break
+            if search_len > 0:
+                # Create SIMD matcher based on type
+                var consecutive_matches = 0
+
+                if ast.type == RANGE and ast.get_value():
+                    var range_pattern = ast.get_value().value()
+                    var simd_matcher = _create_simd_matcher_from_range_pattern(
+                        range_pattern
+                    )
+                    # Count consecutive character class matches using SIMD
+                    for i in range(search_len):
+                        var ch = String(str[current_pos + i])
+                        var simd_match = simd_matcher.contains(ord(ch))
+                        var is_match = (
+                            simd_match if ast.positive_logic else not simd_match
+                        )
+
+                        if is_match:
+                            consecutive_matches += 1
+                        else:
+                            break
+                elif ast.type == DIGIT:
+                    var simd_matcher = create_ascii_digits()
+                    # Count consecutive digit matches using SIMD
+                    for i in range(search_len):
+                        var ch = String(str[current_pos + i])
+                        if simd_matcher.contains(ord(ch)):
+                            consecutive_matches += 1
+                        else:
+                            break
+                elif ast.type == SPACE:
+                    var simd_matcher = create_whitespace()
+                    # Count consecutive space matches using SIMD
+                    for i in range(search_len):
+                        var ch = String(str[current_pos + i])
+                        if simd_matcher.contains(ord(ch)):
+                            consecutive_matches += 1
+                        else:
+                            break
+
+                matches_count = min(consecutive_matches, max_matches)
+                current_pos += matches_count
+
+        else:
+            # Fallback to regular character-by-character matching
+            while matches_count < max_matches and current_pos < len(str):
+                # Early termination for match_first_mode: if we're getting too far from start
+                if match_first_mode and required_start_pos >= 0:
+                    # Allow reasonable expansion but prevent excessive backtracking
+                    if (
+                        current_pos > required_start_pos + 50
+                    ):  # Conservative limit
+                        break
+
+                if ast.is_match(
+                    String(str[current_pos]), current_pos, len(str)
+                ):
+                    matches_count += 1
+                    current_pos += 1
+                else:
+                    break
 
         # Check if we have enough matches
         if matches_count >= min_matches:

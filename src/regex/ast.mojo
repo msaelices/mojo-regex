@@ -142,6 +142,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     var min: Int
     var max: Int
     var positive_logic: Bool  # For character ranges: True for [abc], False for [^abc]
+    var enable_simd: Bool  # Flag to enable SIMD optimization for this node
 
     @always_inline
     fn __init__(
@@ -154,6 +155,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        enable_simd: Bool = False,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
@@ -164,6 +166,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.enable_simd = enable_simd
         self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
@@ -180,6 +183,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        enable_simd: Bool = False,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -190,6 +194,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.enable_simd = enable_simd
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
@@ -205,6 +210,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        enable_simd: Bool = False,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -215,6 +221,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.enable_simd = enable_simd
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
@@ -237,6 +244,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
+        self.enable_simd = other.enable_simd
         self.children_indexes = other.children_indexes
         self.children_len = other.children_len
         # var call_location = __call_location()
@@ -259,6 +267,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
+            and self.enable_simd == other.enable_simd
             and self.children_len == other.children_len
             and (self.children_indexes == other.children_indexes).reduce_and()
         )
@@ -485,6 +494,7 @@ fn SpaceElement[
         end_idx=end_idx,
         min=1,
         max=1,
+        enable_simd=True,
     )
 
 
@@ -507,6 +517,7 @@ fn DigitElement[
         end_idx=end_idx,
         min=1,
         max=1,
+        enable_simd=True,
     )
 
 
@@ -531,6 +542,7 @@ fn RangeElement[
         min=1,
         max=1,
         positive_logic=is_positive_logic,
+        enable_simd=True,
     )
 
 
