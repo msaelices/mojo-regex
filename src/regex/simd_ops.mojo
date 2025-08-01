@@ -415,10 +415,6 @@ struct TwoWaySearcher(Copyable & Movable):
     """The period of the pattern's critical factorization."""
     var critical_pos: Int
     """The position of the critical factorization."""
-    var memory: Int
-    """Memory for the backward search phase."""
-    var memory_fwd: Int
-    """Memory for the forward search phase."""
 
     fn __init__(out self, pattern: String):
         """Initialize the Two-Way searcher with a pattern.
@@ -427,35 +423,86 @@ struct TwoWaySearcher(Copyable & Movable):
             pattern: The pattern to search for.
         """
         self.pattern = pattern
-        self.memory = 0
-        self.memory_fwd = -1
+        self.critical_pos = 0
+        self.period = 1
 
         # Compute critical factorization
         var n = len(self.pattern)
         if n == 0:
-            self.critical_pos = 0
-            self.period = 1
             return
 
-        # Simplified critical factorization
-        # For now, use middle position as critical position
-        # A full implementation would use maximal suffix computation
-        var crit_pos = n // 2
-        var period = n
-
-        # Check for actual period
-        for p in range(1, n):
-            var is_period = True
-            for i in range(n - p):
-                if self.pattern[i] != self.pattern[i + p]:
-                    is_period = False
-                    break
-            if is_period:
-                period = p
-                break
-
+        # Compute critical position using maximal suffix
+        var (crit_pos, period) = self._compute_critical_factorization()
         self.critical_pos = crit_pos
         self.period = period
+
+    fn _compute_critical_factorization(self) -> Tuple[Int, Int]:
+        """Compute the critical factorization of the pattern.
+
+        Returns:
+            Tuple of (critical_position, period)
+        """
+        _ = len(self.pattern)  # Suppress unused warning
+
+        # Compute maximal suffix for both forward and reverse comparisons
+        var (i1, p1) = self._maximal_suffix(False)
+        var (i2, p2) = self._maximal_suffix(True)
+
+        # Choose the critical position
+        var crit_pos: Int
+        var period: Int
+
+        if i1 > i2:
+            crit_pos = i1
+            period = p1
+        else:
+            crit_pos = i2
+            period = p2
+
+        return (crit_pos, period)
+
+    fn _maximal_suffix(self, reverse_cmp: Bool) -> Tuple[Int, Int]:
+        """Compute maximal suffix of the pattern.
+
+        Args:
+            reverse_cmp: If True, use reverse lexicographic comparison
+
+        Returns:
+            Tuple of (position, period)
+        """
+        var n = len(self.pattern)
+        var ms = -1  # Maximal suffix
+        var j = 0  # Index for comparison
+        var k = 1  # Period
+        var p = 1  # Period of maximal suffix
+
+        while j + k < n:
+            var a = ord(self.pattern[j + k])
+            var b = ord(self.pattern[ms + k])
+
+            var cmp_result: Bool
+            if reverse_cmp:
+                cmp_result = a > b
+            else:
+                cmp_result = a < b
+
+            if cmp_result:
+                j += k
+                k = 1
+                p = j - ms
+            elif a == b:
+                if k != p:
+                    k += 1
+                else:
+                    j += p
+                    k = 1
+            else:
+                ms = j
+                j = ms + 1
+                k = 1
+                p = 1
+
+        return (ms + 1, p)
 
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using Two-Way algorithm with SIMD.
@@ -479,38 +526,62 @@ struct TwoWaySearcher(Copyable & Movable):
         if n <= 4:
             return self._short_pattern_search(text, start)
 
+        # Two-Way algorithm main loop
         var pos = start
-        var memory = self.memory
-        var memory_fwd = self.memory_fwd
+        var memory = 0
+
+        # Check if pattern is periodic
+        var is_periodic = self._is_prefix(self.pattern, self.period)
 
         while pos <= m - n:
-            # Check right part (from critical position to end)
+            # First, compare the right part (from critical position to end)
             var i = max(self.critical_pos, memory)
 
-            # Use SIMD for bulk comparison when possible
-            var mismatch_pos = self._simd_compare_forward(text, pos, i)
+            # Use SIMD-optimized comparison for the right part
+            var right_match_end = self._simd_compare_forward(text, pos, i)
 
-            if mismatch_pos == n:
-                # Right part matches, check left part
-                i = self.critical_pos - 1
-                var left_match = True
+            if right_match_end < n:
+                # Mismatch in right part
+                pos += max(right_match_end - self.critical_pos + 1, 1)
+                memory = 0
+            else:
+                # Right part matches, now check left part using SIMD
+                var left_match_start = self._simd_compare_backward(
+                    text, pos, self.critical_pos - 1, memory
+                )
 
-                while i >= 0 and text[pos + i] == self.pattern[i]:
-                    i -= 1
-
-                if i < 0:
-                    # Full match found
+                if left_match_start < 0:
+                    # Full match found!
                     return pos
 
                 # Mismatch in left part
-                pos += self.period
-                memory = n - self.period
-            else:
-                # Mismatch in right part
-                pos += mismatch_pos - memory + 1
-                memory = 0
+                if is_periodic:
+                    pos += self.period
+                    memory = n - self.period
+                else:
+                    pos += max(left_match_start + 1, 1)
+                    memory = 0
 
         return -1
+
+    fn _is_prefix(self, pattern: String, period: Int) -> Bool:
+        """Check if pattern[:period] is a prefix of pattern[period:].
+
+        Args:
+            pattern: The pattern string
+            period: The period to check
+
+        Returns:
+            True if pattern has the given period
+        """
+        var n = len(pattern)
+        if period >= n:
+            return False
+
+        for i in range(n - period):
+            if pattern[i] != pattern[i + period]:
+                return False
+        return True
 
     fn _simd_compare_forward(
         self, text: String, text_pos: Int, start_offset: Int
@@ -526,13 +597,11 @@ struct TwoWaySearcher(Copyable & Movable):
             Position of first mismatch, or pattern length if full match.
         """
         var n = len(self.pattern)
+        var m = len(text)
         var i = start_offset
 
         # SIMD comparison for chunks
-        while i + SIMD_WIDTH <= n:
-            if text_pos + i + SIMD_WIDTH > len(text):
-                break
-
+        while i + SIMD_WIDTH <= n and text_pos + i + SIMD_WIDTH <= m:
             var pattern_chunk = self.pattern.unsafe_ptr().load[
                 width=SIMD_WIDTH
             ](i)
@@ -550,12 +619,37 @@ struct TwoWaySearcher(Copyable & Movable):
             i += SIMD_WIDTH
 
         # Handle remaining characters
-        while i < n and text_pos + i < len(text):
+        while i < n and text_pos + i < m:
             if self.pattern[i] != text[text_pos + i]:
                 return i
             i += 1
 
         return i
+
+    fn _simd_compare_backward(
+        self, text: String, text_pos: Int, end_offset: Int, start_offset: Int
+    ) -> Int:
+        """Compare pattern with text backward from given offset using SIMD.
+
+        Args:
+            text: Text to compare against.
+            text_pos: Starting position in text.
+            end_offset: Ending offset in pattern (inclusive).
+            start_offset: Starting offset in pattern (inclusive lower bound).
+
+        Returns:
+            Position of first mismatch (from left), or -1 if full match.
+        """
+        var j = end_offset
+
+        # For now, use simple character-by-character comparison
+        # TODO: Optimize with SIMD for backward comparison
+        while j >= start_offset:
+            if text[text_pos + j] != self.pattern[j]:
+                return j
+            j -= 1
+
+        return -1  # Full match
 
     fn _short_pattern_search(self, text: String, start: Int) -> Int:
         """Optimized search for very short patterns (1-4 bytes).
