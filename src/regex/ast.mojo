@@ -18,6 +18,17 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
+    ELEMENT,
+    WILDCARD,
+    SPACE,
+    DIGIT,
+    RANGE,
+    START,
+    END,
+    -1,  # sentinel to pad to 8 elements
+]
+
 alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
 
 
@@ -314,7 +325,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, WILDCARD, SPACE, DIGIT, RANGE, START, END]:
+        if (LEAF_ELEMS == self.type).reduce_or():
             return True
         else:
             return False
