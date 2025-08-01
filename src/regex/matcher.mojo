@@ -404,7 +404,9 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
         Optional Match if found.
     """
     var compiled = compile_regex(pattern)
-    return compiled.match_first(text)
+    # search() should find a match anywhere, not just at the beginning
+    # so we use match_next instead of match_first
+    return compiled.match_next(text)
 
 
 fn findall(
