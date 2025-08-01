@@ -1,1 +1,1 @@
-from .matcher import match_first, findall, Match
+from .matcher import match_first, findall, search, Match
