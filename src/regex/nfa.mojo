@@ -5,6 +5,10 @@ from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
+from regex.simd_ops import (
+    TwoWaySearcher,
+)
+from regex.literal_optimizer import extract_literals, extract_literal_prefix
 
 
 struct NFAEngine(Engine):
@@ -18,14 +22,47 @@ struct NFAEngine(Engine):
     """Cached AST from previous regex compilation."""
     var regex: Optional[ASTNode[MutableAnyOrigin]]
     """Compiled AST representation of the current regex pattern."""
+    var literal_prefix: String
+    """Extracted literal prefix for optimization."""
+    var has_literal_optimization: Bool
+    """Whether literal optimization is available for this pattern."""
+    var literal_searcher: Optional[TwoWaySearcher]
+    """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
         self.prev_re = ""
         self.prev_ast = None
         self.pattern = pattern
+        self.literal_prefix = ""
+        self.has_literal_optimization = False
+        self.literal_searcher = None
+
         try:
             self.regex = parse(pattern)
+
+            # Extract literals for optimization
+            if self.regex:
+                var ast = self.regex.value()
+                var literal_set = extract_literals(ast)
+
+                # Use best literal if available
+                if literal_set.best_literal:
+                    var best = literal_set.best_literal.value()
+                    if best.is_prefix and len(best.literal) > 1:
+                        # Use prefix literal for optimization
+                        self.literal_prefix = best.literal
+                        self.has_literal_optimization = True
+                        self.literal_searcher = TwoWaySearcher(
+                            self.literal_prefix
+                        )
+                    elif best.is_required and len(best.literal) > 2:
+                        # Use required literal even if not prefix (for general prefiltering)
+                        self.literal_prefix = best.literal
+                        self.has_literal_optimization = True
+                        self.literal_searcher = TwoWaySearcher(
+                            self.literal_prefix
+                        )
         except:
             self.regex = None
 
@@ -71,32 +108,83 @@ struct NFAEngine(Engine):
         var current_pos = 0
 
         var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
-        while current_pos <= len(text):
-            temp_matches.clear()
-            var result = self._match_node(
-                ast,
-                text,
-                current_pos,
-                temp_matches,
-                match_first_mode=False,
-                required_start_pos=-1,
-            )
-            if result[0]:  # Match found
-                var match_start = current_pos
-                var match_end = result[1]
 
-                # Create match object
-                var matched = Match(0, match_start, match_end, text)
-                matches.append(matched)
+        # Use literal prefiltering if available
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
 
-                # Move past this match to find next one
-                # Avoid infinite loop on zero-width matches
-                if match_end == match_start:
-                    current_pos += 1
+            while current_pos <= len(text):
+                # Find next occurrence of literal
+                var literal_pos = searcher.search(text, current_pos)
+                if literal_pos == -1:
+                    # No more occurrences of required literal
+                    break
+
+                # Try to match the full pattern starting from before the literal
+                var try_pos = literal_pos
+                if self.literal_prefix and not self._is_prefix_literal():
+                    try_pos = max(current_pos, literal_pos - 100)
+
+                # Search for matches around the literal
+                var found_match = False
+                while try_pos <= literal_pos and try_pos <= len(text):
+                    temp_matches.clear()
+                    var result = self._match_node(
+                        ast,
+                        text,
+                        try_pos,
+                        temp_matches,
+                        match_first_mode=False,
+                        required_start_pos=-1,
+                    )
+                    if result[0]:  # Match found
+                        var match_end = result[1]
+                        if self._match_contains_literal(
+                            text, try_pos, match_end
+                        ):
+                            var matched = Match(0, try_pos, match_end, text)
+                            matches.append(matched)
+
+                            # Move past this match
+                            if match_end == try_pos:
+                                current_pos = try_pos + 1
+                            else:
+                                current_pos = match_end
+                            found_match = True
+                            break
+                    try_pos += 1
+
+                if not found_match:
+                    # No match found around this literal, move past it
+                    current_pos = literal_pos + 1
+        else:
+            # No literal optimization, use standard approach
+            while current_pos <= len(text):
+                temp_matches.clear()
+                var result = self._match_node(
+                    ast,
+                    text,
+                    current_pos,
+                    temp_matches,
+                    match_first_mode=False,
+                    required_start_pos=-1,
+                )
+                if result[0]:  # Match found
+                    var match_start = current_pos
+                    var match_end = result[1]
+
+                    # Create match object
+                    var matched = Match(0, match_start, match_end, text)
+                    matches.append(matched)
+
+                    # Move past this match to find next one
+                    # Avoid infinite loop on zero-width matches
+                    if match_end == match_start:
+                        current_pos += 1
+                    else:
+                        current_pos = match_end
                 else:
-                    current_pos = match_end
-            else:
-                current_pos += 1
+                    current_pos += 1
 
         return matches
 
@@ -157,7 +245,6 @@ struct NFAEngine(Engine):
             contain all the group and subgroups matched.
         """
         var matches = List[Match, hint_trivial_type=True]()
-        var str_i = start
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
@@ -167,20 +254,88 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        var result = self._match_node(
-            ast,
-            text,
-            str_i,
-            matches,
-            match_first_mode=False,
-            required_start_pos=-1,
-        )
-        if result[0]:  # Match found
-            var end_idx = result[1]
-            # Always return the overall match with correct range
-            return Match(0, str_i, end_idx, text)
+        var search_pos = start
+
+        # Use literal prefiltering if available
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
+
+            while search_pos <= len(text):
+                # Find next occurrence of literal
+                var literal_pos = searcher.search(text, search_pos)
+                if literal_pos == -1:
+                    # No more occurrences of required literal
+                    return None
+
+                # Try to match the full pattern starting from before the literal
+                # (unless the literal is a prefix, then start at literal position)
+                var try_pos = literal_pos
+                if self.literal_prefix and not self._is_prefix_literal():
+                    # For non-prefix literals, we need to search backwards
+                    # to find where the pattern might start
+                    try_pos = max(
+                        0, literal_pos - 100
+                    )  # Conservative backward search
+
+                # Try matching from positions around the literal
+                var end_pos = min(
+                    len(text), literal_pos + len(self.literal_prefix)
+                )
+                while try_pos <= literal_pos:
+                    matches.clear()
+                    var result = self._match_node(
+                        ast,
+                        text,
+                        try_pos,
+                        matches,
+                        match_first_mode=False,
+                        required_start_pos=-1,
+                    )
+                    if result[0]:  # Match found
+                        var match_end = result[1]
+                        # Verify the match includes our literal
+                        if self._match_contains_literal(
+                            text, try_pos, match_end
+                        ):
+                            return Match(0, try_pos, match_end, text)
+                    try_pos += 1
+
+                # Move search position past this literal occurrence
+                search_pos = literal_pos + 1
+        else:
+            # No literal optimization, fall back to standard search
+            while search_pos <= len(text):
+                matches.clear()
+                var result = self._match_node(
+                    ast,
+                    text,
+                    search_pos,
+                    matches,
+                    match_first_mode=False,
+                    required_start_pos=-1,
+                )
+                if result[0]:  # Match found
+                    var end_idx = result[1]
+                    return Match(0, search_pos, end_idx, text)
+                search_pos += 1
 
         return None
+
+    fn _is_prefix_literal(self) -> Bool:
+        """Check if the extracted literal is a prefix literal."""
+        # Simple heuristic: if pattern starts with the literal, it's a prefix
+        return self.pattern.startswith(self.literal_prefix)
+
+    fn _match_contains_literal(
+        self, text: String, start: Int, end: Int
+    ) -> Bool:
+        """Verify that a match contains the required literal."""
+        if not self.has_literal_optimization or len(self.literal_prefix) == 0:
+            return True
+
+        # Check if the literal appears within the match bounds
+        var match_text = text[start:end]
+        return self.literal_prefix in match_text
 
     @always_inline
     fn _match_node(
