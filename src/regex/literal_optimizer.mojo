@@ -23,8 +23,10 @@ from regex.ast import (
 struct LiteralInfo(Copyable, Movable):
     """Information about a literal substring found in a regex pattern."""
 
-    var literal: String
-    """The literal string itself."""
+    var ast_node: Optional[UnsafePointer[ASTNode[ImmutableAnyOrigin]]]
+    """Pointer to the AST node containing the literal (for single nodes)."""
+    var literal_string: Optional[String]
+    """The literal string (for concatenated literals or computed values)."""
     var start_offset: Int
     """Minimum offset from start where this literal can appear."""
     var is_prefix: Bool
@@ -42,12 +44,42 @@ struct LiteralInfo(Copyable, Movable):
         is_suffix: Bool = False,
         is_required: Bool = True,
     ):
-        """Initialize a LiteralInfo."""
-        self.literal = literal
+        """Initialize a LiteralInfo with a string literal."""
+        self.ast_node = None
+        self.literal_string = literal
         self.start_offset = start_offset
         self.is_prefix = is_prefix
         self.is_suffix = is_suffix
         self.is_required = is_required
+
+    fn __init__(
+        out self,
+        ast_node: UnsafePointer[ASTNode[ImmutableAnyOrigin]],
+        start_offset: Int = 0,
+        is_prefix: Bool = False,
+        is_suffix: Bool = False,
+        is_required: Bool = True,
+    ):
+        """Initialize a LiteralInfo with an AST node pointer."""
+        self.ast_node = ast_node
+        self.literal_string = None
+        self.start_offset = start_offset
+        self.is_prefix = is_prefix
+        self.is_suffix = is_suffix
+        self.is_required = is_required
+
+    fn get_literal(self) -> String:
+        """Get the literal string."""
+        if self.ast_node:
+            var node = self.ast_node.value()[]
+            if node.get_value():
+                return String(node.get_value().value())
+            else:
+                return ""
+        elif self.literal_string:
+            return self.literal_string.value()
+        else:
+            return ""
 
 
 @fieldwise_init
@@ -93,7 +125,7 @@ struct LiteralSet(Movable):
                 score += 1000
 
             # Longer literals are more discriminative
-            score += len(lit.literal) * 10
+            score += len(lit.get_literal()) * 10
 
             # Prefix/suffix literals allow for more targeted searching
             if lit.is_prefix:
@@ -151,9 +183,10 @@ fn _extract_from_node(
     if node.type == ELEMENT:
         # Single literal character
         if node.min >= 1 and node.get_value():
-            var char_str = String(node.get_value().value())
             if node.max == 1:
-                # Exact single character
+                # Exact single character - use String for now
+                # TODO: Fix pointer usage after understanding ownership better
+                var char_str = String(node.get_value().value())
                 var info = LiteralInfo(
                     char_str, offset, at_start, False, is_required
                 )
@@ -162,6 +195,7 @@ fn _extract_from_node(
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
                 if node.min >= 1:  # a+ requires at least one
+                    var char_str = String(node.get_value().value())
                     var info = LiteralInfo(
                         char_str, offset, at_start, False, is_required
                     )
@@ -324,7 +358,7 @@ fn _get_prefix_literal(node: ASTNode) -> String:
         # For groups, extract the full literal sequence
         var literals = _extract_sequence(node, 0, True, True)
         if len(literals) > 0:
-            return literals[0].literal
+            return literals[0].get_literal()
     return ""
 
 
@@ -388,7 +422,7 @@ fn extract_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> String:
     # Look for a prefix literal
     for lit in literals.literals:
         if lit.is_prefix and lit.is_required:
-            return lit.literal
+            return String(lit.get_literal())
 
     # Don't return non-prefix literals as prefix
     return ""
