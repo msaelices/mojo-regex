@@ -91,16 +91,16 @@ struct NFAEngine(Engine):
                 # Use best literal if available
                 if literal_set.best_literal:
                     var best = literal_set.best_literal.value()
-                    if best.is_prefix and len(best.literal) > 1:
+                    if best.is_prefix and len(best.get_literal()) > 1:
                         # Use prefix literal for optimization
-                        self.literal_prefix = best.literal
+                        self.literal_prefix = String(best.get_literal())
                         self.has_literal_optimization = True
                         self.literal_searcher = TwoWaySearcher(
                             self.literal_prefix
                         )
-                    elif best.is_required and len(best.literal) > 2:
+                    elif best.is_required and len(best.get_literal()) > 2:
                         # Use required literal even if not prefix (for general prefiltering)
-                        self.literal_prefix = best.literal
+                        self.literal_prefix = String(best.get_literal())
                         self.has_literal_optimization = True
                         self.literal_searcher = TwoWaySearcher(
                             self.literal_prefix
