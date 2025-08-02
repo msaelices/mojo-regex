@@ -61,6 +61,10 @@ class Benchmark:
             "complex_email": 2,
             "complex_number": 25,
             "simd_": 10,
+            "literal_prefix_": 1,  # Already optimized in Python's re
+            "required_literal_": 1,
+            "no_literal_baseline": 1,
+            "alternation_common_prefix": 1,
         }
 
         internal_iterations = 1
@@ -91,6 +95,13 @@ class Benchmark:
 # ===-----------------------------------------------------------------------===#
 # Benchmark Data Generation
 # ===-----------------------------------------------------------------------===#
+
+# Literal optimization test texts
+SHORT_TEXT = "hello world this is a test with hello again and hello there"
+MEDIUM_TEXT = SHORT_TEXT * 10
+LONG_TEXT = SHORT_TEXT * 100
+EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
+EMAIL_LONG = EMAIL_TEXT * 20
 
 
 def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -> str:
@@ -293,6 +304,20 @@ def bench_simd_heavy_filtering(test_text: str, pattern: str) -> Callable[[], Non
 
 
 # ===-----------------------------------------------------------------------===#
+# Literal Optimization Benchmarks
+# ===-----------------------------------------------------------------------===#
+
+
+def bench_literal_optimization(test_text: str, pattern: str, iterations: int) -> Callable[[], None]:
+    """Benchmark literal optimization patterns."""
+    def benchmark_fn():
+        for _ in range(iterations):
+            results = re.findall(pattern, test_text)
+            len(results)  # Keep result
+    return benchmark_fn
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
 
@@ -394,6 +419,20 @@ def main():
         "simd_multi_char_class",
         bench_simd_heavy_filtering(large_mixed_text, r"[a-z]+[0-9]+"),
     )
+
+    # Literal Optimization Benchmarks
+    m.bench_function("literal_prefix_short",
+        bench_literal_optimization(SHORT_TEXT, r"hello.*world", 1))
+    m.bench_function("literal_prefix_medium",
+        bench_literal_optimization(MEDIUM_TEXT, r"hello.*", 1))
+    m.bench_function("literal_prefix_long",
+        bench_literal_optimization(LONG_TEXT, r"hello.*", 1))
+    m.bench_function("required_literal_short",
+        bench_literal_optimization(EMAIL_TEXT, r".*@example\.com", 1))
+    m.bench_function("no_literal_baseline",
+        bench_literal_optimization(MEDIUM_TEXT, r"[a-z]+", 1))
+    m.bench_function("alternation_common_prefix",
+        bench_literal_optimization(MEDIUM_TEXT, r"(hello|help|helicopter)", 1))
 
     # Results summary
     m.dump_report()
