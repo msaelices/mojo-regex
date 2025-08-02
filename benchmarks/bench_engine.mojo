@@ -12,6 +12,15 @@ from regex import match_first, findall
 # ===-----------------------------------------------------------------------===#
 # Benchmark Data Generation
 # ===-----------------------------------------------------------------------===#
+
+# Literal optimization test texts
+alias SHORT_TEXT = "hello world this is a test with hello again and hello there"
+alias MEDIUM_TEXT = SHORT_TEXT * 10
+alias LONG_TEXT = SHORT_TEXT * 100
+alias EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
+alias EMAIL_LONG = EMAIL_TEXT * 20
+
+
 fn make_test_string[
     length: Int
 ](pattern: String = "abcdefghijklmnopqrstuvwxyz") -> String:
@@ -292,6 +301,87 @@ fn bench_simd_heavy_filtering[
 
 
 # ===-----------------------------------------------------------------------===#
+# Literal Optimization Benchmarks
+# ===-----------------------------------------------------------------------===#
+@parameter
+fn bench_literal_prefix_short(mut b: Bencher) raises:
+    """Benchmark literal prefix pattern on short text."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall("hello.*world", SHORT_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
+fn bench_literal_prefix_medium(mut b: Bencher) raises:
+    """Benchmark literal prefix pattern on medium text."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall("hello.*", MEDIUM_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
+fn bench_literal_prefix_long(mut b: Bencher) raises:
+    """Benchmark literal prefix pattern on long text."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall("hello.*", LONG_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
+fn bench_required_literal_short(mut b: Bencher) raises:
+    """Benchmark required literal (not prefix) on short text."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall(".*@example\\.com", EMAIL_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
+fn bench_no_literal_baseline(mut b: Bencher) raises:
+    """Benchmark pattern with no literals as baseline."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall("[a-z]+", MEDIUM_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
+fn bench_alternation_common_prefix(mut b: Bencher) raises:
+    """Benchmark alternation with common prefix."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall("(hello|help|helicopter)", MEDIUM_TEXT)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
 def main():
@@ -392,6 +482,27 @@ def main():
     )
     m.bench_function[bench_simd_heavy_filtering[10000, "[a-z]+[0-9]+"]](
         BenchId(String("simd_multi_char_class"))
+    )
+
+    # Literal Optimization Benchmarks
+    print("=== Literal Optimization Benchmarks ===")
+    m.bench_function[bench_literal_prefix_short](
+        BenchId(String("literal_prefix_short"))
+    )
+    m.bench_function[bench_literal_prefix_medium](
+        BenchId(String("literal_prefix_medium"))
+    )
+    m.bench_function[bench_literal_prefix_long](
+        BenchId(String("literal_prefix_long"))
+    )
+    m.bench_function[bench_required_literal_short](
+        BenchId(String("required_literal_short"))
+    )
+    m.bench_function[bench_no_literal_baseline](
+        BenchId(String("no_literal_baseline"))
+    )
+    m.bench_function[bench_alternation_common_prefix](
+        BenchId(String("alternation_common_prefix"))
     )
 
     # Results summary
