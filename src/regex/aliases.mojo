@@ -33,3 +33,5 @@ alias CHAR_Z_UPPER = ord("Z")
 alias CHAR_NEWLINE = ord("\n")
 
 alias ALL_EXCEPT_NEWLINE = _all_except_newline()
+
+alias EMPTY_SLICE = StringSlice[ImmutableAnyOrigin]("")

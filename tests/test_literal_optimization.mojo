@@ -27,7 +27,7 @@ fn test_literal_extraction() raises:
     var ast1 = parse("hello")
     var literals1 = extract_literals(ast1)
     assert_true(
-        literals1.best_literal.value().literal == "hello",
+        literals1.best_literal.value().get_literal() == "hello",
         "Should extract 'hello' literal",
     )
     assert_true(
@@ -45,7 +45,7 @@ fn test_literal_extraction() raises:
     )
     var found_hello = False
     for lit in literals2.literals:
-        if lit.literal == "hello":
+        if lit.get_literal() == "hello":
             found_hello = True
             assert_true(lit.is_prefix, "hello should be prefix")
     assert_true(found_hello, "Should find 'hello' literal")
@@ -56,7 +56,7 @@ fn test_literal_extraction() raises:
     # Should find common prefix "hel"
     var found_prefix = False
     for lit in literals3.literals:
-        if lit.literal == "hel":
+        if lit.get_literal() == "hel":
             found_prefix = True
             assert_true(lit.is_required, "Common prefix should be required")
     assert_true(found_prefix, "Should find common prefix 'hel'")
@@ -66,7 +66,8 @@ fn test_literal_extraction() raises:
     var literals4 = extract_literals(ast4)
     var found_example = False
     for lit in literals4.literals:
-        if "@example" in lit.literal or "example" in lit.literal:
+        var lit_str = lit.get_literal()
+        if "@example" in lit_str or "example" in lit_str:
             found_example = True
     assert_true(found_example, "Should find literal containing 'example'")
 

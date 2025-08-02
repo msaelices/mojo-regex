@@ -38,7 +38,7 @@ struct Regex[origin: Origin](
     alias ImmOrigin = ImmutableOrigin.cast_from[origin]
     alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
-    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin],]
+    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin]]
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 

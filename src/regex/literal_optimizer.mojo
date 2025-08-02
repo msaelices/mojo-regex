@@ -5,6 +5,7 @@ This module implements the literal optimization strategies described in the burn
 including literal extraction, selection of optimal search strings, and prefiltering hints.
 """
 
+from regex.aliases import EMPTY_SLICE
 from regex.ast import (
     ASTNode,
     RE,
@@ -23,7 +24,7 @@ from regex.ast import (
 struct LiteralInfo(Copyable, Movable):
     """Information about a literal substring found in a regex pattern."""
 
-    var ast_node: Optional[UnsafePointer[ASTNode[ImmutableAnyOrigin]]]
+    var node_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin]]
     """Pointer to the AST node containing the literal (for single nodes)."""
     var literal_string: Optional[String]
     """The literal string (for concatenated literals or computed values)."""
@@ -38,15 +39,15 @@ struct LiteralInfo(Copyable, Movable):
 
     fn __init__(
         out self,
-        literal: String,
+        node: ASTNode[ImmutableAnyOrigin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal."""
-        self.ast_node = None
-        self.literal_string = literal
+        self.node_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]](to=node)
+        self.literal_string = None
         self.start_offset = start_offset
         self.is_prefix = is_prefix
         self.is_suffix = is_suffix
@@ -54,32 +55,31 @@ struct LiteralInfo(Copyable, Movable):
 
     fn __init__(
         out self,
-        ast_node: UnsafePointer[ASTNode[ImmutableAnyOrigin]],
+        owned literal: String,
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
         is_required: Bool = True,
     ):
-        """Initialize a LiteralInfo with an AST node pointer."""
-        self.ast_node = ast_node
-        self.literal_string = None
+        """Initialize a LiteralInfo with a string literal."""
+        self.node_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]]()
+        self.literal_string = literal^
         self.start_offset = start_offset
         self.is_prefix = is_prefix
         self.is_suffix = is_suffix
         self.is_required = is_required
 
-    fn get_literal(self) -> String:
+    fn get_literal(self) -> StringSlice[ImmutableAnyOrigin]:
         """Get the literal string."""
-        if self.ast_node:
-            var node = self.ast_node.value()[]
-            if node.get_value():
-                return String(node.get_value().value())
-            else:
-                return ""
+        if self.node_ptr and self.node_ptr[].get_value():
+            # If we have an AST node, use its value
+            return self.node_ptr[].get_value().value()
         elif self.literal_string:
-            return self.literal_string.value()
+            # If we have a literal string, return it
+            return self.literal_string.value().as_string_slice().get_immutable()
         else:
-            return ""
+            # No literal available
+            return EMPTY_SLICE
 
 
 @fieldwise_init
@@ -165,7 +165,7 @@ fn extract_literals(ast: ASTNode[MutableAnyOrigin]) -> LiteralSet:
 
 
 fn _extract_from_node(
-    node: ASTNode,
+    node: ASTNode[ImmutableAnyOrigin],
     mut result: LiteralSet,
     offset: Int,
     is_required: Bool,
@@ -184,20 +184,24 @@ fn _extract_from_node(
         # Single literal character
         if node.min >= 1 and node.get_value():
             if node.max == 1:
-                # Exact single character - use String for now
-                # TODO: Fix pointer usage after understanding ownership better
-                var char_str = String(node.get_value().value())
                 var info = LiteralInfo(
-                    char_str, offset, at_start, False, is_required
+                    node=node,
+                    start_offset=offset,
+                    is_prefix=at_start,
+                    is_suffix=False,
+                    is_required=is_required,
                 )
                 result.add(info)
             elif node.max == -1:
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
                 if node.min >= 1:  # a+ requires at least one
-                    var char_str = String(node.get_value().value())
                     var info = LiteralInfo(
-                        char_str, offset, at_start, False, is_required
+                        node=node,
+                        start_offset=offset,
+                        is_prefix=at_start,
+                        is_suffix=False,
+                        is_required=is_required,
                     )
                     result.add(info)
 
@@ -226,10 +230,16 @@ fn _extract_from_node(
         # Simplified: just check direct children of OR node
         var common_prefix = _find_common_prefix_simple(node)
         if len(common_prefix) > 0:
-            var info = LiteralInfo(common_prefix, offset, at_start, False, True)
+            var info = LiteralInfo(
+                literal=common_prefix,
+                start_offset=offset,
+                is_prefix=at_start,
+                is_suffix=False,
+                is_required=True,
+            )
             result.add(info)
 
-        # Also extract literals from each branch (but they're not required)
+        # Etract literals from each branch (but they're not required)
         for i in range(node.get_children_len()):
             _extract_from_node(
                 node.get_child(i), result, offset, False, at_start
@@ -276,11 +286,11 @@ fn _extract_sequence(
             # End of literal sequence
             if len(current_literal) > 0:
                 var info = LiteralInfo(
-                    current_literal,
-                    current_offset,
-                    sequence_at_start,
-                    False,
-                    is_required,
+                    literal=current_literal,
+                    start_offset=current_offset,
+                    is_prefix=sequence_at_start,
+                    is_suffix=False,
+                    is_required=is_required,
                 )
                 literals.append(info)
                 current_offset += len(current_literal)
@@ -319,14 +329,14 @@ fn _find_common_prefix_simple(or_node: ASTNode) -> String:
     _collect_or_prefixes(or_node, prefixes)
 
     if len(prefixes) < 2:
-        return ""
+        return String("")
 
     # Find common prefix among all collected prefixes
     var common = prefixes[0]
     for i in range(1, len(prefixes)):
         common = _longest_common_prefix(common, prefixes[i])
         if len(common) == 0:
-            return ""
+            return String("")
 
     return common
 
@@ -358,7 +368,7 @@ fn _get_prefix_literal(node: ASTNode) -> String:
         # For groups, extract the full literal sequence
         var literals = _extract_sequence(node, 0, True, True)
         if len(literals) > 0:
-            return literals[0].get_literal()
+            return String(literals[0].get_literal())
     return ""
 
 
