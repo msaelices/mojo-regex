@@ -18,7 +18,7 @@ alias SHORT_TEXT = "hello world this is a test with hello again and hello there"
 alias MEDIUM_TEXT = SHORT_TEXT * 10
 alias LONG_TEXT = SHORT_TEXT * 100
 alias EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-alias EMAIL_LONG = EMAIL_TEXT * 20
+alias EMAIL_LONG = EMAIL_TEXT * 5
 
 
 fn make_test_string[
@@ -356,6 +356,19 @@ fn bench_required_literal_short(mut b: Bencher) raises:
 
 
 @parameter
+fn bench_required_literal_long(mut b: Bencher) raises:
+    """Benchmark required literal (not prefix) on long text."""
+
+    @always_inline
+    @parameter
+    fn call_fn() raises:
+        var results = findall(".*@example\\.com", EMAIL_LONG)
+        keep(len(results))
+
+    b.iter[call_fn]()
+
+
+@parameter
 fn bench_no_literal_baseline(mut b: Bencher) raises:
     """Benchmark pattern with no literals as baseline."""
 
@@ -497,6 +510,9 @@ def main():
     )
     m.bench_function[bench_required_literal_short](
         BenchId(String("required_literal_short"))
+    )
+    m.bench_function[bench_required_literal_long](
+        BenchId("required_literal_long")
     )
     m.bench_function[bench_no_literal_baseline](
         BenchId(String("no_literal_baseline"))
