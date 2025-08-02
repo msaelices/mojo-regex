@@ -12,7 +12,7 @@ from regex.simd_ops import (
     SIMD_WIDTH,
     TwoWaySearcher,
 )
-from regex.literal_optimizer import extract_literals, extract_literal_prefix
+from regex.literal_optimizer import extract_literals
 
 
 fn _create_simd_matcher_from_range_pattern(
