@@ -216,7 +216,7 @@ fn create_whitespace() -> CharacterClassSIMD:
     return CharacterClassSIMD(whitespace_chars)
 
 
-struct SIMDStringSearch:
+struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
     var pattern: String
