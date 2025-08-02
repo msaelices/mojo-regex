@@ -60,6 +60,7 @@ fn bench_literal_match[
 ](mut b: Bencher) raises:
     """Benchmark literal string matching."""
     var test_text = make_test_string[text_length]()
+    test_text += "hello world" + test_text
 
     @always_inline
     @parameter

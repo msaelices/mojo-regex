@@ -127,7 +127,7 @@ def bench_literal_match(test_text: str, pattern: str) -> Callable[[], None]:
 
     def benchmark_fn():
         for _ in range(100):
-            result = re.match(pattern, test_text)
+            result = re.search(pattern, test_text)
             # Keep result to prevent optimization
             bool(result)
 
@@ -351,14 +351,14 @@ def main():
     m.bench_function(
         "literal_match_short",
         bench_literal_match(
-            text_1000,
+            text_1000 + " hello world" + text_1000,  # Ensure "hello" is present
             "hello",
         ),
     )
     m.bench_function(
         "literal_match_long",
         bench_literal_match(
-            text_10000,
+            text_10000 + " hello world" + text_1000,  # Ensure "hello" is present
             "hello",
         ),
     )
