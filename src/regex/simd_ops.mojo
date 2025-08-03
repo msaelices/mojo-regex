@@ -304,13 +304,13 @@ struct SIMDStringSearch(Copyable, Movable):
         return True
 
     fn search_all(self, text: String) -> List[Int]:
-        """Find all occurrences of pattern in text.
+        """Find all non-overlapping occurrences of pattern in text.
 
         Args:
             text: Text to search.
 
         Returns:
-            List of starting positions of all matches.
+            List of starting positions of all non-overlapping matches.
         """
         var positions = List[Int]()
         var start = 0
@@ -320,7 +320,8 @@ struct SIMDStringSearch(Copyable, Movable):
             if pos == -1:
                 break
             positions.append(pos)
-            start = pos + 1
+            # Move past this match to avoid overlapping matches
+            start = pos + self.pattern_length
 
         return positions
 
