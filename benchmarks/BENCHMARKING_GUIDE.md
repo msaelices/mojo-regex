@@ -137,3 +137,8 @@ The `run_comparison.sh` script supports different benchmark suites:
 ```
 
 Each suite generates its own set of output files with appropriate prefixes to avoid conflicts.
+
+### Important Notes
+
+- **Benchmark Name Matching**: For proper comparison, benchmark names must match exactly between Python and Mojo implementations. The comparison script matches benchmarks by name.
+- **SIMD Benchmarks**: The SIMD-focused benchmarks use `nfa_simd_` prefix for benchmark names in both Python and Mojo implementations.
