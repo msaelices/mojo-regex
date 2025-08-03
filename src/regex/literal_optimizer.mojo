@@ -156,17 +156,6 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
         self.best_literal = self.literals[best_idx]
 
 
-# fn _node_ptr_casted_to_parent_origin[
-#     parent_origin: ImmutableOrigin,
-# ](
-#     child: ASTNode[ImmutableAnyOrigin],
-# ) -> UnsafePointer[ASTNode[ImmutableAnyOrigin], parent_origin, mut=False]:
-#     """Cast a child node to its parent's origin."""
-#     return UnsafePointer[ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin](to=child).origin_cast[
-#         origin = ImmutableOrigin.cast_from[node_origin, parent_origin], mut=False
-#     ]()
-
-
 fn extract_literals[
     node_origin: ImmutableOrigin
 ](ref [node_origin]ast: ASTNode[ImmutableAnyOrigin]) -> LiteralSet[node_origin]:
