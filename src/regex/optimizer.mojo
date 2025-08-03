@@ -152,7 +152,7 @@ struct PatternAnalyzer:
             var best = literal_set.best_literal.value()
             if best.is_required:
                 info.has_required_literal = True
-                info.required_literal_length = len(best.get_literal())
+                info.required_literal_length = best.get_literal_len()
 
         # Check for SIMD optimization opportunities
         info.benefits_from_simd = self._check_simd_benefits(ast)
