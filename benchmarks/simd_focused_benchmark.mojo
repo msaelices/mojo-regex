@@ -192,7 +192,7 @@ fn bench_nfa_simd_quantified_range[text_length: Int](mut b: Bencher) raises:
 
 
 def main():
-    var m = Bench(BenchConfig(num_repetitions=3))
+    var m = Bench(BenchConfig(num_repetitions=1))
 
     print("=== SIMD-Focused NFA Engine Benchmarks ===")
     print(
