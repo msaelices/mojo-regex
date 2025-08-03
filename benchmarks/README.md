@@ -5,7 +5,7 @@ This directory contains benchmarks for comparing the performance of the regex li
 ## Files
 
 - **`bench_engine.mojo`** - Mojo benchmark suite testing the regex library
-- **`bench_python_re.py`** - Python benchmark suite testing Python's `re` module
+- **`bench_engine.py`** - Python benchmark suite testing Python's `re` module
 - **`README.md`** - This file
 
 ## Running Benchmarks
@@ -22,10 +22,7 @@ mojo benchmarks/bench_engine.mojo -t
 ### Python Benchmarks
 ```bash
 # Run the Python re module benchmarks
-python benchmarks/bench_python_re.py
-
-# Or using python3
-python3 benchmarks/bench_python_re.py
+python benchmarks/bench_engine.py
 ```
 
 

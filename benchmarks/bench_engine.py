@@ -6,6 +6,9 @@ This mirrors the benchmarks/bench_engine.mojo file for direct comparison.
 
 import re
 import time
+import json
+import os
+from datetime import datetime
 from typing import Callable
 
 
@@ -90,6 +93,35 @@ class Benchmark:
 
             # Right-align values to match Mojo format
             print(f"| {name:<25} | {time_ms:>21.17f} | {iters:>6} |")
+
+    def export_json(self, filename: str = "benchmarks/results/python_results.json"):
+        """Export benchmark results to JSON file.
+
+        Args:
+            filename: Path to output JSON file
+        """
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        # Convert results to JSON-serializable format
+        json_results = {
+            "engine": "python",
+            "timestamp": datetime.now().isoformat(),
+            "results": {}
+        }
+
+        for name in self.results:
+            json_results["results"][name] = {
+                "time_ns": self.results[name],
+                "time_ms": self.results[name] / 1_000_000,
+                "iterations": self.iterations[name]
+            }
+
+        # Write to file
+        with open(filename, "w") as f:
+            json.dump(json_results, f, indent=2)
+
+        print(f"\nResults exported to {filename}")
 
 
 # ===-----------------------------------------------------------------------===#
@@ -453,6 +485,9 @@ def main():
 
     # Results summary
     m.dump_report()
+
+    # Export to JSON
+    m.export_json()
 
 
 if __name__ == "__main__":
