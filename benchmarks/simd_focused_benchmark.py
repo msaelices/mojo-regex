@@ -282,55 +282,55 @@ def main():
     # Digit matching benchmarks
     print("--- Digit Matching (\\d+) ---")
     m.bench_function(
-        "python_simd_digits_10k",
+        "nfa_simd_digits_10k",
         bench_python_simd_digits(text_10k)
     )
     m.bench_function(
-        "python_simd_digits_50k",
+        "nfa_simd_digits_50k",
         bench_python_simd_digits(text_50k)
     )
 
     # Whitespace matching benchmarks
     print("--- Whitespace Matching (\\s+) ---")
     m.bench_function(
-        "python_simd_whitespace_10k",
+        "nfa_simd_whitespace_10k",
         bench_python_simd_whitespace(space_text_10k)
     )
     m.bench_function(
-        "python_simd_whitespace_50k",
+        "nfa_simd_whitespace_50k",
         bench_python_simd_whitespace(space_text_50k)
     )
 
     # Character range matching benchmarks
     print("--- Character Range Matching ([a-zA-Z0-9]+) ---")
     m.bench_function(
-        "python_simd_range_10k",
+        "nfa_simd_range_10k",
         bench_python_simd_range(range_text_10k)
     )
     m.bench_function(
-        "python_simd_range_50k",
+        "nfa_simd_range_50k",
         bench_python_simd_range(range_text_50k)
     )
 
     # Negated character range matching benchmarks
     print("--- Negated Character Range Matching ([^a-zA-Z0-9]+) ---")
     m.bench_function(
-        "python_simd_negated_range_10k",
+        "nfa_simd_negated_range_10k",
         bench_python_simd_negated_range(range_text_10k)
     )
     m.bench_function(
-        "python_simd_negated_range_50k",
+        "nfa_simd_negated_range_50k",
         bench_python_simd_negated_range(range_text_50k)
     )
 
     # Quantified character range matching benchmarks
     print("--- Quantified Character Range Matching ([a-z]{3,10}) ---")
     m.bench_function(
-        "python_simd_quantified_range_10k",
+        "nfa_simd_quantified_range_10k",
         bench_python_simd_quantified_range(range_text_10k)
     )
     m.bench_function(
-        "python_simd_quantified_range_50k",
+        "nfa_simd_quantified_range_50k",
         bench_python_simd_quantified_range(range_text_50k)
     )
 
