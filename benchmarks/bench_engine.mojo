@@ -7,6 +7,8 @@ from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from regex import match_first, findall
+from time import perf_counter_ns as now
+from pathlib import Path
 
 
 # ===-----------------------------------------------------------------------===#
@@ -396,6 +398,31 @@ fn bench_alternation_common_prefix(mut b: Bencher) raises:
 
 
 # ===-----------------------------------------------------------------------===#
+# JSON Export Function
+# ===-----------------------------------------------------------------------===#
+fn export_json_results(m: Bench) raises:
+    """Export benchmark results to JSON file."""
+    # For now, write a placeholder since Mojo benchmark API access is limited
+    # The actual results will be parsed from the console output
+    var json_content = String("{\n")
+    json_content += '  "engine": "mojo",\n'
+    json_content += '  "timestamp": "' + String(now()) + '",\n'
+    json_content += '  "note": "Results to be parsed from console output",\n'
+    json_content += '  "results": {}\n'
+    json_content += "}\n"
+
+    # Write to file
+    var results_path = Path("benchmarks/results/mojo_results.json")
+    with open(results_path, "w") as f:
+        f.write(json_content)
+
+    print(
+        "\nPlaceholder JSON exported. Run with output redirection to capture"
+        " results."
+    )
+
+
+# ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
 def main():
@@ -525,3 +552,6 @@ def main():
     # Results summary
     print("\n=== Benchmark Results ===")
     m.dump_report()
+
+    # Export results to JSON
+    export_json_results(m)
