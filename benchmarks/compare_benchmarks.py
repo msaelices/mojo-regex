@@ -196,9 +196,14 @@ def create_comparison_report(
 
 def main():
     """Main comparison function."""
+    # Get file paths from command line arguments or use defaults
+    python_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/python_results.json"
+    mojo_file = sys.argv[2] if len(sys.argv) > 2 else "benchmarks/results/mojo_results.json"
+    output_file = sys.argv[3] if len(sys.argv) > 3 else "benchmarks/results/comparison.json"
+
     # Load results
-    mojo_results = load_results("benchmarks/results/mojo_results.json")
-    python_results = load_results("benchmarks/results/python_results.json")
+    mojo_results = load_results(mojo_file)
+    python_results = load_results(python_file)
 
     # Create comparison
     comparison_data, report = create_comparison_report(mojo_results, python_results)
@@ -207,10 +212,10 @@ def main():
     print(report)
 
     # Save comparison data
-    with open("benchmarks/results/comparison.json", "w") as f:
+    with open(output_file, "w") as f:
         json.dump(comparison_data, f, indent=2)
 
-    print(f"\nComparison data saved to benchmarks/results/comparison.json")
+    print(f"\nComparison data saved to {output_file}")
 
 
 if __name__ == "__main__":

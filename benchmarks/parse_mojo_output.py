@@ -47,6 +47,9 @@ def parse_mojo_benchmark_output(output: str) -> dict:
 
 def main():
     """Read Mojo benchmark output from stdin and create JSON file."""
+    # Get output file from command line argument or use default
+    output_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/mojo_results.json"
+
     # Read all input
     output = sys.stdin.read()
 
@@ -65,10 +68,9 @@ def main():
     }
 
     # Ensure directory exists
-    os.makedirs("benchmarks/results", exist_ok=True)
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
     # Write to file
-    output_file = "benchmarks/results/mojo_results.json"
     with open(output_file, "w") as f:
         json.dump(json_data, f, indent=2)
 

@@ -16,7 +16,7 @@ except ImportError:
     sys.exit(1)
 
 
-def load_comparison_data(filename: str = "benchmarks/results/comparison.json") -> dict:
+def load_comparison_data(filename: str) -> dict:
     """Load comparison data from JSON file.
 
     Args:
@@ -35,7 +35,7 @@ def load_comparison_data(filename: str = "benchmarks/results/comparison.json") -
 
 
 def create_speedup_chart(
-    comparison_data: dict, output_file: str = "benchmarks/results/speedup_chart.png"
+    comparison_data: dict, output_file: str
 ):
     """Create a bar chart showing speedup factors.
 
@@ -131,7 +131,7 @@ def create_speedup_chart(
 
 
 def create_time_comparison_chart(
-    comparison_data: dict, output_file: str = "benchmarks/results/time_comparison.png"
+    comparison_data: dict, output_file: str
 ):
     """Create a grouped bar chart comparing actual execution times.
 
@@ -181,7 +181,7 @@ def create_time_comparison_chart(
 
 
 def create_category_analysis(
-    comparison_data: dict, output_file: str = "benchmarks/results/category_analysis.png"
+    comparison_data: dict, output_file: str
 ):
     """Create a chart analyzing performance by benchmark category.
 
@@ -297,21 +297,29 @@ def create_category_analysis(
 
 def main():
     """Main visualization function."""
+    # Get file paths from command line arguments or use defaults
+    comparison_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/comparison.json"
+    prefix = sys.argv[2] if len(sys.argv) > 2 else ""
+
     # Load comparison data
-    comparison_data = load_comparison_data()
+    comparison_data = load_comparison_data(comparison_file)
 
     print("Creating visualizations...")
 
-    # Create different charts
-    create_speedup_chart(comparison_data)
-    create_time_comparison_chart(comparison_data)
-    create_category_analysis(comparison_data)
+    # Create different charts with prefix
+    speedup_file = f"benchmarks/results/{prefix}speedup_chart.png"
+    time_file = f"benchmarks/results/{prefix}time_comparison.png"
+    category_file = f"benchmarks/results/{prefix}category_analysis.png"
+
+    create_speedup_chart(comparison_data, speedup_file)
+    create_time_comparison_chart(comparison_data, time_file)
+    create_category_analysis(comparison_data, category_file)
 
     print("\nAll visualizations created successfully!")
     print("Check the benchmarks/results/ directory for:")
-    print("  - speedup_chart.png")
-    print("  - time_comparison.png")
-    print("  - category_analysis.png")
+    print(f"  - {prefix}speedup_chart.png")
+    print(f"  - {prefix}time_comparison.png")
+    print(f"  - {prefix}category_analysis.png")
 
 
 if __name__ == "__main__":
