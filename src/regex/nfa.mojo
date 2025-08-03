@@ -162,6 +162,11 @@ struct NFAEngine(Engine):
                     # No more occurrences of required literal
                     break
 
+                # Skip literals that would create overlapping matches
+                if literal_pos < current_pos:
+                    current_pos = literal_pos + 1
+                    continue
+
                 # Try to match the full pattern starting from before the literal
                 var try_pos = literal_pos
                 if self.literal_prefix and not self._is_prefix_literal():
@@ -169,6 +174,11 @@ struct NFAEngine(Engine):
 
                 # Search for matches around the literal
                 var found_match = False
+
+                # For prefix literals, we can only match at the literal position
+                if self._is_prefix_literal():
+                    try_pos = literal_pos
+
                 while try_pos <= literal_pos and try_pos <= len(text):
                     temp_matches.clear()
                     var result = self._match_node(
@@ -187,7 +197,7 @@ struct NFAEngine(Engine):
                             var matched = Match(0, try_pos, match_end, text)
                             matches.append(matched)
 
-                            # Move past this match
+                            # Move past this match to avoid overlapping matches
                             if match_end == try_pos:
                                 current_pos = try_pos + 1
                             else:
@@ -254,6 +264,28 @@ struct NFAEngine(Engine):
                 ast = parse(self.pattern)
             except:
                 return None
+
+        # For match_first (Python's re.match), we can use literal optimization
+        # but only to quickly reject non-matching texts
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
+
+            # Check if the literal exists at all in the text starting from our position
+            var literal_pos = searcher.search(text, start)
+            if literal_pos == -1:
+                # No literal found, so pattern cannot match
+                return None
+
+            # For prefix literals, they must be at the start position
+            if self._is_prefix_literal() and literal_pos != start:
+                return None
+
+            # For non-prefix literals, they must be reachable from start
+            # (within the maximum possible match length from start)
+            if not self._is_prefix_literal():
+                # Conservative check: if literal is too far from start, pattern can't match
+                if literal_pos > start + len(text):
+                    return None
 
         # Try to match at the exact start position only (like Python's re.match)
         # Use match_first_mode for optimized early termination
