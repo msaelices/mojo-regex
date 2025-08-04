@@ -538,7 +538,7 @@ fn SpaceElement[
         end_idx=end_idx,
         min=1,
         max=1,
-        enable_simd=False,  # Will be enabled selectively by parent
+        enable_simd=True,  # Enable SIMD for whitespace matching
     )
     # Pre-create SIMD matcher for potential use
     node.simd_matcher = create_whitespace()
@@ -564,7 +564,7 @@ fn DigitElement[
         end_idx=end_idx,
         min=1,
         max=1,
-        enable_simd=False,  # Will be enabled selectively by parent
+        enable_simd=True,  # Enable SIMD for digit matching
     )
     # Pre-create SIMD matcher for potential use
     node.simd_matcher = create_ascii_digits()
@@ -592,7 +592,7 @@ fn RangeElement[
         min=1,
         max=1,
         positive_logic=is_positive_logic,
-        enable_simd=False,  # Will be enabled selectively by parent
+        enable_simd=True,  # Enable SIMD for character range matching
     )
     # SIMD matcher will be created lazily when needed
     # since we need the actual range pattern from the value
