@@ -1,16 +1,26 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode, RANGE, DIGIT, SPACE
-from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
+from regex.ast import (
+    ASTNode,
+    RANGE,
+    DIGIT,
+    SPACE,
+)
+from regex.aliases import (
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_NEWLINE,
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_CUSTOM,
+)
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
 from regex.simd_ops import (
     CharacterClassSIMD,
-    create_whitespace,
-    create_ascii_digits,
     SIMD_WIDTH,
     TwoWaySearcher,
+    get_simd_matcher,
 )
 from regex.literal_optimizer import extract_literals
 
@@ -559,9 +569,9 @@ struct NFAEngine(Engine):
         var ch = String(str[str_i])
         var is_space: Bool
 
-        # Use cached SIMD matcher if available
-        if ast.simd_matcher:
-            var simd_matcher = ast.simd_matcher.value()
+        # Use global SIMD matcher
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher = get_simd_matcher(ast.simd_matcher_type)
             is_space = simd_matcher.contains(ord(ch))
         else:
             # Fallback to traditional comparison
@@ -596,9 +606,9 @@ struct NFAEngine(Engine):
         var ch = String(str[str_i])
         var is_digit: Bool
 
-        # Use cached SIMD matcher if available
-        if ast.simd_matcher:
-            var simd_matcher = ast.simd_matcher.value()
+        # Use global SIMD matcher
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher = get_simd_matcher(ast.simd_matcher_type)
             is_digit = simd_matcher.contains(ord(ch))
         else:
             # Fallback to traditional comparison
@@ -627,16 +637,39 @@ struct NFAEngine(Engine):
         var ch = String(str[str_i])
         var match_found: Bool
 
-        # Use cached SIMD matcher if available, otherwise create one
-        if ast.simd_matcher:
-            var simd_matcher = ast.simd_matcher.value()
-            var simd_match = simd_matcher.contains(ord(ch))
-            match_found = simd_match if ast.positive_logic else not simd_match
-        elif ast.enable_simd and ast.get_value():
-            var range_pattern = ast.get_value().value()
-            var simd_matcher = _create_simd_matcher_from_range_pattern(
-                range_pattern
-            )
+        # Use SIMD matcher based on type
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher: CharacterClassSIMD
+
+            if ast.simd_matcher_type == SIMD_MATCHER_CUSTOM:
+                # Custom range - create on demand
+                if ast.get_value():
+                    var range_pattern = ast.get_value().value()
+                    simd_matcher = _create_simd_matcher_from_range_pattern(
+                        range_pattern
+                    )
+                else:
+                    # Fallback if no pattern available
+                    var ch_found = False
+                    if ast.get_value():
+                        var range_pattern = ast.get_value().value()
+                        ch_found = ast._is_char_in_range(ch, range_pattern)
+                    match_found = ch_found == ast.positive_logic
+                    if match_found:
+                        return self._apply_quantifier(
+                            ast,
+                            str,
+                            str_i,
+                            1,
+                            match_first_mode,
+                            required_start_pos,
+                        )
+                    else:
+                        return (False, str_i)
+            else:
+                # Use global pre-initialized matcher
+                simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+
             var simd_match = simd_matcher.contains(ord(ch))
             match_found = simd_match if ast.positive_logic else not simd_match
         else:
@@ -1010,10 +1043,30 @@ struct NFAEngine(Engine):
         if match_first_mode and required_start_pos >= 0:
             search_len = min(search_len, required_start_pos + 50 - str_i)
 
-        # Use SIMD bulk matching when we have cached matchers and enough data
-        if ast.simd_matcher and search_len >= SIMD_WIDTH:
-            var simd_matcher = ast.simd_matcher.value()
+        # Use SIMD bulk matching when we have SIMD matcher type and enough data
+        var use_simd = False
+        var simd_matcher = CharacterClassSIMD(
+            ""
+        )  # Initialize with empty matcher
 
+        if (
+            ast.simd_matcher_type != SIMD_MATCHER_NONE
+            and search_len >= SIMD_WIDTH
+        ):
+            if ast.simd_matcher_type == SIMD_MATCHER_CUSTOM:
+                # For custom matchers, create on demand
+                if ast.get_value():
+                    var range_pattern = ast.get_value().value()
+                    simd_matcher = _create_simd_matcher_from_range_pattern(
+                        range_pattern
+                    )
+                    use_simd = True
+            else:
+                # Use global pre-initialized matcher
+                simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+                use_simd = True
+
+        if use_simd:
             # For RANGE nodes, handle positive/negative logic
             if ast.type == RANGE:
                 # For consecutive matches, we need to scan until first non-match
