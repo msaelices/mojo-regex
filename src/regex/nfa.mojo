@@ -1040,7 +1040,8 @@ struct NFAEngine(Engine):
         if min_matches == 1 and max_matches == 1:
             return (True, str_i + char_consumed)
 
-        # Calculate the maximum search length
+        # Calculate the maximum search length from the current position
+        # Note: search_len includes already consumed characters
         var search_len = min(max_matches, len(str) - str_i)
         if match_first_mode and required_start_pos >= 0:
             search_len = min(search_len, required_start_pos + 50 - str_i)
@@ -1091,14 +1092,18 @@ struct NFAEngine(Engine):
             else:
                 # For DIGIT and SPACE, use direct SIMD matching
                 # Count consecutive matches using bulk operations
-                # Start with already consumed characters
-                var consecutive_matches = char_consumed
-                var pos = char_consumed
+                # We already consumed char_consumed characters, so we count total matches
+                var consecutive_matches = 0
+                var pos = 0
 
                 # Process in SIMD-width chunks for better performance
-                while pos + SIMD_WIDTH <= search_len:
+                # Check actual string bounds
+                while (
+                    str_i + char_consumed + pos + SIMD_WIDTH <= len(str)
+                    and consecutive_matches + char_consumed < max_matches
+                ):
                     var chunk_matches = simd_matcher._check_chunk_simd(
-                        str, str_i + pos
+                        str, str_i + char_consumed + pos
                     )
 
                     # Use SIMD reduction to check if all match
@@ -1121,16 +1126,22 @@ struct NFAEngine(Engine):
                         break
 
                 # Handle remaining characters
-                while pos < search_len:
-                    if simd_matcher.contains(ord(str[str_i + pos])):
+                while (
+                    str_i + char_consumed + pos < len(str)
+                    and consecutive_matches + char_consumed < max_matches
+                ):
+                    if simd_matcher.contains(
+                        ord(str[str_i + char_consumed + pos])
+                    ):
                         consecutive_matches += 1
                         pos += 1
                     else:
                         break
 
-                var matches_count = min(consecutive_matches, max_matches)
-                if matches_count >= min_matches:
-                    return (True, str_i + matches_count)
+                # Total matches include already consumed characters
+                var total_matches = char_consumed + consecutive_matches
+                if total_matches >= min_matches:
+                    return (True, str_i + total_matches)
                 else:
                     return (False, str_i)
 
