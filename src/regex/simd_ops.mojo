@@ -19,6 +19,9 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM,
     SIMD_MATCHER_ALNUM_LOWER,
     SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_HEX_DIGITS,
+    SIMD_MATCHER_HEX_LOWER,
+    SIMD_MATCHER_HEX_UPPER,
     SIMD_MATCHER_CUSTOM,
 )
 
@@ -45,6 +48,9 @@ fn _init_simd_matchers() -> SIMDMatchers:
     matchers[SIMD_MATCHER_ALNUM] = create_ascii_alphanumeric()
     matchers[SIMD_MATCHER_ALNUM_LOWER] = create_ascii_alnum_lower()
     matchers[SIMD_MATCHER_ALNUM_UPPER] = create_ascii_alnum_upper()
+    matchers[SIMD_MATCHER_HEX_DIGITS] = create_hex_digits()
+    matchers[SIMD_MATCHER_HEX_LOWER] = create_hex_lower()
+    matchers[SIMD_MATCHER_HEX_UPPER] = create_hex_upper()
     return matchers
 
 
@@ -81,6 +87,7 @@ struct CharacterClassSIMD(Copyable, Movable):
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
 
+    @always_inline
     fn __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
 
@@ -226,9 +233,13 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Use lookup table to check each character
         var matches = SIMD[DType.bool, SIMD_WIDTH](False)
 
+        # Use vectorized operations instead of scalar loop
+        @parameter
         for i in range(SIMD_WIDTH):
             var char_code = Int(chunk[i])
-            matches[i] = self.lookup_table[char_code] == 1
+            # Bounds check to ensure we don't read outside lookup table
+            if char_code >= 0 and char_code < 256:
+                matches[i] = self.lookup_table[char_code] == 1
 
         return matches
 
@@ -321,6 +332,58 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
 
     # Add digits
     for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_digits() -> CharacterClassSIMD:
+    """Create SIMD matcher for hexadecimal digits [0-9a-fA-F]."""
+    var result = CharacterClassSIMD("")
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add lowercase hex letters
+    for i in range(ord("a"), ord("f") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase hex letters
+    for i in range(ord("A"), ord("F") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_lower() -> CharacterClassSIMD:
+    """Create SIMD matcher for lowercase hexadecimal [0-9a-f]."""
+    var result = CharacterClassSIMD("")
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add lowercase hex letters
+    for i in range(ord("a"), ord("f") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_upper() -> CharacterClassSIMD:
+    """Create SIMD matcher for uppercase hexadecimal [0-9A-F]."""
+    var result = CharacterClassSIMD("")
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase hex letters
+    for i in range(ord("A"), ord("F") + 1):
         result.lookup_table[i] = 1
 
     return result

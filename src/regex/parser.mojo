@@ -55,6 +55,9 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM,
     SIMD_MATCHER_ALNUM_LOWER,
     SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_HEX_DIGITS,
+    SIMD_MATCHER_HEX_LOWER,
+    SIMD_MATCHER_HEX_UPPER,
     SIMD_MATCHER_CUSTOM,
 )
 
@@ -92,6 +95,12 @@ fn analyze_range_pattern(pattern: String) -> Int:
         return SIMD_MATCHER_ALNUM_LOWER
     elif inner_pattern == "A-Z0-9":
         return SIMD_MATCHER_ALNUM_UPPER
+    elif inner_pattern == "0-9a-fA-F" or inner_pattern == "a-fA-F0-9":
+        return SIMD_MATCHER_HEX_DIGITS
+    elif inner_pattern == "0-9a-f" or inner_pattern == "a-f0-9":
+        return SIMD_MATCHER_HEX_LOWER
+    elif inner_pattern == "0-9A-F" or inner_pattern == "A-F0-9":
+        return SIMD_MATCHER_HEX_UPPER
     else:
         return SIMD_MATCHER_CUSTOM
 
