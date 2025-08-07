@@ -5,6 +5,8 @@ from regex.ast import (
     RANGE,
     DIGIT,
     SPACE,
+    ELEMENT,
+    WILDCARD,
 )
 from regex.aliases import (
     CHAR_ZERO,
@@ -1049,10 +1051,7 @@ struct NFAEngine(Engine):
             ""
         )  # Initialize with empty matcher
 
-        if (
-            ast.simd_matcher_type != SIMD_MATCHER_NONE
-            and search_len >= SIMD_WIDTH
-        ):
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
             if ast.simd_matcher_type == SIMD_MATCHER_CUSTOM:
                 # For custom matchers, create on demand
                 if ast.get_value():
@@ -1092,8 +1091,9 @@ struct NFAEngine(Engine):
             else:
                 # For DIGIT and SPACE, use direct SIMD matching
                 # Count consecutive matches using bulk operations
-                var consecutive_matches = 0
-                var pos = 0
+                # Start with already consumed characters
+                var consecutive_matches = char_consumed
+                var pos = char_consumed
 
                 # Process in SIMD-width chunks for better performance
                 while pos + SIMD_WIDTH <= search_len:
@@ -1101,29 +1101,32 @@ struct NFAEngine(Engine):
                         str, str_i + pos
                     )
 
-                    # Check if all characters in chunk match
-                    var all_match = True
-                    for j in range(SIMD_WIDTH):
-                        if not chunk_matches[j]:
-                            # Found first non-match
-                            consecutive_matches += j
-                            all_match = False
-                            break
+                    # Use SIMD reduction to check if all match
+                    var all_match = chunk_matches.reduce_and()
 
-                    if not all_match:
+                    if all_match:
+                        # All characters in chunk match
+                        consecutive_matches += SIMD_WIDTH
+                        pos += SIMD_WIDTH
+                    else:
+                        # Find first non-match
+                        # Count consecutive matches from start of this chunk
+                        var chunk_match_count = 0
+                        for j in range(SIMD_WIDTH):
+                            if chunk_matches[j]:
+                                chunk_match_count += 1
+                            else:
+                                break
+                        consecutive_matches += chunk_match_count
                         break
 
-                    consecutive_matches += SIMD_WIDTH
-                    pos += SIMD_WIDTH
-
-                # Handle remaining characters if all chunks matched
-                if pos < search_len and consecutive_matches == pos:
-                    while pos < search_len:
-                        if simd_matcher.contains(ord(str[str_i + pos])):
-                            consecutive_matches += 1
-                            pos += 1
-                        else:
-                            break
+                # Handle remaining characters
+                while pos < search_len:
+                    if simd_matcher.contains(ord(str[str_i + pos])):
+                        consecutive_matches += 1
+                        pos += 1
+                    else:
+                        break
 
                 var matches_count = min(consecutive_matches, max_matches)
                 if matches_count >= min_matches:
@@ -1133,8 +1136,9 @@ struct NFAEngine(Engine):
 
         else:
             # Fallback to regular character-by-character matching
-            var matches_count = 0
-            var current_pos = str_i
+            # Start with already consumed characters
+            var matches_count = char_consumed
+            var current_pos = str_i + char_consumed
 
             while matches_count < max_matches and current_pos < len(str):
                 # Early termination for match_first_mode
@@ -1142,9 +1146,31 @@ struct NFAEngine(Engine):
                     if current_pos > required_start_pos + 50:
                         break
 
-                if ast.is_match(
-                    String(str[current_pos]), current_pos, len(str)
-                ):
+                # Check character directly based on node type
+                var char_matches = False
+                var ch = str[current_pos]
+
+                if ast.type == DIGIT:
+                    char_matches = ord("0") <= ord(ch) <= ord("9")
+                elif ast.type == SPACE:
+                    char_matches = (
+                        ch == " " or ch == "\t" or ch == "\n" or ch == "\r"
+                    )
+                elif ast.type == ELEMENT:
+                    if ast.get_value():
+                        char_matches = ast.get_value().value() == String(ch)
+                elif ast.type == WILDCARD:
+                    char_matches = ord(ch) != ord("\n")
+                elif ast.type == RANGE:
+                    if ast.get_value():
+                        var range_pattern = ast.get_value().value()
+                        char_matches = ast._is_char_in_range(
+                            String(ch), range_pattern
+                        )
+                        if not ast.positive_logic:
+                            char_matches = not char_matches
+
+                if char_matches:
                     matches_count += 1
                     current_pos += 1
                 else:

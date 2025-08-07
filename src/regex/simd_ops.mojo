@@ -80,12 +80,19 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         return CharacterClassSIMD("")
 
 
-@register_passable("trivial")
 struct CharacterClassSIMD(Copyable, Movable):
     """SIMD-optimized character class matcher."""
 
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
+    var is_digits: Bool
+    """True if this matcher is for digits [0-9]."""
+    var is_whitespace: Bool
+    """True if this matcher is for whitespace."""
+    var is_alpha_lower: Bool
+    """True if this matcher is for lowercase letters [a-z]."""
+    var is_alpha_upper: Bool
+    """True if this matcher is for uppercase letters [A-Z]."""
 
     @always_inline
     fn __init__(out self, char_class: StringSlice):
@@ -95,6 +102,10 @@ struct CharacterClassSIMD(Copyable, Movable):
             char_class: String containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.is_digits = False
+        self.is_whitespace = False
+        self.is_alpha_lower = False
+        self.is_alpha_upper = False
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -110,12 +121,24 @@ struct CharacterClassSIMD(Copyable, Movable):
             end_char: Last character in range.
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.is_digits = False
+        self.is_whitespace = False
+        self.is_alpha_lower = False
+        self.is_alpha_upper = False
 
         var start_code = max(ord(start_char), 0)
         var end_code = min(ord(end_char), 255)
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
+
+        # Set flags for common ranges
+        if start_code == ord("0") and end_code == ord("9"):
+            self.is_digits = True
+        elif start_code == ord("a") and end_code == ord("z"):
+            self.is_alpha_lower = True
+        elif start_code == ord("A") and end_code == ord("Z"):
+            self.is_alpha_upper = True
 
     fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -146,8 +169,12 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Process chunks using SIMD
         while pos + SIMD_WIDTH <= text_len:
             var matches = self._check_chunk_simd(text, pos)
+
+            # Use SIMD reduction to quickly check if any match exists
             if matches.reduce_or():
                 # Found at least one match in this chunk
+                # Find the first match position efficiently
+                @parameter
                 for i in range(SIMD_WIDTH):
                     if matches[i]:
                         return pos + i
@@ -230,18 +257,45 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # Use lookup table to check each character
-        var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+        # Use optimized SIMD operations for common character classes
+        if self.is_digits:
+            # For digits [0-9], use SIMD comparisons
+            var is_ge_0 = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("0"))
+            var is_le_9 = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("9"))
+            return is_ge_0 & is_le_9
 
-        # Use vectorized operations instead of scalar loop
-        @parameter
-        for i in range(SIMD_WIDTH):
-            var char_code = Int(chunk[i])
-            # Bounds check to ensure we don't read outside lookup table
-            if char_code >= 0 and char_code < 256:
-                matches[i] = self.lookup_table[char_code] == 1
+        elif self.is_alpha_lower:
+            # For lowercase letters [a-z]
+            var is_ge_a = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            var is_le_z = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z"))
+            return is_ge_a & is_le_z
 
-        return matches
+        elif self.is_alpha_upper:
+            # For uppercase letters [A-Z]
+            var is_ge_A = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            var is_le_Z = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z"))
+            return is_ge_A & is_le_Z
+
+        elif self.is_whitespace:
+            # For whitespace, check common whitespace characters
+            var is_space = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord(" "))
+            var is_tab = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\t"))
+            var is_newline = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\n"))
+            var is_cr = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\r"))
+            return is_space | is_tab | is_newline | is_cr
+
+        else:
+            # Fallback to lookup table for custom character classes
+            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+
+            # Fallback to simple loop for custom character classes
+            @parameter
+            for i in range(SIMD_WIDTH):
+                var char_code = Int(chunk[i])
+                if char_code >= 0 and char_code < 256:
+                    matches[i] = self.lookup_table[char_code] == 1
+
+            return matches
 
 
 @always_inline
@@ -286,7 +340,9 @@ fn create_ascii_alphanumeric() -> CharacterClassSIMD:
 fn create_whitespace() -> CharacterClassSIMD:
     """Create SIMD matcher for whitespace characters [ \\t\\n\\r\\f\\v]."""
     var whitespace_chars = " \t\n\r\f\v"
-    return CharacterClassSIMD(whitespace_chars)
+    var result = CharacterClassSIMD(whitespace_chars)
+    result.is_whitespace = True
+    return result
 
 
 @always_inline
