@@ -51,6 +51,7 @@ struct NFAEngine(Engine):
 
                 # Only apply literal optimization for MEDIUM or COMPLEX patterns
                 # SIMPLE patterns use DFA which is already optimized
+                # This has a HUGE impact on performance
                 if complexity.value != PatternComplexity.SIMPLE:
                     var literal_set = extract_literals(ast)
 
