@@ -53,13 +53,13 @@ EOF
 
 # Add main branch results
 echo '```' >> performance_comparison.md
-tail -n 30 results_main.main >> performance_comparison.md
+tail -n 30 results_main.bench_engine >> performance_comparison.md
 echo '```' >> performance_comparison.md
 
 echo "" >> performance_comparison.md
 echo "#### Optimization Branch" >> performance_comparison.md
 echo '```' >> performance_comparison.md
-tail -n 30 results_optimization.current_branch >> performance_comparison.md
+tail -n 30 results_current_branch.bench_engine >> performance_comparison.md
 echo '```' >> performance_comparison.md
 
 # Add other benchmark results similarly...
