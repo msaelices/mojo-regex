@@ -9,6 +9,7 @@ from regex.simd_ops import (
     TwoWaySearcher,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
+from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
 struct NFAEngine(Engine):
@@ -41,28 +42,37 @@ struct NFAEngine(Engine):
         try:
             self.regex = parse(pattern)
 
-            # Extract literals for optimization
+            # Only apply literal optimization for patterns that benefit from it
+            # Skip for simple patterns that will use DFA anyway
             if self.regex:
                 var ast = self.regex.value()
-                var literal_set = extract_literals(ast)
+                var analyzer = PatternAnalyzer()
+                var complexity = analyzer.classify(ast)
 
-                # Use best literal if available
-                if literal_set.best_literal:
-                    var best = literal_set.best_literal.value()
-                    if best.is_prefix and best.get_literal_len() > 1:
-                        # Use prefix literal for optimization
-                        self.literal_prefix = best.get_literal()
-                        self.has_literal_optimization = True
-                        self.literal_searcher = TwoWaySearcher(
-                            self.literal_prefix
-                        )
-                    elif best.is_required and best.get_literal_len() > 2:
-                        # Use required literal even if not prefix (for general prefiltering)
-                        self.literal_prefix = best.get_literal()
-                        self.has_literal_optimization = True
-                        self.literal_searcher = TwoWaySearcher(
-                            self.literal_prefix
-                        )
+                # Only apply literal optimization for MEDIUM or COMPLEX patterns
+                # SIMPLE patterns use DFA which is already optimized
+                if complexity.value != PatternComplexity.SIMPLE:
+                    var literal_set = extract_literals(ast)
+
+                    # Use best literal if available and significant
+                    if literal_set.best_literal:
+                        var best = literal_set.best_literal.value()
+                        # Require longer literals to justify overhead
+                        if best.is_prefix and best.get_literal_len() > 3:
+                            # Use prefix literal for optimization
+                            self.literal_prefix = best.get_literal()
+                            self.has_literal_optimization = True
+                            self.literal_searcher = TwoWaySearcher(
+                                self.literal_prefix
+                            )
+                        elif best.is_required and best.get_literal_len() > 4:
+                            # Use required literal for prefiltering
+                            # Require even longer literals for non-prefix optimization
+                            self.literal_prefix = best.get_literal()
+                            self.has_literal_optimization = True
+                            self.literal_searcher = TwoWaySearcher(
+                                self.literal_prefix
+                            )
         except:
             self.regex = None
 
