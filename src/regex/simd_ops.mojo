@@ -93,6 +93,16 @@ struct CharacterClassSIMD(Copyable, Movable):
     """True if this matcher is for lowercase letters [a-z]."""
     var is_alpha_upper: Bool
     """True if this matcher is for uppercase letters [A-Z]."""
+    var is_alpha: Bool
+    """True if this matcher is for all letters [a-zA-Z]."""
+    var is_alnum: Bool
+    """True if this matcher is for alphanumeric [a-zA-Z0-9]."""
+    var is_simple_range: Bool
+    """True if this is a simple contiguous range."""
+    var range_start: UInt8
+    """Start of the range (if is_simple_range)."""
+    var range_end: UInt8
+    """End of the range (if is_simple_range)."""
 
     @always_inline
     fn __init__(out self, char_class: StringSlice):
@@ -106,6 +116,11 @@ struct CharacterClassSIMD(Copyable, Movable):
         self.is_whitespace = False
         self.is_alpha_lower = False
         self.is_alpha_upper = False
+        self.is_alpha = False
+        self.is_alnum = False
+        self.is_simple_range = False
+        self.range_start = 0
+        self.range_end = 0
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -125,9 +140,16 @@ struct CharacterClassSIMD(Copyable, Movable):
         self.is_whitespace = False
         self.is_alpha_lower = False
         self.is_alpha_upper = False
+        self.is_alpha = False
+        self.is_alnum = False
 
         var start_code = max(ord(start_char), 0)
         var end_code = min(ord(end_char), 255)
+
+        # Mark this as a simple range for optimization
+        self.is_simple_range = True
+        self.range_start = UInt8(start_code)
+        self.range_end = UInt8(end_code)
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
@@ -276,6 +298,29 @@ struct CharacterClassSIMD(Copyable, Movable):
             var is_le_Z = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z"))
             return is_ge_A & is_le_Z
 
+        elif self.is_alpha:
+            # For all letters [a-zA-Z]
+            var is_lower = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z")))
+            var is_upper = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z")))
+            return is_lower | is_upper
+
+        elif self.is_alnum:
+            # For alphanumeric [a-zA-Z0-9]
+            var is_digit = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("0"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("9")))
+            var is_lower = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z")))
+            var is_upper = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z")))
+            return is_digit | is_lower | is_upper
+
         elif self.is_whitespace:
             # For whitespace, check common whitespace characters
             var is_space = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord(" "))
@@ -285,17 +330,33 @@ struct CharacterClassSIMD(Copyable, Movable):
             return is_space | is_tab | is_newline | is_cr
 
         else:
-            # Fallback to lookup table for custom character classes
-            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+            # For custom character classes, check if it's a simple range first
+            if self.is_simple_range:
+                # Use SIMD range comparison for simple ranges
+                var is_ge_start = chunk >= SIMD[DType.uint8, SIMD_WIDTH](
+                    self.range_start
+                )
+                var is_le_end = chunk <= SIMD[DType.uint8, SIMD_WIDTH](
+                    self.range_end
+                )
+                return is_ge_start & is_le_end
+            else:
+                # For complex custom classes, try to minimize lookup table access
+                # by using SIMD to filter out non-ASCII characters first
+                var matches = SIMD[DType.bool, SIMD_WIDTH](False)
 
-            # Fallback to simple loop for custom character classes
-            @parameter
-            for i in range(SIMD_WIDTH):
-                var char_code = Int(chunk[i])
-                if char_code >= 0 and char_code < 256:
-                    matches[i] = self.lookup_table[char_code] == 1
+                # Only check ASCII characters (0-127) since most character classes
+                # are ASCII-based. This avoids bounds checking in the inner loop.
+                var is_ascii = chunk < SIMD[DType.uint8, SIMD_WIDTH](128)
 
-            return matches
+                # Use the lookup table only for ASCII characters
+                @parameter
+                for i in range(SIMD_WIDTH):
+                    if is_ascii[i]:
+                        var char_code = Int(chunk[i])
+                        matches[i] = self.lookup_table[char_code] == 1
+
+                return matches
 
 
 @always_inline
@@ -320,6 +381,8 @@ fn create_ascii_digits() -> CharacterClassSIMD:
 fn create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Multiple disjoint ranges
+    result.is_alnum = True  # Mark as alphanumeric for optimization
 
     # Add lowercase letters
     for i in range(ord("a"), ord("z") + 1):
@@ -342,6 +405,7 @@ fn create_whitespace() -> CharacterClassSIMD:
     var whitespace_chars = " \t\n\r\f\v"
     var result = CharacterClassSIMD(whitespace_chars)
     result.is_whitespace = True
+    result.is_simple_range = False  # Whitespace is not a contiguous range
     return result
 
 
@@ -349,6 +413,8 @@ fn create_whitespace() -> CharacterClassSIMD:
 fn create_ascii_alpha() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII letters [a-zA-Z]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+    result.is_alpha = True  # Mark as alpha for optimization
 
     # Add lowercase letters
     for i in range(ord("a"), ord("z") + 1):
@@ -365,6 +431,7 @@ fn create_ascii_alpha() -> CharacterClassSIMD:
 fn create_ascii_alnum_lower() -> CharacterClassSIMD:
     """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
 
     # Add lowercase letters
     for i in range(ord("a"), ord("z") + 1):
@@ -381,6 +448,7 @@ fn create_ascii_alnum_lower() -> CharacterClassSIMD:
 fn create_ascii_alnum_upper() -> CharacterClassSIMD:
     """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
 
     # Add uppercase letters
     for i in range(ord("A"), ord("Z") + 1):
@@ -397,6 +465,7 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
 fn create_hex_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for hexadecimal digits [0-9a-fA-F]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Three disjoint ranges
 
     # Add digits
     for i in range(ord("0"), ord("9") + 1):
@@ -417,6 +486,7 @@ fn create_hex_digits() -> CharacterClassSIMD:
 fn create_hex_lower() -> CharacterClassSIMD:
     """Create SIMD matcher for lowercase hexadecimal [0-9a-f]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
 
     # Add digits
     for i in range(ord("0"), ord("9") + 1):
@@ -433,6 +503,7 @@ fn create_hex_lower() -> CharacterClassSIMD:
 fn create_hex_upper() -> CharacterClassSIMD:
     """Create SIMD matcher for uppercase hexadecimal [0-9A-F]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
 
     # Add digits
     for i in range(ord("0"), ord("9") + 1):

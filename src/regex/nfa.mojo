@@ -14,6 +14,12 @@ from regex.aliases import (
     CHAR_NEWLINE,
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_CUSTOM,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
 )
 from regex.engine import Engine
 from regex.matching import Match
@@ -55,10 +61,23 @@ fn _create_simd_matcher_from_range_pattern(
             var start_char = actual_pattern[0:1]
             var end_char = actual_pattern[2:3]
             return CharacterClassSIMD(start_char, end_char)
+        elif actual_pattern == "a-zA-Z0-9":
+            # Common alphanumeric pattern
+            return get_simd_matcher(SIMD_MATCHER_ALNUM)
+        elif actual_pattern == "a-zA-Z":
+            # Common alpha pattern
+            return get_simd_matcher(SIMD_MATCHER_ALPHA)
+        elif actual_pattern == "0-9":
+            # Digits
+            return get_simd_matcher(SIMD_MATCHER_DIGITS)
+        elif actual_pattern == "a-z":
+            # Lowercase letters
+            return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
+        elif actual_pattern == "A-Z":
+            # Uppercase letters
+            return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
         else:
-            # It's a character set like 'abc' or complex pattern
-            # For now, just use the full actual pattern (without ^)
-            # TODO: Handle complex patterns like 'a-zA-Z0-9'
+            # It's a character set like 'abc' or other complex pattern
             return CharacterClassSIMD(actual_pattern)
     else:
         # It's already an expanded character set
