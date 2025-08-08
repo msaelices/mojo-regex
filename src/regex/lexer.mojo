@@ -16,7 +16,8 @@ from regex.aliases import (
     CHAR_RIGHT_CURLY,
     CHAR_RIGHT_PAREN,
     CHAR_SLASH,
-    CHAR_SPACE,
+    CHAR_LIT_SPACE,
+    CHAR_LIT_TAB,
     CHAR_TAB,
     CHAR_VERTICAL_BAR,
     CHAR_ZERO,
@@ -73,11 +74,11 @@ fn scan(regex: String) raises -> List[Token]:
         var ch_codepoint = Int(regex_bytes[i])
 
         if escape_found:
-            if ch_codepoint == CHAR_TAB:
-                var token = ElementToken(char=ord(StringSlice("\t")))
+            if ch_codepoint == CHAR_LIT_TAB:
+                var token = ElementToken(char=CHAR_TAB)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
-            elif ch_codepoint == CHAR_SPACE:
+            elif ch_codepoint == CHAR_LIT_SPACE:
                 var token = SpaceToken(char=ch_codepoint)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)

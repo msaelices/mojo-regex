@@ -1,7 +1,7 @@
 from regex.aliases import (
     DIGITS,
-    CHAR_TAB,
-    CHAR_SPACE,
+    CHAR_LIT_TAB,
+    CHAR_LIT_SPACE,
     CHAR_DIGIT,
     CHAR_COLON,
     CHAR_DOT,
