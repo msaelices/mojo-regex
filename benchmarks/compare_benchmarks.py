@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Compare benchmark results between Mojo and Python regex implementations.
+Generic benchmark comparison tool that can compare any two benchmark results.
+Supports both Python vs Mojo and branch vs branch comparisons.
 """
 
 import json
@@ -28,19 +29,19 @@ def load_results(filename: str) -> dict:
         sys.exit(1)
 
 
-def calculate_speedup(mojo_time: float, python_time: float) -> float:
-    """Calculate speedup factor (how many times faster Mojo is).
+def calculate_speedup(baseline_time: float, test_time: float) -> float:
+    """Calculate speedup factor (how many times faster test is vs baseline).
 
     Args:
-        mojo_time: Time taken by Mojo implementation
-        python_time: Time taken by Python implementation
+        baseline_time: Time taken by baseline implementation
+        test_time: Time taken by test implementation
 
     Returns:
-        Speedup factor (>1 means Mojo is faster)
+        Speedup factor (>1 means test is faster than baseline)
     """
-    if mojo_time == 0:
+    if test_time == 0:
         return float('inf')
-    return python_time / mojo_time
+    return baseline_time / test_time
 
 
 def format_time(time_ms: float) -> str:
@@ -60,28 +61,65 @@ def format_time(time_ms: float) -> str:
         return f"{time_ms:.2f} ms"
 
 
+def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
+    """Detect the type of comparison being performed.
+
+    Returns:
+        Tuple of (baseline_name, test_name, comparison_title)
+    """
+    baseline_engine = baseline_results.get("engine", "unknown")
+    test_engine = test_results.get("engine", "unknown")
+
+    # Check if it's Python vs Mojo comparison
+    if baseline_engine.lower() == "python" and test_engine.lower() == "mojo":
+        return ("Python", "Mojo", "MOJO REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
+    elif baseline_engine.lower() == "mojo" and test_engine.lower() == "python":
+        # Reverse case - swap them
+        return ("Mojo", "Python", "PYTHON REGEX VS MOJO REGEX BENCHMARK COMPARISON")
+    else:
+        # Branch comparison or generic comparison
+        # Try to extract branch info from timestamp or use generic names
+        baseline_name = "Baseline"
+        test_name = "Test"
+
+        # If both are mojo, it's likely a branch comparison
+        if baseline_engine.lower() == "mojo" and test_engine.lower() == "mojo":
+            baseline_name = "Main Branch"
+            test_name = "Current Branch"
+            title = "CURRENT BRANCH VS MAIN BRANCH BENCHMARK COMPARISON"
+        else:
+            title = f"{test_name.upper()} VS {baseline_name.upper()} BENCHMARK COMPARISON"
+
+        return (baseline_name, test_name, title)
+
+
 def create_comparison_report(
-    mojo_results: dict,
-    python_results: dict
+    baseline_results: dict,
+    test_results: dict
 ) -> Tuple[dict, str]:
-    """Create a comparison report between Mojo and Python results.
+    """Create a comparison report between two benchmark results.
 
     Args:
-        mojo_results: Mojo benchmark results
-        python_results: Python benchmark results
+        baseline_results: Baseline benchmark results (e.g., Python or Main branch)
+        test_results: Test benchmark results (e.g., Mojo or Current branch)
 
     Returns:
         Tuple of (comparison_data, formatted_report)
     """
+    # Detect comparison type
+    baseline_name, test_name, comparison_title = detect_comparison_type(baseline_results, test_results)
+
     comparison_data = {
         "summary": {
-            "mojo_engine": mojo_results["engine"],
-            "python_engine": python_results["engine"],
-            "mojo_timestamp": mojo_results["timestamp"],
-            "python_timestamp": python_results["timestamp"],
+            "baseline_engine": baseline_results["engine"],
+            "test_engine": test_results["engine"],
+            "baseline_timestamp": baseline_results.get("timestamp", "N/A"),
+            "test_timestamp": test_results.get("timestamp", "N/A"),
+            "baseline_name": baseline_name,
+            "test_name": test_name,
             "total_benchmarks": 0,
-            "mojo_faster_count": 0,
-            "python_faster_count": 0,
+            "test_faster_count": 0,
+            "baseline_faster_count": 0,
             "average_speedup": 0.0,
             "geometric_mean_speedup": 1.0
         },
@@ -89,31 +127,31 @@ def create_comparison_report(
     }
 
     # Build comparison data
-    all_benchmarks = set(mojo_results["results"].keys()) | set(python_results["results"].keys())
+    all_benchmarks = set(baseline_results["results"].keys()) | set(test_results["results"].keys())
     speedups = []
 
     for benchmark in sorted(all_benchmarks):
-        mojo_result = mojo_results["results"].get(benchmark)
-        python_result = python_results["results"].get(benchmark)
+        baseline_result = baseline_results["results"].get(benchmark)
+        test_result = test_results["results"].get(benchmark)
 
-        if mojo_result and python_result:
-            mojo_time = mojo_result["time_ms"]
-            python_time = python_result["time_ms"]
-            speedup = calculate_speedup(mojo_time, python_time)
+        if baseline_result and test_result:
+            baseline_time = baseline_result["time_ms"]
+            test_time = test_result["time_ms"]
+            speedup = calculate_speedup(baseline_time, test_time)
 
             comparison_data["benchmarks"][benchmark] = {
-                "mojo_time_ms": mojo_time,
-                "python_time_ms": python_time,
+                f"{baseline_name.lower()}_time_ms": baseline_time,
+                f"{test_name.lower()}_time_ms": test_time,
                 "speedup": speedup,
-                "mojo_iterations": mojo_result["iterations"],
-                "python_iterations": python_result["iterations"]
+                f"{baseline_name.lower()}_iterations": baseline_result["iterations"],
+                f"{test_name.lower()}_iterations": test_result["iterations"]
             }
 
             speedups.append(speedup)
             if speedup > 1:
-                comparison_data["summary"]["mojo_faster_count"] += 1
+                comparison_data["summary"]["test_faster_count"] += 1
             elif speedup < 1:
-                comparison_data["summary"]["python_faster_count"] += 1
+                comparison_data["summary"]["baseline_faster_count"] += 1
 
     # Calculate summary statistics
     if speedups:
@@ -129,7 +167,7 @@ def create_comparison_report(
     # Create formatted report
     report = []
     report.append("=" * 100)
-    report.append("MOJO REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
+    report.append(comparison_title)
     report.append("=" * 100)
     report.append("")
 
@@ -137,39 +175,41 @@ def create_comparison_report(
     summary = comparison_data["summary"]
     report.append("SUMMARY:")
     report.append(f"  Total benchmarks compared: {summary['total_benchmarks']}")
-    report.append(f"  Mojo faster: {summary['mojo_faster_count']} benchmarks")
-    report.append(f"  Python faster: {summary['python_faster_count']} benchmarks")
+    report.append(f"  {test_name} faster: {summary['test_faster_count']} benchmarks")
+    report.append(f"  {baseline_name} faster: {summary['baseline_faster_count']} benchmarks")
     report.append(f"  Average speedup: {summary['average_speedup']:.2f}x")
     report.append(f"  Geometric mean speedup: {summary['geometric_mean_speedup']:.2f}x")
+    report.append("")
+    report.append(f"  Note: Speedup > 1.0 means {test_name} is faster than {baseline_name}")
     report.append("")
 
     # Detailed results
     report.append("DETAILED RESULTS:")
     report.append("-" * 100)
-    report.append(f"{'Benchmark':<35} {'Mojo (ms)':>12} {'Python (ms)':>12} {'Speedup':>10} {'Status':>15}")
+    report.append(f"{'Benchmark':<35} {f'{baseline_name} (ms)':>15} {f'{test_name} (ms)':>15} {'Speedup':>10} {'Status':>15}")
     report.append("-" * 100)
 
     for benchmark, data in sorted(comparison_data["benchmarks"].items()):
-        mojo_time = data["mojo_time_ms"]
-        python_time = data["python_time_ms"]
+        baseline_time = data[f"{baseline_name.lower()}_time_ms"]
+        test_time = data[f"{test_name.lower()}_time_ms"]
         speedup = data["speedup"]
 
         if speedup > 10:
-            status = "🚀 Mojo wins!"
+            status = f"🚀 {test_name} wins!"
         elif speedup > 2:
-            status = "✓ Mojo faster"
+            status = f"✓ {test_name} faster"
         elif speedup > 1.1:
-            status = "→ Mojo slight"
+            status = f"→ {test_name} slight"
         elif speedup > 0.9:
             status = "≈ Similar"
         elif speedup > 0.5:
-            status = "← Python slight"
+            status = f"← {baseline_name} slight"
         else:
-            status = "⚠ Python faster"
+            status = f"⚠ {baseline_name} faster"
 
         report.append(
-            f"{benchmark:<35} {format_time(mojo_time):>12} "
-            f"{format_time(python_time):>12} {speedup:>9.2f}x {status:>15}"
+            f"{benchmark:<35} {format_time(baseline_time):>15} "
+            f"{format_time(test_time):>15} {speedup:>9.2f}x {status:>15}"
         )
 
     report.append("-" * 100)
@@ -182,7 +222,7 @@ def create_comparison_report(
         reverse=True
     )
 
-    report.append("TOP 5 SPEEDUPS (Mojo vs Python):")
+    report.append(f"TOP 5 SPEEDUPS ({test_name} vs {baseline_name}):")
     for i, (benchmark, data) in enumerate(sorted_by_speedup[:5]):
         report.append(f"  {i+1}. {benchmark}: {data['speedup']:.2f}x faster")
 
@@ -196,17 +236,24 @@ def create_comparison_report(
 
 def main():
     """Main comparison function."""
-    # Get file paths from command line arguments or use defaults
-    python_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/python_results.json"
-    mojo_file = sys.argv[2] if len(sys.argv) > 2 else "benchmarks/results/mojo_results.json"
+    # Get file paths from command line arguments
+    if len(sys.argv) < 3:
+        print("Usage: compare_benchmarks_generic.py <baseline_results.json> <test_results.json> [output.json]")
+        print("  baseline_results.json: Results to compare against (e.g., Python or Main branch)")
+        print("  test_results.json: Results to test (e.g., Mojo or Current branch)")
+        print("  output.json: Optional output file (default: benchmarks/results/comparison.json)")
+        sys.exit(1)
+
+    baseline_file = sys.argv[1]
+    test_file = sys.argv[2]
     output_file = sys.argv[3] if len(sys.argv) > 3 else "benchmarks/results/comparison.json"
 
     # Load results
-    mojo_results = load_results(mojo_file)
-    python_results = load_results(python_file)
+    baseline_results = load_results(baseline_file)
+    test_results = load_results(test_file)
 
     # Create comparison
-    comparison_data, report = create_comparison_report(mojo_results, python_results)
+    comparison_data, report = create_comparison_report(baseline_results, test_results)
 
     # Print report
     print(report)

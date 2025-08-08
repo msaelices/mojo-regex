@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 """
-Visualize benchmark comparison results with bar graphs.
+Generic visualization for benchmark comparison results.
+Works with both Python vs Mojo and branch vs branch comparisons.
 """
 
 import json
@@ -34,9 +35,25 @@ def load_comparison_data(filename: str) -> dict:
         sys.exit(1)
 
 
-def create_speedup_chart(
-    comparison_data: dict, output_file: str
-):
+def get_time_keys(benchmark_data: dict) -> tuple:
+    """Extract the time field keys from benchmark data.
+
+    Returns:
+        Tuple of (baseline_time_key, test_time_key)
+    """
+    keys = list(benchmark_data.keys())
+    time_keys = [k for k in keys if k.endswith("_time_ms")]
+
+    if len(time_keys) >= 2:
+        # Sort to ensure consistent ordering
+        time_keys.sort()
+        return time_keys[0], time_keys[1]
+    else:
+        # Fallback to defaults
+        return "python_time_ms", "mojo_time_ms"
+
+
+def create_speedup_chart(comparison_data: dict, output_file: str):
     """Create a bar chart showing speedup factors.
 
     Args:
@@ -44,6 +61,11 @@ def create_speedup_chart(
         output_file: Path to save the chart
     """
     benchmarks = comparison_data["benchmarks"]
+    summary = comparison_data["summary"]
+
+    # Get names from summary
+    baseline_name = summary.get("baseline_name", "Baseline")
+    test_name = summary.get("test_name", "Test")
 
     # Sort by speedup for better visualization
     sorted_benchmarks = sorted(
@@ -93,9 +115,9 @@ def create_speedup_chart(
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names)
     ax.invert_yaxis()
-    ax.set_xlabel("Speedup Factor (Mojo vs Python)", fontsize=12)
+    ax.set_xlabel(f"Speedup Factor ({test_name} vs {baseline_name})", fontsize=12)
     ax.set_title(
-        "Mojo Regex Performance vs Python Regex", fontsize=16, fontweight="bold"
+        f"{test_name} Performance vs {baseline_name}", fontsize=16, fontweight="bold"
     )
 
     # Add reference line at 1x
@@ -105,10 +127,9 @@ def create_speedup_chart(
     ax.grid(axis="x", alpha=0.3)
 
     # Add summary text
-    summary = comparison_data["summary"]
     summary_text = (
         f"Geometric Mean Speedup: {summary['geometric_mean_speedup']:.2f}x\n"
-        f"Mojo faster: {summary['mojo_faster_count']}/{summary['total_benchmarks']} benchmarks"
+        f"{test_name} faster: {summary['test_faster_count']}/{summary['total_benchmarks']} benchmarks"
     )
     ax.text(
         0.95,
@@ -130,9 +151,7 @@ def create_speedup_chart(
     print(f"Speedup chart saved to {output_file}")
 
 
-def create_time_comparison_chart(
-    comparison_data: dict, output_file: str
-):
+def create_time_comparison_chart(comparison_data: dict, output_file: str):
     """Create a grouped bar chart comparing actual execution times.
 
     Args:
@@ -140,11 +159,24 @@ def create_time_comparison_chart(
         output_file: Path to save the chart
     """
     benchmarks = comparison_data["benchmarks"]
+    summary = comparison_data["summary"]
+
+    # Get names from summary
+    baseline_name = summary.get("baseline_name", "Baseline")
+    test_name = summary.get("test_name", "Test")
 
     # Get data
     names = sorted(benchmarks.keys())
-    mojo_times = [benchmarks[n]["mojo_time_ms"] for n in names]
-    python_times = [benchmarks[n]["python_time_ms"] for n in names]
+
+    # Get the correct time keys from the first benchmark
+    if names:
+        first_benchmark = benchmarks[names[0]]
+        baseline_key, test_key = get_time_keys(first_benchmark)
+    else:
+        baseline_key, test_key = "python_time_ms", "mojo_time_ms"
+
+    baseline_times = [benchmarks[n].get(baseline_key, 0) for n in names]
+    test_times = [benchmarks[n].get(test_key, 0) for n in names]
 
     # Create figure
     fig, ax = plt.subplots(figsize=(16, 10))
@@ -153,14 +185,18 @@ def create_time_comparison_chart(
     width = 0.35
 
     # Create bars
-    bars1 = ax.bar(x - width / 2, mojo_times, width, label="Mojo", color="#1f77b4")
-    bars2 = ax.bar(x + width / 2, python_times, width, label="Python", color="#ff7f0e")
+    bars1 = ax.bar(
+        x - width / 2, baseline_times, width, label=baseline_name, color="#ff7f0e"
+    )
+    bars2 = ax.bar(x + width / 2, test_times, width, label=test_name, color="#1f77b4")
 
     # Styling
     ax.set_xlabel("Benchmark", fontsize=12)
     ax.set_ylabel("Time (ms) - Log Scale", fontsize=12)
     ax.set_title(
-        "Execution Time Comparison: Mojo vs Python", fontsize=16, fontweight="bold"
+        f"Execution Time Comparison: {test_name} vs {baseline_name}",
+        fontsize=16,
+        fontweight="bold",
     )
     ax.set_xticks(x)
     ax.set_xticklabels(names, rotation=45, ha="right")
@@ -180,9 +216,7 @@ def create_time_comparison_chart(
     print(f"Time comparison chart saved to {output_file}")
 
 
-def create_category_analysis(
-    comparison_data: dict, output_file: str
-):
+def create_category_analysis(comparison_data: dict, output_file: str):
     """Create a chart analyzing performance by benchmark category.
 
     Args:
@@ -190,6 +224,11 @@ def create_category_analysis(
         output_file: Path to save the chart
     """
     benchmarks = comparison_data["benchmarks"]
+    summary = comparison_data["summary"]
+
+    # Get names from summary
+    baseline_name = summary.get("baseline_name", "Baseline")
+    test_name = summary.get("test_name", "Test")
 
     # Categorize benchmarks
     categories = {
@@ -264,7 +303,9 @@ def create_category_analysis(
     ax1.invert_yaxis()
     ax1.set_xlabel("Average Speedup Factor", fontsize=12)
     ax1.set_title(
-        "Average Performance by Regex Category", fontsize=14, fontweight="bold"
+        f"Average Performance by Regex Category ({test_name} vs {baseline_name})",
+        fontsize=14,
+        fontweight="bold",
     )
     ax1.grid(axis="x", alpha=0.3)
     ax1.axvline(x=1, color="red", linestyle="--", alpha=0.5)
@@ -298,7 +339,9 @@ def create_category_analysis(
 def main():
     """Main visualization function."""
     # Get file paths from command line arguments or use defaults
-    comparison_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/comparison.json"
+    comparison_file = (
+        sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/comparison.json"
+    )
     prefix = sys.argv[2] if len(sys.argv) > 2 else ""
 
     # Load comparison data
