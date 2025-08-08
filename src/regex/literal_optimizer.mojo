@@ -19,7 +19,6 @@ from regex.ast import (
     OR,
     GROUP,
 )
-from regex.simd_ops import MultiLiteralSearcher
 
 
 struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
@@ -155,87 +154,6 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
                 best_idx = i
 
         self.best_literal = self.literals[best_idx]
-
-    fn create_multi_literal_searcher(self) -> Optional[MultiLiteralSearcher]:
-        """Create a MultiLiteralSearcher for prefiltering using extracted literals.
-
-        Returns:
-            MultiLiteralSearcher if we have suitable literals, None otherwise.
-        """
-        if len(self.literals) == 0:
-            return None
-
-        # Collect required literals (up to 16 for SIMD efficiency)
-        var search_literals = List[String]()
-        var count = 0
-
-        # First, add all required literals
-        for lit in self.literals:
-            if lit.is_required and count < 16:
-                var literal_str = lit.get_literal()
-                if len(literal_str) > 0:
-                    search_literals.append(literal_str)
-                    count += 1
-
-        # If we have room, add optional literals too
-        if count < 16:
-            for lit in self.literals:
-                if not lit.is_required and count < 16:
-                    var literal_str = lit.get_literal()
-                    if len(literal_str) > 0:
-                        search_literals.append(literal_str)
-                        count += 1
-
-        if len(search_literals) == 0:
-            return None
-
-        return MultiLiteralSearcher(search_literals)
-
-    fn get_prefilter_positions(self, text: String) -> List[Int]:
-        """Get positions in text where pattern might match using literal prefiltering.
-
-        This uses SIMD-accelerated multi-literal search to quickly find candidate
-        positions where the regex pattern might match.
-
-        Args:
-            text: The text to search in.
-
-        Returns:
-            List of positions where pattern might match.
-        """
-        var searcher_opt = self.create_multi_literal_searcher()
-        if not searcher_opt:
-            # No literals to search for - return all positions
-            var positions = List[Int]()
-            for i in range(len(text)):
-                positions.append(i)
-            return positions
-
-        var searcher = searcher_opt.value()
-        var positions = List[Int]()
-
-        # Use multi-literal search to find candidate positions
-        var pos = 0
-        while pos < len(text):
-            var match_result = searcher.search_any(text, pos)
-            if match_result:
-                var match_info = match_result.value()
-                var match_pos = match_info.position
-                var literal_idx = match_info.literal_index
-
-                # Get the matched literal info
-                if literal_idx < len(self.literals):
-                    var lit_info = self.literals[literal_idx]
-                    # Adjust position based on literal's offset in pattern
-                    var candidate_pos = match_pos - lit_info.start_offset
-                    if candidate_pos >= 0:
-                        positions.append(candidate_pos)
-
-                pos = match_pos + 1
-            else:
-                break
-
-        return positions
 
 
 fn extract_literals[
@@ -450,7 +368,7 @@ fn _find_common_prefix_simple(or_node: ASTNode) -> String:
     # Find common prefix among all collected prefixes
     var common = prefixes[0]
     for i in range(1, len(prefixes)):
-        common = _longest_common_prefix_simd(common, prefixes[i])
+        common = _longest_common_prefix(common, prefixes[i])
         if len(common) == 0:
             return String("")
 
@@ -495,65 +413,6 @@ fn _longest_common_prefix(s1: String, s2: String) -> String:
     while i < min_len and s1[i] == s2[i]:
         i += 1
     return s1[:i]
-
-
-fn _longest_common_prefix_simd(s1: String, s2: String) -> String:
-    """Find the longest common prefix of two strings using SIMD.
-
-    This function uses SIMD operations to compare multiple characters at once,
-    significantly speeding up the common prefix computation.
-
-    Args:
-        s1: First string.
-        s2: Second string.
-
-    Returns:
-        The longest common prefix.
-    """
-    from sys.info import simdwidthof
-
-    alias simd_width = simdwidthof[DType.uint8]()
-    var min_len = min(len(s1), len(s2))
-
-    if min_len == 0:
-        return ""
-
-    var common_len = 0
-    var i = 0
-
-    # Process in SIMD chunks
-    while i + simd_width <= min_len:
-        # Load SIMD chunks from both strings
-        var chunk1 = SIMD[DType.uint8, simd_width](0)
-        var chunk2 = SIMD[DType.uint8, simd_width](0)
-
-        for j in range(simd_width):
-            chunk1[j] = ord(s1[i + j])
-            chunk2[j] = ord(s2[i + j])
-
-        # Compare chunks
-        var matches = chunk1 == chunk2
-
-        # Check if all characters match
-        if matches.reduce_and():
-            # All characters in chunk match
-            common_len += simd_width
-            i += simd_width
-        else:
-            # Find first mismatch in chunk
-            for j in range(simd_width):
-                if matches[j]:
-                    common_len += 1
-                else:
-                    return s1[:common_len]
-            i += simd_width
-
-    # Process remaining characters
-    while i < min_len and s1[i] == s2[i]:
-        common_len += 1
-        i += 1
-
-    return s1[:common_len]
 
 
 fn has_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> Bool:

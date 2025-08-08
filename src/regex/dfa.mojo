@@ -24,7 +24,7 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
-from regex.simd_ops import SIMDStringSearch, SIMD_WIDTH
+from regex.simd_ops import SIMDStringSearch
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -835,95 +835,6 @@ struct DFAEngine(Engine):
                 return match_result
         return None
 
-    fn _process_chunk_simd(
-        self,
-        chunk: SIMD[DType.uint8, SIMD_WIDTH],
-        current_states: SIMD[DType.uint8, SIMD_WIDTH],
-        chunk_len: Int,
-    ) -> SIMD[DType.uint8, SIMD_WIDTH]:
-        """Process a SIMD chunk of characters through the DFA in parallel.
-
-        Args:
-            chunk: SIMD vector of characters to process.
-            current_states: SIMD vector of current states for each character position.
-            chunk_len: Number of valid characters in the chunk.
-
-        Returns:
-            SIMD vector of next states after processing the chunk.
-        """
-        var next_states = SIMD[DType.uint8, SIMD_WIDTH](
-            255
-        )  # 255 = invalid state
-
-        # Process each character in parallel
-        for i in range(chunk_len):
-            var char_code = chunk[i]
-            var current_state = Int(current_states[i])
-
-            if current_state < len(self.states) and current_state != 255:
-                var next_state = self.states[current_state].get_transition(
-                    Int(char_code)
-                )
-                if next_state != -1:
-                    next_states[i] = UInt8(next_state)
-
-        return next_states
-
-    fn _try_match_at_position_simd(
-        self, text: String, start_pos: Int
-    ) -> Optional[Match]:
-        """Try to match pattern using SIMD-accelerated DFA processing.
-
-        This method processes multiple input positions in parallel using SIMD,
-        effectively simulating multiple DFA runs at different starting positions.
-
-        Args:
-            text: Input text to match against.
-            start_pos: Position to start matching from.
-
-        Returns:
-            Optional Match if pattern matches, None otherwise.
-        """
-        var text_len = len(text)
-        if start_pos >= text_len:
-            return None
-
-        # Initialize SIMD vectors for parallel DFA simulation
-        var chunk_size = min(SIMD_WIDTH, text_len - start_pos)
-        var current_states = SIMD[DType.uint8, SIMD_WIDTH](self.start_state)
-        var accepting_positions = SIMD[DType.int32, SIMD_WIDTH](-1)
-
-        # Process text in SIMD chunks
-        var pos = start_pos
-        while pos < text_len and chunk_size > 0:
-            # Load chunk of characters
-            var chunk = SIMD[DType.uint8, SIMD_WIDTH](0)
-            for i in range(chunk_size):
-                if pos + i < text_len:
-                    chunk[i] = ord(text[pos + i])
-
-            # Process chunk through DFA
-            current_states = self._process_chunk_simd(
-                chunk, current_states, chunk_size
-            )
-
-            # Check for accepting states
-            for i in range(chunk_size):
-                var state = Int(current_states[i])
-                if state < len(self.states) and state != 255:
-                    if self.states[state].is_accepting:
-                        accepting_positions[i] = pos + i + 1
-
-            pos += chunk_size
-            chunk_size = min(SIMD_WIDTH, text_len - pos)
-
-        # Find first accepting position
-        for i in range(SIMD_WIDTH):
-            if accepting_positions[i] != -1:
-                return Match(0, start_pos, Int(accepting_positions[i]), text)
-
-        return None
-
     fn _try_match_at_position(
         self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
@@ -1006,71 +917,6 @@ struct DFAEngine(Engine):
             return Match(0, start_pos, last_accepting_pos, text)
 
         return None
-
-    fn match_all_simd(
-        self, text: String
-    ) -> List[Match, hint_trivial_type=True]:
-        """Find all non-overlapping matches using SIMD-accelerated DFA processing.
-
-        This method processes multiple starting positions in parallel, significantly
-        speeding up pattern matching for character class patterns.
-
-        Args:
-            text: Input text to search.
-
-        Returns:
-            List of all matches found.
-        """
-        var matches = List[Match, hint_trivial_type=True]()
-        var text_len = len(text)
-
-        # Special handling for anchored patterns
-        if self.has_start_anchor or self.has_end_anchor:
-            var match_result = self.match_next(text, 0)
-            if match_result:
-                matches.append(match_result.value())
-            return matches
-
-        # Use existing SIMD search for pure literals
-        if self.is_pure_literal and self.simd_string_search:
-            return self.match_all(text)
-
-        # Process multiple starting positions in parallel
-        var pos = 0
-        while pos < text_len:
-            # Try SIMD_WIDTH different starting positions in parallel
-            var batch_size = min(SIMD_WIDTH, text_len - pos)
-            var found_match = False
-            var earliest_match_pos = text_len
-            var earliest_match: Optional[Match] = None
-
-            # Check each position in the batch
-            for offset in range(batch_size):
-                var start = pos + offset
-                if start >= text_len:
-                    break
-
-                var match_result = self._try_match_at_position(text, start)
-                if match_result:
-                    var match_obj = match_result.value()
-                    if match_obj.start_idx < earliest_match_pos:
-                        earliest_match_pos = match_obj.start_idx
-                        earliest_match = match_result
-                        found_match = True
-
-            if found_match and earliest_match:
-                var match_obj = earliest_match.value()
-                matches.append(match_obj)
-                # Skip past this match
-                if match_obj.end_idx == match_obj.start_idx:
-                    pos = match_obj.start_idx + 1
-                else:
-                    pos = match_obj.end_idx
-            else:
-                # No matches in this batch, move to next batch
-                pos += batch_size
-
-        return matches
 
     fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
         """Find all non-overlapping matches using DFA.
