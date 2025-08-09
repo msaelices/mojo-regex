@@ -16,6 +16,7 @@ The module automatically adapts to the available SIMD width:
 """
 
 from algorithm import vectorize
+from builtin._location import __call_location
 from sys import ffi
 from sys.info import simdwidthof
 from regex.aliases import (
@@ -47,6 +48,7 @@ struct CharacterClassSIMD(Copyable, Movable):
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
 
+    @always_inline
     fn __init__(out self, owned char_class: String):
         """Initialize SIMD character class matcher.
 
@@ -66,7 +68,10 @@ struct CharacterClassSIMD(Copyable, Movable):
             var char_code = ord(char_class[i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
+        var call_location = __call_location()
+        print("Init CharacterClassSIMD", call_location)
 
+    @always_inline
     fn __init__(out self, start_char: String, end_char: String):
         """Initialize with a character range like 'a'-'z'.
 
@@ -86,6 +91,8 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
+        var call_location = __call_location()
+        print("Init CharacterClassSIMD", call_location)
 
     fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
