@@ -1,1188 +1,591 @@
-## Mojo🔥 GPU Programming Workshop
+## High-Performance Regex in Mojo🔥
+
+### Building a Hybrid DFA/NFA Engine with SIMD Optimization
 
 <div style="text-align: center;">
-<img src="./image/workshop.png" alt="workshop" width="700" height="400">
+<img src="./image/regex-engine.png" alt="regex engine" width="700" height="400">
 </div>
 
 ---
 
-# Workshop Agenda
+# Presentation Agenda
 
-### Part 1: Foundations
+### Part 1: Introduction & Motivation
 
-**1. Why Mojo🔥?**
+**1. What is mojo-regex?**
 <!-- .element: class="fragment" data-fragment-index="1" -->
 
-**2. Setup Using [Pixi](https://pixi.sh/latest/)**
+**2. Why Build a Regex Engine in Mojo?**
 <!-- .element: class="fragment" data-fragment-index="2" -->
 
-**3. Introduction to Mojo🔥 for GPU Programming**
+**3. Performance Comparison**
 <!-- .element: class="fragment" data-fragment-index="3" -->
 
-### Part 2: Practical Implementation
+### Part 2: Architecture Deep Dive
 
-**4. Hands-on GPU Programming in Mojo**
+**4. Hybrid DFA/NFA Design**
 <!-- .element: class="fragment" data-fragment-index="4" -->
 
-**5. Create your Own AI Model with MAX🧑‍🚀**
+**5. Component Overview**
 <!-- .element: class="fragment" data-fragment-index="5" -->
 
-**6. PyTorch Integration**
+### Part 3: Performance Optimizations
+
+**6. SIMD and Memory Optimizations**
 <!-- .element: class="fragment" data-fragment-index="6" -->
+
+**7. Practical Examples & Benchmarks**
+<!-- .element: class="fragment" data-fragment-index="7" -->
 
 ---
 
 # 📚 Resources
 
-- **Modular OSS Repository** [https://github.com/modular/modular](https://github.com/modular/modular)
+- **GitHub Repository** [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
 
-- **Introduction to GPU Programming in Mojo🔥**
-[https://docs.modular.com/mojo/manual/gpu/architecture](https://docs.modular.com/mojo/manual/gpu/architecture)
-
-- **Mojo🔥 GPU Puzzles** [github.com/modular/mojo-gpu-puzzles](https://github.com/modular/mojo-gpu-puzzles)
-
-- **🤖AI Coding Assistance Guide** [https://docs.modular.com/max/coding-assistants/](https://docs.modular.com/max/coding-assistants/)
-
-- **✅Forum** [forum.modular.com](https://forum.modular.com/)
-
----
-
-<!-- .slide: class="center-slide" -->
-# Part 1: Foundations
-
----
-
-### Why Mojo🔥?
-
-- 🤝 **Heterogenous _System_ Programming Language**
-- 🐍 **Python-like Syntax**
-- ⚡ **Zero-cost Abstractions**
-- 🛡️ **Strong Type System**
-- 🦀 **Memory Safety**
-
----
-
-### Performance Benefits
-
-- 📊 **Built-in SIMD Support**
-- 🔧 **Direct Hardware Access**
-- 🔄 **Cross-Hardware Portability**
-
-_Combining the best of Python, C++, and Swift/Rust_
-
-Note: Mojo represents a paradigm shift in systems programming, making GPU programming accessible without sacrificing performance.
-
----
-
-<!-- .slide: class="center-slide" -->
-
-# GPU Programming
-
-## Traditional vs Mojo🔥
-
----
-
-### ❌ Traditional CUDA Pain Points
-
-**Complex and Error-Prone**
-
-```cpp
-// Manual memory management, verbose boilerplate
-int *d_a, *d_b, *d_c;
-cudaMalloc(&d_a, size * sizeof(int));
-cudaMalloc(&d_b, size * sizeof(int));
-cudaMemcpy(d_a, h_a, size * sizeof(int), cudaMemcpyHostToDevice);
-vector_add<<<grid, block>>>(d_a, d_b, d_c);
-cudaDeviceSynchronize();
-cudaFree(d_a); cudaFree(d_b); cudaFree(d_c);
-```
-
-⚠️ **Manual memory management • Verbose syntax • Error-prone**
-
----
-
-### ✅ Mojo🔥 Elegance
-
-**Python Simplicity, C++ Performance**
-
-```mojo
-ctx = DeviceContext()
-a = ctx.enqueue_create_buffer[dtype](size)
-b = ctx.enqueue_create_buffer[dtype](size)
-c = ctx.enqueue_create_buffer[dtype](size)
-ctx.enqueue_function[vector_add[dtype, size]](
-    a.unsafe_ptr(), b.unsafe_ptr(), c.unsafe_ptr(),
-    grid_dim=blocks, block_dim=threads
-)
-ctx.synchronize()
-```
-
-✨ **Automatic memory management • Clean syntax • Type-safe**
-
----
-
-<!-- .slide: class="center-slide" -->
-## Mojo🔥 GPU Advantages
-
-## Built for Modern Development
-
----
-
-### Development Features
-
-- 🚀 **Direct hardware access** with Python ergonomics
-- 🔧 **Built-in GPU types**: `DeviceContext`, `LayoutTensor`
-- 💾 **Automatic memory management** with ASAP destruction
-
----
-
-### Performance Features
-
-- ⚡ **Async operations** between CPU and GPU
-- 🎯 **Thread-safe by design** for massive parallelism
-- 📈 **Compile-time optimizations** for peak performance
-
----
-
-
-## Setup Using Pixi
-
-### Prerequisites
-
-- 📖 **Documentation**: [docs.modular.com/max/get-started](https://docs.modular.com/max/get-started)
-
-- **OS Support:**
-  - Linux/Ubuntu 22.04+
-  - macOS 13+
-  - Windows WSL2
-
-- **Python: >=3.9, < 3.13**
-
-- **[Compatible GPUs](https://docs.modular.com/max/faq/#gpu-requirements)**
-  - Tier 1: NVIDIA H100/200, A100/A10, L4/L40 and AMD MI300X and MI325X
-  - Tier 2: NVIDIA RTX 40XX/30XX series
-  - Tier 3: Check the documentation
-
----
-
-## 🛠️ Installation Steps
-
+- **Installation Guide**
 ```bash
-# Install Pixi
-curl -fsSL https://pixi.sh/install.sh | sh
+pixi add mojo-regex
 ```
 
-```bash
-# Create a new project
-pixi init quickstart \
-    -c https://conda.modular.com/max-nightly/ -c conda-forge \
-    && cd quickstart
-```
+- **Performance Tips** [/docs/performance-tips.md](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
 
-```bash
-# Add MAX that includes Mojo
-pixi add max
+- **Contributing Guide** [CONTRIBUTING.md](https://github.com/msaelices/mojo-regex/blob/main/CONTRIBUTING.md)
 
-# Verify installation
-pixi run mojo --version
-```
-
-🔍 **Environment Check**: Follow along - we'll troubleshoot together!
-
-Note: Make sure everyone has their environment working before we proceed to coding.
-
----
-
-### VS Code Extension
-
-Be sure to use the [nightly VSCode
-extension](https://marketplace.visualstudio.com/items?itemName=modular-mojotools.vscode-mojo-nightly)
-instead of the stable extension. That will ensure that you're using the latest
-version to give you the best experience.
-
-<div style="text-align: center;">
-<img src="./image/nightly.jpg" alt="nightly" width="900" >
-</div>
-
----
-
-
-<!-- .slide: class="center-slide" -->
-# Introduction to Mojo🔥
-
-### Essentials for GPU Programming
-
----
-
-### 🧠 Core Language Concepts
-
-```mojo
-# `main` function is the entry point of the program
-fn main():
-    print("Hello, World!")
-
-# Basic function
-fn add(a: Int32, b: Int32) -> Int32:
-    return a + b
-
-# Parametric function: `param` is known at compile-time
-fn kernel[size: Int, dtype: DType](data: UnsafePointer[dtype]):
-    # Parameters drive GPU performance
-```
-
-⚠️ **Key Point**: `fn` functions are strict, essential for GPU kernels (no exceptions allowed)
-
----
-
-### Python Compatible `def` Function
-
-```mojo
-def main():
-    try:
-        ...
-    except:
-        raise Error("Exception occured!")
-
-# equivalent to
-
-fn main() raises:
-    try:
-        ...
-    except:
-        raise Error("Exception occured!")
-```
-
----
-
-### Variable Declaration
-
-- Python-like
-
-```mojo
-a = 42
-```
-
-- The use of `var` is mostly optional but is required for type-checking
-
-```mojo
-var a: UInt128 = 42
-# Same as
-a = UInt128(42)
-```
-
----
-
-### Function Types Comparison
-
-- **`fn` Functions:**
-  - ✅ **Strict and Safe**
-  - No exceptions by default
-  - Required for GPU kernels
-
-- **`def` Functions:**
-  - 🐍 **Python Compatible**
-  - Can raise exceptions
-  - More flexible
-  - Runtime behavior
-  - Interop friendly
-
-🔥 **GPU Rule**: Use `fn` for kernels - GPU hardware cannot handle exceptions!
-
----
-
-### Type System Highlights
-
-- `Int32/64` is a 32/64-bit integer
-- `Float32/64` is a 32/64-bit floating point number
-- `Bool` is a boolean
-- `String` is a string
-- `List[T]` is a list of type `T`
-- `Pointer[T]` is a safe (non-null) pointer to type `T`
-- `UnsafePointer[T]` is an unsafe pointer to type `T`
-- `SIMD[DType, width: Int]` is a SIMD vector
+- **Mojo Documentation** [docs.modular.com/mojo](https://docs.modular.com/mojo)
 
 ---
 
 <!-- .slide: class="center-slide" -->
-`Float32` = `Scalar[DType.float32]` = `SIMD[DType.float32, 1]`
-
-```mojo
-# compile-time constant
-alias size = 4
-# SIMD types for vectorization
-vector = SIMD[DType.float32, 4](1.0, 2.0, 3.0, 4.0)
-
-# Memory management
-ptr = UnsafePointer[Float32].alloc(1000)
-# Explicit cleanup
-ptr.free()
-```
-
-⚡ **Performance Tip**: SIMD types unlock vectorization for massive parallelism!
+# Part 1: Introduction & Motivation
 
 ---
 
-### Structs
+### What is mojo-regex?
 
-```mojo
-struct Vector3D:
-    var x: Float32
-    var y: Float32
-    var z: Float32
+A regex library for Mojo featuring:
 
-    fn __init__(out self, x: Float32, y: Float32, z: Float32):
-        self.x = x
-        self.y = y
-        self.z = z
+- 🏎️ **Hybrid DFA/NFA Architecture** - Best of both worlds
+- ⚡ **SIMD-Accelerated Matching** - Vectorized operations
+- 🐍 **Python-Compatible API** - Familiar interface
+- 🚀 **O(n) Performance** - For common patterns
+- 🔧 **Zero-Copy Operations** - Memory efficient
 
-    fn magnitude(self) -> Float32:
-        return sqrt(self.x * self.x + self.y * self.y + self.z * self.z)
+---
+
+### Current Features
+
+#### ✅ Implemented
+- Basic elements: literals, wildcards (`a`, `.`)
+- Character classes: `[a-z]`, `[^0-9]`
+- Quantifiers: `*`, `+`, `?`, `{n}`, `{n,m}`
+- Anchors: `^`, `$`
+- Groups and alternation: `(abc)`, `a|b`
+- Global matching: `findall()`
+
+#### 🚧 In Progress
+- Predefined classes: `\d`, `\w`, `\s`
+- Non-capturing groups: `(?:...)`
+- Case-insensitive matching
+- Match replacement: `sub()`, `gsub()`
+
+---
+
+### Why Build a Regex Engine in Mojo?
+
+**The Performance Challenge**
+
+```python
+# Python's re module (C implementation)
+import re
+pattern = re.compile(r"[a-z]+")
+matches = pattern.findall(text)  # Fast, but...
+```
+
+**Problems with existing solutions:**
+- 🐍 Python's `re`: Fast C code, but Python overhead
+- 🦀 Rust's regex: Great, but foreign function interface overhead
+- 📦 PCRE: Powerful, but complex and not SIMD-optimized
+
+---
+
+### Mojo's Unique Advantages
+
+- 🚀 **Zero-cost abstractions** - High-level code, low-level performance
+- 🔧 **Native SIMD support** - Built-in vectorization
+- 🐍 **Python-like syntax** - Easy to understand and maintain
+- 💾 **Manual memory control** - No GC overhead
+- 🔥 **Compile-time optimizations** - Parameters and specialization
+
+_Perfect storm for building a regex engine!_
+
+---
+
+### Performance Comparison
+
+| Pattern Type | Python `re` | mojo-regex | Speedup |
+|--------------|-------------|------------|---------|
+| Literal match | 0.120ms | 0.050ms | 2.4x |
+| Character class | 0.007ms | 0.005ms | 1.4x |
+| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
+| Complex patterns | 17ms | 20ms | 0.85x |
+
+**Key Insights:**
+- ✅ Competitive with highly-optimized C implementation
+- ⚡ Faster for literal patterns (SIMD string search)
+- 🎯 Room for improvement in complex patterns
+
+Note: Benchmarks on typical text processing workloads
+
+---
+
+<!-- .slide: class="center-slide" -->
+# Part 2: Architecture Deep Dive
+
+---
+
+### The Hybrid DFA/NFA Approach
+
+**Traditional Approaches:**
+- **DFA Only**: Fast O(n) but limited features, exponential states
+- **NFA Only**: Full features but O(nm) with backtracking
+
+**Our Solution: Intelligent Routing**
+
+```
+Pattern → Analyzer → Simple? → DFA Engine (O(n))
+                 ↓
+              Complex? → NFA Engine (Full features)
+```
+
+🧠 **Smart Design**: Use the right tool for the job!
+
+---
+
+### Architecture Overview
+
+```
+Input: "hello.*world"
+        ↓
+   📝 Lexer
+        ↓
+   🔣 Tokens: [ELEMENT(h), ELEMENT(e), ..., WILDCARD, ASTERISK, ...]
+        ↓
+   🌳 Parser
+        ↓
+   🎯 AST: RE → [ELEMENT(hello), WILDCARD(quantified), ELEMENT(world)]
+        ↓
+   🧠 Optimizer (Pattern Analysis)
+        ↓
+   🔀 HybridMatcher
+      ├─ 🏎️ DFA Engine (simple patterns)
+      └─ 🔄 NFA Engine (complex patterns)
+        ↓
+   📊 Match Results
 ```
 
 ---
 
-### Conditional Statements
+### Component Details: Lexer & Parser
 
+**Lexer** (`lexer.mojo`)
 ```mojo
-fn check_value(x: Int32) -> String:
-    if x > 0:
-        return "positive"
-    elif x < 0:
-        return "negative"
-    else:
-        return "zero"
+fn scan(regex: String) -> List[Token]:
+    # Tokenize: "a+" → [ELEMENT('a'), PLUS()]
 ```
+
+**Parser** (`parser.mojo`)
+```mojo
+fn parse(tokens: List[Token]) -> ASTNode:
+    # Build AST with proper precedence
+    # Handle groups, alternation, quantifiers
+```
+
+**Key Design**: Clean separation of concerns
 
 ---
 
-### Loops with `for` and `while`
+### The AST: Index-Based Architecture
 
+**Traditional Approach:**
 ```mojo
-fn iterate_example():
-    for i in range(5):
-        print(i)
-
-    count = 0
-    while count < 3:
-        print("count:", count)
-        count += 1
+struct ASTNode:
+    var children: List[ASTNode]  # Copies everywhere!
 ```
+
+**Our Approach:**
+```mojo
+struct Regex:
+    var children_ptr: UnsafePointer[ASTNode]  # All nodes here
+    var children_len: Int
+
+struct ASTNode:
+    var children_indexes: SIMD[DType.uint8, 256]  # Just indices!
+    var regex_ptr: UnsafePointer[Regex]  # Back reference
+```
+
+🚀 **Benefits**: No copies, cache-friendly, SIMD potential
 
 ---
 
-### Break and Continue
+### Pattern Complexity Analysis
 
 ```mojo
-fn loop_control():
-    for i in range(10):
-        if i == 3:
-            continue  # Skip iteration
-        if i == 7:
-            break     # Exit loop
-        print(i)
+struct PatternAnalyzer:
+    fn classify(self, ast: ASTNode) -> PatternComplexity:
+        # Analyze pattern features
+        
+        if self._is_literal_only(ast):
+            return PatternComplexity.SIMPLE  # → DFA
+            
+        if self._has_simple_quantifiers(ast):
+            return PatternComplexity.SIMPLE  # → DFA
+            
+        if self._has_groups_or_alternation(ast):
+            return PatternComplexity.COMPLEX  # → NFA
 ```
 
-💡 **GPU Note**: Control flows in kernels should be minimized for optimal performance!
+**Classification drives performance!**
 
 ---
 
-
-### Compile Time Optimizations
-
-#### Parameters and the `@parameter for` decorator
-
-Mojo structs and functions can take parameters. `@parameter` annotations denote
-compile-time evaluation, like explicit loop unrolling:
+### DFA Engine Implementation
 
 ```mojo
-fn repeat[count: Int](msg: String):
-    @parameter
-    for i in range(count):
-        print(msg)
-
-repeat[3]("Hello")
+struct DFAEngine:
+    var states: List[DFAState]
+    
+    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+        var current_state = self.start_state
+        var pos = start
+        
+        while pos < len(text):
+            var char_code = ord(text[pos])
+            current_state = self.states[current_state].transitions[char_code]
+            
+            if current_state == -1:  # No transition
+                return None
+                
+            if self.states[current_state].is_accepting:
+                return Match(start, pos + 1, text)
+                
+            pos += 1
 ```
 
-```bash
-Hello
-Hello
-Hello
-```
+⚡ **O(n) guaranteed** - No backtracking!
 
 ---
 
-### Compile Time Optimizations
+<!-- .slide: class="center-slide" -->
+# Part 3: Performance Optimizations
 
-#### `@parameter if` decorator
+---
 
+### SIMD Character Class Matching
+
+**The Challenge**: Check if character is in `[a-z]`
+
+**Traditional Approach:**
+```mojo
+# Check each character one by one
+if char >= 'a' and char <= 'z':
+    match!
+```
+
+**SIMD Approach:**
+```mojo
+struct CharacterClassSIMD:
+    var lookup_table: SIMD[DType.uint8, 256]
+    
+    fn _check_chunk_simd(self, text: String, pos: Int):
+        var chunk = text.unsafe_ptr().load[width=16](pos)
+        var result = self.lookup_table._dynamic_shuffle(chunk)
+        return result != 0  # 16 chars checked at once!
+```
+
+🚀 **16x theoretical speedup!**
+
+---
+
+### SIMD Optimization Details
+
+**Dynamic Shuffle Magic** (commit 265edd7)
 ```mojo
 @parameter
-if True:
-    print("this will be included in the binary")
-else:
-    print("this will be eliminated at compile time")
+if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
+    # Use native pshufb/tbl1 instructions
+    var result = self.lookup_table._dynamic_shuffle(chunk)
+    return result != 0
 ```
 
----
-
-### Compile Time Specialization
-
-"Generics" refers to functions that can act on multiple types of values, or
-containers that can hold multiple types of values. For example, SIMD, can hold
-different data types/widths.
-
+**Hybrid Approach** (commit 3e2cf21)
 ```mojo
-struct SIMD[type: DType, size: Int]:
-    var value: … # Some low-level MLIR stuff here
-
-    # Many standard operators are supported.
-    fn __mult__(self, rhs: Self) -> Self: ...
-
+fn __init__(out self, char_class: String):
+    # Small classes (≤3 chars): Direct comparison
+    # Large classes: Lookup table with SIMD
+    self.use_shuffle_optimization = len(char_class) > 3
 ```
 
-```
-var vector = SIMD[DType.int16, 4](1, 2, 3, 4)
-vector = vector * vector
-for i in range(4):
-    print(vector[i], end=" ")
+💡 **Key Insight**: SIMD has overhead - use wisely!
+
+---
+
+### Memory Optimizations
+
+**Register-Passable Structs**
+```mojo
+@register_passable("trivial")
+struct SIMDStringSearch:
+    var pattern_length: Int  # 8 bytes
+    var first_char_simd: SIMD[DType.uint8, 16]  # 16 bytes
+    # Total: 24 bytes - fits in registers!
 ```
 
-```bash
-1 4 9 16
+**Benefits:**
+- ✅ No heap allocations
+- ✅ No reference counting
+- ✅ CPU register passing
+- ✅ Better cache locality
+
+---
+
+### Caching Strategies
+
+**Global SIMD Matcher Cache** (commit cecd978)
+```mojo
+var _digit_matcher_cache = _Global[
+    Optional[RangeBasedMatcher],
+    Optional[RangeBasedMatcher](None),
+    _initialize_digit_matcher,
+]
+
+fn get_digit_matcher() -> RangeBasedMatcher:
+    """Get cached matcher, creating if necessary."""
+    var cached = _digit_matcher_cache.get_value()
+    if not cached:
+        cached = Optional(create_digit_matcher())
+        _digit_matcher_cache.set_value(cached)
+    return cached.value()
+```
+
+🎯 **One allocation, used everywhere!**
+
+---
+
+### Compile-Time Optimizations
+
+**Static ASCII Values**
+```mojo
+# Before: Runtime computation
+if ord(char) >= ord('0') and ord(char) <= ord('9'):
+
+# After: Compile-time constants
+alias CHAR_ZERO = ord('0')
+alias CHAR_NINE = ord('9')
+if char_code >= CHAR_ZERO and char_code <= CHAR_NINE:
+```
+
+**Specialized Matchers**
+```mojo
+fn create_hex_matcher() -> NibbleBasedMatcher:
+    """Optimized for [0-9a-fA-F] using bit operations."""
+    return NibbleBasedMatcher()
 ```
 
 ---
 
-### Key Takeaways
+### Real-World Performance Impact
 
-🔥 **`fn` for kernels** (no exceptions)
+**Literal String Search** (SIMD-optimized)
+```mojo
+# Finding "example.com" in text
+var searcher = SIMDStringSearch("example.com")
+var pos = searcher.search(text, 0)
+```
+- ⚡ 2.4x faster than Python's `re`
+- 🎯 Uses Boyer-Moore-style first character check
 
-⚡ **SIMD types** Vectorization
-
-🏗️ **Structs** for Data Structures
-
-> Note: These fundamentals are crucial - they enable the performance characteristics that make Mojo special for CPU/GPU programming.
+**Character Class Matching**
+```mojo
+# Pattern: [a-z]+
+var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
+```
+- ⚡ Process 16-32 characters per instruction
+- 🎯 Automatic vectorization
 
 ---
 
 <!-- .slide: class="center-slide" -->
-# Part 2: Practical Implementation
+# Part 4: Practical Examples
 
 ---
 
-<!-- .slide: class="center-slide" -->
-## Hands-on GPU Programming with Mojo🔥
-
----
-
-### Clone the Mojo🔥 GPU Puzzles
-
-```bash
-git clone https://github.com/modular/mojo-gpu-puzzles
-cd mojo-gpu-puzzles
-```
-
-Make sure you've Pixi installed. See [https://prefix.dev/](https://prefix.dev/)
-
-```bash
-curl -fsSL https://pixi.sh/install.sh | sh
-```
-
-🌐 **Online Version**: [builds.modular.com/puzzles](https://builds.modular.com/puzzles)
-
-📝 **Note**: Extensive use in Part 2!
-
----
-
-<!-- .slide: class="center-slide" -->
-## GPU Programming Fundamentals
-
----
-
-<div style="display: flex; align-items: flex-start; gap: 40px;">
-<div style="flex: 1;">
-
-### GPU vs CPU Architecture
-- **CPUs**: Few powerful cores optimized for sequential processing and complex decision making
-- **GPUs**: Thousands of smaller, simpler cores designed for parallel processing
-- **Complementary**: CPU handles program flow and complex logic, GPU handles parallel computations
-
-</div>
-<div style="flex: 0 0 500px;">
-<img src="./image/cpu-gpu-architecture.png" alt="CPU vs GPU Architecture" width="500" height="400" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-### GPU Hardware Components
-
-<img src="./image/sm-architecture.png" alt="SM Architecture" width="1000" height="400" style="border-radius: 5px;">
-
----
-
-### GPU Hardware Components
-
-- **Streaming Multiprocessors (SMs)**: Self-contained processing factories that operate independently
-- **CUDA Cores/Stream Processors**: Basic arithmetic units performing calculations
-- **Tensor/Matrix Cores**: Specialized units for matrix multiplication and AI operations
-- **Register Files**: Ultra-fast storage for thread-specific data
-- **Shared Memory/L1 Cache**: Low-latency memory for data sharing between threads
-
----
-
-### GPU Execution Model
-
-<img src="./image/grid-hierarchy.png" alt="Grid hierarchy" width="700" height="600" style="border-radius: 5px;">
-
----
-
-### GPU Execution Model
-- **Kernel**: Function that runs on GPU across thousands/millions of threads
-- **Grid**: Top-level organization of all threads executing a kernel
-- **Thread Blocks**: Groups of threads that can collaborate and share memory
-- **Warps**: Subsets of 32-64 threads that execute the same instruction simultaneously
-- **SIMT**: Single Instruction, Multiple Threads execution model
-
----
-
-### Key Performance Concepts
-- **Warp Divergence**: Performance penalty when threads in a warp take different paths
-- **Memory Coalescing**: Efficient memory access when threads access contiguous locations
-- **Thread Block Sizing**: Should be multiples of warp size for optimal resource usage
-- **Latency Hiding**: GPU switches between warps to hide memory access delays
-
----
-
-### Your First Kernel
-
-Print block and thread ids for `grid_dim=2` and `block_dim=4`
-
-In `main.mojo`:
+### Basic Usage
 
 ```mojo
-from gpu import block_idx, thread_idx
-from gpu.host import DeviceContext
-
-fn print_threads():
-    print("Block index:", block_idx.x, "\t", "Thread index: ", thread_idx.x)
-
-def main():
-    # create device context
-    ctx = DeviceContext()
-    # GPU kernel launches asynchronously - doesn't block Host (CPU)
-    ctx.enqueue_function[print_threads](grid_dim=2, block_dim=4)
-    # synchronize Host thread with GPU
-    ctx.synchronize()
-```
-
----
-
-### Your First Kernel
-
-Run `pixi run mojo main.mojo`
-
-```output
- Block index: 1          Thread index:  0
- Block index: 1          Thread index:  1
- Block index: 1          Thread index:  2
- Block index: 1          Thread index:  3
- Block index: 0          Thread index:  0
- Block index: 0          Thread index:  1
- Block index: 0          Thread index:  2
- Block index: 0          Thread index:  3
-```
-
-👁️ Notice the Parallel execution of GPU threads
-
----
-
-## [🧩Puzzle 1: Map](https://builds.modular.com/puzzles/puzzle_01/puzzle_01.html)
-
-Adds `10` to each position of vector `a` and stores it in vector `output`.
-
-</div>
-<div style="flex: 0 0 800px;">
-<img src="./gifs/puzzle_01_viz.gif" alt="Puzzle 01" width="800" height="400" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-## [🧩Puzzle 1: Map](https://builds.modular.com/puzzles/puzzle_01/puzzle_01.html)
-
-Adds `10` to each position of vector `a` and stores it in vector `output`.
-
-```mojo
-alias SIZE = 4
-alias BLOCKS_PER_GRID = 1
-alias THREADS_PER_BLOCK = SIZE
-alias dtype = DType.float32
-
-fn add_10(
-    output: UnsafePointer[Scalar[dtype]], a: UnsafePointer[Scalar[dtype]]
-):
-    i = thread_idx.x
-    # FILL ME IN (roughly 1 line)
-```
-
-Run `pixi run p01`
-
----
-
-## Solution
-
-```mojo
-fn add_10(
-    output: UnsafePointer[Scalar[dtype]], a: UnsafePointer[Scalar[dtype]]
-):
-    i = thread_idx.x
-    output[i] = a[i] + 10
-```
-
----
-
-## [🧩Puzzle 3: Guards](https://builds.modular.com/puzzles/puzzle_03/puzzle_03.html)
-
-Add `10` to each position of vector `a` and stores it in vector `output`. You have **more threads than positions**.
-
-</div>
-<div style="flex: 0 0 800px;">
-<img src="./gifs/puzzle_03_viz.gif" alt="Puzzle 03" width="800" height="400" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-## [🧩Puzzle 3: Guards](https://builds.modular.com/puzzles/puzzle_03/puzzle_03.html)
-
-Add `10` to each position of vector `a` and stores it in vector `output`. You have **more threads than positions**.
-
-```mojo
-alias SIZE = 4
-alias BLOCKS_PER_GRID = 1
-alias THREADS_PER_BLOCK = (8, 1)
-alias dtype = DType.float32
-
-fn add_10_guard(output: UnsafePointer[Scalar[dtype]],
-    a: UnsafePointer[Scalar[dtype]],
-    size: Int,
-):
-    i = thread_idx.x
-    # FILL ME IN (roughly 2 lines)
-```
-
-Run `pixi run p03`
-
----
-
-## Solution
-
-```mojo
-fn add_10_guard(
-    output: UnsafePointer[Scalar[dtype]],
-    a: UnsafePointer[Scalar[dtype]],
-    size: Int,
-):
-    i = thread_idx.x
-    if i < size:
-        output[i] = a[i] + 10.0
-```
-
----
-
-## [🧩Puzzle 4: 2D Map](https://builds.modular.com/puzzles/puzzle_04/puzzle_04.html)
-
-Add `10` to each position of 2D square matrix `a` and stores it in 2D square matrix `output`. Note `a` is row-major i.e. rows are stored in memory.
-
-</div>
-<div style="flex: 0 0 800px;">
-<img src="./gifs/puzzle_04_viz.gif" alt="Puzzle 04" width="800" height="400" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-<!-- .slide: class="center-slide" -->
-## Thread Indexing Convention
-
-</div>
-<div style="flex: 0 0 800px;">
-<img src="./gifs/thread_indexing_viz.gif" alt="thread indexing" width="800" height="500" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-## [🧩Puzzle 4: 2D Map](https://builds.modular.com/puzzles/puzzle_04/puzzle_04.html)
-
-Add `10` to each position of 2D square matrix `a` and stores it in 2D square matrix `output`. Note `a` is row-major i.e. rows are stored in memory.
-
-```mojo
-alias SIZE = 2
-alias BLOCKS_PER_GRID = 1
-alias THREADS_PER_BLOCK = (3, 3)
-alias dtype = DType.float32
-
-fn add_10_2d(
-    output: UnsafePointer[Scalar[dtype]],
-    a: UnsafePointer[Scalar[dtype]],
-    size: Int,
-):
-    row = thread_idx.y
-    col = thread_idx.x
-    # FILL ME IN (roughly 2 lines)
-```
-
----
-
-## Solution
-
-Indexing convention:
-- `thread_idx.y` corresponds to the row index
-- `thread_idx.x` corresponds to the column index
-
-```mojo
-fn add_10_2d(
-    output: UnsafePointer[Scalar[dtype]],
-    a: UnsafePointer[Scalar[dtype]],
-    size: Int,
-):
-    row = thread_idx.y
-    col = thread_idx.x
-    if row < size and col < size:
-        output[row * size + col] = a[row * size + col] + 10.0
-```
-
----
-
-## Why `LayoutTensor`?
-
-Growing challenging with raw `UnsafePointer`
-
-```mojo
-# 2D indexing coming in later puzzles
-idx = row * WIDTH + col
-
-# 3D indexing
-idx = (batch * HEIGHT + row) * WIDTH + col
-
-# With padding
-idx = (batch * padded_height + row) * padded_width + col
-```
-
----
-
-## Why `LayoutTensor`?
-
-Idiomatic access `LayoutTensor`:
-
-```mojo
-output[i, j] = a[i, j] + 10.0  # 2D indexing
-output[b, i, j] = a[b, i, j] + 10.0  # 3D indexing
-```
-
-and more advanced features preview:
-
-```mojo
-# Column-major layout
-layout_col = Layout.col_major(HEIGHT, WIDTH)
-# Tiled layout (for better cache utilization)
-layout_tiled = tensor.tiled[4, 4](HEIGHT, WIDTH)
-# Vectorized access
-vec_tensor = tensor.vectorize[1, simd_width]()
-# Asynchronous transfers
-copy_dram_to_sram_async[thread_layout=layout](dst, src)
-# Tensor Core operations (coming in later puzzles)
-mma_op = TensorCore[dtype, out_type, Index(M, N, K)]()
-result = mma_op.mma_op(a_reg, b_reg, c_reg)
-```
-
----
-
-## How to use `LayoutTensor`?
-
-`LayoutTensor` can be both on CPU and GPU depending on where the underlying data pointer lives.
-
-```mojo
-from layout import Layout, LayoutTensor
-# Define layout
-alias layout = Layout.row_major(2, 3)
-# Allocate and initialized memory either on Host (CPU) or Device (GPU)
-data_ptr = ...
-# Create tensor using the `date_ptr`
-tensor = LayoutTensor[mut=True, dtype, layout](data_ptr)
-tensor[0, 0] += 1
-```
-
-Mojo manual: ["Using LayoutTensor"](https://docs.modular.com/mojo/manual/layout/tensors)
-
----
-
-## Back to Puzzle 4: 2D Map
-
-**Raw `UnsafePointer` approach:**
-
-```mojo
-row = thread_idx.y
-col = thread_idx.x
-if row < size and col < size:
-    output[row * size + col] = a[row * size + col] + 10.0
-```
-
-**`LayoutTensor` approach:**
-
-```mojo
-row = thread_idx.y
-col = thread_idx.x
-if row < size and col < size:
-    output[row, col] = a[row, col] + 10.0
-```
-
----
-
-## [🧩Puzzle 8: Shared Memory](https://builds.modular.com/puzzles/puzzle_08/puzzle_08.html)
-
-Add `10` to each position of a vector `a` and stores it in vector `output`. You have **fewer threads per block** than the size of `a`.
-
-</div>
-<div style="flex: 0 0 800px;">
-<img src="./gifs/puzzle_08_viz.gif" alt="Puzzle 08" width="800" height="400" style="border-radius: 5px;">
-</div>
-</div>
-
----
-
-## [🧩Puzzle 8: Shared Memory](https://builds.modular.com/puzzles/puzzle_08/puzzle_08.html)
-
-Add `10` to each position of a vector `a` and stores it in vector `output`. You have **fewer threads per block** than the size of `a`.
-
-```mojo
-# Allocate shared memory using tensor builder
-shared = tb[dtype]().row_major[TPB]().shared().alloc()
-
-global_i = block_dim.x * block_idx.x + thread_idx.x
-local_i = thread_idx.x
-# Copy local data into shared memory
-if global_i < size:
-    shared[local_i] = a[global_i]
-
-# wait for all threads to complete works within a thread block
-barrier()
-
-# FILL ME IN (roughly 2 lines)
-```
-
----
-
-## Solution
-
-```mojo
-# Allocate shared memory using tensor builder
-shared = tb[dtype]().row_major[TPB]().shared().alloc()
-
-global_i = block_dim.x * block_idx.x + thread_idx.x
-local_i = thread_idx.x
-
-if global_i < size:
-    shared[local_i] = a[global_i]
-# Copy local data into shared memory
-barrier()
-# Bound-check and store to global memory
-if global_i < size:
-    output[global_i] = shared[local_i] + 10
-```
-
----
-
-<!-- .slide: class="center-slide" -->
-## Model Development with MAX🧑‍🚀
-
----
-
-## 📚 Resources
-
-- **Get started with MAX graphs**
-[https://docs.modular.com/max/tutorials/get-started-with-max-graph-in-python](https://docs.modular.com/max/tutorials/get-started-with-max-graph-in-python)
-- **Build an MLP block as a module**
-[https://docs.modular.com/max/tutorials/build-an-mlp-block](https://docs.modular.com/max/tutorials/build-an-mlp-block)
-- **Serve custom model architectures**
-[https://docs.modular.com/max/tutorials/serve-custom-model-architectures](https://docs.modular.com/max/tutorials/serve-custom-model-architectures)
-- **Examples of custom operations**
-[https://github.com/modular/modular/tree/main/examples/custom_ops](https://github.com/modular/modular/tree/main/examples/custom_ops)
-
-
----
-
-## 🤖 Models in MAX🧑‍🚀
-
-- 🏗️ **Built using the MAX Graph API** - Unified computation framework
-- 🐍 **Defined in Python** - Familiar, productive development experience
-- ⚡ **Tensor computation graphs** - With lightning-fast Mojo nodes
-
----
-
-## 🐍 Why Python for MAX Graphs?
-
-**"Best of Both Worlds: Python Productivity + Mojo Performance"**
-
-- 🔗 **Direct integration** with Python's rich ML ecosystem
-- 👨‍💻 **Familiar language** to ML engineers and researchers
-- 🚀 **Computation time dominated by graph execution** - where Mojo shines!
-
----
-
-## 🚀 Serving LLMs with MAX
-
-**"Get your AI models running in seconds!"**
-
-```sh
-max serve --model-path=Qwen/Qwen2.5-0.5B-Instruct
-```
-
-or
-
-```sh
-python -m max.entrypoints.pipelines serve \
-  --model-path=Qwen/Qwen2.5-0.5B-Instruct
-```
-
-📚 **Explore the source**: [github.com/modular/modular](https://github.com/modular/modular/tree/main/max/serve)
-
----
-
-## 🧪 Testing LLM Text Generation with MAX
-
-**Quick validation of your model deployment**
-
-```sh
-max generate --model-path=Qwen/Qwen2.5-0.5B-Instruct --prompt "Hello there."
-```
-
-💡 **Pro tip**: Perfect for development testing and demos!
-
----
-
-## 🧩 MAX Graph Basics
-
-**Core building blocks for high-performance AI**
-
-- 📊 **Graph** (`max.graph`) - Your computation blueprint
-- ⚙️ **Graph operations** (`max.graph.ops`) - Mathematical operations
-- 🖥️ **Devices** (`max.driver`) - CPU, GPU, accelerator management
-- 🎯 **Inference sessions** (`max.engine`) - Optimized execution runtime
-
----
-
-### 🏗️ Construct a Graph
-
-**Building your first computation graph**
-
-```python
-input_type = TensorType(
-    dtype=DType.float32, shape=(1,), device=DeviceRef.CPU()
+from regex import match_first, findall, search
+
+# Simple literal matching
+var result = match_first("hello", "hello world")
+if result:
+    print("Match found:", result.value().get_match_text())
+    # Output: Match found: hello
+
+# Find all matches
+var matches = findall("a", "banana")
+print("Found", len(matches), "matches")
+# Output: Found 3 matches
+
+# Character classes
+var emails = findall(
+    "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+    "Contact john@example.com or mary@test.org"
 )
-with Graph(
-    "simple_add_graph", input_types=(input_type, input_type)
-) as graph:
-    lhs, rhs = graph.inputs
-    out = ops.add(lhs, rhs)
-    graph.output(out)
+# Finds both email addresses
 ```
-
-✨ **Clean, declarative syntax** - Just like you'd expect!
 
 ---
 
-### ⚡ Compile and Execute a Graph
-
-**From definition to blazing-fast execution**
-
-```python
-session = engine.InferenceSession()
-model = session.load(graph)
-
-output = model.execute(a, b)[0]
-result = output.to_numpy()
-```
-
-🔥 **That's it!** MAX handles all the optimization magic behind the scenes.
-
----
-
-## 🔧 Graph Operations
-
-**Building blocks for any computation you can imagine**
-
-- 🧱 **Simple atomic operations** - Lower level than other frameworks
-- 🚀 **Rely on graph compiler for fusion** - Automatic optimization
-- 📖 **Comprehensive library** - Full list at [docs.modular.com/max/api/python/graph/ops](https://docs.modular.com/max/api/python/graph/ops)
-
-```
-...
-abs()      add()         allgather()    argmax()
-argmin()   argsort()     as_interleaved_complex()
-...
-```
-
-💎 **200+ operations** and growing!
-
----
-
-## 🧠 `max.nn` Layers
-
-**High-level abstractions for rapid development**
-
-- 🏗️ **Higher-level abstractions** on operations
-- 🔄 **Designed to ease porting from PyTorch** - Familiar patterns
-- 🚧 **Rapidly expanding** - We're just getting started!
-  - 💡 Missing something obvious? **Let us know!**
-
--> [Translation guide from PyTorch to MAX](https://github.com/modular/modular/blob/main/docs/eng-design/docs/pytorch-to-max-mapping-guide.md)
-
----
-
-### 🔥 Defining Custom Operations in Mojo
-
-**Unleash maximum performance with custom kernels**
+### Advanced Patterns
 
 ```mojo
-@compiler.register("add_one")
-struct AddOne:
-    @staticmethod
-    fn execute[
-        target: StaticString,
-    ](
-        output: OutputTensor,
-        x: InputTensor[dtype = output.dtype, rank = output.rank],
-        ctx: DeviceContextPtr,
-    ) raises:
-        @parameter
-        @always_inline
-        fn elementwise_add_one[
-            width: Int
-        ](idx: IndexList[x.rank]) -> SIMD[x.dtype, width]:
-            return x.load[width](idx) + 1
+# Quantifiers
+match_first("a+", "aaaa")      # Matches "aaaa"
+match_first("a{2,4}", "aaaaa") # Matches "aaaa"
 
-        foreach[elementwise_add_one, target=target](output, ctx)
+# Anchors
+match_first("^hello", "hello world")  # ✓ Matches
+match_first("^world", "hello world")  # ✗ No match
+
+# Groups and alternation
+match_first("(com|org|net)", "example.com")  # Matches "com"
+
+# Complex patterns
+var url_pattern = "^https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
+match_first(url_pattern, "https://example.com")  # ✓ Valid URL
 ```
 
 ---
 
-### 🔗 Using Custom Operations in Python Graphs
+### Performance Best Practices
 
-**Seamless integration: Python🐍 productivity meets Mojo🔥 performance**
+**1. Reuse Compiled Patterns**
+```mojo
+# Good: Compile once
+var pattern = CompiledRegex("[0-9]+")
+for text in texts:
+    var matches = pattern.match_all(text)
 
-```python
-mojo_kernels = Path(__file__).parent / "kernels"
-
-device = CPU() if accelerator_count() == 0 else Accelerator()
-graph = Graph(
-    "addition",
-    forward=lambda x: ops.custom(
-        name="add_one",
-        device=DeviceRef.from_device(device),
-        values=[x],
-        out_types=[
-            TensorType(
-                dtype=x.dtype,
-                shape=x.tensor.shape,
-                device=DeviceRef.from_device(device),
-            )
-        ],
-    )[0].tensor,
-    input_types=[
-        TensorType(
-            dtype,
-            shape=[rows, columns],
-            device=DeviceRef.from_device(device),
-        ),
-    ],
-    custom_extensions=[mojo_kernels],
-)
+# Bad: Recompile every time
+for text in texts:
+    var matches = findall("[0-9]+", text)
 ```
 
-🎯 **Best of both worlds**: Write once in Mojo, use everywhere in Python!
+**2. Use Simple Patterns When Possible**
+```mojo
+# Prefer DFA-eligible patterns
+match_first("error", log_line)  # O(n) with SIMD
 
----
-
-## 🏛️ Model Architectures
-
-**Rich ecosystem of pre-built, optimized architectures**
-
-- 🎯 **MAX supports common LLM architectures** - Ready to use out of the box
-- 📂 **Open source implementations** - [`modular/max/pipelines/architectures`](https://github.com/modular/modular/tree/main/max/pipelines/architectures)
-- 🔍 **Check first, build later** - May already exist or have a close match to modify
-
-💡 **Transformer, Llama, Mistral, Qwen** and many more already supported!
-
----
-
-## 🚀 Registering and Serving a Model Architecture
-
-**From research to production in 5 steps**
-
-**Tutorial:** ["Serve custom model architectures"](https://docs.modular.com/max/tutorials/serve-custom-model-architectures)
-
-- 📊 **Implement the main model graph** - Define your computation
-- ⚙️ **Handle model configuration metadata** - Parameters and settings
-- 🗺️ **Map weight names to internal structure** - Connect checkpoints to graph
-- 📝 **Register the architecture with MAX** - Make it discoverable
-- 🎯 **Load with `--custom-architectures`** - Deploy your custom model
-
----
-
-<!-- .slide: class="center-slide" -->
-## PyTorch Custom Ops Integration (Beta Feature)
-
-### 🚀 Mojo Kernels 🤝 PyTorch Models
-
----
-
-### Key Benefits
-
-- ⚡ **High-performance kernels** in Mojo🔥
-- 🐍 **Familiar PyTorch workflow**
-- 🔄 **Seamless integration** - no framework switching
-- 🎯 **Target-agnostic** - same code runs on CPU/GPU
-
----
-
-### Simple Integration
-
-```python
-import torch
-from max.torch import CustomOpLibrary
-
-# Load compiled Mojo kernels
-ops = CustomOpLibrary("./operations")
-
-# Use in PyTorch as normal
-@torch.compile
-def my_model(x):
-    return ops.my_custom_kernel(x)
+# Over complex alternatives
+match_first("err(or)?", log_line)  # May use NFA
 ```
 
-📖 **Tutorial**: [docs.modular.com/max/tutorials/custom-kernels-pytorch](https://docs.modular.com/max/tutorials/custom-kernels-pytorch)
+---
 
-💻 **Code**: [https://github.com/modular/modular/tree/main/examples/pytorch_custom_ops](https://github.com/modular/modular/tree/main/examples/pytorch_custom_ops)
+### Benchmarking Example
+
+```mojo
+from time import perf_counter_ns as now
+from regex import match_first
+
+fn benchmark_literal_match():
+    var text = "hello world" * 1000
+    var pattern = "world"
+    
+    var start = now()
+    for _ in range(1000):
+        var result = match_first(pattern, text)
+        keep(result.__bool__())  # Prevent optimization
+    
+    var elapsed = now() - start
+    print("Time per match:", elapsed / 1000, "ns")
+
+# Results:
+# mojo-regex: ~50ns per match
+# Python re:  ~120ns per match
+```
 
 ---
 
-### Up for a challenge? ✋
+### Integration Tips
 
-- [🧩 Puzzle 19: Embedding Op](https://builds.modular.com/puzzles/puzzle_19/puzzle_19.html)
-- [🧩 Puzzle 20: Kernel Fusion and Custom Backward Pass](https://builds.modular.com/puzzles/puzzle_20/puzzle_20.html)
+**1. Error Handling**
+```mojo
+try:
+    var result = match_first(user_pattern, text)
+except:
+    print("Invalid regex pattern")
+```
+
+**2. Building Complex Patterns**
+```mojo
+# Use raw strings for cleaner patterns
+alias EMAIL_PATTERN = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
+
+# Build patterns programmatically
+var words = ["error", "warning", "fatal"]
+var pattern = "(" + "|".join(words) + ")"
+```
 
 ---
 
-## Using AI coding agents with MAX and Mojo
+### Future Roadmap
 
-- When developing new kernels, start inside the root of a `modular` checkout
-  - The repository has pre-populated CLAUDE.md and Cursor rules
-- For external projects, refer to a `modular` checkout for latest APIs and examples
-- Point to our available `llms.txt` for latest documentation
-- For more, see ["Using AI coding assistants"](https://docs.modular.com/max/coding-assistants)
+**Coming Soon:**
+- 📝 Predefined character classes (`\d`, `\w`, `\s`)
+- 🔄 Non-greedy quantifiers (`*?`, `+?`)
+- 🎯 Named capture groups
+- 🔧 Match replacement (`sub()`, `gsub()`)
+- 🌍 Unicode support
+
+**Long Term:**
+- 👀 Lookahead/lookbehind assertions
+- 🔗 Backreferences
+- 📊 Compile-time pattern optimization
+- 🚀 GPU acceleration for parallel matching
+
+---
+
+### Contributing
+
+**How to Contribute:**
+
+1. **Check the TO-DO list** in README.md
+2. **Read CONTRIBUTING.md** for architecture details
+3. **Run benchmarks** before/after changes
+4. **Add tests** for new features
+
+**Good First Issues:**
+- Implement `\d` character class
+- Add case-insensitive flag
+- Improve error messages
+- Add more benchmarks
+
+---
+
+### Performance Tips Summary
+
+**Do's:**
+- ✅ Use DFA-eligible patterns when possible
+- ✅ Reuse compiled patterns
+- ✅ Leverage SIMD for character classes
+- ✅ Profile before optimizing
+
+**Don'ts:**
+- ❌ Don't use complex patterns for simple tasks
+- ❌ Don't recompile patterns in loops
+- ❌ Don't ignore pattern complexity
+- ❌ Don't assume NFA is always slower
 
 ---
 
@@ -1191,6 +594,11 @@ def my_model(x):
 
 ## Questions & Discussion
 
-_Let's build the future of AI programming together!_
+**Resources:**
+- GitHub: [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
+- Docs: [Performance Tips](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
+- Install: `pixi add mojo-regex`
 
-Note: Thank you for joining this workshop! Continue learning with the resources provided, and don't hesitate to reach out to the community for support.
+_Let's build high-performance text processing together!_
+
+Note: Thank you for your interest in mojo-regex! Feel free to contribute, report issues, or share your use cases. The Mojo ecosystem is growing, and regex is a fundamental building block.

@@ -1,12 +1,14 @@
-# Mojo🔥 GPU Programming Workshop
+# Regex Engine in Mojo🔥
 
-A comprehensive workshop introducing GPU programming with Mojo🔥, featuring hands-on exercises, interactive slides, and real-world applications.
+A presentation about the mojo-regex library, showcasing its hybrid DFA/NFA architecture, SIMD optimizations, and performance achievements.
 
-## 🎯 Workshop Overview
+## 🎯 Presentation Overview
 
-This workshop covers:
-- **Part 1: Foundations** - Why Mojo, setup, and language fundamentals
-- **Part 2: Practical Implementation** - Hands-on GPU programming with Mojo GPU Puzzles
+This presentation covers:
+- **Part 1: Introduction & Motivation** - What is mojo-regex and why build it in Mojo
+- **Part 2: Architecture Deep Dive** - Hybrid DFA/NFA design and components
+- **Part 3: Performance Optimizations** - SIMD, memory, and compile-time optimizations
+- **Part 4: Practical Examples** - Usage, benchmarks, and future roadmap
 
 ## 🛠️ Installation
 
@@ -81,10 +83,10 @@ pixi run npx serve . -p 4000
 
 ## 📖 Additional Resources
 
+- **Mojo-Regex Repository**: [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
+- **Performance Tips**: [Performance Optimization Guide](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
+- **Contributing Guide**: [CONTRIBUTING.md](https://github.com/msaelices/mojo-regex/blob/main/CONTRIBUTING.md)
 - **Mojo Documentation**: [docs.modular.com/mojo](https://docs.modular.com/mojo)
-- **GPU Programming Guide**: [docs.modular.com/mojo/manual/gpu](https://docs.modular.com/mojo/manual/gpu)
-- **GPU Puzzles**: [github.com/modular/mojo-gpu-puzzles](https://github.com/modular/mojo-gpu-puzzles)
-- **PyTorch Custom Ops**: [docs.modular.com/max/tutorials/custom-kernels-pytorch](https://docs.modular.com/max/tutorials/custom-kernels-pytorch)
 - **Community Forum**: [forum.modular.com](https://forum.modular.com)
 
 ## 🤝 Contributing
@@ -102,4 +104,4 @@ For questions about this workshop:
 
 ---
 
-**Happy GPU Programming with Mojo! 🔥**
+**Happy Regex Matching with Mojo! 🔥**
