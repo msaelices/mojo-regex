@@ -6,7 +6,7 @@ Supports both Python vs Mojo and branch vs branch comparisons.
 
 import json
 import sys
-from typing import Dict, Tuple
+from typing import Tuple
 
 
 def load_results(filename: str) -> dict:
@@ -19,7 +19,7 @@ def load_results(filename: str) -> dict:
         Dictionary with benchmark data
     """
     try:
-        with open(filename, 'r') as f:
+        with open(filename, "r") as f:
             return json.load(f)
     except FileNotFoundError:
         print(f"Error: Results file '{filename}' not found", file=sys.stderr)
@@ -40,7 +40,7 @@ def calculate_speedup(baseline_time: float, test_time: float) -> float:
         Speedup factor (>1 means test is faster than baseline)
     """
     if test_time == 0:
-        return float('inf')
+        return float("inf")
     return baseline_time / test_time
 
 
@@ -84,30 +84,33 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
 
         # If both are mojo, it's likely a branch comparison
         if baseline_engine.lower() == "mojo" and test_engine.lower() == "mojo":
-            baseline_name = "Main Branch"
+            baseline_name = "Other Branch"
             test_name = "Current Branch"
-            title = "CURRENT BRANCH VS MAIN BRANCH BENCHMARK COMPARISON"
+            title = "CURRENT BRANCH VS OTHER BRANCH BENCHMARK COMPARISON"
         else:
-            title = f"{test_name.upper()} VS {baseline_name.upper()} BENCHMARK COMPARISON"
+            title = (
+                f"{test_name.upper()} VS {baseline_name.upper()} BENCHMARK COMPARISON"
+            )
 
         return (baseline_name, test_name, title)
 
 
 def create_comparison_report(
-    baseline_results: dict,
-    test_results: dict
+    baseline_results: dict, test_results: dict
 ) -> Tuple[dict, str]:
     """Create a comparison report between two benchmark results.
 
     Args:
-        baseline_results: Baseline benchmark results (e.g., Python or Main branch)
+        baseline_results: Baseline benchmark results (e.g., Python or Other branch)
         test_results: Test benchmark results (e.g., Mojo or Current branch)
 
     Returns:
         Tuple of (comparison_data, formatted_report)
     """
     # Detect comparison type
-    baseline_name, test_name, comparison_title = detect_comparison_type(baseline_results, test_results)
+    baseline_name, test_name, comparison_title = detect_comparison_type(
+        baseline_results, test_results
+    )
 
     comparison_data = {
         "summary": {
@@ -121,13 +124,15 @@ def create_comparison_report(
             "test_faster_count": 0,
             "baseline_faster_count": 0,
             "average_speedup": 0.0,
-            "geometric_mean_speedup": 1.0
+            "geometric_mean_speedup": 1.0,
         },
-        "benchmarks": {}
+        "benchmarks": {},
     }
 
     # Build comparison data
-    all_benchmarks = set(baseline_results["results"].keys()) | set(test_results["results"].keys())
+    all_benchmarks = set(baseline_results["results"].keys()) | set(
+        test_results["results"].keys()
+    )
     speedups = []
 
     for benchmark in sorted(all_benchmarks):
@@ -144,7 +149,7 @@ def create_comparison_report(
                 f"{test_name.lower()}_time_ms": test_time,
                 "speedup": speedup,
                 f"{baseline_name.lower()}_iterations": baseline_result["iterations"],
-                f"{test_name.lower()}_iterations": test_result["iterations"]
+                f"{test_name.lower()}_iterations": test_result["iterations"],
             }
 
             speedups.append(speedup)
@@ -162,7 +167,9 @@ def create_comparison_report(
         product = 1.0
         for s in speedups:
             product *= s
-        comparison_data["summary"]["geometric_mean_speedup"] = product ** (1.0 / len(speedups))
+        comparison_data["summary"]["geometric_mean_speedup"] = product ** (
+            1.0 / len(speedups)
+        )
 
     # Create formatted report
     report = []
@@ -176,17 +183,23 @@ def create_comparison_report(
     report.append("SUMMARY:")
     report.append(f"  Total benchmarks compared: {summary['total_benchmarks']}")
     report.append(f"  {test_name} faster: {summary['test_faster_count']} benchmarks")
-    report.append(f"  {baseline_name} faster: {summary['baseline_faster_count']} benchmarks")
+    report.append(
+        f"  {baseline_name} faster: {summary['baseline_faster_count']} benchmarks"
+    )
     report.append(f"  Average speedup: {summary['average_speedup']:.2f}x")
     report.append(f"  Geometric mean speedup: {summary['geometric_mean_speedup']:.2f}x")
     report.append("")
-    report.append(f"  Note: Speedup > 1.0 means {test_name} is faster than {baseline_name}")
+    report.append(
+        f"  Note: Speedup > 1.0 means {test_name} is faster than {baseline_name}"
+    )
     report.append("")
 
     # Detailed results
     report.append("DETAILED RESULTS:")
     report.append("-" * 100)
-    report.append(f"{'Benchmark':<35} {f'{baseline_name} (ms)':>15} {f'{test_name} (ms)':>15} {'Speedup':>10} {'Status':>15}")
+    report.append(
+        f"{'Benchmark':<35} {f'{baseline_name} (ms)':>15} {f'{test_name} (ms)':>15} {'Speedup':>10} {'Status':>15}"
+    )
     report.append("-" * 100)
 
     for benchmark, data in sorted(comparison_data["benchmarks"].items()):
@@ -219,17 +232,17 @@ def create_comparison_report(
     sorted_by_speedup = sorted(
         comparison_data["benchmarks"].items(),
         key=lambda x: x[1]["speedup"],
-        reverse=True
+        reverse=True,
     )
 
     report.append(f"TOP 5 SPEEDUPS ({test_name} vs {baseline_name}):")
     for i, (benchmark, data) in enumerate(sorted_by_speedup[:5]):
-        report.append(f"  {i+1}. {benchmark}: {data['speedup']:.2f}x faster")
+        report.append(f"  {i + 1}. {benchmark}: {data['speedup']:.2f}x faster")
 
     report.append("")
     report.append("BOTTOM 5 SPEEDUPS:")
     for i, (benchmark, data) in enumerate(sorted_by_speedup[-5:]):
-        report.append(f"  {i+1}. {benchmark}: {data['speedup']:.2f}x")
+        report.append(f"  {i + 1}. {benchmark}: {data['speedup']:.2f}x")
 
     return comparison_data, "\n".join(report)
 
@@ -238,15 +251,23 @@ def main():
     """Main comparison function."""
     # Get file paths from command line arguments
     if len(sys.argv) < 3:
-        print("Usage: compare_benchmarks_generic.py <baseline_results.json> <test_results.json> [output.json]")
-        print("  baseline_results.json: Results to compare against (e.g., Python or Main branch)")
+        print(
+            "Usage: compare_benchmarks_generic.py <baseline_results.json> <test_results.json> [output.json]"
+        )
+        print(
+            "  baseline_results.json: Results to compare against (e.g., Python or Other branch)"
+        )
         print("  test_results.json: Results to test (e.g., Mojo or Current branch)")
-        print("  output.json: Optional output file (default: benchmarks/results/comparison.json)")
+        print(
+            "  output.json: Optional output file (default: benchmarks/results/comparison.json)"
+        )
         sys.exit(1)
 
     baseline_file = sys.argv[1]
     test_file = sys.argv[2]
-    output_file = sys.argv[3] if len(sys.argv) > 3 else "benchmarks/results/comparison.json"
+    output_file = (
+        sys.argv[3] if len(sys.argv) > 3 else "benchmarks/results/comparison.json"
+    )
 
     # Load results
     baseline_results = load_results(baseline_file)
