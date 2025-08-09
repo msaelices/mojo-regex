@@ -164,7 +164,7 @@ struct CharacterClassSIMD(Copyable, Movable):
         # For small chunks or when _dynamic_shuffle isn't optimal,
         # we need to check if we can use the fast path
         @parameter
-        if SIMD_WIDTH == 16:
+        if SIMD_WIDTH == 32:
             # Fast path: use _dynamic_shuffle for 16-byte chunks
             # The lookup table acts as our shuffle table
             var result = self.lookup_table._dynamic_shuffle(chunk)
