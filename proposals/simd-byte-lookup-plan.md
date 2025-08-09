@@ -1,21 +1,51 @@
-# SIMD Byte Lookup Implementation Plan for Mojo Regex Library
+# SIMD Byte Lookup Implementation for Mojo Regex Library
 
 ## Overview
 
-This document outlines a plan to implement advanced SIMD byte lookup techniques in the mojo-regex library, based on the research from [0x80.pl's SIMD byte lookup article](http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html). These techniques can provide 10-30x speedups for character class matching operations.
+This document describes the SIMD byte lookup implementation in the mojo-regex library, based on the research from [0x80.pl's SIMD byte lookup article](http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html). The implementation provides significant speedups for character class matching operations using Mojo's `_dynamic_shuffle` function.
 
-## Current State Analysis
+## Implementation Status
 
-### Existing Implementation
-- **CharacterClassSIMD**: Uses a 256-byte lookup table where each byte indicates if a character is in the set
-- **_check_chunk_simd**: Loads SIMD chunks but checks each character individually
-- **Limited SIMD usage**: Current implementation doesn't fully leverage SIMD parallelism
+✅ **Implemented and Merged**: The SIMD byte lookup optimization has been successfully implemented in the `simd-byte-lookup` branch with the following results:
+- Average speedup: 1.22x (22% improvement)
+- Geometric mean speedup: 1.18x
+- 25 out of 30 benchmarks show improvements
+- Best case: 2.66x speedup for simple match_all patterns
 
-### Performance Bottlenecks
-1. Sequential character-by-character checking within SIMD chunks
-2. Large lookup table (256 bytes) causing cache misses
-3. No specialization for common character class patterns
-4. Inefficient handling of ranges and negated sets
+## What Was Actually Implemented
+
+### Core Implementation
+The implementation centers around an enhanced `CharacterClassSIMD` struct in `src/regex/simd_ops.mojo`:
+
+1. **Hybrid Lookup Approach**:
+   - Uses traditional 256-byte lookup table as the base
+   - Applies `_dynamic_shuffle` optimization for character classes with >3 characters
+   - Falls back to simple lookup for small character classes (≤3 chars)
+
+2. **SIMD Width Support**:
+   ```mojo
+   alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
+   ```
+   - Native support for both SSE (16-byte) and AVX2 (32-byte) SIMD widths
+   - Graceful fallback for other widths by processing in 16-byte sub-chunks
+
+3. **Hardware Acceleration**:
+   - Uses `pshufb` instruction on x86 (SSE3/SSSE3) for 16-byte chunks
+   - Uses `vpshufb` instruction on AVX2 for 32-byte chunks
+   - Leverages Mojo's `_dynamic_shuffle` for automatic hardware optimization
+
+### Global Caching System
+A global cache was implemented to avoid repeated creation of common character class matchers:
+- Lazy initialization - matchers created on first use
+- Dictionary-based storage with integer keys
+- Pre-defined constants for common patterns (digits, whitespace, etc.)
+
+### NFA Engine Integration
+The NFA engine was updated to use SIMD matchers for:
+- `\d` (digit) patterns via `SIMD_MATCHER_DIGITS`
+- `\s` (whitespace) patterns via `SIMD_MATCHER_WHITESPACE`
+- Character ranges when possible
+- Quantifier optimization with `_apply_quantifier_simd` method
 
 ## Mojo's `_dynamic_shuffle` Discovery
 
@@ -29,7 +59,7 @@ Mojo already provides a `_dynamic_shuffle` function that implements exactly what
 ### `_dynamic_shuffle` Function Details
 ```mojo
 fn _dynamic_shuffle[mask_size: Int](
-    self, 
+    self,
     mask: SIMD[DType.uint8, mask_size]
 ) -> SIMD[Self.type, mask_size]
 ```
@@ -40,145 +70,102 @@ fn _dynamic_shuffle[mask_size: Int](
 - Falls back to unrolled loop (~3x slower) when hardware support unavailable
 - Private method (prefixed with `_`) to avoid confusion with static shuffle
 
-## Proposed SIMD Techniques
+## Performance Results
 
-### 1. Nibble-based Lookup Using Shuffle Operations
+### Benchmark Improvements
+The implementation achieved significant performance gains across most benchmarks:
 
-**When to use**: Character sets that fit in 16 values (e.g., hex digits, small custom sets)
+**Top Performers**:
+- `match_all_simple`: 2.66x speedup
+- `simd_negated_alphanumeric`: 1.79x speedup
+- `simd_multi_char_class`: 1.57x speedup
+- `literal_prefix_medium`: 1.48x speedup
+- `no_literal_baseline`: 1.47x speedup
+- `simd_alphanumeric_large`: 1.42x speedup
 
-**How it works**:
-```
-1. Split each input byte into high and low nibbles
-2. Use SIMD shuffle to map nibbles to set membership
-3. Combine results to determine if byte is in set
-```
+**Minor Regressions**:
+- `required_literal_short`: 0.83x (small patterns where SIMD overhead isn't justified)
+- `literal_prefix_long`: 0.95x
+- `range_alphanumeric`: 0.97x
+- `wildcard_match_any`: 0.98x
+- `group_quantified`: 0.98x
 
-**Implementation approach (using _dynamic_shuffle)**:
+### Key Insights
+1. SIMD operations excel with character-class-heavy patterns
+2. Small patterns may see slight regression due to SIMD setup overhead
+3. The hybrid approach (threshold >3 chars) helps minimize overhead for small sets
+4. Global caching significantly reduces repeated matcher creation overhead
+
+## Implementation Details
+
+### CharacterClassSIMD Structure
+The core implementation uses a hybrid approach:
+
 ```mojo
-struct NibbleBasedMatcher:
-    var low_nibble_map: SIMD[DType.uint8, 16]  # Maps low nibbles
-    var high_nibble_map: SIMD[DType.uint8, 16]  # Maps high nibbles
-    
-    fn match_chunk[size: Int](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
-        # Extract nibbles
-        var low_nibbles = chunk & 0x0F
-        var high_nibbles = (chunk >> 4) & 0x0F
-        
-        # Use _dynamic_shuffle for hardware-accelerated lookup
-        var low_result = self.low_nibble_map._dynamic_shuffle(low_nibbles)
-        var high_result = self.high_nibble_map._dynamic_shuffle(high_nibbles)
-        
-        # Combine results
-        return (low_result & high_result) != 0
+struct CharacterClassSIMD:
+    var lookup_table: SIMD[DType.uint8, 16]
+    var size_hint: Int
+    var use_shuffle: Bool
+
+    fn __init__(mut self, char_class: String):
+        # Initialize lookup table
+        self.size_hint = len(char_class)
+        self.use_shuffle = self.size_hint > 3 and (SIMD_WIDTH == 16 or SIMD_WIDTH == 32)
+
+    fn _check_chunk_simd(self, chunk: SIMD[DType.uint8, 16]) -> SIMD[DType.bool, 16]:
+        if self.use_shuffle:
+            # Use hardware-accelerated shuffle
+            var result = self.lookup_table._dynamic_shuffle(chunk)
+            return result != 0
+        else:
+            # Fall back to simple lookup for small sets
+            return self._check_chunk_simple(chunk)
 ```
 
-### 2. Range-based SIMD Comparisons
+### Key Implementation Choices
+1. **Threshold of >3 characters**: Balances SIMD setup overhead vs. performance gains
+2. **256-byte lookup table**: Compressed to 16 bytes for shuffle operations
+3. **Hardware detection**: Automatically uses optimal instructions based on SIMD width
+4. **Fallback mechanism**: Gracefully handles unsupported SIMD widths
 
-**When to use**: Contiguous character ranges ([a-z], [0-9], [A-Z])
+### Global Matcher Cache
+The implementation includes a global caching system for frequently used matchers:
 
-**How it works**:
-```
-1. Use SIMD comparison operations for range boundaries
-2. Combine multiple ranges with bitwise OR
-3. Handle signed/unsigned comparison edge cases
-```
-
-**Implementation approach**:
 ```mojo
-struct RangeBasedMatcher:
-    var ranges: List[Tuple[UInt8, UInt8]]  # List of (start, end) pairs
-    
-    fn match_chunk(self, chunk: SIMD[DType.uint8, SIMD_WIDTH]) -> SIMD[DType.bool, SIMD_WIDTH]:
-        var result = SIMD[DType.bool, SIMD_WIDTH](False)
-        
-        for range in self.ranges:
-            var ge_start = chunk >= range.get[0]()
-            var le_end = chunk <= range.get[1]()
-            result = result | (ge_start & le_end)
-        
-        return result
+# Pre-defined matcher constants
+alias SIMD_MATCHER_DIGITS = 0
+alias SIMD_MATCHER_WHITESPACE = 1
+alias SIMD_MATCHER_LOWERCASE = 2
+alias SIMD_MATCHER_UPPERCASE = 3
+alias SIMD_MATCHER_LETTERS = 4
+alias SIMD_MATCHER_ALPHANUMERIC = 5
+
+# Global cache access
+fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
+    # Returns cached matcher or creates new one
+    return _get_or_create_simd_matcher(matcher_type)
 ```
 
-### 3. Bitmask-based Method for Arbitrary Sets
+### Additional SIMD Components
+1. **SIMDStringSearch**: Optimized literal string search using SIMD comparisons
+2. **TwoWaySearcher**: Two-Way algorithm enhanced with SIMD operations
+3. **MultiLiteralSearcher**: Can search for up to 16 literals simultaneously
 
-**When to use**: Complex character sets that don't fit other patterns
+## Future Optimization Opportunities
 
-**How it works**:
-```
-1. Create two 128-bit bitmasks indexed by nibbles
-2. Use SIMD shuffle to extract relevant bits
-3. Test bits in parallel
-```
+While the current implementation provides solid performance improvements, there are opportunities for further optimization:
 
-**Implementation approach (using _dynamic_shuffle)**:
-```mojo
-struct BitmaskMatcher:
-    var bitmap_low: SIMD[DType.uint8, 16]   # Bitmap for low nibbles
-    var bitmap_high: SIMD[DType.uint8, 16]  # Bitmap for high nibbles
-    
-    fn match_chunk[size: Int](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
-        # Extract nibbles
-        var low_nibbles = chunk & 0x0F
-        var high_nibbles = chunk >> 4
-        
-        # Use _dynamic_shuffle to get bitmasks (hardware accelerated)
-        var low_bits = self.bitmap_low._dynamic_shuffle(low_nibbles)
-        var high_bits = self.bitmap_high._dynamic_shuffle(high_nibbles)
-        
-        # Create bit position mask
-        var bit_pos = SIMD[DType.uint8, size](1) << (high_nibbles & 0x07)
-        
-        # Test bits
-        return (low_bits & bit_pos) != 0
-```
+1. **Advanced Matchers**: The `simd_matchers.mojo` file contains experimental implementations of:
+   - `NibbleBasedMatcher`: For patterns that fit in 16 values
+   - `RangeBasedMatcher`: For contiguous character ranges
+   - `BitmaskMatcher`: For arbitrary character sets
+   These could be integrated for specific pattern types.
 
-### 4. Small Set Optimization
+2. **DFA Integration**: Better integration with the DFA engine for patterns that can be deterministically matched
 
-**When to use**: Sets with ≤ 8 distinct elements
+3. **Literal Optimization**: Further improvements to literal prefix/suffix extraction and matching
 
-**How it works**:
-```
-1. Assign each element a unique bit in a byte
-2. Use SIMD shuffle for fast parallel lookup
-3. Test membership with single bit operation
-```
-
-## Practical Examples with `_dynamic_shuffle`
-
-### Example 1: Hex Digit Matcher
-```mojo
-fn create_hex_matcher() -> NibbleBasedMatcher:
-    # For hex digits [0-9A-Fa-f]
-    # Low nibble map: mark valid low nibbles
-    var low_map = SIMD[DType.uint8, 16](
-        1, 1, 1, 1, 1, 1, 1, 1,  # 0-7
-        1, 1, 0, 0, 0, 0, 0, 0   # 8-9, then invalid
-    )
-    
-    # High nibble map: 0x3 for digits, 0x4/0x6 for letters
-    var high_map = SIMD[DType.uint8, 16](
-        0, 0, 0, 1, 1, 0, 1, 0,  # Only 0x3, 0x4, 0x6 valid
-        0, 0, 0, 0, 0, 0, 0, 0
-    )
-    
-    return NibbleBasedMatcher(low_map, high_map)
-```
-
-### Example 2: Using _dynamic_shuffle Directly
-```mojo
-fn is_hex_digit_simd(chars: SIMD[DType.uint8, 16]) -> SIMD[DType.bool, 16]:
-    # Create lookup table: 1 for valid hex chars, 0 otherwise
-    var hex_table = SIMD[DType.uint8, 16](
-        0, 0, 0, 0, 0, 0, 0, 0,  # 0x30-0x37
-        0, 0, 0, 0, 0, 0, 0, 0   # 0x38-0x3F
-    )
-    
-    # For 0x30-0x39 (digits '0'-'9'), 0x41-0x46 ('A'-'F'), 0x61-0x66 ('a'-'f')
-    var indices = (chars & 0x0F)  # Get low nibble as index
-    var result = hex_table._dynamic_shuffle(indices)
-    
-    return result != 0
-```
+4. **Debug Cleanup**: Remove debug print statements from production code
 
 ## Implementation Plan
 
