@@ -281,14 +281,6 @@ struct DFAEngine(Engine):
             self._create_accepting_state()
             return
 
-        # For pure literal patterns without anchors, use SIMD string search
-        if not has_start_anchor and not has_end_anchor and len_pattern > 0:
-            self.simd_string_search = SIMDStringSearch(pattern)
-            self.is_pure_literal = True
-            # Still create a minimal DFA for compatibility
-            self._create_accepting_state()
-            return
-
         # Create states: one for each character + one final accepting state
         # Set up transitions for each character in the pattern
         for i in range(len_pattern):
@@ -348,11 +340,11 @@ struct DFAEngine(Engine):
                 pattern_str = "[a-zA-Z0-9]"
             elif char_class == " \t\n\r\f\v":
                 pattern_str = "\\s"
-            
+
             if pattern_str:
                 self.simd_char_pattern = pattern_str
                 self.simd_char_matcher = CharacterClassSIMD(char_class)
-        
+
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
             var start_state = DFAState(is_accepting=True, match_length=0)
@@ -890,19 +882,7 @@ struct DFAEngine(Engine):
         if start_pos > len(text):
             return None
 
-        # Use SIMD search for pure literal patterns
-        if self.is_pure_literal and self.simd_string_search:
-            var searcher = self.simd_string_search.value()
-            var match_pos = searcher.search(text, start_pos)
-
-            if match_pos != -1:
-                # For match_first (require_exact_position=True), match must be at start_pos
-                if require_exact_position and match_pos != start_pos:
-                    return None
-
-                var pattern_len = len(searcher.pattern)
-                return Match(0, match_pos, match_pos + pattern_len, text)
-            return None
+        # Skip SIMD path - removed for performance
 
         # Try SIMD matching for simple character class patterns
         if self.simd_char_matcher and len(self.states) > 0:
@@ -982,15 +962,7 @@ struct DFAEngine(Engine):
                 matches.append(match_result.value())
             return matches
 
-        # Use SIMD search for pure literal patterns
-        if self.is_pure_literal and self.simd_string_search:
-            var searcher = self.simd_string_search.value()
-            var positions = searcher.search_all(text)
-            var pattern_len = len(searcher.pattern)
-            for i in range(len(positions)):
-                var pos = positions[i]
-                matches.append(Match(0, pos, pos + pattern_len, text))
-            return matches
+        # Skip SIMD path - removed for performance
 
         var pos = 0
         var text_len = len(text)

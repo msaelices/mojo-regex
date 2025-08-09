@@ -12,6 +12,7 @@ from regex.simd_ops import (
     create_whitespace,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
+from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
 struct NFAEngine(Engine):
@@ -44,28 +45,39 @@ struct NFAEngine(Engine):
         try:
             self.regex = parse(pattern)
 
-            # Extract literals for optimization
+            # Only apply literal optimization for patterns that benefit from it
+            # Skip for simple patterns that will use DFA anyway
             if self.regex:
                 var ast = self.regex.value()
-                var literal_set = extract_literals(ast)
+                var analyzer = PatternAnalyzer()
+                var complexity = analyzer.classify(ast)
 
-                # Use best literal if available
-                if literal_set.best_literal:
-                    var best = literal_set.best_literal.value()
-                    if best.is_prefix and best.get_literal_len() > 1:
-                        # Use prefix literal for optimization
-                        self.literal_prefix = best.get_literal()
-                        self.has_literal_optimization = True
-                        self.literal_searcher = TwoWaySearcher(
-                            self.literal_prefix
-                        )
-                    elif best.is_required and best.get_literal_len() > 2:
-                        # Use required literal even if not prefix (for general prefiltering)
-                        self.literal_prefix = best.get_literal()
-                        self.has_literal_optimization = True
-                        self.literal_searcher = TwoWaySearcher(
-                            self.literal_prefix
-                        )
+                # Only apply literal optimization for MEDIUM or COMPLEX patterns
+                # SIMPLE patterns use DFA which is already optimized
+                # This has a HUGE impact on performance
+                if complexity.value != PatternComplexity.SIMPLE:
+                    var literal_set = extract_literals(ast)
+
+                    # Use best literal if available and significant
+                    ref best_literal = literal_set.get_best_literal()
+                    if best_literal:
+                        var best = best_literal.value()
+                        # Require longer literals to justify overhead
+                        if best.is_prefix and best.get_literal_len() > 3:
+                            # Use prefix literal for optimization
+                            self.literal_prefix = best.get_literal()
+                            self.has_literal_optimization = True
+                            self.literal_searcher = TwoWaySearcher(
+                                self.literal_prefix
+                            )
+                        elif best.is_required and best.get_literal_len() > 4:
+                            # Use required literal for prefiltering
+                            # Require even longer literals for non-prefix optimization
+                            self.literal_prefix = best.get_literal()
+                            self.has_literal_optimization = True
+                            self.literal_searcher = TwoWaySearcher(
+                                self.literal_prefix
+                            )
         except:
             self.regex = None
 
@@ -222,28 +234,6 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        # # For match_first (Python's re.match), we can use literal optimization
-        # # but only to quickly reject non-matching texts
-        # if self.has_literal_optimization and self.literal_searcher:
-        #     var searcher = self.literal_searcher.value()
-        #
-        #     # Check if the literal exists at all in the text starting from our position
-        #     var literal_pos = searcher.search(text, start)
-        #     if literal_pos == -1:
-        #         # No literal found, so pattern cannot match
-        #         return None
-        #
-        #     # For prefix literals, they must be at the start position
-        #     if self._is_prefix_literal() and literal_pos != start:
-        #         return None
-        #
-        #     # For non-prefix literals, they must be reachable from start
-        #     # (within the maximum possible match length from start)
-        #     if not self._is_prefix_literal():
-        #         # Conservative check: if literal is too far from start, pattern can't match
-        #         if literal_pos > start + len(text):
-        #             return None
-
         # Try to match at the exact start position only (like Python's re.match)
         # Use match_first_mode for optimized early termination
         var result = self._match_node(
@@ -357,23 +347,25 @@ struct NFAEngine(Engine):
         # Simple heuristic: if pattern starts with the literal, it's a prefix
         return self.pattern.startswith(self.literal_prefix)
 
-    fn _create_range_matcher(self, range_pattern: String) -> Optional[CharacterClassSIMD]:
+    fn _create_range_matcher(
+        self, range_pattern: String
+    ) -> Optional[CharacterClassSIMD]:
         """Create SIMD matcher for a range pattern.
-        
+
         Args:
             range_pattern: The range pattern string (e.g., "[a-z]" or "abcdefg...").
-        
+
         Returns:
             Optional SIMD matcher for the pattern.
         """
         # Try to create a SIMD matcher for common patterns
         var char_class = String()
-        
+
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             # It's a pattern like "[a-z]", need to expand it
             var inner = range_pattern[1:-1]
-            
+
             # Handle common patterns
             if inner == "a-z":
                 char_class = "abcdefghijklmnopqrstuvwxyz"
@@ -382,23 +374,26 @@ struct NFAEngine(Engine):
             elif inner == "0-9":
                 char_class = "0123456789"
             elif inner == "a-zA-Z":
-                char_class = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                char_class = (
+                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                )
             elif inner == "a-zA-Z0-9":
                 char_class = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
             else:
                 # More complex pattern, use helper to expand
                 from regex.dfa import expand_character_range
+
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns
                 char_class = String()
         else:
             # Already expanded
             char_class = range_pattern
-        
+
         # Create SIMD matcher
         if char_class:
             return CharacterClassSIMD(char_class)
-        
+
         return None
 
     fn _match_contains_literal(
@@ -608,14 +603,16 @@ struct NFAEngine(Engine):
 
         if ast.get_value():
             var range_pattern = ast.get_value().value()
-            
+
             # Try to use SIMD matcher for common patterns
             var simd_matcher = self._create_range_matcher(String(range_pattern))
             if simd_matcher:
                 ch_found = simd_matcher.value().contains(ch_code)
             else:
                 # Fallback to regular range matching
-                ch_found = ast._is_char_in_range(String(str[str_i]), range_pattern)
+                ch_found = ast._is_char_in_range(
+                    String(str[str_i]), range_pattern
+                )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -977,7 +974,10 @@ struct NFAEngine(Engine):
 
         # Try SIMD optimization for quantified character classes
         from regex.ast import DIGIT, SPACE, RANGE
-        if ast.type in [DIGIT, SPACE, RANGE] and (min_matches > 1 or max_matches != 1):
+
+        if ast.type in [DIGIT, SPACE, RANGE] and (
+            min_matches > 1 or max_matches != 1
+        ):
             var simd_result = self._apply_quantifier_simd(
                 ast, str, str_i, min_matches, max_matches
             )
@@ -1017,21 +1017,21 @@ struct NFAEngine(Engine):
         max_matches: Int,
     ) -> Tuple[Bool, Int]:
         """Apply quantifier using SIMD for faster bulk matching.
-        
+
         Args:
             ast: The AST node (DIGIT, SPACE, or RANGE).
             str: Input string.
             str_i: Current position.
             min_matches: Minimum required matches.
             max_matches: Maximum allowed matches (-1 for unlimited).
-        
+
         Returns:
             Tuple of (success, final_position).
         """
         from regex.ast import DIGIT, SPACE, RANGE
-        
+
         var simd_matcher: Optional[CharacterClassSIMD] = None
-        
+
         # Get appropriate SIMD matcher
         if ast.type == DIGIT:
             simd_matcher = create_ascii_digits()
@@ -1040,32 +1040,32 @@ struct NFAEngine(Engine):
         elif ast.type == RANGE and ast.get_value():
             var range_pattern = String(ast.get_value().value())
             simd_matcher = self._create_range_matcher(range_pattern)
-        
+
         if not simd_matcher:
             return (False, str_i)
-        
+
         var matcher = simd_matcher.value()
         var pos = str_i
         var match_count = 0
         var actual_max = max_matches
         if actual_max == -1:
             actual_max = len(str) - str_i
-        
+
         # Count consecutive matching characters
         while pos < len(str) and match_count < actual_max:
             var ch_code = ord(str[pos])
             var matches = matcher.contains(ch_code)
-            
+
             # For negated logic in RANGE
             if ast.type == RANGE and not ast.positive_logic:
                 matches = not matches
-            
+
             if matches:
                 match_count += 1
                 pos += 1
             else:
                 break
-        
+
         # Check if we satisfied the quantifier
         if match_count >= min_matches:
             return (True, pos)
