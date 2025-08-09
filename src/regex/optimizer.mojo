@@ -148,8 +148,8 @@ struct PatternAnalyzer:
             info.literal_prefix_length = len(prefix)
 
         # Check for required literals
-        if literal_set.best_literal:
-            var best = literal_set.best_literal.value()
+        if literal_set.get_best_literal():
+            var best = literal_set.get_best_literal().value()
             if best.is_required:
                 info.has_required_literal = True
                 info.required_literal_length = best.get_literal_len()
