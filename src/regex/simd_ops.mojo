@@ -3,6 +3,16 @@ SIMD-optimized operations for high-performance regex matching.
 
 This module leverages Mojo's SIMD capabilities to vectorize character operations,
 providing significant speedups for character class matching and string scanning.
+
+Hardware Requirements for Optimal Performance:
+- SSE3/SSSE3: Required for 16-byte _dynamic_shuffle operations (pshufb instruction)
+- AVX2: Required for 32-byte _dynamic_shuffle operations (vpshufb instruction)
+- AVX-512: Future support possible for 64-byte operations
+
+The module automatically adapts to the available SIMD width:
+- SIMD_WIDTH == 16: Uses SSE shuffle operations (most x86-64 CPUs)
+- SIMD_WIDTH == 32: Uses AVX2 shuffle operations (modern x86-64 CPUs since ~2013)
+- Other widths: Falls back to scalar or sub-optimal vectorized operations
 """
 
 from algorithm import vectorize
@@ -34,7 +44,10 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         # Use shuffle optimization for larger character classes (empirically determined threshold)
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
-        self.use_shuffle = self.size_hint > 3 and SIMD_WIDTH == 16
+        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
+        self.use_shuffle = self.size_hint > 3 and (
+            SIMD_WIDTH == 16 or SIMD_WIDTH == 32
+        )
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -56,7 +69,10 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         self.size_hint = end_code - start_code + 1
         # Character ranges typically benefit from shuffle optimization
-        self.use_shuffle = self.size_hint > 3 and SIMD_WIDTH == 16
+        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
+        self.use_shuffle = self.size_hint > 3 and (
+            SIMD_WIDTH == 16 or SIMD_WIDTH == 32
+        )
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
@@ -178,9 +194,10 @@ struct CharacterClassSIMD(Copyable, Movable):
         if self.use_shuffle:
 
             @parameter
-            if SIMD_WIDTH == 16:
-                # Fast path: use _dynamic_shuffle for 16-byte chunks
+            if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
+                # Fast path: use _dynamic_shuffle for 16-byte (SSE) or 32-byte (AVX2) chunks
                 # The lookup table acts as our shuffle table
+                # Hardware support: SSE3/SSSE3 for 16-byte, AVX2 for 32-byte
                 var result = self.lookup_table._dynamic_shuffle(chunk)
                 return result != 0
             else:
