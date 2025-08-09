@@ -66,10 +66,13 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         self.size_hint = len(char_class)
 
-        # Use shuffle optimization for larger character classes (empirically determined threshold)
+        # Use shuffle optimization for medium-sized character classes
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
-        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
+        # For large classes (>32 chars like alphanumeric with 62 chars), shuffle becomes inefficient
+        # Optimal range for shuffle: 4-32 characters
+        self.use_shuffle = (
+            self.size_hint > 3 and self.size_hint <= 32 and (USE_SHUFFLE)
+        )
 
         # Set bits for each character in the class
         for i in range(len(char_class)):

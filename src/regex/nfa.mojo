@@ -382,21 +382,19 @@ struct NFAEngine(Engine):
 
             # Handle common patterns with specialized matchers
             if inner == "a-z":
-                # For now, still use CharacterClassSIMD but could return RangeBasedMatcher
                 char_class = "abcdefghijklmnopqrstuvwxyz"
             elif inner == "A-Z":
                 char_class = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             elif inner == "0-9":
-                # Could use create_digit_matcher() here but keeping CharacterClassSIMD for compatibility
                 char_class = "0123456789"
             elif inner == "a-zA-Z":
-                # Could use create_alpha_matcher() here
                 char_class = (
                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                 )
             elif inner == "a-zA-Z0-9":
-                # Could use create_alnum_matcher() here
-                char_class = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+                # Return None to signal that specialized matcher should be used
+                # This will be handled in _apply_quantifier_simd
+                return None
             else:
                 # More complex pattern, use helper to expand
                 from regex.dfa import expand_character_range
@@ -622,15 +620,22 @@ struct NFAEngine(Engine):
         if ast.get_value():
             var range_pattern = ast.get_value().value()
 
-            # Try to use SIMD matcher for common patterns
-            var simd_matcher = self._create_range_matcher(String(range_pattern))
-            if simd_matcher:
-                ch_found = simd_matcher.value().contains(ch_code)
+            # Check for alphanumeric pattern first
+            if range_pattern == "[a-zA-Z0-9]":
+                var alnum_matcher = get_alnum_matcher()
+                ch_found = alnum_matcher.contains(ch_code)
             else:
-                # Fallback to regular range matching
-                ch_found = ast._is_char_in_range(
-                    String(str[str_i]), range_pattern
+                # Try to use SIMD matcher for other patterns
+                var simd_matcher = self._create_range_matcher(
+                    String(range_pattern)
                 )
+                if simd_matcher:
+                    ch_found = simd_matcher.value().contains(ch_code)
+                else:
+                    # Fallback to regular range matching
+                    ch_found = ast._is_char_in_range(
+                        String(str[str_i]), range_pattern
+                    )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -997,8 +1002,9 @@ struct NFAEngine(Engine):
             var simd_result = self._apply_quantifier_simd(
                 ast, str, str_i, min_matches, max_matches
             )
-            if simd_result[0]:
-                return simd_result
+            # Always return SIMD result when SIMD optimization is used
+            # Don't fall through to regular matching
+            return simd_result
 
         # Use regular greedy matching, but with early termination for match_first_mode
         var matches_count = 0
@@ -1059,16 +1065,16 @@ struct NFAEngine(Engine):
             )
         elif ast.type == RANGE and ast.get_value():
             var range_pattern = String(ast.get_value().value())
-            var range_matcher = self._create_range_matcher(range_pattern)
-            if range_matcher:
-                var matcher = range_matcher.value()
-                # Handle negated logic
+
+            # Check for alphanumeric pattern that should use RangeBasedMatcher
+            if range_pattern == "[a-zA-Z0-9]":
+                var alnum_matcher = get_alnum_matcher()
                 if ast.positive_logic:
                     return apply_quantifier_simd_generic(
-                        matcher, str, str_i, min_matches, max_matches
+                        alnum_matcher, str, str_i, min_matches, max_matches
                     )
                 else:
-                    # For negated ranges, we need custom logic
+                    # For negated alphanumeric, use custom logic
                     var pos = str_i
                     var match_count = 0
                     var actual_max = max_matches
@@ -1077,7 +1083,7 @@ struct NFAEngine(Engine):
 
                     while pos < len(str) and match_count < actual_max:
                         var ch_code = ord(str[pos])
-                        if not matcher.contains(ch_code):  # Negated
+                        if not alnum_matcher.contains(ch_code):  # Negated
                             match_count += 1
                             pos += 1
                         else:
@@ -1087,6 +1093,35 @@ struct NFAEngine(Engine):
                         return (True, pos)
                     else:
                         return (False, str_i)
+            else:
+                var range_matcher = self._create_range_matcher(range_pattern)
+                if range_matcher:
+                    var matcher = range_matcher.value()
+                    # Handle negated logic
+                    if ast.positive_logic:
+                        return apply_quantifier_simd_generic(
+                            matcher, str, str_i, min_matches, max_matches
+                        )
+                    else:
+                        # For negated ranges, we need custom logic
+                        var pos = str_i
+                        var match_count = 0
+                        var actual_max = max_matches
+                        if actual_max == -1:
+                            actual_max = len(str) - str_i
+
+                        while pos < len(str) and match_count < actual_max:
+                            var ch_code = ord(str[pos])
+                            if not matcher.contains(ch_code):  # Negated
+                                match_count += 1
+                                pos += 1
+                            else:
+                                break
+
+                        if match_count >= min_matches:
+                            return (True, pos)
+                        else:
+                            return (False, str_i)
 
         return (False, str_i)
 
