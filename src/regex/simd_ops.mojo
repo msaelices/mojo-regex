@@ -442,11 +442,11 @@ struct TwoWaySearcher(Copyable & Movable):
         # For the Two-Way algorithm to work correctly, we need a proper critical factorization.
         # The current simplified approach causes the algorithm to skip potential matches.
         # For now, we'll use a more conservative approach that ensures correctness.
-        
+
         # The critical position should be computed using maximal suffix,
         # but for correctness we can use position 1 which guarantees we won't skip matches
         self.critical_pos = 1 if n > 1 else 0
-        
+
         # Compute the actual period of the pattern
         var period = 1
         var k = 1
@@ -458,7 +458,7 @@ struct TwoWaySearcher(Copyable & Movable):
                 period = k
                 break
             k += 1
-        
+
         self.period = period
 
     fn search(self, text: String, start: Int = 0) -> Int:
