@@ -20,6 +20,7 @@ from sys.info import simdwidthof
 
 # SIMD width for character operations (uint8)
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
 
 @register_passable("trivial")
@@ -45,9 +46,7 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Use shuffle optimization for larger character classes (empirically determined threshold)
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (
-            SIMD_WIDTH == 16 or SIMD_WIDTH == 32
-        )
+        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -70,9 +69,7 @@ struct CharacterClassSIMD(Copyable, Movable):
         self.size_hint = end_code - start_code + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (
-            SIMD_WIDTH == 16 or SIMD_WIDTH == 32
-        )
+        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
