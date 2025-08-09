@@ -18,6 +18,10 @@ struct CharacterClassSIMD(Copyable, Movable):
 
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
+    var size_hint: Int
+    """Number of characters in the class for optimization decisions."""
+    var use_shuffle: Bool
+    """Whether to use shuffle optimization based on pattern characteristics."""
 
     fn __init__(out self, owned char_class: String):
         """Initialize SIMD character class matcher.
@@ -26,6 +30,11 @@ struct CharacterClassSIMD(Copyable, Movable):
             char_class: String containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.size_hint = len(char_class)
+
+        # Use shuffle optimization for larger character classes (empirically determined threshold)
+        # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
+        self.use_shuffle = self.size_hint > 3 and SIMD_WIDTH == 16
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -44,6 +53,10 @@ struct CharacterClassSIMD(Copyable, Movable):
 
         var start_code = max(ord(start_char), 0)
         var end_code = min(ord(end_char), 255)
+
+        self.size_hint = end_code - start_code + 1
+        # Character ranges typically benefit from shuffle optimization
+        self.use_shuffle = self.size_hint > 3 and SIMD_WIDTH == 16
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
@@ -161,35 +174,48 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # For small chunks or when _dynamic_shuffle isn't optimal,
-        # we need to check if we can use the fast path
-        @parameter
-        if SIMD_WIDTH == 32:
-            # Fast path: use _dynamic_shuffle for 16-byte chunks
-            # The lookup table acts as our shuffle table
-            var result = self.lookup_table._dynamic_shuffle(chunk)
-            return result != 0
+        # Use hybrid approach based on pattern characteristics
+        if self.use_shuffle:
+
+            @parameter
+            if SIMD_WIDTH == 16:
+                # Fast path: use _dynamic_shuffle for 16-byte chunks
+                # The lookup table acts as our shuffle table
+                var result = self.lookup_table._dynamic_shuffle(chunk)
+                return result != 0
+            else:
+                # Fallback for other sizes - still avoid the loop by using vectorized operations
+                var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+
+                # Process in 16-byte sub-chunks when possible
+                @parameter
+                for offset in range(0, SIMD_WIDTH, 16):
+
+                    @parameter
+                    if offset + 16 <= SIMD_WIDTH:
+                        var sub_chunk = chunk.slice[16, offset=offset]()
+                        var sub_result = self.lookup_table._dynamic_shuffle(
+                            sub_chunk
+                        )
+                        for i in range(16):
+                            matches[offset + i] = sub_result[i] != 0
+                    else:
+                        # Handle remaining elements
+                        for i in range(offset, SIMD_WIDTH):
+                            var char_code = Int(chunk[i])
+                            matches[i] = self.lookup_table[char_code] == 1
+
+                return matches
         else:
-            # Fallback for other sizes - still avoid the loop by using vectorized operations
+            # Simple lookup for small character classes - often faster for simple patterns
             var matches = SIMD[DType.bool, SIMD_WIDTH](False)
 
-            # Process in 16-byte sub-chunks when possible
+            # Unroll for better performance
             @parameter
-            for offset in range(0, SIMD_WIDTH, 16):
-
-                @parameter
-                if offset + 16 <= SIMD_WIDTH:
-                    var sub_chunk = chunk.slice[16, offset=offset]()
-                    var sub_result = self.lookup_table._dynamic_shuffle(
-                        sub_chunk
-                    )
-                    for i in range(16):
-                        matches[offset + i] = sub_result[i] != 0
-                else:
-                    # Handle remaining elements
-                    for i in range(offset, SIMD_WIDTH):
-                        var char_code = Int(chunk[i])
-                        matches[i] = self.lookup_table[char_code] == 1
+            for i in range(SIMD_WIDTH):
+                var char_code = Int(chunk[i])
+                if char_code < 256:
+                    matches[i] = self.lookup_table[char_code] == 1
 
             return matches
 
@@ -281,6 +307,10 @@ struct SIMDStringSearch(Copyable, Movable):
         var text_len = len(text)
         var pos = start
 
+        # For very short patterns (1-2 chars), use simpler approach
+        if self.pattern_length <= 2:
+            return self._search_short_pattern(text, start)
+
         # Use SIMD to quickly find potential matches by first character
         while pos + SIMD_WIDTH <= text_len:
             # Load chunk of text
@@ -304,6 +334,36 @@ struct SIMDStringSearch(Copyable, Movable):
             if self._verify_match(text, pos):
                 return pos
             pos += 1
+
+        return -1
+
+    fn _search_short_pattern(self, text: String, start: Int) -> Int:
+        """Optimized search for very short patterns (1-2 characters).
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
+        var text_len = len(text)
+
+        if self.pattern_length == 1:
+            # Single character - simple scan
+            var target_char = self.pattern[0]
+            for i in range(start, text_len):
+                if text[i] == target_char:
+                    return i
+        elif self.pattern_length == 2:
+            # Two characters - check pairs
+            if text_len - start < 2:
+                return -1
+            var first_char = self.pattern[0]
+            var second_char = self.pattern[1]
+            for i in range(start, text_len - 1):
+                if text[i] == first_char and text[i + 1] == second_char:
+                    return i
 
         return -1
 

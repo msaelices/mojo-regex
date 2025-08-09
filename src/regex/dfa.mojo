@@ -281,6 +281,12 @@ struct DFAEngine(Engine):
             self._create_accepting_state()
             return
 
+        # For pure literal patterns without anchors, use SIMD string search
+        if not has_start_anchor and not has_end_anchor and len_pattern > 0:
+            self.is_pure_literal = True
+            self.simd_string_search = SIMDStringSearch(pattern)
+            # Still create DFA states as fallback
+
         # Create states: one for each character + one final accepting state
         # Set up transitions for each character in the pattern
         for i in range(len_pattern):
@@ -882,7 +888,22 @@ struct DFAEngine(Engine):
         if start_pos > len(text):
             return None
 
-        # Skip SIMD path - removed for performance
+        # Fast path for pure literal patterns using SIMD
+        if self.is_pure_literal and self.simd_string_search:
+            var searcher = self.simd_string_search.value()
+            if require_exact_position:
+                # For match_first, must match at exact position
+                if searcher._verify_match(text, start_pos):
+                    var match_len = searcher.pattern_length
+                    return Match(0, start_pos, start_pos + match_len, text)
+                return None
+            else:
+                # For match_next, can search from position
+                var pos = searcher.search(text, start_pos)
+                if pos != -1:
+                    var match_len = searcher.pattern_length
+                    return Match(0, pos, pos + match_len, text)
+                return None
 
         # Try SIMD matching for simple character class patterns
         if self.simd_char_matcher and len(self.states) > 0:
