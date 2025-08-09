@@ -457,19 +457,6 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             length=self.end_idx - self.start_idx,
         )
 
-    @always_inline
-    fn get_immutable[
-        self_origin: MutableOrigin,
-    ](ref [self_origin]self) -> ref [
-        ImmutableOrigin.cast_from[self_origin]
-    ] Self:
-        """Return an immutable version of self.
-
-        Returns:
-            An immutable version of the same ASTNode.
-        """
-        return rebind[ImmutableOrigin.cast_from[self]](self)
-
 
 @always_inline
 fn Element[

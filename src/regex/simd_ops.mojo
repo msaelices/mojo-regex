@@ -415,11 +415,10 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-struct SIMDStringSearch(Copyable, Movable):
+@register_passable("trivial")
+struct SIMDStringSearch:
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern: String
-    """The literal string pattern to search for."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
@@ -431,7 +430,6 @@ struct SIMDStringSearch(Copyable, Movable):
         Args:
             pattern: Literal string pattern to search for.
         """
-        self.pattern = pattern
         self.pattern_length = len(pattern)
 
         # Create SIMD vector with first character of pattern
@@ -441,10 +439,11 @@ struct SIMDStringSearch(Copyable, Movable):
         else:
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](0)
 
-    fn search(self, text: String, start: Int = 0) -> Int:
+    fn search(self, pattern: String, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using SIMD acceleration.
 
         Args:
+            pattern: Pattern to search for.
             text: Text to search in.
             start: Starting position.
 
@@ -474,14 +473,14 @@ struct SIMDStringSearch(Copyable, Movable):
                 for i in range(SIMD_WIDTH):
                     if matches[i]:
                         var candidate_pos = pos + i
-                        if self._verify_match(text, candidate_pos):
+                        if self._verify_match(pattern, text, candidate_pos):
                             return candidate_pos
 
             pos += SIMD_WIDTH
 
         # Handle remaining characters
         while pos <= text_len - self.pattern_length:
-            if self._verify_match(text, pos):
+            if self._verify_match(pattern, text, pos):
                 return pos
             pos += 1
 
@@ -517,10 +516,11 @@ struct SIMDStringSearch(Copyable, Movable):
 
         return -1
 
-    fn _verify_match(self, text: String, pos: Int) -> Bool:
+    fn _verify_match(self, pattern: String, text: String, pos: Int) -> Bool:
         """Verify that pattern matches at given position.
 
         Args:
+            pattern: Pattern to match.
             text: Text to check.
             pos: Position to check.
 
@@ -531,15 +531,16 @@ struct SIMDStringSearch(Copyable, Movable):
             return False
 
         for i in range(self.pattern_length):
-            if String(text[pos + i]) != String(self.pattern[i]):
+            if String(text[pos + i]) != String(pattern[i]):
                 return False
 
         return True
 
-    fn search_all(self, text: String) -> List[Int]:
+    fn search_all(self, pattern: String, text: String) -> List[Int]:
         """Find all non-overlapping occurrences of pattern in text.
 
         Args:
+            pattern: Pattern to search for.
             text: Text to search.
 
         Returns:
@@ -549,7 +550,7 @@ struct SIMDStringSearch(Copyable, Movable):
         var start = 0
 
         while True:
-            var pos = self.search(text, start)
+            var pos = self.search(pattern, text, start)
             if pos == -1:
                 break
             positions.append(pos)
@@ -906,24 +907,26 @@ struct TwoWaySearcher(Copyable & Movable):
             self.period = 1
             return
 
-        # Simplified critical factorization
-        # For now, use middle position as critical position
-        # A full implementation would use maximal suffix computation
-        var crit_pos = n // 2
-        var period = n
+        # For the Two-Way algorithm to work correctly, we need a proper critical factorization.
+        # The current simplified approach causes the algorithm to skip potential matches.
+        # For now, we'll use a more conservative approach that ensures correctness.
 
-        # Check for actual period
-        for p in range(1, n):
-            var is_period = True
-            for i in range(n - p):
-                if self.pattern[i] != self.pattern[i + p]:
-                    is_period = False
-                    break
-            if is_period:
-                period = p
+        # The critical position should be computed using maximal suffix,
+        # but for correctness we can use position 1 which guarantees we won't skip matches
+        self.critical_pos = 1 if n > 1 else 0
+
+        # Compute the actual period of the pattern
+        var period = 1
+        var k = 1
+        while k < n:
+            var i = 0
+            while i < n - k and self.pattern[i] == self.pattern[i + k]:
+                i += 1
+            if i == n - k:
+                period = k
                 break
+            k += 1
 
-        self.critical_pos = crit_pos
         self.period = period
 
     fn search(self, text: String, start: Int = 0) -> Int:
@@ -948,9 +951,15 @@ struct TwoWaySearcher(Copyable & Movable):
         if n <= 4:
             return self._short_pattern_search(text, start)
 
+        # For patterns where Two-Way's complexity isn't needed, use SIMD search
+        # This ensures correctness while maintaining good performance
+        if n <= 32:
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(self.pattern, text, start)
+
+        # For longer patterns, use the Two-Way algorithm
         var pos = start
-        var memory = self.memory
-        var memory_fwd = self.memory_fwd
+        var memory = 0
 
         while pos <= m - n:
             # Check right part (from critical position to end)
@@ -962,7 +971,6 @@ struct TwoWaySearcher(Copyable & Movable):
             if mismatch_pos == n:
                 # Right part matches, check left part
                 i = self.critical_pos - 1
-                var left_match = True
 
                 while i >= 0 and text[pos + i] == self.pattern[i]:
                     i -= 1
@@ -1037,7 +1045,7 @@ struct TwoWaySearcher(Copyable & Movable):
         if n == 1:
             # Single character search
             var search = SIMDStringSearch(self.pattern)
-            return search.search(text, start)
+            return search.search(self.pattern, text, start)
 
         # For 2-4 byte patterns, use rolling comparison
         var pos = start

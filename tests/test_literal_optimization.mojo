@@ -27,14 +27,15 @@ fn test_literal_extraction() raises:
     var ast1 = parse("hello")
     var literals1 = extract_literals(ast1)
     assert_true(
-        literals1.best_literal.value().get_literal() == "hello",
+        literals1.get_best_literal().value().get_literal() == "hello",
         "Should extract 'hello' literal",
     )
     assert_true(
-        literals1.best_literal.value().is_prefix, "Should identify as prefix"
+        literals1.get_best_literal().value().is_prefix,
+        "Should identify as prefix",
     )
     assert_true(
-        literals1.best_literal.value().is_required, "Should be required"
+        literals1.get_best_literal().value().is_required, "Should be required"
     )
 
     # Test pattern with literal prefix
