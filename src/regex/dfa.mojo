@@ -35,6 +35,10 @@ from regex.simd_matchers import (
     RangeBasedMatcher,
     NibbleBasedMatcher,
 )
+from regex.parametric_nfa_helpers import (
+    apply_quantifier_simd_generic,
+    find_in_text_simd,
+)
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -336,20 +340,36 @@ struct DFAEngine(Engine):
             var pattern_str = String()
             if char_class == DIGITS or char_class == "0123456789":
                 pattern_str = "[0-9]"
+                # For now, keep using CharacterClassSIMD for compatibility
+                # In future: could use create_digit_matcher() with wrapper
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
             elif char_class == LOWERCASE_LETTERS:
                 pattern_str = "[a-z]"
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
             elif char_class == UPPERCASE_LETTERS:
                 pattern_str = "[A-Z]"
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
             elif char_class == ALL_LETTERS:
                 pattern_str = "[a-zA-Z]"
+                # For now, keep using CharacterClassSIMD for compatibility
+                # In future: could use create_alpha_matcher() with wrapper
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
             elif char_class == ALPHANUMERIC:
                 pattern_str = "[a-zA-Z0-9]"
+                # For now, keep using CharacterClassSIMD for compatibility
+                # In future: could use create_alnum_matcher() with wrapper
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
             elif char_class == " \t\n\r\f\v":
                 pattern_str = "\\s"
+                # For now, keep using CharacterClassSIMD for compatibility
+                # In future: could use create_whitespace_matcher() with wrapper
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
+            else:
+                # For other patterns, use standard CharacterClassSIMD
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
 
             if pattern_str:
                 self.simd_char_pattern = pattern_str
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters

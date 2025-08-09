@@ -961,7 +961,7 @@ struct TwoWaySearcher(Copyable & Movable):
         return -1
 
 
-struct MultiLiteralSearcher:
+struct MultiLiteralSearcher(Copyable, Movable):
     """SIMD-optimized multi-literal string searcher (Teddy-like algorithm).
 
     Can search for multiple short literals simultaneously using SIMD.

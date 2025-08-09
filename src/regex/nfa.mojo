@@ -382,18 +382,22 @@ struct NFAEngine(Engine):
             # It's a pattern like "[a-z]", need to expand it
             var inner = range_pattern[1:-1]
 
-            # Handle common patterns
+            # Handle common patterns with specialized matchers
             if inner == "a-z":
+                # For now, still use CharacterClassSIMD but could return RangeBasedMatcher
                 char_class = "abcdefghijklmnopqrstuvwxyz"
             elif inner == "A-Z":
                 char_class = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             elif inner == "0-9":
+                # Could use create_digit_matcher() here but keeping CharacterClassSIMD for compatibility
                 char_class = "0123456789"
             elif inner == "a-zA-Z":
+                # Could use create_alpha_matcher() here
                 char_class = (
                     "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
                 )
             elif inner == "a-zA-Z0-9":
+                # Could use create_alnum_matcher() here
                 char_class = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
             else:
                 # More complex pattern, use helper to expand
