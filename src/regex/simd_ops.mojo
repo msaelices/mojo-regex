@@ -161,14 +161,34 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # Use lookup table to check each character
-        var matches = SIMD[DType.bool, SIMD_WIDTH](False)
-
-        for i in range(SIMD_WIDTH):
-            var char_code = Int(chunk[i])
-            matches[i] = self.lookup_table[char_code] == 1
-
-        return matches
+        # For small chunks or when _dynamic_shuffle isn't optimal,
+        # we need to check if we can use the fast path
+        @parameter
+        if SIMD_WIDTH == 16:
+            # Fast path: use _dynamic_shuffle for 16-byte chunks
+            # The lookup table acts as our shuffle table
+            var result = self.lookup_table._dynamic_shuffle(chunk)
+            return result != 0
+        else:
+            # Fallback for other sizes - still avoid the loop by using vectorized operations
+            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+            
+            # Process in 16-byte sub-chunks when possible
+            @parameter
+            for offset in range(0, SIMD_WIDTH, 16):
+                @parameter
+                if offset + 16 <= SIMD_WIDTH:
+                    var sub_chunk = chunk.slice[16, offset=offset]()
+                    var sub_result = self.lookup_table._dynamic_shuffle(sub_chunk)
+                    for i in range(16):
+                        matches[offset + i] = sub_result[i] != 0
+                else:
+                    # Handle remaining elements
+                    for i in range(offset, SIMD_WIDTH):
+                        var char_code = Int(chunk[i])
+                        matches[i] = self.lookup_table[char_code] == 1
+            
+            return matches
 
 
 @always_inline
