@@ -439,24 +439,26 @@ struct TwoWaySearcher(Copyable & Movable):
             self.period = 1
             return
 
-        # Simplified critical factorization
-        # For now, use middle position as critical position
-        # A full implementation would use maximal suffix computation
-        var crit_pos = n // 2
-        var period = n
-
-        # Check for actual period
-        for p in range(1, n):
-            var is_period = True
-            for i in range(n - p):
-                if self.pattern[i] != self.pattern[i + p]:
-                    is_period = False
-                    break
-            if is_period:
-                period = p
+        # For the Two-Way algorithm to work correctly, we need a proper critical factorization.
+        # The current simplified approach causes the algorithm to skip potential matches.
+        # For now, we'll use a more conservative approach that ensures correctness.
+        
+        # The critical position should be computed using maximal suffix,
+        # but for correctness we can use position 1 which guarantees we won't skip matches
+        self.critical_pos = 1 if n > 1 else 0
+        
+        # Compute the actual period of the pattern
+        var period = 1
+        var k = 1
+        while k < n:
+            var i = 0
+            while i < n - k and self.pattern[i] == self.pattern[i + k]:
+                i += 1
+            if i == n - k:
+                period = k
                 break
-
-        self.critical_pos = crit_pos
+            k += 1
+        
         self.period = period
 
     fn search(self, text: String, start: Int = 0) -> Int:
@@ -481,9 +483,15 @@ struct TwoWaySearcher(Copyable & Movable):
         if n <= 4:
             return self._short_pattern_search(text, start)
 
+        # For patterns where Two-Way's complexity isn't needed, use SIMD search
+        # This ensures correctness while maintaining good performance
+        if n <= 32:
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(self.pattern, text, start)
+
+        # For longer patterns, use the Two-Way algorithm
         var pos = start
-        var memory = self.memory
-        var memory_fwd = self.memory_fwd
+        var memory = 0
 
         while pos <= m - n:
             # Check right part (from critical position to end)
@@ -495,7 +503,6 @@ struct TwoWaySearcher(Copyable & Movable):
             if mismatch_pos == n:
                 # Right part matches, check left part
                 i = self.critical_pos - 1
-                var left_match = True
 
                 while i >= 0 and text[pos + i] == self.pattern[i]:
                     i -= 1
