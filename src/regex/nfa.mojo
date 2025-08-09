@@ -975,9 +975,7 @@ struct NFAEngine(Engine):
         # Try SIMD optimization for quantified character classes
         from regex.ast import DIGIT, SPACE, RANGE
 
-        if ast.type in [DIGIT, SPACE, RANGE] and (
-            min_matches > 1 or max_matches != 1
-        ):
+        if ast.is_simd_optimizable(min_matches, max_matches):
             var simd_result = self._apply_quantifier_simd(
                 ast, str, str_i, min_matches, max_matches
             )
