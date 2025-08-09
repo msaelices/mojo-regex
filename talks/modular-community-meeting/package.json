@@ -1,0 +1,30 @@
+{
+  "name": "mojo-gpu-programming",
+  "version": "1.0.0",
+  "description": "Mojo GPU Programming Workshop Slides",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -p 3033",
+    "dev": "npx live-server --port=3034 --host=localhost --watch=slides.md,index.html",
+    "pdf": "npx serve . -p 3033 & echo 'Open http://localhost:3033?print-pdf in Chrome and Print to PDF'",
+    "export-pdf": "npx concurrently --kill-others --success first \"npx serve . -p 3033\" \"npx wait-on http://localhost:3033 && npx decktape reveal http://localhost:3033 mojo-gpu-workshop.pdf --chrome-arg=--no-sandbox --chrome-arg=--disable-web-security --chrome-arg=--disable-features=VizDisplayCompositor --chrome-arg=--font-render-hinting=none --chrome-arg=--enable-font-antialiasing --chrome-arg=--force-color-profile=srgb --chrome-arg=--disable-gpu --load-pause=3000 --size=1920x1080\""
+  },
+  "dependencies": {
+    "reveal.js": "^5.1.0",
+    "serve": "^14.2.3",
+    "live-server": "^1.2.2"
+  },
+  "devDependencies": {
+    "decktape": "^3.12.0",
+    "concurrently": "^8.2.2",
+    "wait-on": "^7.2.0"
+  },
+  "keywords": [
+    "mojo",
+    "gpu",
+    "workshop",
+    "reveal.js"
+  ],
+  "author": "Modular Team",
+  "license": "MIT"
+}
