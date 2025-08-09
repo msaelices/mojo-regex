@@ -127,30 +127,20 @@ struct NibbleBasedMatcher(SIMDMatcher, Copyable, Movable):
         return (low_match & high_match) != 0
 
 
-fn create_hex_digit_matcher() -> NibbleBasedMatcher:
-    """Create a nibble-based matcher for hex digits [0-9A-Fa-f].
+fn create_hex_digit_matcher() -> RangeBasedMatcher:
+    """Create a matcher for hex digits [0-9A-Fa-f].
+    
+    Note: Using range-based matcher for now as nibble-based approach
+    requires more complex bit manipulation for this specific pattern.
     
     Returns:
         Optimized matcher for hex digits.
     """
-    # For hex digits:
-    # - Digits '0'-'9': 0x30-0x39 (high nibble=3, low nibble=0-9)
-    # - Upper 'A'-'F': 0x41-0x46 (high nibble=4, low nibble=1-6)  
-    # - Lower 'a'-'f': 0x61-0x66 (high nibble=6, low nibble=1-6)
-    
-    # Low nibble LUT: valid if 0-9 or 1-6
-    var low_lut = SIMD[DType.uint8, 16](
-        0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,  # 0-7: all valid
-        0xFF, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   # 8-9 valid, A-F invalid
-    )
-    
-    # High nibble LUT: valid if nibble is 3 (digits), 4 (upper), or 6 (lower)
-    var high_lut = SIMD[DType.uint8, 16](
-        0x00, 0x00, 0x00, 0xFF, 0xFF, 0x00, 0xFF, 0x00,  # 3, 4, 6 are valid
-        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00   # rest invalid
-    )
-    
-    return NibbleBasedMatcher(low_lut, high_lut)
+    var matcher = RangeBasedMatcher()
+    matcher.add_range(ord("0"), ord("9"))
+    matcher.add_range(ord("A"), ord("F"))
+    matcher.add_range(ord("a"), ord("f"))
+    return matcher
 
 
 struct RangeBasedMatcher(SIMDMatcher, Copyable, Movable):
@@ -266,3 +256,64 @@ fn create_alnum_matcher() -> RangeBasedMatcher:
     matcher.add_range(ord("A"), ord("Z"))
     matcher.add_range(ord("0"), ord("9"))
     return matcher
+
+
+fn create_whitespace_matcher() -> NibbleBasedMatcher:
+    """Create a nibble-based matcher for whitespace characters.
+    
+    Matches: space (0x20), tab (0x09), newline (0x0A), carriage return (0x0D),
+    form feed (0x0C), vertical tab (0x0B).
+    
+    Returns:
+        Optimized matcher for whitespace characters.
+    """
+    # Whitespace characters:
+    # - Space ' ': 0x20 (high nibble=2, low nibble=0)
+    # - Tab '\t': 0x09 (high nibble=0, low nibble=9)
+    # - Newline '\n': 0x0A (high nibble=0, low nibble=A)
+    # - Vertical tab '\v': 0x0B (high nibble=0, low nibble=B)
+    # - Form feed '\f': 0x0C (high nibble=0, low nibble=C)
+    # - Carriage return '\r': 0x0D (high nibble=0, low nibble=D)
+    
+    # Low nibble LUT: valid for 0 (space), 9-D (tab, \n, \v, \f, \r)
+    var low_lut = SIMD[DType.uint8, 16](
+        0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,  # 0 valid
+        0x00, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x00, 0x00   # 9-D valid
+    )
+    
+    # High nibble LUT: valid for 0 (tab/newline/etc) and 2 (space)
+    var high_lut = SIMD[DType.uint8, 16](
+        0xFF, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00,  # 0, 2 valid
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    )
+    
+    return NibbleBasedMatcher(low_lut, high_lut)
+
+
+fn analyze_character_class_pattern(pattern: String) -> String:
+    """Analyze a character class pattern and determine the optimal SIMD strategy.
+    
+    Args:
+        pattern: Character class pattern (e.g., "[a-z]", "[0-9A-Fa-f]", etc.)
+        
+    Returns:
+        String indicating the optimal strategy: "range", "nibble", or "lookup".
+    """
+    # Check for common patterns
+    if pattern == "[0-9]" or pattern == "\\d":
+        return "range"
+    elif pattern == "[a-z]" or pattern == "[A-Z]":
+        return "range"
+    elif pattern == "[a-zA-Z]" or pattern == "[0-9a-zA-Z]" or pattern == "[a-zA-Z0-9]" or pattern == "\\w":
+        return "range"
+    elif pattern == "[0-9A-Fa-f]" or pattern == "[0-9a-fA-F]":
+        return "range"  # Using range-based for hex digits
+    elif pattern == "\\s":
+        return "nibble"
+    else:
+        # Check if it's a simple range
+        if pattern.startswith("[") and pattern.endswith("]") and "-" in pattern:
+            var inner = pattern[1:-1]
+            if len(inner) == 3 and inner[1] == "-":
+                return "range"
+        return "lookup"
