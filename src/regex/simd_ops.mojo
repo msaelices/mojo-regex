@@ -419,6 +419,8 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
 struct SIMDStringSearch:
     """SIMD-optimized string search for literal patterns."""
 
+    var pattern_ptr: UnsafePointer[Byte]
+    """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
@@ -430,6 +432,7 @@ struct SIMDStringSearch:
         Args:
             pattern: Literal string pattern to search for.
         """
+        self.pattern_ptr = pattern.unsafe_ptr()
         self.pattern_length = len(pattern)
 
         # Create SIMD vector with first character of pattern
@@ -439,11 +442,10 @@ struct SIMDStringSearch:
         else:
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](0)
 
-    fn search(self, pattern: String, text: String, start: Int = 0) -> Int:
+    fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using SIMD acceleration.
 
         Args:
-            pattern: Pattern to search for.
             text: Text to search in.
             start: Starting position.
 
@@ -473,14 +475,14 @@ struct SIMDStringSearch:
                 for i in range(SIMD_WIDTH):
                     if matches[i]:
                         var candidate_pos = pos + i
-                        if self._verify_match(pattern, text, candidate_pos):
+                        if self._verify_match(text, candidate_pos):
                             return candidate_pos
 
             pos += SIMD_WIDTH
 
         # Handle remaining characters
         while pos <= text_len - self.pattern_length:
-            if self._verify_match(pattern, text, pos):
+            if self._verify_match(text, pos):
                 return pos
             pos += 1
 
@@ -500,27 +502,28 @@ struct SIMDStringSearch:
 
         if self.pattern_length == 1:
             # Single character - simple scan
-            var target_char = self.pattern[0]
+            var target_char = self.pattern_ptr[][0]
             for i in range(start, text_len):
-                if text[i] == target_char:
+                if ord(text[i]) == Int(target_char):
                     return i
         elif self.pattern_length == 2:
             # Two characters - check pairs
             if text_len - start < 2:
                 return -1
-            var first_char = self.pattern[0]
-            var second_char = self.pattern[1]
+            var first_char = self.pattern_ptr[][0]
+            var second_char = self.pattern_ptr[][1]
             for i in range(start, text_len - 1):
-                if text[i] == first_char and text[i + 1] == second_char:
+                if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
+                    second_char
+                ):
                     return i
 
         return -1
 
-    fn _verify_match(self, pattern: String, text: String, pos: Int) -> Bool:
+    fn _verify_match(self, text: String, pos: Int) -> Bool:
         """Verify that pattern matches at given position.
 
         Args:
-            pattern: Pattern to match.
             text: Text to check.
             pos: Position to check.
 
@@ -531,16 +534,15 @@ struct SIMDStringSearch:
             return False
 
         for i in range(self.pattern_length):
-            if String(text[pos + i]) != String(pattern[i]):
+            if ord(text[pos + i]) != Int(self.pattern_ptr[][i]):
                 return False
 
         return True
 
-    fn search_all(self, pattern: String, text: String) -> List[Int]:
+    fn search_all(self, text: String) -> List[Int]:
         """Find all non-overlapping occurrences of pattern in text.
 
         Args:
-            pattern: Pattern to search for.
             text: Text to search.
 
         Returns:
@@ -550,7 +552,7 @@ struct SIMDStringSearch:
         var start = 0
 
         while True:
-            var pos = self.search(pattern, text, start)
+            var pos = self.search(text, start)
             if pos == -1:
                 break
             positions.append(pos)
@@ -955,7 +957,7 @@ struct TwoWaySearcher(Copyable & Movable):
         # This ensures correctness while maintaining good performance
         if n <= 32:
             var search = SIMDStringSearch(self.pattern)
-            return search.search(self.pattern, text, start)
+            return search.search(text, start)
 
         # For longer patterns, use the Two-Way algorithm
         var pos = start
@@ -1045,7 +1047,7 @@ struct TwoWaySearcher(Copyable & Movable):
         if n == 1:
             # Single character search
             var search = SIMDStringSearch(self.pattern)
-            return search.search(self.pattern, text, start)
+            return search.search(text, start)
 
         # For 2-4 byte patterns, use rolling comparison
         var pos = start
