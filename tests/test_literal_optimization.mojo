@@ -31,7 +31,8 @@ fn test_literal_extraction() raises:
         "Should extract 'hello' literal",
     )
     assert_true(
-        literals1.get_best_literal().value().is_prefix, "Should identify as prefix"
+        literals1.get_best_literal().value().is_prefix,
+        "Should identify as prefix",
     )
     assert_true(
         literals1.get_best_literal().value().is_required, "Should be required"
