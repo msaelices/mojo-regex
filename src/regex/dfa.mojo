@@ -27,11 +27,11 @@ from regex.tokens import (
 from regex.simd_ops import SIMDStringSearch, CharacterClassSIMD
 from regex.simd_matchers import (
     analyze_character_class_pattern,
-    create_digit_matcher,
-    create_alpha_matcher,
-    create_alnum_matcher,
-    create_whitespace_matcher,
-    create_hex_digit_matcher,
+    get_digit_matcher,
+    get_alpha_matcher,
+    get_alnum_matcher,
+    get_whitespace_matcher,
+    get_hex_digit_matcher,
     RangeBasedMatcher,
     NibbleBasedMatcher,
 )

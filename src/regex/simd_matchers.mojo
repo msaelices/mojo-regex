@@ -5,6 +5,16 @@ Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.htm
 """
 
 from sys.info import simdwidthof
+from sys import ffi
+from memory import UnsafePointer
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_HEX_DIGITS,
+)
 
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 
@@ -365,3 +375,125 @@ fn analyze_character_class_pattern(pattern: String) -> String:
             if len(inner) == 3 and inner[1] == "-":
                 return "range"
         return "lookup"
+
+
+# Global cache for RangeBasedMatcher instances
+alias RangeMatchers = Dict[Int, RangeBasedMatcher]
+alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
+    "RangeMatchers", RangeMatchers, _init_range_matchers
+]
+
+
+fn _init_range_matchers() -> RangeMatchers:
+    """Initialize the global range matchers dictionary."""
+    var matchers = RangeMatchers()
+    return matchers
+
+
+fn _get_range_matchers() -> UnsafePointer[RangeMatchers]:
+    """Returns a pointer to the global range matchers dictionary."""
+    var ptr = _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
+    return ptr
+
+
+# Global cache for NibbleBasedMatcher instances
+alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
+alias _NIBBLE_MATCHERS_GLOBAL = ffi._Global[
+    "NibbleMatchers", NibbleMatchers, _init_nibble_matchers
+]
+
+
+fn _init_nibble_matchers() -> NibbleMatchers:
+    """Initialize the global nibble matchers dictionary."""
+    var matchers = NibbleMatchers()
+    return matchers
+
+
+fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers]:
+    """Returns a pointer to the global nibble matchers dictionary."""
+    var ptr = _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
+    return ptr
+
+
+fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
+    """Create a new range matcher for the given type."""
+    var matcher = RangeBasedMatcher()
+
+    if matcher_type == SIMD_MATCHER_DIGITS:
+        matcher.add_range(ord("0"), ord("9"))
+    elif matcher_type == SIMD_MATCHER_ALPHA:
+        matcher.add_range(ord("a"), ord("z"))
+        matcher.add_range(ord("A"), ord("Z"))
+    elif matcher_type == SIMD_MATCHER_ALNUM:
+        matcher.add_range(ord("a"), ord("z"))
+        matcher.add_range(ord("A"), ord("Z"))
+        matcher.add_range(ord("0"), ord("9"))
+    elif matcher_type == SIMD_MATCHER_HEX_DIGITS:
+        matcher.add_range(ord("0"), ord("9"))
+        matcher.add_range(ord("A"), ord("F"))
+        matcher.add_range(ord("a"), ord("f"))
+
+    return matcher
+
+
+@always_inline
+fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
+    """Get a range matcher by type from the global cache.
+
+    Args:
+        matcher_type: One of the SIMD_MATCHER_* constants.
+
+    Returns:
+        The corresponding RangeBasedMatcher instance.
+    """
+    var matchers_ptr = _get_range_matchers()
+    var matchers = matchers_ptr[]
+
+    # Try to get from cache
+    try:
+        return matchers[matcher_type]
+    except:
+        # Create and cache the matcher
+        var matcher = _create_range_matcher_for_type(matcher_type)
+        matchers[matcher_type] = matcher
+        return matcher
+
+
+@always_inline
+fn get_digit_matcher() -> RangeBasedMatcher:
+    """Get cached digit matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_DIGITS)
+
+
+@always_inline
+fn get_alpha_matcher() -> RangeBasedMatcher:
+    """Get cached alpha matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_ALPHA)
+
+
+@always_inline
+fn get_alnum_matcher() -> RangeBasedMatcher:
+    """Get cached alphanumeric matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_ALNUM)
+
+
+@always_inline
+fn get_hex_digit_matcher() -> RangeBasedMatcher:
+    """Get cached hex digit matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_HEX_DIGITS)
+
+
+@always_inline
+fn get_whitespace_matcher() -> NibbleBasedMatcher:
+    """Get cached whitespace matcher instance."""
+    var matchers_ptr = _get_nibble_matchers()
+    var matchers = matchers_ptr[]
+
+    # Try to get from cache
+    try:
+        return matchers[SIMD_MATCHER_WHITESPACE]
+    except:
+        # Create and cache the matcher
+        var matcher = create_whitespace_matcher()
+        matchers[SIMD_MATCHER_WHITESPACE] = matcher
+        return matcher

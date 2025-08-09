@@ -17,10 +17,10 @@ from regex.simd_ops import (
     get_simd_matcher,
 )
 from regex.simd_matchers import (
-    create_digit_matcher,
-    create_whitespace_matcher,
-    create_alpha_matcher,
-    create_alnum_matcher,
+    get_digit_matcher,
+    get_whitespace_matcher,
+    get_alpha_matcher,
+    get_alnum_matcher,
     RangeBasedMatcher,
 )
 from regex.parametric_nfa_helpers import (
@@ -573,7 +573,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         # Use specialized SIMD whitespace matcher for better performance
-        var whitespace_matcher = create_whitespace_matcher()
+        var whitespace_matcher = get_whitespace_matcher()
         var ch_code = ord(str[str_i])
         if whitespace_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -596,7 +596,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         # Use specialized SIMD digit matcher for better performance
-        var digit_matcher = create_digit_matcher()
+        var digit_matcher = get_digit_matcher()
         var ch_code = ord(str[str_i])
         if digit_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -1050,12 +1050,12 @@ struct NFAEngine(Engine):
 
         # Use specialized matchers for better performance
         if ast.type == DIGIT:
-            var digit_matcher = create_digit_matcher()
+            var digit_matcher = get_digit_matcher()
             return apply_quantifier_simd_generic(
                 digit_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == SPACE:
-            var whitespace_matcher = create_whitespace_matcher()
+            var whitespace_matcher = get_whitespace_matcher()
             return apply_quantifier_simd_generic(
                 whitespace_matcher, str, str_i, min_matches, max_matches
             )
