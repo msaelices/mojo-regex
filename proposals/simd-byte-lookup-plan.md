@@ -148,6 +148,11 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
     return _get_or_create_simd_matcher(matcher_type)
 ```
 
+**Recent Enhancements**:
+- ✓ Global caching extended to specialized matchers (RangeBasedMatcher, NibbleBasedMatcher)
+- ✓ Cache implementations using `ffi._Global` for zero-allocation access
+- ✓ Getter functions for common patterns: `get_digit_matcher()`, `get_whitespace_matcher()`, etc.
+
 ### Additional SIMD Components
 1. **SIMDStringSearch**: Optimized literal string search using SIMD comparisons
 2. **TwoWaySearcher**: Two-Way algorithm enhanced with SIMD operations
@@ -181,16 +186,16 @@ While the current implementation provides solid performance improvements, there 
    ```
 
 2. **Implement specialized matchers**:
-   - `NibbleBasedMatcher` for hex digits, small sets ✓ (implemented in simd_matchers.mojo but not integrated)
-   - `RangeBasedMatcher` for contiguous ranges ✓ (implemented in simd_matchers.mojo but not integrated)
+   - `NibbleBasedMatcher` for hex digits, small sets ✓ (implemented and cached globally)
+   - `RangeBasedMatcher` for contiguous ranges ✓ (implemented, cached, and integrated in NFA/DFA)
    - `BitmaskMatcher` for arbitrary sets ❌
    - `SmallSetMatcher` for tiny sets (≤8 elements) ❌
 
-3. **Create matcher factory**: ✓ (partially - `get_simd_matcher` function with pre-defined types)
-   ```mojo
-   fn create_optimal_matcher(char_set: String) -> SIMDMatcher:
-       # Analyze character set and return optimal matcher
-   ```
+3. **Create matcher factory**: ✓ (partially - multiple factory functions implemented)
+   - `get_simd_matcher` for CharacterClassSIMD with pre-defined types
+   - `get_range_matcher` for cached RangeBasedMatcher instances
+   - `get_digit_matcher`, `get_alpha_matcher`, etc. for specific patterns
+   - Global caching with `ffi._Global` prevents repeated allocations
 
 ### Phase 2: Integration with Regex Engine (Week 2)
 
@@ -205,9 +210,10 @@ While the current implementation provides solid performance improvements, there 
    - Optimize character class compilation ❌
 
 3. **Update NFA engine**:
-   - Use SIMD matchers in `_match_digit`, `_match_range`, etc. ✓ (uses get_simd_matcher)
+   - Use SIMD matchers in `_match_digit`, `_match_range`, etc. ✓ (uses specialized matchers)
    - Add literal prefiltering with SIMD ✓ (TwoWaySearcher with SIMD)
    - Optimize backtracking with SIMD lookahead ❌
+   - Integrated parametric functions for zero-cost abstractions ✓
 
 ### Phase 3: Optimization and Specialization (Week 3)
 
@@ -226,7 +232,8 @@ While the current implementation provides solid performance improvements, there 
 3. **Memory layout optimization**:
    - Align data structures for SIMD access ❌
    - Minimize cache misses ✓ (global caching reduces repeated allocations)
-   - Use compact representations ❌ (still uses 256-byte lookup table)
+   - Use compact representations ✓ (RangeBasedMatcher uses 4 ranges max)
+   - Zero-allocation access patterns ✓ (ffi._Global caching)
 
 ### Phase 4: Testing and Benchmarking (Week 4)
 
@@ -424,8 +431,100 @@ fn _is_valid_utf8(span: Span[Byte]) -> Bool:
 4. **Risk**: Regression in edge cases
    - **Mitigation**: Extensive testing, gradual rollout, feature flags
 
+## Next Steps - Implementation Roadmap
+
+### Immediate Priorities (High Impact, Low Complexity)
+
+1. **Integrate Specialized Matchers More Deeply**:
+   - Replace CharacterClassSIMD usage with specialized matchers where applicable
+   - Use RangeBasedMatcher for all contiguous ranges (currently underutilized)
+   - Add heuristics in `_create_range_matcher` to choose optimal matcher type
+   - Benchmark impact of each matcher type on common patterns
+
+2. **Optimize Matcher Selection Heuristics**:
+   ```mojo
+   fn create_optimal_matcher(pattern: String) -> impl SIMDMatcher:
+       # Analyze pattern characteristics
+       if is_contiguous_ranges(pattern):
+           return get_range_matcher(...)
+       elif count_unique_chars(pattern) <= 16:
+           return create_nibble_matcher(...)
+       elif pattern_density(pattern) > 0.5:
+           return create_bitmask_matcher(...)
+       else:
+           return CharacterClassSIMD(pattern)
+   ```
+
+3. **Implement BitmaskMatcher** (for arbitrary character sets):
+   - Use bit manipulation for dense character sets
+   - Optimal for patterns with >50% density in ASCII range
+   - Example: punctuation characters, printable ASCII
+
+### Medium-term Goals (Moderate Complexity)
+
+4. **Compile-time Pattern Specialization**:
+   - Generate specialized code for common patterns at compile time
+   - Use Mojo's parametric features for zero-overhead abstractions
+   - Examples: `\d+`, `\s*`, `[a-zA-Z]+`
+
+5. **SIMD-aware Pattern Compilation**:
+   - Modify parser to generate SIMD-friendly AST nodes
+   - Add hints for optimal matcher selection during parsing
+   - Pre-compute nibble lookup tables at compile time
+
+6. **Memory Layout Optimizations**:
+   - Ensure 16-byte alignment for SIMD data structures
+   - Pack related data to improve cache locality
+   - Use compact representations for state machines
+
+### Long-term Vision (High Complexity, High Impact)
+
+7. **Advanced SIMD Techniques**:
+   - Implement parallel DFA state transitions using SIMD
+   - Use AVX-512 for 64-byte operations where available
+   - Explore GPU acceleration for massive text processing
+
+8. **Hybrid Matcher Strategies**:
+   - Combine multiple matchers for complex patterns
+   - Example: `[a-zA-Z0-9_.-]+@[a-zA-Z0-9.-]+` using both range and literal matchers
+   - Dynamic switching based on input characteristics
+
+## Performance Optimization Strategy
+
+### Current Bottlenecks
+1. **CharacterClassSIMD overhead**: Still using 256-byte lookup tables
+2. **Matcher selection**: Not using optimal matcher for each pattern type
+3. **Cache misses**: Large lookup tables cause cache pollution
+
+### Proposed Solutions
+1. **Replace CharacterClassSIMD gradually**:
+   - Start with digit and whitespace patterns (highest usage)
+   - Measure performance impact at each step
+   - Maintain backward compatibility
+
+2. **Implement incremental optimization**:
+   ```mojo
+   # Phase 1: Use specialized matchers for common patterns
+   if pattern == "\\d": return get_digit_matcher()
+   elif pattern == "\\s": return get_whitespace_matcher()
+
+   # Phase 2: Analyze patterns for optimal matcher
+   var analysis = analyze_pattern(pattern)
+   if analysis.is_range: return create_range_matcher(...)
+
+   # Phase 3: Full pattern analysis with heuristics
+   return create_optimal_matcher_with_heuristics(pattern)
+   ```
+
+3. **Benchmark-driven development**:
+   - Add micro-benchmarks for each matcher type
+   - Track performance regression for each change
+   - Use A/B testing for matcher selection heuristics
+
 ## Conclusion
 
 The discovery of Mojo's `_dynamic_shuffle` function significantly simplifies our implementation of SIMD byte lookup techniques. With native hardware support for `pshufb` (x86) and `tbl1` (ARM) instructions already available, we can achieve the promised 10-30x speedups for character class matching with less implementation complexity than originally anticipated.
+
+Recent improvements with global caching and parametric functions have laid a solid foundation. The next phase focuses on deeper integration of specialized matchers and implementing selection heuristics to automatically choose the optimal matcher for each pattern. This incremental approach ensures we maintain stability while progressively improving performance.
 
 The modular approach allows for incremental implementation and testing, ensuring stability while delivering performance improvements. The availability of `_dynamic_shuffle` means we can focus on the high-level matcher design rather than low-level SIMD intrinsics, making the implementation more maintainable and portable.
