@@ -18,6 +18,15 @@ The module automatically adapts to the available SIMD width:
 from algorithm import vectorize
 from builtin._location import __call_location
 from sys import ffi
+from regex.simd_matchers import (
+    SIMDMatcher,
+    NibbleBasedMatcher,
+    RangeBasedMatcher,
+    create_digit_matcher,
+    create_whitespace_matcher,
+    create_alpha_matcher,
+    create_alnum_matcher,
+)
 from sys.info import simdwidthof
 from regex.aliases import (
     SIMD_MATCHER_NONE,
@@ -38,7 +47,7 @@ alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
 
 @register_passable("trivial")
-struct CharacterClassSIMD(Copyable, Movable):
+struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
     """SIMD-optimized character class matcher."""
 
     var lookup_table: SIMD[DType.uint8, 256]
@@ -162,6 +171,64 @@ struct CharacterClassSIMD(Copyable, Movable):
         vectorize[closure, SIMD_WIDTH](text_len - pos)
 
         return matches
+
+    fn match_chunk[
+        size: Int
+    ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
+        """Check if characters in chunk match the character class.
+
+        Implements the SIMDMatcher trait interface.
+
+        Parameters:
+            size: Size of the SIMD chunk to process.
+
+        Args:
+            chunk: SIMD vector of characters to check.
+
+        Returns:
+            SIMD vector of booleans indicating matches.
+        """
+        # Use hybrid approach based on pattern characteristics
+        if self.use_shuffle:
+
+            @parameter
+            if size == 16 or size == 32:
+                # Fast path: use _dynamic_shuffle for optimal sizes
+                var result = self.lookup_table._dynamic_shuffle(chunk)
+                return result != 0
+            else:
+                # Fallback for other sizes
+                var matches = SIMD[DType.bool, size](False)
+
+                # Process in 16-byte sub-chunks when possible
+                @parameter
+                for offset in range(0, size, 16):
+
+                    @parameter
+                    if offset + 16 <= size:
+                        var sub_chunk = chunk.slice[16, offset=offset]()
+                        var sub_result = self.lookup_table._dynamic_shuffle(
+                            sub_chunk
+                        )
+                        for i in range(16):
+                            matches[offset + i] = sub_result[i] != 0
+                    else:
+                        # Handle remaining elements
+                        for i in range(offset, size):
+                            var char_code = Int(chunk[i])
+                            matches[i] = self.lookup_table[char_code] == 1
+
+                return matches
+        else:
+            # Simple lookup for small character classes
+            var matches = SIMD[DType.bool, size](False)
+
+            @parameter
+            for i in range(size):
+                var char_code = Int(chunk[i])
+                matches[i] = self.lookup_table[char_code] == 1
+
+            return matches
 
     fn count_matches(self, text: String, start: Int = 0, end: Int = -1) -> Int:
         """Count how many characters match this class in the given range.
@@ -624,6 +691,91 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
             matcher = CharacterClassSIMD("")
         matchers[matcher_type] = matcher
         return matcher
+
+
+fn create_optimal_simd_matcher(
+    pattern: String, pattern_type: String = ""
+) -> CharacterClassSIMD:
+    """Create the optimal SIMD matcher based on pattern analysis.
+
+    This is a temporary implementation that returns CharacterClassSIMD.
+    TODO: Return SIMDMatcher trait once we have better integration.
+
+    Args:
+        pattern: The character class pattern (e.g., "0123456789" or "[a-z]").
+        pattern_type: Optional hint about pattern type ("digits", "whitespace", etc.).
+
+    Returns:
+        The optimal matcher for the pattern.
+    """
+    # For now, we'll use the existing CharacterClassSIMD
+    # In the next phase, we'll integrate the specialized matchers
+
+    # Check for pre-defined types first
+    if pattern_type == "whitespace" or pattern == " \t\n\r\f\v":
+        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+    elif pattern_type == "digits" or pattern == "0123456789":
+        return get_simd_matcher(SIMD_MATCHER_DIGITS)
+    elif pattern == "abcdefghijklmnopqrstuvwxyz":
+        return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
+    elif pattern == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
+    elif pattern == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+        return get_simd_matcher(SIMD_MATCHER_ALPHA)
+    elif (
+        pattern
+        == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    ):
+        return get_simd_matcher(SIMD_MATCHER_ALNUM)
+
+    # TODO: Analyze pattern to determine if it's suitable for:
+    # - NibbleBasedMatcher (≤16 unique values)
+    # - RangeBasedMatcher (contiguous ranges)
+    # - BitmaskMatcher (arbitrary sets)
+
+    # For now, fall back to CharacterClassSIMD
+    return CharacterClassSIMD(pattern)
+
+
+fn process_text_with_matcher[
+    T: SIMDMatcher
+](matcher: T, text: String, start: Int = 0) -> List[Int]:
+    """Process text with any SIMD matcher implementation.
+
+    This is a generic function that works with any type implementing SIMDMatcher.
+
+    Parameters:
+        T: The concrete type implementing SIMDMatcher.
+
+    Args:
+        matcher: The SIMD matcher instance.
+        text: Text to process.
+        start: Starting position.
+
+    Returns:
+        List of positions where matches were found.
+    """
+    var matches = List[Int]()
+    var pos = start
+    var text_len = len(text)
+
+    while pos + 16 <= text_len:
+        var chunk = text.unsafe_ptr().load[width=16](pos)
+        var chunk_matches = matcher.match_chunk(chunk)
+
+        for i in range(16):
+            if chunk_matches[i]:
+                matches.append(pos + i)
+
+        pos += 16
+
+    # Handle remaining characters
+    while pos < text_len:
+        if matcher.contains(ord(text[pos])):
+            matches.append(pos)
+        pos += 1
+
+    return matches
 
 
 struct TwoWaySearcher(Copyable & Movable):

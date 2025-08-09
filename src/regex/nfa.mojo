@@ -16,6 +16,17 @@ from regex.simd_ops import (
     CharacterClassSIMD,
     get_simd_matcher,
 )
+from regex.simd_matchers import (
+    create_digit_matcher,
+    create_whitespace_matcher,
+    create_alpha_matcher,
+    create_alnum_matcher,
+    RangeBasedMatcher,
+)
+from regex.parametric_nfa_helpers import (
+    apply_quantifier_simd_generic,
+    find_in_text_simd,
+)
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
@@ -557,8 +568,8 @@ struct NFAEngine(Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        # Use SIMD whitespace matcher
-        var whitespace_matcher = get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+        # Use specialized SIMD whitespace matcher for better performance
+        var whitespace_matcher = create_whitespace_matcher()
         var ch_code = ord(str[str_i])
         if whitespace_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -580,8 +591,8 @@ struct NFAEngine(Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        # Use SIMD digit matcher
-        var digit_matcher = get_simd_matcher(SIMD_MATCHER_DIGITS)
+        # Use specialized SIMD digit matcher for better performance
+        var digit_matcher = create_digit_matcher()
         var ch_code = ord(str[str_i])
         if digit_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -1033,47 +1044,49 @@ struct NFAEngine(Engine):
         """
         from regex.ast import DIGIT, SPACE, RANGE
 
-        var simd_matcher: Optional[CharacterClassSIMD] = None
-
-        # Get appropriate SIMD matcher
+        # Use specialized matchers for better performance
         if ast.type == DIGIT:
-            simd_matcher = get_simd_matcher(SIMD_MATCHER_DIGITS)
+            var digit_matcher = create_digit_matcher()
+            return apply_quantifier_simd_generic(
+                digit_matcher, str, str_i, min_matches, max_matches
+            )
         elif ast.type == SPACE:
-            simd_matcher = get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+            var whitespace_matcher = create_whitespace_matcher()
+            return apply_quantifier_simd_generic(
+                whitespace_matcher, str, str_i, min_matches, max_matches
+            )
         elif ast.type == RANGE and ast.get_value():
             var range_pattern = String(ast.get_value().value())
-            simd_matcher = self._create_range_matcher(range_pattern)
+            var range_matcher = self._create_range_matcher(range_pattern)
+            if range_matcher:
+                var matcher = range_matcher.value()
+                # Handle negated logic
+                if ast.positive_logic:
+                    return apply_quantifier_simd_generic(
+                        matcher, str, str_i, min_matches, max_matches
+                    )
+                else:
+                    # For negated ranges, we need custom logic
+                    var pos = str_i
+                    var match_count = 0
+                    var actual_max = max_matches
+                    if actual_max == -1:
+                        actual_max = len(str) - str_i
 
-        if not simd_matcher:
-            return (False, str_i)
+                    while pos < len(str) and match_count < actual_max:
+                        var ch_code = ord(str[pos])
+                        if not matcher.contains(ch_code):  # Negated
+                            match_count += 1
+                            pos += 1
+                        else:
+                            break
 
-        var matcher = simd_matcher.value()
-        var pos = str_i
-        var match_count = 0
-        var actual_max = max_matches
-        if actual_max == -1:
-            actual_max = len(str) - str_i
+                    if match_count >= min_matches:
+                        return (True, pos)
+                    else:
+                        return (False, str_i)
 
-        # Count consecutive matching characters
-        while pos < len(str) and match_count < actual_max:
-            var ch_code = ord(str[pos])
-            var matches = matcher.contains(ch_code)
-
-            # For negated logic in RANGE
-            if ast.type == RANGE and not ast.positive_logic:
-                matches = not matches
-
-            if matches:
-                match_count += 1
-                pos += 1
-            else:
-                break
-
-        # Check if we satisfied the quantifier
-        if match_count >= min_matches:
-            return (True, pos)
-        else:
-            return (False, str_i)
+        return (False, str_i)
 
 
 fn findall(
