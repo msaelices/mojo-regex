@@ -7,25 +7,120 @@ providing significant speedups for character class matching and string scanning.
 
 from algorithm import vectorize
 from sys.info import simdwidthof
+from sys import ffi
+from collections import Dict
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_ALNUM_LOWER,
+    SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_HEX_DIGITS,
+    SIMD_MATCHER_HEX_LOWER,
+    SIMD_MATCHER_HEX_UPPER,
+    SIMD_MATCHER_CUSTOM,
+)
 
 # SIMD width for character operations (uint8)
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 
+# Global SIMD matchers dictionary type
+alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
 
-@register_passable("trivial")
+# Global SIMD matchers cache
+alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
+    "SIMDMatchers", SIMDMatchers, _init_simd_matchers
+]
+
+
+fn _init_simd_matchers() -> SIMDMatchers:
+    """Initialize the global SIMD matchers dictionary."""
+    var matchers = SIMDMatchers()
+    matchers[SIMD_MATCHER_WHITESPACE] = create_whitespace()
+    matchers[SIMD_MATCHER_DIGITS] = create_ascii_digits()
+    matchers[SIMD_MATCHER_ALPHA_LOWER] = create_ascii_lowercase()
+    matchers[SIMD_MATCHER_ALPHA_UPPER] = create_ascii_uppercase()
+    matchers[SIMD_MATCHER_ALPHA] = create_ascii_alpha()
+    matchers[SIMD_MATCHER_ALNUM] = create_ascii_alphanumeric()
+    matchers[SIMD_MATCHER_ALNUM_LOWER] = create_ascii_alnum_lower()
+    matchers[SIMD_MATCHER_ALNUM_UPPER] = create_ascii_alnum_upper()
+    matchers[SIMD_MATCHER_HEX_DIGITS] = create_hex_digits()
+    matchers[SIMD_MATCHER_HEX_LOWER] = create_hex_lower()
+    matchers[SIMD_MATCHER_HEX_UPPER] = create_hex_upper()
+    return matchers
+
+
+fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers]:
+    """Returns a pointer to the global SIMD matchers dictionary."""
+    var ptr = _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
+    return ptr
+
+
+fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
+    """Get a SIMD matcher by type from the global cache.
+
+    Args:
+        matcher_type: One of the SIMD_MATCHER_* constants.
+
+    Returns:
+        The corresponding CharacterClassSIMD matcher.
+    """
+    var matchers_ptr = _get_simd_matchers()
+    var matchers = matchers_ptr[]
+
+    # Try to get from cache
+    try:
+        return matchers[matcher_type]
+    except:
+        # Return empty matcher for unknown types
+        return CharacterClassSIMD("")
+
+
 struct CharacterClassSIMD(Copyable, Movable):
     """SIMD-optimized character class matcher."""
 
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
+    var is_digits: Bool
+    """True if this matcher is for digits [0-9]."""
+    var is_whitespace: Bool
+    """True if this matcher is for whitespace."""
+    var is_alpha_lower: Bool
+    """True if this matcher is for lowercase letters [a-z]."""
+    var is_alpha_upper: Bool
+    """True if this matcher is for uppercase letters [A-Z]."""
+    var is_alpha: Bool
+    """True if this matcher is for all letters [a-zA-Z]."""
+    var is_alnum: Bool
+    """True if this matcher is for alphanumeric [a-zA-Z0-9]."""
+    var is_simple_range: Bool
+    """True if this is a simple contiguous range."""
+    var range_start: UInt8
+    """Start of the range (if is_simple_range)."""
+    var range_end: UInt8
+    """End of the range (if is_simple_range)."""
 
-    fn __init__(out self, owned char_class: String):
+    @always_inline
+    fn __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
 
         Args:
             char_class: String containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.is_digits = False
+        self.is_whitespace = False
+        self.is_alpha_lower = False
+        self.is_alpha_upper = False
+        self.is_alpha = False
+        self.is_alnum = False
+        self.is_simple_range = False
+        self.range_start = 0
+        self.range_end = 0
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -33,7 +128,7 @@ struct CharacterClassSIMD(Copyable, Movable):
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
 
-    fn __init__(out self, start_char: String, end_char: String):
+    fn __init__(out self, start_char: StringSlice, end_char: StringSlice):
         """Initialize with a character range like 'a'-'z'.
 
         Args:
@@ -41,13 +136,31 @@ struct CharacterClassSIMD(Copyable, Movable):
             end_char: Last character in range.
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.is_digits = False
+        self.is_whitespace = False
+        self.is_alpha_lower = False
+        self.is_alpha_upper = False
+        self.is_alpha = False
+        self.is_alnum = False
 
-        var start_code = ord(start_char)
-        var end_code = ord(end_char)
+        var start_code = max(ord(start_char), 0)
+        var end_code = min(ord(end_char), 255)
+
+        # Mark this as a simple range for optimization
+        self.is_simple_range = True
+        self.range_start = UInt8(start_code)
+        self.range_end = UInt8(end_code)
 
         for char_code in range(start_code, end_code + 1):
-            if char_code >= 0 and char_code < 256:
-                self.lookup_table[char_code] = 1
+            self.lookup_table[char_code] = 1
+
+        # Set flags for common ranges
+        if start_code == ord("0") and end_code == ord("9"):
+            self.is_digits = True
+        elif start_code == ord("a") and end_code == ord("z"):
+            self.is_alpha_lower = True
+        elif start_code == ord("A") and end_code == ord("Z"):
+            self.is_alpha_upper = True
 
     fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -78,8 +191,12 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Process chunks using SIMD
         while pos + SIMD_WIDTH <= text_len:
             var matches = self._check_chunk_simd(text, pos)
+
+            # Use SIMD reduction to quickly check if any match exists
             if matches.reduce_or():
                 # Found at least one match in this chunk
+                # Find the first match position efficiently
+                @parameter
                 for i in range(SIMD_WIDTH):
                     if matches[i]:
                         return pos + i
@@ -162,15 +279,84 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # Use lookup table to check each character
-        var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+        # Use optimized SIMD operations for common character classes
+        if self.is_digits:
+            # For digits [0-9], use SIMD comparisons
+            var is_ge_0 = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("0"))
+            var is_le_9 = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("9"))
+            return is_ge_0 & is_le_9
 
-        for i in range(SIMD_WIDTH):
-            var char_code = Int(chunk[i])
-            if char_code >= 0 and char_code < 256:
-                matches[i] = self.lookup_table[char_code] == 1
+        elif self.is_alpha_lower:
+            # For lowercase letters [a-z]
+            var is_ge_a = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            var is_le_z = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z"))
+            return is_ge_a & is_le_z
 
-        return matches
+        elif self.is_alpha_upper:
+            # For uppercase letters [A-Z]
+            var is_ge_A = chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            var is_le_Z = chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z"))
+            return is_ge_A & is_le_Z
+
+        elif self.is_alpha:
+            # For all letters [a-zA-Z]
+            var is_lower = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z")))
+            var is_upper = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z")))
+            return is_lower | is_upper
+
+        elif self.is_alnum:
+            # For alphanumeric [a-zA-Z0-9]
+            var is_digit = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("0"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("9")))
+            var is_lower = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("a"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("z")))
+            var is_upper = (
+                chunk >= SIMD[DType.uint8, SIMD_WIDTH](ord("A"))
+            ) & (chunk <= SIMD[DType.uint8, SIMD_WIDTH](ord("Z")))
+            return is_digit | is_lower | is_upper
+
+        elif self.is_whitespace:
+            # For whitespace, check common whitespace characters
+            var is_space = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord(" "))
+            var is_tab = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\t"))
+            var is_newline = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\n"))
+            var is_cr = chunk == SIMD[DType.uint8, SIMD_WIDTH](ord("\r"))
+            return is_space | is_tab | is_newline | is_cr
+
+        else:
+            # For custom character classes, check if it's a simple range first
+            if self.is_simple_range:
+                # Use SIMD range comparison for simple ranges
+                var is_ge_start = chunk >= SIMD[DType.uint8, SIMD_WIDTH](
+                    self.range_start
+                )
+                var is_le_end = chunk <= SIMD[DType.uint8, SIMD_WIDTH](
+                    self.range_end
+                )
+                return is_ge_start & is_le_end
+            else:
+                # For complex custom classes, try to minimize lookup table access
+                # by using SIMD to filter out non-ASCII characters first
+                var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+
+                # Only check ASCII characters (0-127) since most character classes
+                # are ASCII-based. This avoids bounds checking in the inner loop.
+                var is_ascii = chunk < SIMD[DType.uint8, SIMD_WIDTH](128)
+
+                # Use the lookup table only for ASCII characters
+                @parameter
+                for i in range(SIMD_WIDTH):
+                    if is_ascii[i]:
+                        var char_code = Int(chunk[i])
+                        matches[i] = self.lookup_table[char_code] == 1
+
+                return matches
 
 
 @always_inline
@@ -195,6 +381,8 @@ fn create_ascii_digits() -> CharacterClassSIMD:
 fn create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Multiple disjoint ranges
+    result.is_alnum = True  # Mark as alphanumeric for optimization
 
     # Add lowercase letters
     for i in range(ord("a"), ord("z") + 1):
@@ -215,10 +403,120 @@ fn create_ascii_alphanumeric() -> CharacterClassSIMD:
 fn create_whitespace() -> CharacterClassSIMD:
     """Create SIMD matcher for whitespace characters [ \\t\\n\\r\\f\\v]."""
     var whitespace_chars = " \t\n\r\f\v"
-    return CharacterClassSIMD(whitespace_chars)
+    var result = CharacterClassSIMD(whitespace_chars)
+    result.is_whitespace = True
+    result.is_simple_range = False  # Whitespace is not a contiguous range
+    return result
 
 
-struct SIMDStringSearch:
+@always_inline
+fn create_ascii_alpha() -> CharacterClassSIMD:
+    """Create SIMD matcher for ASCII letters [a-zA-Z]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+    result.is_alpha = True  # Mark as alpha for optimization
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_lower() -> CharacterClassSIMD:
+    """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_upper() -> CharacterClassSIMD:
+    """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_digits() -> CharacterClassSIMD:
+    """Create SIMD matcher for hexadecimal digits [0-9a-fA-F]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Three disjoint ranges
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add lowercase hex letters
+    for i in range(ord("a"), ord("f") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase hex letters
+    for i in range(ord("A"), ord("F") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_lower() -> CharacterClassSIMD:
+    """Create SIMD matcher for lowercase hexadecimal [0-9a-f]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add lowercase hex letters
+    for i in range(ord("a"), ord("f") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_hex_upper() -> CharacterClassSIMD:
+    """Create SIMD matcher for uppercase hexadecimal [0-9A-F]."""
+    var result = CharacterClassSIMD("")
+    result.is_simple_range = False  # Two disjoint ranges
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase hex letters
+    for i in range(ord("A"), ord("F") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
     var pattern: String
@@ -306,13 +604,13 @@ struct SIMDStringSearch:
         return True
 
     fn search_all(self, text: String) -> List[Int]:
-        """Find all occurrences of pattern in text.
+        """Find all non-overlapping occurrences of pattern in text.
 
         Args:
             text: Text to search.
 
         Returns:
-            List of starting positions of all matches.
+            List of starting positions of all non-overlapping matches.
         """
         var positions = List[Int]()
         var start = 0
@@ -322,7 +620,8 @@ struct SIMDStringSearch:
             if pos == -1:
                 break
             positions.append(pos)
-            start = pos + 1
+            # Move past this match to avoid overlapping matches
+            start = pos + self.pattern_length
 
         return positions
 
@@ -402,3 +701,397 @@ fn simd_count_char(text: String, target_char: String) -> Int:
         pos += 1
 
     return count
+
+
+struct TwoWaySearcher(Copyable & Movable):
+    """SIMD-optimized Two-Way string search algorithm.
+
+    The Two-Way algorithm provides O(n) worst-case time complexity with O(1) space.
+    This implementation enhances it with SIMD for the search phase.
+    """
+
+    var pattern: String
+    """The pattern to search for."""
+    var period: Int
+    """The period of the pattern's critical factorization."""
+    var critical_pos: Int
+    """The position of the critical factorization."""
+
+    fn __init__(out self, pattern: String):
+        """Initialize the Two-Way searcher with a pattern.
+
+        Args:
+            pattern: The pattern to search for.
+        """
+        self.pattern = pattern
+        self.critical_pos = 0
+        self.period = 1
+
+        # Compute critical factorization
+        var n = len(self.pattern)
+        if n == 0:
+            return
+
+        # Compute critical position using maximal suffix
+        var (crit_pos, period) = self._compute_critical_factorization()
+        self.critical_pos = crit_pos
+        self.period = period
+
+    fn _compute_critical_factorization(self) -> Tuple[Int, Int]:
+        """Compute the critical factorization of the pattern.
+
+        Returns:
+            Tuple of (critical_position, period)
+        """
+        _ = len(self.pattern)  # Suppress unused warning
+
+        # Compute maximal suffix for both forward and reverse comparisons
+        var (i1, p1) = self._maximal_suffix(False)
+        var (i2, p2) = self._maximal_suffix(True)
+
+        # Choose the critical position
+        var crit_pos: Int
+        var period: Int
+
+        if i1 > i2:
+            crit_pos = i1
+            period = p1
+        else:
+            crit_pos = i2
+            period = p2
+
+        return (crit_pos, period)
+
+    fn _maximal_suffix(self, reverse_cmp: Bool) -> Tuple[Int, Int]:
+        """Compute maximal suffix of the pattern.
+
+        Args:
+            reverse_cmp: If True, use reverse lexicographic comparison
+
+        Returns:
+            Tuple of (position, period)
+        """
+        var n = len(self.pattern)
+        var ms = -1  # Maximal suffix
+        var j = 0  # Index for comparison
+        var k = 1  # Period
+        var p = 1  # Period of maximal suffix
+
+        while j + k < n:
+            var a = ord(self.pattern[j + k])
+            var b = ord(self.pattern[ms + k])
+
+            var cmp_result: Bool
+            if reverse_cmp:
+                cmp_result = a > b
+            else:
+                cmp_result = a < b
+
+            if cmp_result:
+                j += k
+                k = 1
+                p = j - ms
+            elif a == b:
+                if k != p:
+                    k += 1
+                else:
+                    j += p
+                    k = 1
+            else:
+                ms = j
+                j = ms + 1
+                k = 1
+                p = 1
+
+        return (ms + 1, p)
+
+    fn search(self, text: String, start: Int = 0) -> Int:
+        """Search for pattern in text using Two-Way algorithm with SIMD.
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
+        var n = len(self.pattern)
+        var m = len(text)
+
+        if n == 0:
+            return start
+        if n > m - start:
+            return -1
+
+        # For very short patterns, use simple SIMD search
+        if n <= 4:
+            return self._short_pattern_search(text, start)
+
+        # Two-Way algorithm main loop
+        var pos = start
+        var memory = 0
+
+        # Check if pattern is periodic
+        var is_periodic = self._is_prefix(self.pattern, self.period)
+
+        while pos <= m - n:
+            # First, compare the right part (from critical position to end)
+            var i = max(self.critical_pos, memory)
+
+            # Use SIMD-optimized comparison for the right part
+            var right_match_end = self._simd_compare_forward(text, pos, i)
+
+            if right_match_end < n:
+                # Mismatch in right part
+                pos += max(right_match_end - self.critical_pos + 1, 1)
+                memory = 0
+            else:
+                # Right part matches, now check left part using SIMD
+                var left_match_start = self._simd_compare_backward(
+                    text, pos, self.critical_pos - 1, memory
+                )
+
+                if left_match_start < 0:
+                    # Full match found!
+                    return pos
+
+                # Mismatch in left part
+                if is_periodic:
+                    pos += self.period
+                    memory = n - self.period
+                else:
+                    pos += max(left_match_start + 1, 1)
+                    memory = 0
+
+        return -1
+
+    fn _is_prefix(self, pattern: String, period: Int) -> Bool:
+        """Check if pattern[:period] is a prefix of pattern[period:].
+
+        Args:
+            pattern: The pattern string
+            period: The period to check
+
+        Returns:
+            True if pattern has the given period
+        """
+        var n = len(pattern)
+        if period >= n:
+            return False
+
+        for i in range(n - period):
+            if pattern[i] != pattern[i + period]:
+                return False
+        return True
+
+    fn _simd_compare_forward(
+        self, text: String, text_pos: Int, start_offset: Int
+    ) -> Int:
+        """Compare pattern with text starting from given offset using SIMD.
+
+        Args:
+            text: Text to compare against.
+            text_pos: Starting position in text.
+            start_offset: Starting offset in pattern.
+
+        Returns:
+            Position of first mismatch, or pattern length if full match.
+        """
+        var n = len(self.pattern)
+        var m = len(text)
+        var i = start_offset
+
+        # SIMD comparison for chunks
+        while i + SIMD_WIDTH <= n and text_pos + i + SIMD_WIDTH <= m:
+            var pattern_chunk = self.pattern.unsafe_ptr().load[
+                width=SIMD_WIDTH
+            ](i)
+            var text_chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](
+                text_pos + i
+            )
+
+            var matches = pattern_chunk == text_chunk
+            if not matches.reduce_and():
+                # Find first mismatch
+                for j in range(SIMD_WIDTH):
+                    if not matches[j]:
+                        return i + j
+
+            i += SIMD_WIDTH
+
+        # Handle remaining characters
+        while i < n and text_pos + i < m:
+            if self.pattern[i] != text[text_pos + i]:
+                return i
+            i += 1
+
+        return i
+
+    fn _simd_compare_backward(
+        self, text: String, text_pos: Int, end_offset: Int, start_offset: Int
+    ) -> Int:
+        """Compare pattern with text backward from given offset using SIMD.
+
+        Args:
+            text: Text to compare against.
+            text_pos: Starting position in text.
+            end_offset: Ending offset in pattern (inclusive).
+            start_offset: Starting offset in pattern (inclusive lower bound).
+
+        Returns:
+            Position of first mismatch (from left), or -1 if full match.
+        """
+        var j = end_offset
+
+        # For now, use simple character-by-character comparison
+        # TODO: Optimize with SIMD for backward comparison
+        while j >= start_offset:
+            if text[text_pos + j] != self.pattern[j]:
+                return j
+            j -= 1
+
+        return -1  # Full match
+
+    fn _short_pattern_search(self, text: String, start: Int) -> Int:
+        """Optimized search for very short patterns (1-4 bytes).
+
+        Uses SIMD to search for pattern as a small integer.
+        """
+        var n = len(self.pattern)
+        var m = len(text)
+
+        if n == 1:
+            # Single character search
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(text, start)
+
+        # For 2-4 byte patterns, use rolling comparison
+        var pos = start
+        while pos <= m - n:
+            var matched = True
+            for i in range(n):
+                if text[pos + i] != self.pattern[i]:
+                    matched = False
+                    break
+            if matched:
+                return pos
+            pos += 1
+
+        return -1
+
+
+struct MultiLiteralSearcher:
+    """SIMD-optimized multi-literal string searcher (Teddy-like algorithm).
+
+    Can search for multiple short literals simultaneously using SIMD.
+    """
+
+    var literals: List[String]
+    """The literals to search for."""
+    var max_len: Int
+    """Maximum length among all literals."""
+    var min_len: Int
+    """Minimum length among all literals."""
+    var first_bytes: SIMD[DType.uint8, 16]
+    """First byte of each literal (up to 16)."""
+    var literal_count: Int
+    """Number of literals (max 16 for SIMD efficiency)."""
+
+    fn __init__(out self, literals: List[String]):
+        """Initialize multi-literal searcher.
+
+        Args:
+            literals: List of literal strings to search for.
+        """
+        self.literals = literals
+        self.literal_count = min(len(literals), 16)
+        self.max_len = 0
+        self.min_len = 999999
+        self.first_bytes = SIMD[DType.uint8, 16](0)
+
+        # Initialize first bytes and find min/max lengths
+        for i in range(self.literal_count):
+            var lit = literals[i]
+            if len(lit) > 0:
+                self.first_bytes[i] = ord(lit[0])
+                self.max_len = max(self.max_len, len(lit))
+                self.min_len = min(self.min_len, len(lit))
+
+    fn search(self, text: String, start: Int = 0) -> Tuple[Int, Int]:
+        """Search for any literal in text.
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+
+        Returns:
+            Tuple of (position, literal_index) for first match, or (-1, -1) if not found.
+        """
+        if self.literal_count == 0 or self.min_len == 0:
+            return (-1, -1)
+
+        var text_len = len(text)
+        var pos = start
+
+        # Process text in SIMD chunks
+        while pos + SIMD_WIDTH <= text_len - self.min_len + 1:
+            var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
+
+            # Check if any first bytes match
+            var any_match = SIMD[DType.bool, SIMD_WIDTH](False)
+            for i in range(self.literal_count):
+                var matches = chunk == SIMD[DType.uint8, SIMD_WIDTH](
+                    self.first_bytes[i]
+                )
+                any_match = any_match | matches
+
+            if any_match.reduce_or():
+                # Found potential matches, verify each
+                for offset in range(SIMD_WIDTH):
+                    if any_match[offset]:
+                        var text_pos = pos + offset
+
+                        # Check each literal
+                        for lit_idx in range(self.literal_count):
+                            var lit = self.literals[lit_idx]
+                            if len(lit) > 0 and text[text_pos] == lit[0]:
+                                # Verify full literal
+                                if self._verify_literal(text, text_pos, lit):
+                                    return (text_pos, lit_idx)
+
+            pos += SIMD_WIDTH
+
+        # Handle remaining positions
+        while pos <= text_len - self.min_len:
+            for lit_idx in range(self.literal_count):
+                var lit = self.literals[lit_idx]
+                if self._verify_literal(text, pos, lit):
+                    return (pos, lit_idx)
+            pos += 1
+
+        return (-1, -1)
+
+    fn _verify_literal(self, text: String, pos: Int, literal: String) -> Bool:
+        """Verify that literal matches at given position.
+
+        Args:
+            text: Text to check.
+            pos: Position to check at.
+            literal: Literal to verify.
+
+        Returns:
+            True if literal matches at position.
+        """
+        var lit_len = len(literal)
+        if pos + lit_len > len(text):
+            return False
+
+        # Use SIMD comparison for longer literals
+        if lit_len >= SIMD_WIDTH:
+            return simd_memcmp(text, pos, literal, 0, lit_len)
+
+        # Simple comparison for short literals
+        for i in range(lit_len):
+            if text[pos + i] != literal[i]:
+                return False
+        return True

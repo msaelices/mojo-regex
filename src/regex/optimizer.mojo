@@ -5,6 +5,7 @@ This module implements the optimization strategies outlined in the optimization 
 - Pattern complexity classification
 - DFA compilation for simple patterns
 - SIMD character class optimization
+- Literal optimization opportunities
 """
 
 from regex.ast import (
@@ -19,6 +20,11 @@ from regex.ast import (
     END,
     OR,
     GROUP,
+)
+from regex.literal_optimizer import (
+    extract_literals,
+    has_literal_prefix,
+    extract_literal_prefix,
 )
 
 
@@ -75,6 +81,32 @@ struct PatternComplexity(Copyable, Representable, Stringable, Writable):
         writer.write(self.__str__())
 
 
+struct OptimizationInfo(Movable):
+    """Information about optimization opportunities for a regex pattern."""
+
+    var has_literal_prefix: Bool
+    """Whether the pattern has a literal prefix that can be optimized."""
+    var literal_prefix_length: Int
+    """Length of the literal prefix (0 if none)."""
+    var has_required_literal: Bool
+    """Whether the pattern has a required literal anywhere."""
+    var required_literal_length: Int
+    """Length of the longest required literal."""
+    var benefits_from_simd: Bool
+    """Whether the pattern would benefit from SIMD character class optimization."""
+    var suggested_engine: String
+    """Suggested engine based on optimization analysis (DFA, NFA, or Hybrid)."""
+
+    fn __init__(out self):
+        """Initialize with no optimizations."""
+        self.has_literal_prefix = False
+        self.literal_prefix_length = 0
+        self.has_required_literal = False
+        self.required_literal_length = 0
+        self.benefits_from_simd = False
+        self.suggested_engine = "NFA"
+
+
 struct PatternAnalyzer:
     """Analyzes regex patterns to determine optimal execution strategy."""
 
@@ -92,6 +124,90 @@ struct PatternAnalyzer:
             PatternComplexity indicating the optimal execution strategy.
         """
         return self._analyze_node(ast, depth=0)
+
+    fn analyze_optimizations(
+        self, ast: ASTNode[MutableAnyOrigin]
+    ) -> OptimizationInfo:
+        """Analyze pattern for optimization opportunities.
+
+        Args:
+            ast: The root AST node of the parsed regex.
+
+        Returns:
+            OptimizationInfo with details about available optimizations.
+        """
+        var info = OptimizationInfo()
+
+        # Extract literals
+        var literal_set = extract_literals(ast)
+
+        # Check for literal prefix
+        if has_literal_prefix(ast):
+            info.has_literal_prefix = True
+            var prefix = extract_literal_prefix(ast)
+            info.literal_prefix_length = len(prefix)
+
+        # Check for required literals
+        if literal_set.best_literal:
+            var best = literal_set.best_literal.value()
+            if best.is_required:
+                info.has_required_literal = True
+                info.required_literal_length = best.get_literal_len()
+
+        # Check for SIMD optimization opportunities
+        info.benefits_from_simd = self._check_simd_benefits(ast)
+
+        # Determine suggested engine
+        var complexity = self.classify(ast)
+        if complexity.value == PatternComplexity.SIMPLE:
+            if info.has_literal_prefix and info.literal_prefix_length > 3:
+                info.suggested_engine = "DFA with literal prefilter"
+            else:
+                info.suggested_engine = "DFA"
+        elif complexity.value == PatternComplexity.MEDIUM:
+            if info.has_required_literal and info.required_literal_length > 2:
+                info.suggested_engine = "NFA with literal prefilter"
+            else:
+                info.suggested_engine = "Hybrid"
+        else:
+            if info.has_required_literal:
+                info.suggested_engine = "NFA with literal prefilter"
+            else:
+                info.suggested_engine = "NFA"
+
+        return info^
+
+    fn _check_simd_benefits(self, ast: ASTNode) -> Bool:
+        """Check if pattern would benefit from SIMD optimizations.
+
+        Args:
+            ast: AST node to check.
+
+        Returns:
+            True if SIMD would provide significant benefits.
+        """
+        return self._count_simd_nodes(ast) > 0
+
+    fn _count_simd_nodes(self, ast: ASTNode) -> Int:
+        """Count nodes that benefit from SIMD optimization."""
+        var count = 0
+
+        if ast.type == RANGE or ast.type == DIGIT or ast.type == SPACE:
+            # Character classes benefit from SIMD
+            if ast.min > 1 or ast.max == -1:  # Repeated character classes
+                count += 2  # Extra benefit for repetition
+            else:
+                count += 1
+        elif ast.type == GROUP or ast.type == RE:
+            # Recursively count in children
+            for i in range(ast.get_children_len()):
+                count += self._count_simd_nodes(ast.get_child(i))
+        elif ast.type == OR:
+            # Count in all branches
+            for i in range(ast.get_children_len()):
+                count += self._count_simd_nodes(ast.get_child(i))
+
+        return count
 
     fn _analyze_node(self, ast: ASTNode, depth: Int) -> PatternComplexity:
         """Recursively analyze AST nodes to determine complexity.

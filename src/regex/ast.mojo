@@ -3,7 +3,15 @@ from builtin._location import __call_location
 from memory import UnsafePointer
 from os import abort
 
-from regex.aliases import CHAR_ZERO, CHAR_NINE
+from regex.aliases import (
+    CHAR_ZERO,
+    CHAR_NINE,
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_CUSTOM,
+)
+from regex.simd_ops import CharacterClassSIMD
 
 
 alias RE = 0
@@ -18,6 +26,17 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
+    ELEMENT,
+    WILDCARD,
+    SPACE,
+    DIGIT,
+    RANGE,
+    START,
+    END,
+    -1,  # sentinel to pad to 8 elements
+]
+
 alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
 
 
@@ -27,7 +46,7 @@ struct Regex[origin: Origin](
     alias ImmOrigin = ImmutableOrigin.cast_from[origin]
     alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
-    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin],]
+    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin]]
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 
@@ -150,6 +169,8 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     """Maximum number of matches for quantifiers (-1 for unlimited)."""
     var positive_logic: Bool
     """For character ranges: True for [abc], False for [^abc]."""
+    var simd_matcher_type: Int
+    """Type of SIMD matcher to use (SIMD_MATCHER_* constants)."""
 
     @always_inline
     fn __init__(
@@ -162,6 +183,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        simd_matcher_type: Int = SIMD_MATCHER_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
@@ -172,6 +194,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.simd_matcher_type = simd_matcher_type
         self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
@@ -188,6 +211,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        simd_matcher_type: Int = SIMD_MATCHER_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -198,6 +222,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.simd_matcher_type = simd_matcher_type
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
@@ -213,6 +238,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        simd_matcher_type: Int = SIMD_MATCHER_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -223,6 +249,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.simd_matcher_type = simd_matcher_type
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
@@ -245,6 +272,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.min = other.min
         self.max = other.max
         self.positive_logic = other.positive_logic
+        self.simd_matcher_type = other.simd_matcher_type
         self.children_indexes = other.children_indexes
         self.children_len = other.children_len
         # var call_location = __call_location()
@@ -267,6 +295,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
+            and self.simd_matcher_type == other.simd_matcher_type
             and self.children_len == other.children_len
             and (self.children_indexes == other.children_indexes).reduce_and()
         )
@@ -314,7 +343,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, WILDCARD, SPACE, DIGIT, RANGE, START, END]:
+        if (LEAF_ELEMS == self.type).reduce_or():
             return True
         else:
             return False
@@ -429,6 +458,19 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             length=self.end_idx - self.start_idx,
         )
 
+    @always_inline
+    fn get_immutable[
+        self_origin: MutableOrigin,
+    ](ref [self_origin]self) -> ref [
+        ImmutableOrigin.cast_from[self_origin]
+    ] Self:
+        """Return an immutable version of self.
+
+        Returns:
+            An immutable version of the same ASTNode.
+        """
+        return rebind[ImmutableOrigin.cast_from[self]](self)
+
 
 @always_inline
 fn Element[
@@ -493,6 +535,7 @@ fn SpaceElement[
         end_idx=end_idx,
         min=1,
         max=1,
+        simd_matcher_type=SIMD_MATCHER_WHITESPACE,
     )
 
 
@@ -515,6 +558,7 @@ fn DigitElement[
         end_idx=end_idx,
         min=1,
         max=1,
+        simd_matcher_type=SIMD_MATCHER_DIGITS,
     )
 
 
@@ -539,6 +583,7 @@ fn RangeElement[
         min=1,
         max=1,
         positive_logic=is_positive_logic,
+        simd_matcher_type=SIMD_MATCHER_CUSTOM,  # Will be determined later based on pattern
     )
 
 

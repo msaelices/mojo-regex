@@ -1,10 +1,87 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode
-from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
+from regex.ast import (
+    ASTNode,
+    RANGE,
+    DIGIT,
+    SPACE,
+    ELEMENT,
+    WILDCARD,
+)
+from regex.aliases import (
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_NEWLINE,
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_CUSTOM,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+)
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
+from regex.simd_ops import (
+    CharacterClassSIMD,
+    SIMD_WIDTH,
+    TwoWaySearcher,
+    get_simd_matcher,
+)
+from regex.literal_optimizer import extract_literals
+
+
+fn _create_simd_matcher_from_range_pattern(
+    range_pattern: StringSlice,
+) -> CharacterClassSIMD:
+    """Create SIMD matcher from range pattern like '[a-z]' or 'abcxyz'.
+
+    Args:
+        range_pattern: Pattern that may contain range syntax like 'a-z' or explicit chars.
+
+    Returns:
+        A CharacterClassSIMD matcher configured for the pattern.
+    """
+    # If pattern starts with '[', it contains range syntax
+    if range_pattern.startswith("[") and range_pattern.endswith("]"):
+        # Remove brackets
+        var inner = range_pattern[1:-1]
+
+        # Check for negation and strip it
+        # The negation is handled by the AST node's positive_logic field
+        var actual_pattern = inner
+        if len(inner) > 0 and inner[0] == "^":
+            actual_pattern = inner[1:]
+
+        # Check if it's a simple range like 'a-z'
+        if len(actual_pattern) == 3 and actual_pattern[1] == "-":
+            # It's a range, use the range constructor
+            var start_char = actual_pattern[0:1]
+            var end_char = actual_pattern[2:3]
+            return CharacterClassSIMD(start_char, end_char)
+        elif actual_pattern == "a-zA-Z0-9":
+            # Common alphanumeric pattern
+            return get_simd_matcher(SIMD_MATCHER_ALNUM)
+        elif actual_pattern == "a-zA-Z":
+            # Common alpha pattern
+            return get_simd_matcher(SIMD_MATCHER_ALPHA)
+        elif actual_pattern == "0-9":
+            # Digits
+            return get_simd_matcher(SIMD_MATCHER_DIGITS)
+        elif actual_pattern == "a-z":
+            # Lowercase letters
+            return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
+        elif actual_pattern == "A-Z":
+            # Uppercase letters
+            return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
+        else:
+            # It's a character set like 'abc' or other complex pattern
+            return CharacterClassSIMD(actual_pattern)
+    else:
+        # It's already an expanded character set
+        return CharacterClassSIMD(range_pattern)
 
 
 struct NFAEngine(Engine):
@@ -18,14 +95,47 @@ struct NFAEngine(Engine):
     """Cached AST from previous regex compilation."""
     var regex: Optional[ASTNode[MutableAnyOrigin]]
     """Compiled AST representation of the current regex pattern."""
+    var literal_prefix: String
+    """Extracted literal prefix for optimization."""
+    var has_literal_optimization: Bool
+    """Whether literal optimization is available for this pattern."""
+    var literal_searcher: Optional[TwoWaySearcher]
+    """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
         self.prev_re = ""
         self.prev_ast = None
         self.pattern = pattern
+        self.literal_prefix = ""
+        self.has_literal_optimization = False
+        self.literal_searcher = None
+
         try:
             self.regex = parse(pattern)
+
+            # Extract literals for optimization
+            if self.regex:
+                var ast = self.regex.value()
+                var literal_set = extract_literals(ast)
+
+                # Use best literal if available
+                if literal_set.best_literal:
+                    var best = literal_set.best_literal.value()
+                    if best.is_prefix and best.get_literal_len() > 1:
+                        # Use prefix literal for optimization
+                        self.literal_prefix = best.get_literal()
+                        self.has_literal_optimization = True
+                        self.literal_searcher = TwoWaySearcher(
+                            self.literal_prefix
+                        )
+                    elif best.is_required and best.get_literal_len() > 2:
+                        # Use required literal even if not prefix (for general prefiltering)
+                        self.literal_prefix = best.get_literal()
+                        self.has_literal_optimization = True
+                        self.literal_searcher = TwoWaySearcher(
+                            self.literal_prefix
+                        )
         except:
             self.regex = None
 
@@ -71,32 +181,93 @@ struct NFAEngine(Engine):
         var current_pos = 0
 
         var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
-        while current_pos <= len(text):
-            temp_matches.clear()
-            var result = self._match_node(
-                ast,
-                text,
-                current_pos,
-                temp_matches,
-                match_first_mode=False,
-                required_start_pos=-1,
-            )
-            if result[0]:  # Match found
-                var match_start = current_pos
-                var match_end = result[1]
 
-                # Create match object
-                var matched = Match(0, match_start, match_end, text)
-                matches.append(matched)
+        # Use literal prefiltering if available
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
 
-                # Move past this match to find next one
-                # Avoid infinite loop on zero-width matches
-                if match_end == match_start:
-                    current_pos += 1
+            while current_pos <= len(text):
+                # Find next occurrence of literal
+                var literal_pos = searcher.search(text, current_pos)
+                if literal_pos == -1:
+                    # No more occurrences of required literal
+                    break
+
+                # Skip literals that would create overlapping matches
+                if literal_pos < current_pos:
+                    current_pos = literal_pos + 1
+                    continue
+
+                # Try to match the full pattern starting from before the literal
+                var try_pos = literal_pos
+                if self.literal_prefix and not self._is_prefix_literal():
+                    try_pos = max(current_pos, literal_pos - 100)
+
+                # Search for matches around the literal
+                var found_match = False
+
+                # For prefix literals, we can only match at the literal position
+                if self._is_prefix_literal():
+                    try_pos = literal_pos
+
+                while try_pos <= literal_pos and try_pos <= len(text):
+                    temp_matches.clear()
+                    var result = self._match_node(
+                        ast,
+                        text,
+                        try_pos,
+                        temp_matches,
+                        match_first_mode=False,
+                        required_start_pos=-1,
+                    )
+                    if result[0]:  # Match found
+                        var match_end = result[1]
+                        if self._match_contains_literal(
+                            text, try_pos, match_end
+                        ):
+                            var matched = Match(0, try_pos, match_end, text)
+                            matches.append(matched)
+
+                            # Move past this match to avoid overlapping matches
+                            if match_end == try_pos:
+                                current_pos = try_pos + 1
+                            else:
+                                current_pos = match_end
+                            found_match = True
+                            break
+                    try_pos += 1
+
+                if not found_match:
+                    # No match found around this literal, move past it
+                    current_pos = literal_pos + 1
+        else:
+            # No literal optimization, use standard approach
+            while current_pos <= len(text):
+                temp_matches.clear()
+                var result = self._match_node(
+                    ast,
+                    text,
+                    current_pos,
+                    temp_matches,
+                    match_first_mode=False,
+                    required_start_pos=-1,
+                )
+                if result[0]:  # Match found
+                    var match_start = current_pos
+                    var match_end = result[1]
+
+                    # Create match object
+                    var matched = Match(0, match_start, match_end, text)
+                    matches.append(matched)
+
+                    # Move past this match to find next one
+                    # Avoid infinite loop on zero-width matches
+                    if match_end == match_start:
+                        current_pos += 1
+                    else:
+                        current_pos = match_end
                 else:
-                    current_pos = match_end
-            else:
-                current_pos += 1
+                    current_pos += 1
 
         return matches
 
@@ -124,6 +295,28 @@ struct NFAEngine(Engine):
                 ast = parse(self.pattern)
             except:
                 return None
+
+        # For match_first (Python's re.match), we can use literal optimization
+        # but only to quickly reject non-matching texts
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
+
+            # Check if the literal exists at all in the text starting from our position
+            var literal_pos = searcher.search(text, start)
+            if literal_pos == -1:
+                # No literal found, so pattern cannot match
+                return None
+
+            # For prefix literals, they must be at the start position
+            if self._is_prefix_literal() and literal_pos != start:
+                return None
+
+            # For non-prefix literals, they must be reachable from start
+            # (within the maximum possible match length from start)
+            if not self._is_prefix_literal():
+                # Conservative check: if literal is too far from start, pattern can't match
+                if literal_pos > start + len(text):
+                    return None
 
         # Try to match at the exact start position only (like Python's re.match)
         # Use match_first_mode for optimized early termination
@@ -157,7 +350,6 @@ struct NFAEngine(Engine):
             contain all the group and subgroups matched.
         """
         var matches = List[Match, hint_trivial_type=True]()
-        var str_i = start
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
@@ -167,20 +359,88 @@ struct NFAEngine(Engine):
             except:
                 return None
 
-        var result = self._match_node(
-            ast,
-            text,
-            str_i,
-            matches,
-            match_first_mode=False,
-            required_start_pos=-1,
-        )
-        if result[0]:  # Match found
-            var end_idx = result[1]
-            # Always return the overall match with correct range
-            return Match(0, str_i, end_idx, text)
+        var search_pos = start
+
+        # Use literal prefiltering if available
+        if self.has_literal_optimization and self.literal_searcher:
+            var searcher = self.literal_searcher.value()
+
+            while search_pos <= len(text):
+                # Find next occurrence of literal
+                var literal_pos = searcher.search(text, search_pos)
+                if literal_pos == -1:
+                    # No more occurrences of required literal
+                    return None
+
+                # Try to match the full pattern starting from before the literal
+                # (unless the literal is a prefix, then start at literal position)
+                var try_pos = literal_pos
+                if self.literal_prefix and not self._is_prefix_literal():
+                    # For non-prefix literals, we need to search backwards
+                    # to find where the pattern might start
+                    try_pos = max(
+                        0, literal_pos - 100
+                    )  # Conservative backward search
+
+                # Try matching from positions around the literal
+                var end_pos = min(
+                    len(text), literal_pos + len(self.literal_prefix)
+                )
+                while try_pos <= literal_pos:
+                    matches.clear()
+                    var result = self._match_node(
+                        ast,
+                        text,
+                        try_pos,
+                        matches,
+                        match_first_mode=False,
+                        required_start_pos=-1,
+                    )
+                    if result[0]:  # Match found
+                        var match_end = result[1]
+                        # Verify the match includes our literal
+                        if self._match_contains_literal(
+                            text, try_pos, match_end
+                        ):
+                            return Match(0, try_pos, match_end, text)
+                    try_pos += 1
+
+                # Move search position past this literal occurrence
+                search_pos = literal_pos + 1
+        else:
+            # No literal optimization, fall back to standard search
+            while search_pos <= len(text):
+                matches.clear()
+                var result = self._match_node(
+                    ast,
+                    text,
+                    search_pos,
+                    matches,
+                    match_first_mode=False,
+                    required_start_pos=-1,
+                )
+                if result[0]:  # Match found
+                    var end_idx = result[1]
+                    return Match(0, search_pos, end_idx, text)
+                search_pos += 1
 
         return None
+
+    fn _is_prefix_literal(self) -> Bool:
+        """Check if the extracted literal is a prefix literal."""
+        # Simple heuristic: if pattern starts with the literal, it's a prefix
+        return self.pattern.startswith(self.literal_prefix)
+
+    fn _match_contains_literal(
+        self, text: String, start: Int, end: Int
+    ) -> Bool:
+        """Verify that a match contains the required literal."""
+        if not self.has_literal_optimization or len(self.literal_prefix) == 0:
+            return True
+
+        # Check if the literal appears within the match bounds
+        var match_text = text[start:end]
+        return self.literal_prefix in match_text
 
     @always_inline
     fn _match_node(
@@ -323,12 +583,28 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match whitespace character (\\s)."""
+        """Match whitespace character (\\s) with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        if ch == " " or ch == "\t" or ch == "\n" or ch == "\r" or ch == "\f":
+        var is_space: Bool
+
+        # Use global SIMD matcher
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+            is_space = simd_matcher.contains(ord(ch))
+        else:
+            # Fallback to traditional comparison
+            is_space = (
+                ch == " "
+                or ch == "\t"
+                or ch == "\n"
+                or ch == "\r"
+                or ch == "\f"
+            )
+
+        if is_space:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -344,12 +620,22 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match digit character (\\d)."""
+        """Match digit character (\\d) with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        if CHAR_ZERO <= ord(ch) <= CHAR_NINE:
+        var is_digit: Bool
+
+        # Use global SIMD matcher
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+            is_digit = simd_matcher.contains(ord(ch))
+        else:
+            # Fallback to traditional comparison
+            is_digit = CHAR_ZERO <= ord(ch) <= CHAR_NINE
+
+        if is_digit:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -365,18 +651,57 @@ struct NFAEngine(Engine):
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
-        """Match character range [abc] or [^abc]."""
+        """Match character range [abc] or [^abc] with SIMD optimization."""
         if str_i >= len(str):
             return (False, str_i)
 
         var ch = String(str[str_i])
-        var ch_found = False
+        var match_found: Bool
 
-        if ast.get_value():
-            var range_pattern = ast.get_value().value()
-            ch_found = ast._is_char_in_range(ch, range_pattern)
+        # Use SIMD matcher based on type
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            var simd_matcher: CharacterClassSIMD
 
-        if ch_found == ast.positive_logic:
+            if ast.simd_matcher_type == SIMD_MATCHER_CUSTOM:
+                # Custom range - create on demand
+                if ast.get_value():
+                    var range_pattern = ast.get_value().value()
+                    simd_matcher = _create_simd_matcher_from_range_pattern(
+                        range_pattern
+                    )
+                else:
+                    # Fallback if no pattern available
+                    var ch_found = False
+                    if ast.get_value():
+                        var range_pattern = ast.get_value().value()
+                        ch_found = ast._is_char_in_range(ch, range_pattern)
+                    match_found = ch_found == ast.positive_logic
+                    if match_found:
+                        return self._apply_quantifier(
+                            ast,
+                            str,
+                            str_i,
+                            1,
+                            match_first_mode,
+                            required_start_pos,
+                        )
+                    else:
+                        return (False, str_i)
+            else:
+                # Use global pre-initialized matcher
+                simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+
+            var simd_match = simd_matcher.contains(ord(ch))
+            match_found = simd_match if ast.positive_logic else not simd_match
+        else:
+            # Fallback to linear search
+            var ch_found = False
+            if ast.get_value():
+                var range_pattern = ast.get_value().value()
+                ch_found = ast._is_char_in_range(ch, range_pattern)
+            match_found = ch_found == ast.positive_logic
+
+        if match_found:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -734,29 +1059,157 @@ struct NFAEngine(Engine):
         if min_matches == 1 and max_matches == 1:
             return (True, str_i + char_consumed)
 
-        # Use regular greedy matching, but with early termination for match_first_mode
-        var matches_count = 0
-        var current_pos = str_i
+        # Calculate the maximum search length from the current position
+        # Note: search_len includes already consumed characters
+        var search_len = min(max_matches, len(str) - str_i)
+        if match_first_mode and required_start_pos >= 0:
+            search_len = min(search_len, required_start_pos + 50 - str_i)
 
-        # Try to match as many times as possible (greedy)
-        while matches_count < max_matches and current_pos < len(str):
-            # Early termination for match_first_mode: if we're getting too far from start
-            if match_first_mode and required_start_pos >= 0:
-                # Allow reasonable expansion but prevent excessive backtracking
-                if current_pos > required_start_pos + 50:  # Conservative limit
+        # Use SIMD bulk matching when we have SIMD matcher type and enough data
+        var use_simd = False
+        var simd_matcher = CharacterClassSIMD(
+            ""
+        )  # Initialize with empty matcher
+
+        if ast.simd_matcher_type != SIMD_MATCHER_NONE:
+            if ast.simd_matcher_type == SIMD_MATCHER_CUSTOM:
+                # For custom matchers, create on demand
+                if ast.get_value():
+                    var range_pattern = ast.get_value().value()
+                    simd_matcher = _create_simd_matcher_from_range_pattern(
+                        range_pattern
+                    )
+                    use_simd = True
+            else:
+                # Use global pre-initialized matcher
+                simd_matcher = get_simd_matcher(ast.simd_matcher_type)
+                use_simd = True
+
+        if use_simd:
+            # For RANGE nodes, handle positive/negative logic
+            if ast.type == RANGE:
+                # For consecutive matches, we need to scan until first non-match
+                var consecutive_matches = 0
+                var pos = 0
+                while pos < search_len:
+                    var ch_code = ord(str[str_i + pos])
+                    var is_match = simd_matcher.contains(ch_code)
+                    if ast.positive_logic:
+                        if not is_match:
+                            break
+                    else:
+                        if is_match:
+                            break
+                    consecutive_matches += 1
+                    pos += 1
+
+                var matches_count = min(consecutive_matches, max_matches)
+                if matches_count >= min_matches:
+                    return (True, str_i + matches_count)
+                else:
+                    return (False, str_i)
+            else:
+                # For DIGIT and SPACE, use direct SIMD matching
+                # Count consecutive matches using bulk operations
+                # We already consumed char_consumed characters, so we count total matches
+                var consecutive_matches = 0
+                var pos = 0
+
+                # Process in SIMD-width chunks for better performance
+                # Check actual string bounds
+                while (
+                    str_i + char_consumed + pos + SIMD_WIDTH <= len(str)
+                    and consecutive_matches + char_consumed < max_matches
+                ):
+                    var chunk_matches = simd_matcher._check_chunk_simd(
+                        str, str_i + char_consumed + pos
+                    )
+
+                    # Use SIMD reduction to check if all match
+                    var all_match = chunk_matches.reduce_and()
+
+                    if all_match:
+                        # All characters in chunk match
+                        consecutive_matches += SIMD_WIDTH
+                        pos += SIMD_WIDTH
+                    else:
+                        # Find first non-match
+                        # Count consecutive matches from start of this chunk
+                        var chunk_match_count = 0
+                        for j in range(SIMD_WIDTH):
+                            if chunk_matches[j]:
+                                chunk_match_count += 1
+                            else:
+                                break
+                        consecutive_matches += chunk_match_count
+                        break
+
+                # Handle remaining characters
+                while (
+                    str_i + char_consumed + pos < len(str)
+                    and consecutive_matches + char_consumed < max_matches
+                ):
+                    if simd_matcher.contains(
+                        ord(str[str_i + char_consumed + pos])
+                    ):
+                        consecutive_matches += 1
+                        pos += 1
+                    else:
+                        break
+
+                # Total matches include already consumed characters
+                var total_matches = char_consumed + consecutive_matches
+                if total_matches >= min_matches:
+                    return (True, str_i + total_matches)
+                else:
+                    return (False, str_i)
+
+        else:
+            # Fallback to regular character-by-character matching
+            # Start with already consumed characters
+            var matches_count = char_consumed
+            var current_pos = str_i + char_consumed
+
+            while matches_count < max_matches and current_pos < len(str):
+                # Early termination for match_first_mode
+                if match_first_mode and required_start_pos >= 0:
+                    if current_pos > required_start_pos + 50:
+                        break
+
+                # Check character directly based on node type
+                var char_matches = False
+                var ch = str[current_pos]
+
+                if ast.type == DIGIT:
+                    char_matches = ord("0") <= ord(ch) <= ord("9")
+                elif ast.type == SPACE:
+                    char_matches = (
+                        ch == " " or ch == "\t" or ch == "\n" or ch == "\r"
+                    )
+                elif ast.type == ELEMENT:
+                    if ast.get_value():
+                        char_matches = ast.get_value().value() == String(ch)
+                elif ast.type == WILDCARD:
+                    char_matches = ord(ch) != ord("\n")
+                elif ast.type == RANGE:
+                    if ast.get_value():
+                        var range_pattern = ast.get_value().value()
+                        char_matches = ast._is_char_in_range(
+                            String(ch), range_pattern
+                        )
+                        if not ast.positive_logic:
+                            char_matches = not char_matches
+
+                if char_matches:
+                    matches_count += 1
+                    current_pos += 1
+                else:
                     break
 
-            if ast.is_match(String(str[current_pos]), current_pos, len(str)):
-                matches_count += 1
-                current_pos += 1
+            if matches_count >= min_matches:
+                return (True, current_pos)
             else:
-                break
-
-        # Check if we have enough matches
-        if matches_count >= min_matches:
-            return (True, current_pos)
-        else:
-            return (False, str_i)
+                return (False, str_i)
 
 
 fn findall(

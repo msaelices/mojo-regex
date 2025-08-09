@@ -24,6 +24,7 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
+from regex.simd_ops import SIMDStringSearch
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -215,6 +216,10 @@ struct DFAEngine(Engine):
     """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
+    var simd_string_search: Optional[SIMDStringSearch]
+    """SIMD-optimized string search for pure literal patterns."""
+    var is_pure_literal: Bool
+    """Whether this is a pure literal pattern (no regex operators)."""
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
@@ -222,6 +227,8 @@ struct DFAEngine(Engine):
         self.start_state = 0
         self.has_start_anchor = False
         self.has_end_anchor = False
+        self.simd_string_search = None
+        self.is_pure_literal = False
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -229,6 +236,8 @@ struct DFAEngine(Engine):
         self.start_state = other.start_state
         self.has_start_anchor = other.has_start_anchor
         self.has_end_anchor = other.has_end_anchor
+        self.simd_string_search = other.simd_string_search^
+        self.is_pure_literal = other.is_pure_literal
 
     fn compile_pattern(
         mut self,
@@ -251,6 +260,14 @@ struct DFAEngine(Engine):
         self.has_end_anchor = has_end_anchor
 
         if len_pattern == 0:
+            self._create_accepting_state()
+            return
+
+        # For pure literal patterns without anchors, use SIMD string search
+        if not has_start_anchor and not has_end_anchor and len_pattern > 0:
+            self.simd_string_search = SIMDStringSearch(pattern)
+            self.is_pure_literal = True
+            # Still create a minimal DFA for compatibility
             self._create_accepting_state()
             return
 
@@ -790,7 +807,9 @@ struct DFAEngine(Engine):
             return None  # Start anchor requires match at position 0
 
         # Python only allows matching at the start of the string
-        return self._try_match_at_position(text, start)
+        return self._try_match_at_position(
+            text, start, require_exact_position=True
+        )
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
@@ -817,18 +836,33 @@ struct DFAEngine(Engine):
         return None
 
     fn _try_match_at_position(
-        self, text: String, start_pos: Int
+        self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
         """Try to match pattern starting at a specific position.
 
         Args:
             text: Input text to match against.
             start_pos: Position to start matching from.
+            require_exact_position: If True, only match at exact start_pos (for match_first).
 
         Returns:
             Optional Match if pattern matches at this position, None otherwise.
         """
         if start_pos > len(text):
+            return None
+
+        # Use SIMD search for pure literal patterns
+        if self.is_pure_literal and self.simd_string_search:
+            var searcher = self.simd_string_search.value()
+            var match_pos = searcher.search(text, start_pos)
+
+            if match_pos != -1:
+                # For match_first (require_exact_position=True), match must be at start_pos
+                if require_exact_position and match_pos != start_pos:
+                    return None
+
+                var pattern_len = len(searcher.pattern)
+                return Match(0, match_pos, match_pos + pattern_len, text)
             return None
 
         if start_pos == len(text):
@@ -901,6 +935,16 @@ struct DFAEngine(Engine):
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
+            return matches
+
+        # Use SIMD search for pure literal patterns
+        if self.is_pure_literal and self.simd_string_search:
+            var searcher = self.simd_string_search.value()
+            var positions = searcher.search_all(text)
+            var pattern_len = len(searcher.pattern)
+            for i in range(len(positions)):
+                var pos = positions[i]
+                matches.append(Match(0, pos, pos + pattern_len, text))
             return matches
 
         var pos = 0

@@ -45,6 +45,64 @@ from regex.ast import (
     OR,
     GROUP,
 )
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_ALNUM_LOWER,
+    SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_HEX_DIGITS,
+    SIMD_MATCHER_HEX_LOWER,
+    SIMD_MATCHER_HEX_UPPER,
+    SIMD_MATCHER_CUSTOM,
+)
+
+
+fn analyze_range_pattern(pattern: String) -> Int:
+    """Analyze a range pattern to determine the appropriate SIMD matcher type.
+
+    Args:
+        pattern: The range pattern (e.g., "[a-z]", "[0-9]", "[a-zA-Z0-9]")
+
+    Returns:
+        The SIMD_MATCHER_* constant for this pattern.
+    """
+    # Remove brackets if present
+    var inner_pattern = pattern
+    if pattern.startswith("[") and pattern.endswith("]"):
+        inner_pattern = pattern[1:-1]
+
+    # Check for negation
+    if inner_pattern.startswith("^"):
+        inner_pattern = inner_pattern[1:]
+
+    # Check common patterns
+    if inner_pattern == "a-z":
+        return SIMD_MATCHER_ALPHA_LOWER
+    elif inner_pattern == "A-Z":
+        return SIMD_MATCHER_ALPHA_UPPER
+    elif inner_pattern == "0-9":
+        return SIMD_MATCHER_DIGITS
+    elif inner_pattern == "a-zA-Z":
+        return SIMD_MATCHER_ALPHA
+    elif inner_pattern == "a-zA-Z0-9":
+        return SIMD_MATCHER_ALNUM
+    elif inner_pattern == "a-z0-9":
+        return SIMD_MATCHER_ALNUM_LOWER
+    elif inner_pattern == "A-Z0-9":
+        return SIMD_MATCHER_ALNUM_UPPER
+    elif inner_pattern == "0-9a-fA-F" or inner_pattern == "a-fA-F0-9":
+        return SIMD_MATCHER_HEX_DIGITS
+    elif inner_pattern == "0-9a-f" or inner_pattern == "a-f0-9":
+        return SIMD_MATCHER_HEX_LOWER
+    elif inner_pattern == "0-9A-F" or inner_pattern == "A-F0-9":
+        return SIMD_MATCHER_HEX_UPPER
+    else:
+        return SIMD_MATCHER_CUSTOM
 
 
 @always_inline
@@ -316,12 +374,18 @@ fn parse_token_list[
             # Calculate proper end position - should be after the closing bracket
             var bracket_end_pos = tokens[i].start_pos + 1
 
+            # Extract the pattern to analyze for SIMD matcher type
+            var pattern = regex.pattern[bracket_start_pos:bracket_end_pos]
+            var simd_type = analyze_range_pattern(pattern)
+
             var range_elem = RangeElement[ImmutableAnyOrigin](
                 regex=regex,
                 start_idx=bracket_start_pos,
                 end_idx=bracket_end_pos,
                 is_positive_logic=positive_logic,
             )
+            # Set the SIMD matcher type
+            range_elem.simd_matcher_type = simd_type
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
                 check_for_quantifiers[ImmutableAnyOrigin](i, range_elem, tokens)
