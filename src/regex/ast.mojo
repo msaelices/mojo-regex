@@ -18,6 +18,23 @@ alias OR = 8
 alias NOT = 9
 alias GROUP = 10
 
+alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
+    ELEMENT,
+    WILDCARD,
+    SPACE,
+    DIGIT,
+    RANGE,
+    START,
+    END,
+    -1,  # sentinel to pad to 8 elements
+]
+alias SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
+    SPACE,
+    DIGIT,
+    RANGE,
+    -1,  # sentinel to pad to 4 elements
+]
+
 alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
 
 
@@ -27,7 +44,7 @@ struct Regex[origin: Origin](
     alias ImmOrigin = ImmutableOrigin.cast_from[origin]
     alias Immutable = Regex[origin = Self.ImmOrigin]
     var pattern: String
-    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin],]
+    var children_ptr: UnsafePointer[ASTNode[ImmutableAnyOrigin]]
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 
@@ -312,9 +329,20 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         else:
             writer.write("ASTNode(type=", self.type, ", value=None)")
 
+    @always_inline
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if self.type in [ELEMENT, WILDCARD, SPACE, DIGIT, RANGE, START, END]:
+        if (LEAF_ELEMS == self.type).reduce_or():
+            return True
+        else:
+            return False
+
+    @always_inline
+    fn is_simd_optimizable(self, min_matches: Int, max_matches: Int) -> Bool:
+        """Check if the AST node is a SIMD quantifier."""
+        if (SIMD_QUANTIFIERS == self.type).reduce_or() and (
+            min_matches > 1 or max_matches != 1
+        ):
             return True
         else:
             return False
@@ -428,6 +456,19 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
             length=self.end_idx - self.start_idx,
         )
+
+    @always_inline
+    fn get_immutable[
+        self_origin: MutableOrigin,
+    ](ref [self_origin]self) -> ref [
+        ImmutableOrigin.cast_from[self_origin]
+    ] Self:
+        """Return an immutable version of self.
+
+        Returns:
+            An immutable version of the same ASTNode.
+        """
+        return rebind[ImmutableOrigin.cast_from[self]](self)
 
 
 @always_inline
