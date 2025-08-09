@@ -172,14 +172,17 @@ struct CharacterClassSIMD(Copyable, Movable):
         else:
             # Fallback for other sizes - still avoid the loop by using vectorized operations
             var matches = SIMD[DType.bool, SIMD_WIDTH](False)
-            
+
             # Process in 16-byte sub-chunks when possible
             @parameter
             for offset in range(0, SIMD_WIDTH, 16):
+
                 @parameter
                 if offset + 16 <= SIMD_WIDTH:
                     var sub_chunk = chunk.slice[16, offset=offset]()
-                    var sub_result = self.lookup_table._dynamic_shuffle(sub_chunk)
+                    var sub_result = self.lookup_table._dynamic_shuffle(
+                        sub_chunk
+                    )
                     for i in range(16):
                         matches[offset + i] = sub_result[i] != 0
                 else:
@@ -187,7 +190,7 @@ struct CharacterClassSIMD(Copyable, Movable):
                     for i in range(offset, SIMD_WIDTH):
                         var char_code = Int(chunk[i])
                         matches[i] = self.lookup_table[char_code] == 1
-            
+
             return matches
 
 
