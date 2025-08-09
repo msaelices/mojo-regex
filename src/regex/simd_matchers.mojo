@@ -337,7 +337,7 @@ fn analyze_character_class_pattern(pattern: String) -> String:
     """Analyze a character class pattern and determine the optimal SIMD strategy.
 
     Args:
-        pattern: Character class pattern (e.g., "[a-z]", "[0-9A-Fa-f]", etc.)
+        pattern: Character class pattern (e.g., "[a-z]", "[0-9A-Fa-f]", etc.).
 
     Returns:
         String indicating the optimal strategy: "range", "nibble", or "lookup".

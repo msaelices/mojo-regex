@@ -24,7 +24,17 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
-from regex.simd_ops import SIMDStringSearch
+from regex.simd_ops import SIMDStringSearch, CharacterClassSIMD
+from regex.simd_matchers import (
+    analyze_character_class_pattern,
+    create_digit_matcher,
+    create_alpha_matcher,
+    create_alnum_matcher,
+    create_whitespace_matcher,
+    create_hex_digit_matcher,
+    RangeBasedMatcher,
+    NibbleBasedMatcher,
+)
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
 alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
@@ -220,6 +230,10 @@ struct DFAEngine(Engine):
     """SIMD-optimized string search for pure literal patterns."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
+    var simd_char_matcher: Optional[CharacterClassSIMD]
+    """SIMD-optimized character class matcher for simple patterns."""
+    var simd_char_pattern: String
+    """The character class pattern being matched with SIMD."""
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
@@ -229,6 +243,8 @@ struct DFAEngine(Engine):
         self.has_end_anchor = False
         self.simd_string_search = None
         self.is_pure_literal = False
+        self.simd_char_matcher = None
+        self.simd_char_pattern = ""
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -238,6 +254,8 @@ struct DFAEngine(Engine):
         self.has_end_anchor = other.has_end_anchor
         self.simd_string_search = other.simd_string_search^
         self.is_pure_literal = other.is_pure_literal
+        self.simd_char_matcher = other.simd_char_matcher^
+        self.simd_char_pattern = other.simd_char_pattern^
 
     fn compile_pattern(
         mut self,
@@ -314,6 +332,27 @@ struct DFAEngine(Engine):
             max_matches: Maximum number of matches (-1 for unlimited).
             positive_logic: True for [a-z], False for [^a-z].
         """
+        # Try to use SIMD optimization for simple character class patterns
+        if min_matches >= 0 and positive_logic:
+            # Check if this is a pattern we can optimize with SIMD
+            var pattern_str = String()
+            if char_class == DIGITS or char_class == "0123456789":
+                pattern_str = "[0-9]"
+            elif char_class == LOWERCASE_LETTERS:
+                pattern_str = "[a-z]"
+            elif char_class == UPPERCASE_LETTERS:
+                pattern_str = "[A-Z]"
+            elif char_class == ALL_LETTERS:
+                pattern_str = "[a-zA-Z]"
+            elif char_class == ALPHANUMERIC:
+                pattern_str = "[a-zA-Z0-9]"
+            elif char_class == " \t\n\r\f\v":
+                pattern_str = "\\s"
+            
+            if pattern_str:
+                self.simd_char_pattern = pattern_str
+                self.simd_char_matcher = CharacterClassSIMD(char_class)
+        
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
             var start_state = DFAState(is_accepting=True, match_length=0)
@@ -865,6 +904,12 @@ struct DFAEngine(Engine):
                 return Match(0, match_pos, match_pos + pattern_len, text)
             return None
 
+        # Try SIMD matching for simple character class patterns
+        if self.simd_char_matcher and len(self.states) > 0:
+            var match_result = self._try_match_simd(text, start_pos)
+            if match_result:
+                return match_result
+
         if start_pos == len(text):
             # Check if we can match empty string
             if (
@@ -968,59 +1013,59 @@ struct DFAEngine(Engine):
 
         return matches
 
-    # fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
-    #     """SIMD-optimized matching for character class patterns.
-    #
-    #     Args:
-    #         text: Input text to match against.
-    #         start_pos: Position to start matching from.
-    #
-    #     Returns:
-    #         Optional Match if pattern matches at this position, None otherwise.
-    #     """
-    #     if not self.simd_matcher:
-    #         return None
-    #
-    #     var simd_matcher = self.simd_matcher.value()
-    #     var pos = start_pos
-    #     var match_count = 0
-    #     var text_len = len(text)
-    #
-    #     # Check if start state is accepting (for patterns like [a-z]*)
-    #     var start_accepting = (
-    #         len(self.states) > 0 and self.states[self.start_state].is_accepting
-    #     )
-    #
-    #     # Count consecutive matching characters using SIMD
-    #     while pos < text_len:
-    #         var ch = text[pos]
-    #         if simd_matcher.contains(ch):
-    #             match_count += 1
-    #             pos += 1
-    #         else:
-    #             break
-    #
-    #     # Determine if we have a valid match based on the DFA pattern
-    #     var is_valid_match = False
-    #     var match_end = start_pos + match_count
-    #
-    #     if match_count == 0:
-    #         # No characters matched - only valid if start state accepts (e.g., [a-z]*)
-    #         if start_accepting:
-    #             is_valid_match = True
-    #             match_end = start_pos
-    #     else:
-    #         # Some characters matched - check if this satisfies the pattern
-    #         # For character class patterns, any positive match count is typically valid
-    #         is_valid_match = True
-    #
-    #     if is_valid_match:
-    #         # Check end anchor constraint
-    #         if self.has_end_anchor and match_end != text_len:
-    #             return None
-    #         return Match(0, start_pos, match_end, text)
-    #
-    #     return None
+    fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
+        """SIMD-optimized matching for character class patterns.
+
+        Args:
+            text: Input text to match against.
+            start_pos: Position to start matching from.
+
+        Returns:
+            Optional Match if pattern matches at this position, None otherwise.
+        """
+        if not self.simd_char_matcher:
+            return None
+
+        var simd_matcher = self.simd_char_matcher.value()
+        var pos = start_pos
+        var match_count = 0
+        var text_len = len(text)
+
+        # Check if start state is accepting (for patterns like [a-z]*)
+        var start_accepting = (
+            len(self.states) > 0 and self.states[self.start_state].is_accepting
+        )
+
+        # Count consecutive matching characters using SIMD
+        while pos < text_len:
+            var ch_code = ord(text[pos])
+            if simd_matcher.contains(ch_code):
+                match_count += 1
+                pos += 1
+            else:
+                break
+
+        # Determine if we have a valid match based on the DFA pattern
+        var is_valid_match = False
+        var match_end = start_pos + match_count
+
+        if match_count == 0:
+            # No characters matched - only valid if start state accepts (e.g., [a-z]*)
+            if start_accepting:
+                is_valid_match = True
+                match_end = start_pos
+        else:
+            # Some characters matched - check if this satisfies the pattern
+            # For character class patterns, any positive match count is typically valid
+            is_valid_match = True
+
+        if is_valid_match:
+            # Check end anchor constraint
+            if self.has_end_anchor and match_end != text_len:
+                return None
+            return Match(0, start_pos, match_end, text)
+
+        return None
 
 
 struct BoyerMoore:
