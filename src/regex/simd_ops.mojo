@@ -16,7 +16,20 @@ The module automatically adapts to the available SIMD width:
 """
 
 from algorithm import vectorize
+from sys import ffi
 from sys.info import simdwidthof
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_ALNUM_LOWER,
+    SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_CUSTOM,
+)
 
 # SIMD width for character operations (uint8)
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
@@ -279,6 +292,54 @@ fn create_whitespace() -> CharacterClassSIMD:
     return CharacterClassSIMD(whitespace_chars)
 
 
+@always_inline
+fn create_ascii_alpha() -> CharacterClassSIMD:
+    """Create SIMD matcher for ASCII letters [a-zA-Z]."""
+    var result = CharacterClassSIMD("")
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_lower() -> CharacterClassSIMD:
+    """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
+    var result = CharacterClassSIMD("")
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_upper() -> CharacterClassSIMD:
+    """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
+    var result = CharacterClassSIMD("")
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
 struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
@@ -498,6 +559,54 @@ fn simd_count_char(text: String, target_char: String) -> Int:
         pos += 1
 
     return count
+
+
+# Global SIMD matchers dictionary type
+alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
+
+# Global SIMD matchers cache
+alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
+    "SIMDMatchers", SIMDMatchers, _init_simd_matchers
+]
+
+
+fn _init_simd_matchers() -> SIMDMatchers:
+    """Initialize the global SIMD matchers dictionary."""
+    var matchers = SIMDMatchers()
+    matchers[SIMD_MATCHER_WHITESPACE] = create_whitespace()
+    matchers[SIMD_MATCHER_DIGITS] = create_ascii_digits()
+    matchers[SIMD_MATCHER_ALPHA_LOWER] = create_ascii_lowercase()
+    matchers[SIMD_MATCHER_ALPHA_UPPER] = create_ascii_uppercase()
+    matchers[SIMD_MATCHER_ALPHA] = create_ascii_alpha()
+    matchers[SIMD_MATCHER_ALNUM] = create_ascii_alphanumeric()
+    matchers[SIMD_MATCHER_ALNUM_LOWER] = create_ascii_alnum_lower()
+    matchers[SIMD_MATCHER_ALNUM_UPPER] = create_ascii_alnum_upper()
+    return matchers
+
+
+fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers]:
+    """Returns a pointer to the global SIMD matchers dictionary."""
+    var ptr = _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
+    return ptr
+
+
+@always_inline
+fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
+    """Get a SIMD matcher by type from the global cache.
+    Args:
+        matcher_type: One of the SIMD_MATCHER_* constants.
+    Returns:
+        The corresponding CharacterClassSIMD matcher.
+    """
+    var matchers_ptr = _get_simd_matchers()
+    var matchers = matchers_ptr[]
+
+    # Try to get from cache
+    try:
+        return matchers[matcher_type]
+    except:
+        # Return empty matcher for unknown types
+        return CharacterClassSIMD("")
 
 
 struct TwoWaySearcher(Copyable & Movable):

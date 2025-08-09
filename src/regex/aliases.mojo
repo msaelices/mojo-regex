@@ -36,3 +36,14 @@ alias CHAR_NEWLINE = ord("\n")
 alias ALL_EXCEPT_NEWLINE = _all_except_newline()
 
 alias EMPTY_SLICE = StringSlice[ImmutableAnyOrigin]("")
+
+# SIMD matcher type constants
+alias SIMD_MATCHER_WHITESPACE = 1
+alias SIMD_MATCHER_DIGITS = 2
+alias SIMD_MATCHER_ALPHA_LOWER = 3
+alias SIMD_MATCHER_ALPHA_UPPER = 4
+alias SIMD_MATCHER_ALPHA = 5
+alias SIMD_MATCHER_ALNUM = 6
+alias SIMD_MATCHER_ALNUM_LOWER = 7
+alias SIMD_MATCHER_ALNUM_UPPER = 8
+alias SIMD_MATCHER_CUSTOM = 9

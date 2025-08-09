@@ -1,15 +1,20 @@
 from memory import UnsafePointer
 
 from regex.ast import ASTNode
-from regex.aliases import CHAR_ZERO, CHAR_NINE, CHAR_NEWLINE
+from regex.aliases import (
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_NEWLINE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_WHITESPACE,
+)
 from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
 from regex.simd_ops import (
     TwoWaySearcher,
     CharacterClassSIMD,
-    create_ascii_digits,
-    create_whitespace,
+    get_simd_matcher,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity
@@ -553,7 +558,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         # Use SIMD whitespace matcher
-        var whitespace_matcher = create_whitespace()
+        var whitespace_matcher = get_simd_matcher(SIMD_MATCHER_WHITESPACE)
         var ch_code = ord(str[str_i])
         if whitespace_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -576,7 +581,7 @@ struct NFAEngine(Engine):
             return (False, str_i)
 
         # Use SIMD digit matcher
-        var digit_matcher = create_ascii_digits()
+        var digit_matcher = get_simd_matcher(SIMD_MATCHER_DIGITS)
         var ch_code = ord(str[str_i])
         if digit_matcher.contains(ch_code):
             return self._apply_quantifier(
@@ -1032,9 +1037,9 @@ struct NFAEngine(Engine):
 
         # Get appropriate SIMD matcher
         if ast.type == DIGIT:
-            simd_matcher = create_ascii_digits()
+            simd_matcher = get_simd_matcher(SIMD_MATCHER_DIGITS)
         elif ast.type == SPACE:
-            simd_matcher = create_whitespace()
+            simd_matcher = get_simd_matcher(SIMD_MATCHER_WHITESPACE)
         elif ast.type == RANGE and ast.get_value():
             var range_pattern = String(ast.get_value().value())
             simd_matcher = self._create_range_matcher(range_pattern)
