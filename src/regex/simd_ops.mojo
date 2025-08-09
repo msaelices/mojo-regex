@@ -580,14 +580,6 @@ alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
 fn _init_simd_matchers() -> SIMDMatchers:
     """Initialize the global SIMD matchers dictionary."""
     var matchers = SIMDMatchers()
-    matchers[SIMD_MATCHER_WHITESPACE] = create_whitespace()
-    matchers[SIMD_MATCHER_DIGITS] = create_ascii_digits()
-    matchers[SIMD_MATCHER_ALPHA_LOWER] = create_ascii_lowercase()
-    matchers[SIMD_MATCHER_ALPHA_UPPER] = create_ascii_uppercase()
-    matchers[SIMD_MATCHER_ALPHA] = create_ascii_alpha()
-    matchers[SIMD_MATCHER_ALNUM] = create_ascii_alphanumeric()
-    matchers[SIMD_MATCHER_ALNUM_LOWER] = create_ascii_alnum_lower()
-    matchers[SIMD_MATCHER_ALNUM_UPPER] = create_ascii_alnum_upper()
     return matchers
 
 
@@ -612,8 +604,28 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
     try:
         return matchers[matcher_type]
     except:
-        # Return empty matcher for unknown types
-        return CharacterClassSIMD("")
+        var matcher: CharacterClassSIMD
+        if matcher_type == SIMD_MATCHER_WHITESPACE:
+            matcher = create_whitespace()
+        elif matcher_type == SIMD_MATCHER_DIGITS:
+            matcher = create_ascii_digits()
+        elif matcher_type == SIMD_MATCHER_ALPHA_LOWER:
+            matcher = create_ascii_lowercase()
+        elif matcher_type == SIMD_MATCHER_ALPHA_UPPER:
+            matcher = create_ascii_uppercase()
+        elif matcher_type == SIMD_MATCHER_ALPHA:
+            matcher = create_ascii_alpha()
+        elif matcher_type == SIMD_MATCHER_ALNUM:
+            matcher = create_ascii_alphanumeric()
+        elif matcher_type == SIMD_MATCHER_ALNUM_LOWER:
+            matcher = create_ascii_alnum_lower()
+        elif matcher_type == SIMD_MATCHER_ALNUM_UPPER:
+            matcher = create_ascii_alnum_upper()
+        else:
+            # Custom matcher, create empty one
+            matcher = CharacterClassSIMD("")
+        matchers[matcher_type] = matcher
+        return matcher
 
 
 struct TwoWaySearcher(Copyable & Movable):
