@@ -56,8 +56,9 @@ struct NFAEngine(Engine):
                     var literal_set = extract_literals(ast)
 
                     # Use best literal if available and significant
-                    if literal_set.best_literal:
-                        var best = literal_set.best_literal.value()
+                    ref best_literal = literal_set.get_best_literal()
+                    if best_literal:
+                        var best = best_literal.value()
                         # Require longer literals to justify overhead
                         if best.is_prefix and best.get_literal_len() > 3:
                             # Use prefix literal for optimization

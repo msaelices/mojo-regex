@@ -5,6 +5,7 @@ This module implements the literal optimization strategies described in the burn
 including literal extraction, selection of optimal search strings, and prefiltering hints.
 """
 
+from builtin._location import __call_location
 from regex.aliases import EMPTY_SLICE
 from regex.ast import (
     ASTNode,
@@ -73,6 +74,19 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
         self.is_suffix = is_suffix
         self.is_required = is_required
 
+    # @always_inline
+    # fn __copyinit__(out self, other: Self):
+    #     """Copy constructor for LiteralInfo."""
+    #     self.node_ptr = other.node_ptr
+    #     self.literal_string = other.literal_string
+    #     self.start_offset = other.start_offset
+    #     self.is_prefix = other.is_prefix
+    #     self.is_suffix = other.is_suffix
+    #     self.is_required = other.is_required
+    #
+    #     var call_location = __call_location()
+    #     print("Copying LiteralInfo", call_location)
+
     fn get_literal(self) -> String:
         """Get the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
@@ -101,17 +115,17 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
 
     var literals: List[LiteralInfo[node_origin]]
     """All literals found in the pattern."""
-    var best_literal: Optional[LiteralInfo[node_origin]]
+    var best_literal_idx: Optional[Int]
     """The best literal to use for prefiltering."""
 
     fn __init__(out self):
         """Initialize an empty literal set."""
         self.literals = List[LiteralInfo[node_origin]]()
-        self.best_literal = None
+        self.best_literal_idx = None
 
-    fn add(mut self, literal: LiteralInfo[node_origin]):
+    fn add(mut self, owned literal: LiteralInfo[node_origin]):
         """Add a literal to the set."""
-        self.literals.append(literal)
+        self.literals.append(literal^)
 
     fn select_best(mut self):
         """Select the best literal for prefiltering.
@@ -123,14 +137,14 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
         4. Prefer literals that appear later in the pattern
         """
         if len(self.literals) == 0:
-            self.best_literal = None
+            self.best_literal_idx = None
             return
 
         var best_idx = 0
         var best_score = 0
 
         for i in range(len(self.literals)):
-            var lit = self.literals[i]
+            ref lit = self.literals[i]
             var score = 0
 
             # Required literals are strongly preferred
@@ -153,7 +167,15 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
                 best_score = score
                 best_idx = i
 
-        self.best_literal = self.literals[best_idx]
+        self.best_literal_idx = best_idx
+
+    @always_inline
+    fn get_best_literal(self) -> Optional[LiteralInfo[node_origin]]:
+        """Get the best literal for prefiltering, if available."""
+        if self.best_literal_idx:
+            return self.literals[self.best_literal_idx.value()]
+        else:
+            return None
 
 
 fn extract_literals[
@@ -247,10 +269,10 @@ fn _extract_from_node[
                     return
 
             # Regular group - extract sequence
-            var group_literals = _extract_sequence(
+            ref group_literals = _extract_sequence(
                 node, offset, is_required, at_start
             )
-            for lit in group_literals:
+            for ref lit in group_literals:
                 result.add(lit)
 
     elif node.type == OR:
