@@ -3,13 +3,38 @@ SIMD-optimized operations for high-performance regex matching.
 
 This module leverages Mojo's SIMD capabilities to vectorize character operations,
 providing significant speedups for character class matching and string scanning.
+
+Hardware Requirements for Optimal Performance:
+- SSE3/SSSE3: Required for 16-byte _dynamic_shuffle operations (pshufb instruction)
+- AVX2: Required for 32-byte _dynamic_shuffle operations (vpshufb instruction)
+- AVX-512: Future support possible for 64-byte operations
+
+The module automatically adapts to the available SIMD width:
+- SIMD_WIDTH == 16: Uses SSE shuffle operations (most x86-64 CPUs)
+- SIMD_WIDTH == 32: Uses AVX2 shuffle operations (modern x86-64 CPUs since ~2013)
+- Other widths: Falls back to scalar or sub-optimal vectorized operations
 """
 
 from algorithm import vectorize
+from builtin._location import __call_location
+from sys import ffi
 from sys.info import simdwidthof
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_ALNUM_LOWER,
+    SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_CUSTOM,
+)
 
 # SIMD width for character operations (uint8)
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
 
 @register_passable("trivial")
@@ -18,6 +43,10 @@ struct CharacterClassSIMD(Copyable, Movable):
 
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
+    var size_hint: Int
+    """Number of characters in the class for optimization decisions."""
+    var use_shuffle: Bool
+    """Whether to use shuffle optimization based on pattern characteristics."""
 
     fn __init__(out self, owned char_class: String):
         """Initialize SIMD character class matcher.
@@ -26,12 +55,20 @@ struct CharacterClassSIMD(Copyable, Movable):
             char_class: String containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
+        self.size_hint = len(char_class)
+
+        # Use shuffle optimization for larger character classes (empirically determined threshold)
+        # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
+        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
+        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
             var char_code = ord(char_class[i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
+        # var call_location = __call_location()
+        # print("Init CharacterClassSIMD", call_location)
 
     fn __init__(out self, start_char: String, end_char: String):
         """Initialize with a character range like 'a'-'z'.
@@ -45,8 +82,15 @@ struct CharacterClassSIMD(Copyable, Movable):
         var start_code = max(ord(start_char), 0)
         var end_code = min(ord(end_char), 255)
 
+        self.size_hint = end_code - start_code + 1
+        # Character ranges typically benefit from shuffle optimization
+        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
+        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
+
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
+        # var call_location = __call_location()
+        # print("Init CharacterClassSIMD", call_location)
 
     fn contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -161,14 +205,51 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # Use lookup table to check each character
-        var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+        # Use hybrid approach based on pattern characteristics
+        if self.use_shuffle:
 
-        for i in range(SIMD_WIDTH):
-            var char_code = Int(chunk[i])
-            matches[i] = self.lookup_table[char_code] == 1
+            @parameter
+            if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
+                # Fast path: use _dynamic_shuffle for 16-byte (SSE) or 32-byte (AVX2) chunks
+                # The lookup table acts as our shuffle table
+                # Hardware support: SSE3/SSSE3 for 16-byte, AVX2 for 32-byte
+                var result = self.lookup_table._dynamic_shuffle(chunk)
+                return result != 0
+            else:
+                # Fallback for other sizes - still avoid the loop by using vectorized operations
+                var matches = SIMD[DType.bool, SIMD_WIDTH](False)
 
-        return matches
+                # Process in 16-byte sub-chunks when possible
+                @parameter
+                for offset in range(0, SIMD_WIDTH, 16):
+
+                    @parameter
+                    if offset + 16 <= SIMD_WIDTH:
+                        var sub_chunk = chunk.slice[16, offset=offset]()
+                        var sub_result = self.lookup_table._dynamic_shuffle(
+                            sub_chunk
+                        )
+                        for i in range(16):
+                            matches[offset + i] = sub_result[i] != 0
+                    else:
+                        # Handle remaining elements
+                        for i in range(offset, SIMD_WIDTH):
+                            var char_code = Int(chunk[i])
+                            matches[i] = self.lookup_table[char_code] == 1
+
+                return matches
+        else:
+            # Simple lookup for small character classes - often faster for simple patterns
+            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+
+            # Unroll for better performance
+            @parameter
+            for i in range(SIMD_WIDTH):
+                var char_code = Int(chunk[i])
+                if char_code < 256:
+                    matches[i] = self.lookup_table[char_code] == 1
+
+            return matches
 
 
 @always_inline
@@ -216,6 +297,54 @@ fn create_whitespace() -> CharacterClassSIMD:
     return CharacterClassSIMD(whitespace_chars)
 
 
+@always_inline
+fn create_ascii_alpha() -> CharacterClassSIMD:
+    """Create SIMD matcher for ASCII letters [a-zA-Z]."""
+    var result = CharacterClassSIMD("")
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_lower() -> CharacterClassSIMD:
+    """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
+    var result = CharacterClassSIMD("")
+
+    # Add lowercase letters
+    for i in range(ord("a"), ord("z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
+@always_inline
+fn create_ascii_alnum_upper() -> CharacterClassSIMD:
+    """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
+    var result = CharacterClassSIMD("")
+
+    # Add uppercase letters
+    for i in range(ord("A"), ord("Z") + 1):
+        result.lookup_table[i] = 1
+
+    # Add digits
+    for i in range(ord("0"), ord("9") + 1):
+        result.lookup_table[i] = 1
+
+    return result
+
+
 struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
@@ -258,6 +387,10 @@ struct SIMDStringSearch(Copyable, Movable):
         var text_len = len(text)
         var pos = start
 
+        # For very short patterns (1-2 chars), use simpler approach
+        if self.pattern_length <= 2:
+            return self._search_short_pattern(text, start)
+
         # Use SIMD to quickly find potential matches by first character
         while pos + SIMD_WIDTH <= text_len:
             # Load chunk of text
@@ -281,6 +414,36 @@ struct SIMDStringSearch(Copyable, Movable):
             if self._verify_match(text, pos):
                 return pos
             pos += 1
+
+        return -1
+
+    fn _search_short_pattern(self, text: String, start: Int) -> Int:
+        """Optimized search for very short patterns (1-2 characters).
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
+        var text_len = len(text)
+
+        if self.pattern_length == 1:
+            # Single character - simple scan
+            var target_char = self.pattern[0]
+            for i in range(start, text_len):
+                if text[i] == target_char:
+                    return i
+        elif self.pattern_length == 2:
+            # Two characters - check pairs
+            if text_len - start < 2:
+                return -1
+            var first_char = self.pattern[0]
+            var second_char = self.pattern[1]
+            for i in range(start, text_len - 1):
+                if text[i] == first_char and text[i + 1] == second_char:
+                    return i
 
         return -1
 
@@ -401,6 +564,66 @@ fn simd_count_char(text: String, target_char: String) -> Int:
         pos += 1
 
     return count
+
+
+# Global SIMD matchers dictionary type
+alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
+
+# Global SIMD matchers cache
+alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
+    "SIMDMatchers", SIMDMatchers, _init_simd_matchers
+]
+
+
+fn _init_simd_matchers() -> SIMDMatchers:
+    """Initialize the global SIMD matchers dictionary."""
+    var matchers = SIMDMatchers()
+    return matchers
+
+
+fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers]:
+    """Returns a pointer to the global SIMD matchers dictionary."""
+    var ptr = _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
+    return ptr
+
+
+@always_inline
+fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
+    """Get a SIMD matcher by type from the global cache.
+    Args:
+        matcher_type: One of the SIMD_MATCHER_* constants.
+    Returns:
+        The corresponding CharacterClassSIMD matcher.
+    """
+    var matchers_ptr = _get_simd_matchers()
+    var matchers = matchers_ptr[]
+
+    # Try to get from cache
+    try:
+        return matchers[matcher_type]
+    except:
+        var matcher: CharacterClassSIMD
+        if matcher_type == SIMD_MATCHER_WHITESPACE:
+            matcher = create_whitespace()
+        elif matcher_type == SIMD_MATCHER_DIGITS:
+            matcher = create_ascii_digits()
+        elif matcher_type == SIMD_MATCHER_ALPHA_LOWER:
+            matcher = create_ascii_lowercase()
+        elif matcher_type == SIMD_MATCHER_ALPHA_UPPER:
+            matcher = create_ascii_uppercase()
+        elif matcher_type == SIMD_MATCHER_ALPHA:
+            matcher = create_ascii_alpha()
+        elif matcher_type == SIMD_MATCHER_ALNUM:
+            matcher = create_ascii_alphanumeric()
+        elif matcher_type == SIMD_MATCHER_ALNUM_LOWER:
+            matcher = create_ascii_alnum_lower()
+        elif matcher_type == SIMD_MATCHER_ALNUM_UPPER:
+            matcher = create_ascii_alnum_upper()
+        else:
+            # Custom matcher, create empty one
+            matcher = CharacterClassSIMD("")
+        matchers[matcher_type] = matcher
+        return matcher
 
 
 struct TwoWaySearcher(Copyable & Movable):

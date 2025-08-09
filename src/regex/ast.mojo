@@ -28,6 +28,12 @@ alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
     END,
     -1,  # sentinel to pad to 8 elements
 ]
+alias SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
+    SPACE,
+    DIGIT,
+    RANGE,
+    -1,  # sentinel to pad to 4 elements
+]
 
 alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
 
@@ -323,9 +329,20 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         else:
             writer.write("ASTNode(type=", self.type, ", value=None)")
 
+    @always_inline
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
         if (LEAF_ELEMS == self.type).reduce_or():
+            return True
+        else:
+            return False
+
+    @always_inline
+    fn is_simd_optimizable(self, min_matches: Int, max_matches: Int) -> Bool:
+        """Check if the AST node is a SIMD quantifier."""
+        if (SIMD_QUANTIFIERS == self.type).reduce_or() and (
+            min_matches > 1 or max_matches != 1
+        ):
             return True
         else:
             return False
