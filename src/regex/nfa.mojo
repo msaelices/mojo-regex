@@ -15,6 +15,8 @@ from regex.simd_ops import (
     TwoWaySearcher,
     CharacterClassSIMD,
     get_simd_matcher,
+    apply_quantifier_simd_generic,
+    find_in_text_simd,
 )
 from regex.simd_matchers import (
     get_digit_matcher,
@@ -22,10 +24,6 @@ from regex.simd_matchers import (
     get_alpha_matcher,
     get_alnum_matcher,
     RangeBasedMatcher,
-)
-from regex.parametric_nfa_helpers import (
-    apply_quantifier_simd_generic,
-    find_in_text_simd,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity

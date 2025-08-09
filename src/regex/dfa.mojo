@@ -24,7 +24,12 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
-from regex.simd_ops import SIMDStringSearch, CharacterClassSIMD
+from regex.simd_ops import (
+    SIMDStringSearch,
+    CharacterClassSIMD,
+    apply_quantifier_simd_generic,
+    find_in_text_simd,
+)
 from regex.simd_matchers import (
     analyze_character_class_pattern,
     get_digit_matcher,
@@ -34,10 +39,6 @@ from regex.simd_matchers import (
     get_hex_digit_matcher,
     RangeBasedMatcher,
     NibbleBasedMatcher,
-)
-from regex.parametric_nfa_helpers import (
-    apply_quantifier_simd_generic,
-    find_in_text_simd,
 )
 
 alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
