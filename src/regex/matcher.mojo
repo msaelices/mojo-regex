@@ -46,19 +46,21 @@ trait RegexMatcher:
         ...
 
 
-struct DFAMatcher(Copyable, Movable, RegexMatcher):
+struct DFAMatcher[regex_orig: MutableOrigin](Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine: DFAEngine
+    var engine: DFAEngine[regex_orig]
     """The underlying DFA engine for pattern matching."""
 
-    fn __init__(out self, owned ast: ASTNode[MutableAnyOrigin]) raises:
+    fn __init__(
+        out self, owned ast: ASTNode[ImmutableAnyOrigin], ref pattern: String
+    ) raises:
         """Initialize DFA matcher by compiling the AST.
 
         Args:
             ast: AST representing the regex pattern.
         """
-        self.engine = compile_simple_pattern(ast)
+        self.engine = compile_simple_pattern[ImmutableAnyOrigin](ast, pattern)
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
@@ -126,18 +128,20 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_all(text)
 
 
-struct HybridMatcher(Copyable, Movable, RegexMatcher):
+struct HybridMatcher[regex_orig: MutableOrigin](
+    Copyable, Movable, RegexMatcher
+):
     """Intelligent matcher that routes to optimal engine based on pattern complexity.
     """
 
-    var dfa_matcher: Optional[DFAMatcher]
+    var dfa_matcher: Optional[DFAMatcher[regex_orig]]
     """Optional DFA matcher for simple patterns."""
     var nfa_matcher: NFAMatcher
     """NFA matcher as fallback for complex patterns."""
     var complexity: PatternComplexity
     """Analyzed complexity level of the regex pattern."""
 
-    fn __init__(out self, pattern: String) raises:
+    fn __init__(out self, ref [regex_orig]pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
 
         Args:
@@ -155,7 +159,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Create DFA matcher if pattern is simple enough
         if self.complexity.value == PatternComplexity.SIMPLE:
             try:
-                self.dfa_matcher = DFAMatcher(ast)
+                self.dfa_matcher = DFAMatcher[regex_orig](ast, pattern)
             except:
                 # DFA compilation failed, fall back to NFA only
                 self.dfa_matcher = None
@@ -237,10 +241,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return self.complexity
 
 
-struct CompiledRegex(Copyable, Movable):
+alias CompiledRegex = CompiledRegexImpl[MutableAnyOrigin]
+
+
+struct CompiledRegexImpl[regex_orig: MutableOrigin](Copyable, Movable):
     """High-level compiled regex object with caching and optimization."""
 
-    var matcher: HybridMatcher
+    var matcher: HybridMatcher[regex_orig]
     """The hybrid matcher instance for this compiled regex."""
     var pattern: String
     """The original regex pattern string."""
@@ -254,7 +261,7 @@ struct CompiledRegex(Copyable, Movable):
             pattern: Regex pattern string.
         """
         self.pattern = pattern
-        self.matcher = HybridMatcher(pattern)
+        self.matcher = HybridMatcher[regex_orig](self.pattern)
         self.compiled_at = monotonic()
 
     fn __moveinit__(out self, owned other: Self):

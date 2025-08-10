@@ -220,7 +220,9 @@ struct DFAState(Copyable, Movable):
         return -1
 
 
-struct DFAEngine(Engine):
+struct DFAEngine[
+    literal_orig: MutableOrigin,
+](Engine):
     """DFA-based regex engine for O(n) pattern matching."""
 
     var states: List[DFAState]
@@ -231,7 +233,9 @@ struct DFAEngine(Engine):
     """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
-    var simd_string_search: Optional[SIMDStringSearch]
+    var simd_string_search: Optional[
+        SIMDStringSearch[ImmutableOrigin.cast_from[literal_orig]]
+    ]
     """SIMD-optimized string search for pure literal patterns."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
@@ -239,10 +243,10 @@ struct DFAEngine(Engine):
     """SIMD-optimized character class matcher for simple patterns."""
     var simd_char_pattern: String
     """The character class pattern being matched with SIMD."""
-    var literal_pattern: String
+    var literal_pattern: StringSlice[origin=literal_orig]
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
-    fn __init__(out self):
+    fn __init__(out self, ref [literal_orig]literal_pattern: String):
         """Initialize an empty DFA engine."""
         self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
@@ -252,7 +256,7 @@ struct DFAEngine(Engine):
         self.is_pure_literal = False
         self.simd_char_matcher = None
         self.simd_char_pattern = ""
-        self.literal_pattern = ""
+        self.literal_pattern = literal_pattern.as_string_slice()
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -285,7 +289,7 @@ struct DFAEngine(Engine):
         var len_pattern = len(pattern)
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
-        self.literal_pattern = pattern
+        self.literal_pattern = pattern.as_string_slice()
 
         if len_pattern == 0:
             self._create_accepting_state()
@@ -293,9 +297,12 @@ struct DFAEngine(Engine):
 
         # For pure literal patterns without anchors, use SIMD string search
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
-            self.literal_pattern = pattern  # Store pattern to keep it alive
+            self.literal_pattern = (
+                pattern.as_string_slice()
+            )  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch(self.literal_pattern)
+            # TODO: Fix SIMD string search with proper origin tracking
+            # self.simd_string_search = SIMDStringSearch[ImmutableOrigin.cast_from[literal_orig]](str(self.literal_pattern))
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
@@ -1264,7 +1271,11 @@ struct BoyerMoore:
         return positions
 
 
-fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_ast_pattern[
+    ast_orig: ImmutableOrigin
+](
+    ast: ASTNode[ast_orig], ref [MutableAnyOrigin]pattern: String
+) raises -> DFAEngine[MutableAnyOrigin]:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -1276,7 +1287,7 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     Raises:
         Error if pattern is too complex for DFA compilation.
     """
-    var dfa = DFAEngine()
+    var dfa = DFAEngine[MutableAnyOrigin](pattern)
 
     if is_literal_pattern(ast):
         # Handle literal string patterns (possibly with anchors)
@@ -1327,7 +1338,11 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     return dfa^
 
 
-fn compile_simple_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_simple_pattern[
+    ast_orig: ImmutableOrigin
+](
+    ast: ASTNode[ast_orig], ref [MutableAnyOrigin]pattern: String
+) raises -> DFAEngine[MutableAnyOrigin]:
     """Compile a simple pattern AST into a DFA engine.
 
     Args:
@@ -1338,9 +1353,10 @@ fn compile_simple_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
 
     Raises:
         Error if pattern is too complex for DFA compilation.
+        pattern: String pattern to store and keep alive.
     """
-    # Use the enhanced compilation function
-    return compile_ast_pattern(ast)
+    # Use the enhanced compilation function but with pattern tracking
+    return compile_ast_pattern[ast_orig](ast, pattern)
 
 
 fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:

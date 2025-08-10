@@ -429,7 +429,7 @@ struct SIMDStringSearch[
 ]:
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern_ptr: UnsafePointer[Byte, origin=pattern_orig]
+    var pattern_ptr: UnsafePointer[Byte]
     """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
