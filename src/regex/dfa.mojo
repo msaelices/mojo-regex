@@ -239,6 +239,8 @@ struct DFAEngine(Engine):
     """SIMD-optimized character class matcher for simple patterns."""
     var simd_char_pattern: String
     """The character class pattern being matched with SIMD."""
+    var literal_pattern: String
+    """Storage for literal pattern to keep it alive for SIMD string search."""
 
     fn __init__(out self):
         """Initialize an empty DFA engine."""
@@ -250,6 +252,7 @@ struct DFAEngine(Engine):
         self.is_pure_literal = False
         self.simd_char_matcher = None
         self.simd_char_pattern = ""
+        self.literal_pattern = ""
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -261,10 +264,11 @@ struct DFAEngine(Engine):
         self.is_pure_literal = other.is_pure_literal
         self.simd_char_matcher = other.simd_char_matcher^
         self.simd_char_pattern = other.simd_char_pattern^
+        self.literal_pattern = other.literal_pattern^
 
     fn compile_pattern(
         mut self,
-        owned pattern: String,
+        pattern: String,
         has_start_anchor: Bool,
         has_end_anchor: Bool,
     ) raises:
@@ -281,6 +285,7 @@ struct DFAEngine(Engine):
         var len_pattern = len(pattern)
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
+        self.literal_pattern = pattern
 
         if len_pattern == 0:
             self._create_accepting_state()
@@ -288,8 +293,9 @@ struct DFAEngine(Engine):
 
         # For pure literal patterns without anchors, use SIMD string search
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
+            self.literal_pattern = pattern  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch(pattern)
+            self.simd_string_search = SIMDStringSearch(self.literal_pattern)
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
