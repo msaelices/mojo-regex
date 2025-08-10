@@ -1,9 +1,9 @@
-## High-Performance Regex in Mojo🔥
+## High-Performance Regex in Mojo
 
 ### Building a Hybrid DFA/NFA Engine with SIMD Optimization
 
 <div style="text-align: center;">
-<img src="./image/regex-engine.png" alt="regex engine" width="700" height="400">
+<img src="./image/logo.png" alt="regex engine">
 </div>
 
 ---
