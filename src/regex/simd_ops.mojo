@@ -424,17 +424,19 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
 
 
 @register_passable("trivial")
-struct SIMDStringSearch:
+struct SIMDStringSearch[
+    pattern_orig: ImmutableOrigin,
+]:
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern_ptr: UnsafePointer[Byte]
+    var pattern_ptr: UnsafePointer[Byte, origin=pattern_orig]
     """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
     """SIMD vector filled with the first character of the pattern for fast comparison."""
 
-    fn __init__(out self, pattern: String):
+    fn __init__(out self, ref [pattern_orig]pattern: String):
         """Initialize SIMD string search.
 
         Args:
@@ -543,6 +545,15 @@ struct SIMDStringSearch:
 
         for i in range(self.pattern_length):
             var ptr = self.pattern_ptr + i
+            # TODO: Remove when debugging is complete
+            print(
+                "Checking character at position",
+                pos + i,
+                ":",
+                text[pos + i],
+                "==",
+                chr(Int(ptr[])),
+            )
             if ord(text[pos + i]) != Int(ptr[]):
                 return False
 
