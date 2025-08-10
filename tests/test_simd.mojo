@@ -153,19 +153,19 @@ def test_simd_string_search():
     var search = SIMDStringSearch("hello")
 
     # Test basic search
-    assert_equal(search.search("hello world"), 0)
-    assert_equal(search.search("say hello there"), 4)
-    assert_equal(search.search("goodbye"), -1)
+    assert_equal(search.search("hello", "hello world"), 0)
+    assert_equal(search.search("hello", "say hello there"), 4)
+    assert_equal(search.search("hello", "goodbye"), -1)
 
     # Test with start position
-    assert_equal(search.search("hello hello hello", 1), 6)
+    assert_equal(search.search("hello", "hello hello hello", 1), 6)
 
 
 def test_simd_string_search_all():
     """Test finding all occurrences with SIMD string search."""
     var search = SIMDStringSearch("ll")
 
-    var positions = search.search_all("hello world, all well")
+    var positions = search.search_all("ll", "hello world, all well")
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 2)  # "hello"
     assert_equal(positions[1], 14)  # "all"
@@ -177,18 +177,18 @@ def test_simd_string_search_empty():
     var search = SIMDStringSearch("")
 
     # Empty pattern should match at any position
-    assert_equal(search.search("hello"), 0)
-    assert_equal(search.search("hello", 2), 2)
+    assert_equal(search.search("", "hello"), 0)
+    assert_equal(search.search("", "hello", 2), 2)
 
 
 def test_simd_string_search_single_char():
     """Test SIMD string search with single character."""
     var search = SIMDStringSearch("a")
 
-    assert_equal(search.search("banana"), 1)
-    assert_equal(search.search("hello"), -1)
+    assert_equal(search.search("a", "banana"), 1)
+    assert_equal(search.search("a", "hello"), -1)
 
-    var positions = search.search_all("banana")
+    var positions = search.search_all("a", "banana")
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 1)
     assert_equal(positions[1], 3)
