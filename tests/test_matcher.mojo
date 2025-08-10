@@ -126,7 +126,7 @@ def test_match_function():
     """Test high-level match function (anchored at start)."""
     # Clear cache to avoid any caching issues
     clear_regex_cache()
-    
+
     # Should match at start
     var result1 = match_first("hello", "hello world")
     assert_true(result1.__bool__())
