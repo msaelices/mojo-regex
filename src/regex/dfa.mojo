@@ -589,6 +589,11 @@ struct DFAEngine(Engine):
             self._create_accepting_state()
             return
 
+        # TODO: Enable SIMD optimization for digit-heavy patterns
+        # This addresses performance regression in patterns like [0-9]+[.]?[0-9]*
+        # Currently disabled due to correctness issues - needs better integration with DFA logic
+        # self._try_enable_simd_for_sequence(sequence_info)
+
         # Build a chain of states for each character class in the sequence
         var current_state_index = 0
 
@@ -780,6 +785,47 @@ struct DFAEngine(Engine):
         var state = DFAState(is_accepting=True, match_length=0)
         self.states.append(state)
         self.start_state = 0
+
+    fn _try_enable_simd_for_sequence(
+        mut self, sequence_info: SequentialPatternInfo
+    ):
+        """Try to enable SIMD optimization for multi-character sequences dominated by digits.
+
+        This addresses performance regression in patterns like [0-9]+[.]?[0-9]*
+        where SIMD optimization was disabled despite being digit-heavy.
+
+        Args:
+            sequence_info: Information about the pattern sequence.
+        """
+        if not sequence_info.elements:
+            return
+
+        # Analyze the sequence to see if it's digit-dominated
+        var digit_elements = 0
+        var total_elements = len(sequence_info.elements)
+        var first_element_is_digits = False
+
+        for i in range(total_elements):
+            var element = sequence_info.elements[i]
+            if (
+                element.char_class == DIGITS
+                or element.char_class == "0123456789"
+            ):
+                digit_elements += 1
+                if i == 0:
+                    first_element_is_digits = True
+
+        # Enable SIMD for patterns where:
+        # 1. First element is digits with min_matches >= 1 (like [0-9]+)
+        # 2. At least half the elements are digit-related
+        # This covers patterns like [0-9]+[.]?[0-9]*
+        if (
+            first_element_is_digits
+            and sequence_info.elements[0].min_matches >= 1
+            and digit_elements * 2 >= total_elements
+        ):
+            self.simd_char_matcher = CharacterClassSIMD(DIGITS)
+            self.simd_char_pattern = "[0-9]"
 
     @always_inline
     fn _add_character_class_transitions(
