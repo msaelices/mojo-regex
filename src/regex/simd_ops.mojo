@@ -45,6 +45,12 @@ from regex.aliases import (
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
+# Shuffle optimization thresholds
+# Below this size, simple lookup is faster than shuffle
+alias SHUFFLE_MIN_SIZE = 4
+# Above this size, shuffle becomes inefficient due to sparsity
+alias SHUFFLE_MAX_SIZE = 32
+
 
 @register_passable("trivial")
 struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
@@ -69,9 +75,11 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         # Use shuffle optimization for medium-sized character classes
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
         # For large classes (>32 chars like alphanumeric with 62 chars), shuffle becomes inefficient
-        # Optimal range for shuffle: 4-32 characters
+        # Optimal range for shuffle: SHUFFLE_MIN_SIZE-SHUFFLE_MAX_SIZE characters
         self.use_shuffle = (
-            self.size_hint > 3 and self.size_hint <= 32 and (USE_SHUFFLE)
+            self.size_hint >= SHUFFLE_MIN_SIZE
+            and self.size_hint <= SHUFFLE_MAX_SIZE
+            and (USE_SHUFFLE)
         )
 
         # Set bits for each character in the class
@@ -97,7 +105,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.size_hint = end_code - start_code + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
+        self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and (USE_SHUFFLE)
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1

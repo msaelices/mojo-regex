@@ -29,6 +29,18 @@ from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
+# Threshold for complex character class patterns (e.g. [a-zA-Z0-9._%+-])
+# When a pattern has alphanumeric ranges plus more than this many characters,
+# use optimized two-phase matching (check alphanumeric first, then special chars)
+alias COMPLEX_CHAR_CLASS_THRESHOLD = 10
+
+# Minimum literal length thresholds for optimization
+# Prefix literals need to be longer than this to justify optimization overhead
+alias MIN_PREFIX_LITERAL_LENGTH = 3
+# Non-prefix literals need even longer length to be worth the overhead
+alias MIN_REQUIRED_LITERAL_LENGTH = 4
+
+
 struct NFAEngine(Engine):
     """A regex engine that can match regex patterns against text."""
 
@@ -77,14 +89,22 @@ struct NFAEngine(Engine):
                     if best_literal:
                         var best = best_literal.value()
                         # Require longer literals to justify overhead
-                        if best.is_prefix and best.get_literal_len() > 3:
+                        if (
+                            best.is_prefix
+                            and best.get_literal_len()
+                            > MIN_PREFIX_LITERAL_LENGTH
+                        ):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
                             self.literal_searcher = TwoWaySearcher(
                                 self.literal_prefix
                             )
-                        elif best.is_required and best.get_literal_len() > 4:
+                        elif (
+                            best.is_required
+                            and best.get_literal_len()
+                            > MIN_REQUIRED_LITERAL_LENGTH
+                        ):
                             # Use required literal for prefiltering
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
@@ -402,7 +422,9 @@ struct NFAEngine(Engine):
 
                 # If it has alphanumeric ranges plus special chars, return None
                 # to signal specialized handling
-                if has_alnum and len(inner) > 10:  # e.g. "a-zA-Z0-9._%-+"
+                if (
+                    has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
                 # More complex pattern, use helper to expand
@@ -657,7 +679,7 @@ struct NFAEngine(Engine):
                     var has_digits = "0-9" in inner
                     var has_alnum = has_lower and has_upper and has_digits
 
-                    if has_alnum and len(inner) > 10:
+                    if has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD:
                         # Complex pattern like [a-zA-Z0-9._%+-]
                         # Check alphanumeric first (common case)
                         var alnum_matcher = get_alnum_matcher()
@@ -669,28 +691,14 @@ struct NFAEngine(Engine):
                             ch_found = ch in inner
                     else:
                         # Try to use SIMD matcher for other patterns
-                        var simd_matcher = self._create_range_matcher(
-                            String(range_pattern)
+                        ch_found = self._match_with_simd_or_fallback(
+                            ast, String(range_pattern), str[str_i], ch_code
                         )
-                        if simd_matcher:
-                            ch_found = simd_matcher.value().contains(ch_code)
-                        else:
-                            # Fallback to regular range matching
-                            ch_found = ast._is_char_in_range(
-                                String(str[str_i]), range_pattern
-                            )
                 else:
-                    # Try to use SIMD matcher for other patterns
-                    var simd_matcher = self._create_range_matcher(
-                        String(range_pattern)
+                    # Not a bracketed pattern, try SIMD matcher
+                    ch_found = self._match_with_simd_or_fallback(
+                        ast, String(range_pattern), str[str_i], ch_code
                     )
-                    if simd_matcher:
-                        ch_found = simd_matcher.value().contains(ch_code)
-                    else:
-                        # Fallback to regular range matching
-                        ch_found = ast._is_char_in_range(
-                            String(str[str_i]), range_pattern
-                        )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -718,6 +726,21 @@ struct NFAEngine(Engine):
             return (True, str_i)
         else:
             return (False, str_i)
+
+    fn _match_with_simd_or_fallback(
+        self,
+        ast: ASTNode,
+        range_pattern: String,
+        ch: String,
+        ch_code: Int,
+    ) -> Bool:
+        """Try to match with SIMD matcher, fallback to regular matching."""
+        var simd_matcher = self._create_range_matcher(range_pattern)
+        if simd_matcher:
+            return simd_matcher.value().contains(ch_code)
+        else:
+            # Fallback to regular range matching
+            return ast._is_char_in_range(ch, StringSlice(range_pattern))
 
     fn _match_or(
         self,
@@ -1255,7 +1278,9 @@ struct NFAEngine(Engine):
                     var has_upper = "A-Z" in inner
                     var has_digits = "0-9" in inner
                     var has_alnum = has_lower and has_upper and has_digits
-                    is_complex_pattern = has_alnum and len(inner) > 10
+                    is_complex_pattern = (
+                        has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                    )
 
                 if is_complex_pattern:
                     # Handle complex patterns like [a-zA-Z0-9._%+-] efficiently
