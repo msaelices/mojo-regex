@@ -177,7 +177,7 @@ Input: "hello.*world"
 
 ---
 
-### Component Details: Lexer & Parser
+### Component: Lexer & Parser
 
 **Lexer** (`lexer.mojo`)
 ```mojo
@@ -196,7 +196,33 @@ fn parse(tokens: List[Token]) -> ASTNode:
 
 ---
 
-### DFA and NFA Engines
+### Components: Optimizer and Matcher
+
+**Pattern Analysis** (`optimizer.mojo`)
+```mojo
+struct PatternAnalyzer:
+    fn classify(self, ast: ASTNode[MutableAnyOrigin]) -> PatternComplexity:
+        if ast.type == ASTNode.ELEMENT:
+            return PatternComplexity.SIMPLE  # → DFA
+        if self._has_groups_or_alternation(ast):
+            return PatternComplexity.COMPLEX  # → NFA
+        ...
+```
+**Matcher** (`matcher.mojo`)
+```mojo
+struct DFAMatcher(RegexMatcher):  # or NFAMatcher
+    var engine: DFAEngine  # or NFAEngine
+
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+        return self.engine.match_first(text, start)
+
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        return self.engine.match_next(text, start)
+```
+
+---
+
+### Component: DFA and NFA Engines
 
 - **Deterministic Finite Automaton**: Fast O(n) but limited features, exponential states
 - **Non-deterministic FA**: Full features but O(nm) with backtracking
@@ -254,93 +280,40 @@ struct PatternAnalyzer:
         # Analyze pattern features
         
         if self._is_literal_only(ast):
-            return PatternComplexity.SIMPLE  # → DFA
+            return PatternComplexity.SIMPLE  # → DFA, so O(n)
             
         if self._has_simple_quantifiers(ast):
-            return PatternComplexity.SIMPLE  # → DFA
+            return PatternComplexity.SIMPLE  # → DFA, so O(n)
             
         if self._has_groups_or_alternation(ast):
-            return PatternComplexity.COMPLEX  # → NFA
+            return PatternComplexity.COMPLEX  # → NFA, so O(nm)
 ```
-
 **Classification drives performance!**
 
 ---
 
-### DFA Engine Implementation
-
-```mojo
-struct DFAEngine:
-    var states: List[DFAState]
-    
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
-        var current_state = self.start_state
-        var pos = start
-        
-        while pos < len(text):
-            var char_code = ord(text[pos])
-            current_state = self.states[current_state].transitions[char_code]
-            
-            if current_state == -1:  # No transition
-                return None
-                
-            if self.states[current_state].is_accepting:
-                return Match(start, pos + 1, text)
-                
-            pos += 1
-```
-
-⚡ **O(n) guaranteed** - No backtracking!
-
-
----
-
-### SIMD Character Class Matching
+### SIMD Matching
 
 **The Challenge**: Check if character is in `[a-z]`
 
-**Traditional Approach:**
+**Traditional Approach (one char at a time):**
 ```mojo
-# Check each character one by one
 if char >= 'a' and char <= 'z':
-    match!
 ```
-
 **SIMD Approach:**
 ```mojo
-struct CharacterClassSIMD:
-    var lookup_table: SIMD[DType.uint8, 256]
+struct CharacterClassSIMD(SIMDMatcher):
+    var lookup_table: SIMD[DType.uint8, 256]  # 'a' to 'z' as 1s
     
-    fn _check_chunk_simd(self, text: String, pos: Int):
-        var chunk = text.unsafe_ptr().load[width=16](pos)
+    fn match_chunk[
+        size: Int
+    ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         var result = self.lookup_table._dynamic_shuffle(chunk)
-        return result != 0  # 16 chars checked at once!
+        return result != 0
 ```
 
-🚀 **16x theoretical speedup!**
-
----
-
-### SIMD Optimization Details
-
-**Dynamic Shuffle Magic** (commit 265edd7)
-```mojo
-@parameter
-if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
-    # Use native pshufb/tbl1 instructions
-    var result = self.lookup_table._dynamic_shuffle(chunk)
-    return result != 0
-```
-
-**Hybrid Approach** (commit 3e2cf21)
-```mojo
-fn __init__(out self, char_class: String):
-    # Small classes (≤3 chars): Direct comparison
-    # Large classes: Lookup table with SIMD
-    self.use_shuffle_optimization = len(char_class) > 3
-```
-
-💡 **Key Insight**: SIMD has overhead - use wisely!
+- 🚀 **16x/32x theoretical speedup!**
+- 💡 **Key Insight**: SIMD has overhead - use wisely!
 
 ---
 
@@ -365,7 +338,7 @@ struct SIMDStringSearch:
 
 ### Caching Strategies
 
-**Global SIMD Matcher Cache** (commit cecd978)
+**Global SIMD Matcher Cache**
 ```mojo
 var _digit_matcher_cache = _Global[
     Optional[RangeBasedMatcher],
