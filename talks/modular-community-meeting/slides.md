@@ -91,19 +91,18 @@ A regex library for Mojo featuring:
 
 ### Why Build a Regex Engine in Mojo?
 
-**The Performance Challenge**
+**Just problem solving!**
+- At Smith.ai, needed a high-performance phone number parser
+- Build smith-phonenums, based on python-phonenumbers
+- Turns out regex is the bottleneck
 
-```python
-# Python's re module (C implementation)
-import re
-pattern = re.compile(r"[a-z]+")
-matches = pattern.findall(text)  # Fast, but...
-```
+**Alternatives:**
+- Import Python's `re` module from Mojo
+- Parsing numbers without regexs
 
-**Problems with existing solutions:**
-- 🐍 Python's `re`: Fast C code, but Python overhead
-- 🦀 Rust's regex: Great, but foreign function interface overhead
-- 📦 PCRE: Powerful, but complex and not SIMD-optimized
+**Hard mode:**
+- Build a regex engine in Mojo "from scratch"
+- Thanks to LLMs, entry barrier was much lower
 
 ---
 
