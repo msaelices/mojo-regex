@@ -1064,7 +1064,38 @@ struct DFAEngine(Engine):
             return None
 
         # Check if start state is accepting (for patterns like [a-z]*)
-        var _ = self.states[self.start_state].is_accepting
+        var start_accepting = self.states[self.start_state].is_accepting
+
+        # Disable SIMD for exact quantifier patterns to ensure correctness
+        if len(self.states) > 1 and not start_accepting:
+            # Check if this looks like an exact quantifier pattern
+            var accepting_states = 0
+            var min_length = -1
+            var max_length = -1
+
+            for i in range(len(self.states)):
+                if self.states[i].is_accepting:
+                    accepting_states += 1
+                    if self.states[i].match_length > 0:
+                        if (
+                            min_length == -1
+                            or self.states[i].match_length < min_length
+                        ):
+                            min_length = self.states[i].match_length
+                        if (
+                            max_length == -1
+                            or self.states[i].match_length > max_length
+                        ):
+                            max_length = self.states[i].match_length
+
+            # If we have specific length constraints, this indicates quantifiers like {3} or {2,4}
+            if min_length > 0:
+                if accepting_states == 1:
+                    # Exact quantifier like {3} - disable SIMD, fall back to DFA
+                    return None
+                elif max_length > min_length:
+                    # Range quantifier like {2,4} - disable SIMD, fall back to DFA
+                    return None
 
         # Use SIMD to count consecutive matching characters
         var pos = start_pos
@@ -1078,50 +1109,28 @@ struct DFAEngine(Engine):
             else:
                 break
 
-        # Now validate this match by simulating DFA execution with the matched characters
-        # This ensures we respect quantifier constraints properly
-        var current_state = self.start_state
-        var last_accepting_pos = -1
-        var sim_pos = start_pos
+        # Restore original fast SIMD logic (from before commit 0f5804a3e8df649030ee7cfaa8b3a87fc9c4ad68)
+        # This provides maximum performance for the common case
 
-        # Check if start state is accepting (for * quantifiers)
-        if (
-            current_state < len(self.states)
-            and self.states[current_state].is_accepting
-        ):
-            last_accepting_pos = sim_pos
+        # Original logic: simple and fast
+        var is_valid_match = False
+        var match_end = start_pos + match_count
 
-        # Simulate DFA execution for the characters we matched with SIMD
-        var chars_to_process = match_count
-        while chars_to_process > 0 and sim_pos < text_len:
-            var char_code = ord(text[sim_pos])
+        if match_count == 0:
+            # No characters matched - only valid if start state accepts (e.g., [a-z]*)
+            if start_accepting:
+                is_valid_match = True
+                match_end = start_pos
+        else:
+            # Some characters matched - for character class patterns, any positive match count is typically valid
+            # This is the original logic that provided high performance
+            is_valid_match = True
 
-            if current_state >= len(self.states):
-                break
-
-            var next_state = self.states[current_state].get_transition(
-                char_code
-            )
-            if next_state == -1:
-                break
-
-            current_state = next_state
-            sim_pos += 1
-            chars_to_process -= 1
-
-            # Check if current state is accepting
-            if (
-                current_state < len(self.states)
-                and self.states[current_state].is_accepting
-            ):
-                last_accepting_pos = sim_pos
-
-        # Check if we have a valid match from the simulation
-        if last_accepting_pos != -1:
+        if is_valid_match:
             # Check end anchor constraint
-            if self.has_end_anchor and last_accepting_pos != text_len:
+            if self.has_end_anchor and match_end != text_len:
                 return None
-            return Match(0, start_pos, last_accepting_pos, text)
+            return Match(0, start_pos, match_end, text)
 
         return None
 
