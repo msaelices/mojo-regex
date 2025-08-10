@@ -393,7 +393,7 @@ struct NFAEngine(Engine):
             Optional SIMD matcher for the pattern.
         """
         # Try to create a SIMD matcher for common patterns
-        var char_class = String()
+        var char_class: String
 
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
@@ -1311,7 +1311,7 @@ struct NFAEngine(Engine):
 
                     while pos < len(str) and match_count < actual_max:
                         var ch_code = ord(str[pos])
-                        var is_match = False
+                        var is_match: Bool
 
                         # Check alphanumeric first (common case)
                         if alnum_matcher.contains(ch_code):

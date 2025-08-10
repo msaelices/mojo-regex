@@ -678,11 +678,10 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         The corresponding CharacterClassSIMD matcher.
     """
     var matchers_ptr = _get_simd_matchers()
-    var matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
-        return matchers[matcher_type]
+        return matchers[][matcher_type]
     except:
         var matcher: CharacterClassSIMD
         if matcher_type == SIMD_MATCHER_WHITESPACE:
@@ -704,7 +703,7 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         else:
             # Custom matcher, create empty one
             matcher = CharacterClassSIMD("")
-        matchers[matcher_type] = matcher
+        matchers[][matcher_type] = matcher
         return matcher
 
 
