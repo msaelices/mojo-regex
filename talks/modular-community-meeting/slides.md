@@ -104,7 +104,11 @@ A regex library for Mojo featuring:
 - Build a regex engine in Mojo "from scratch"
 - Thanks to LLMs, entry barrier was much lower
 
+---
+
 ### Performance Comparison
+
+TODO: Update with latest benchmarks
 
 | Pattern Type | Python `re` | mojo-regex | Speedup |
 |--------------|-------------|------------|---------|
@@ -113,35 +117,19 @@ A regex library for Mojo featuring:
 | Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
 | Complex patterns | 17ms | 20ms | 0.85x |
 
-**Key Insights:**
-- ✅ Competitive with highly-optimized C implementation
-- ⚡ Faster for literal patterns (SIMD string search)
-- 🎯 Room for improvement in complex patterns
+---
 
-Note: Benchmarks on typical text processing workloads
+### Key Performance Insights
+- Not competing with Python but with 25 y/o C library.
+- Not a regex/SIMD expert. Just learning as I go.
+- Difficult to trace copies and allocations.
+  - Use `__call_location` in `__init__` or `__copyinit__`
+  - Not easy in 3rd party structs (e.g. `List`, `String`).
 
 ---
 
 <!-- .slide: class="center-slide" -->
-# Part 2: Architecture Deep Dive
-
----
-
-### The Hybrid DFA/NFA Approach
-
-**Traditional Approaches:**
-- **DFA Only**: Fast O(n) but limited features, exponential states
-- **NFA Only**: Full features but O(nm) with backtracking
-
-**Our Solution: Intelligent Routing**
-
-```
-Pattern → Analyzer → Simple? → DFA Engine (O(n))
-                 ↓
-              Complex? → NFA Engine (Full features)
-```
-
-🧠 **Smart Design**: Use the right tool for the job!
+# Part 2: Architecture Overview
 
 ---
 
@@ -188,7 +176,34 @@ fn parse(tokens: List[Token]) -> ASTNode:
 
 ---
 
-### The AST: Index-Based Architecture
+### DFA and NFA Engines
+
+- **Deterministic Finite Automaton**: Fast O(n) but limited features, exponential states
+- **Non-deterministic FA**: Full features but O(nm) with backtracking
+
+```mojo
+struct DFAEngine:  # or NFAEngine
+    
+    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+        # Fast O(n) matching using precomputed states
+```
+
+**Our Solution: Intelligent Routing**
+
+```
+Pattern → Analyzer → Simple? → DFA Engine (O(n))
+                 ↓
+              Complex? → NFA Engine (Full features)
+```
+
+---
+
+<!-- .slide: class="center-slide" -->
+# Part 3: Performance Optimizations
+
+---
+
+### AST: Index-Based Architecture
 
 **Traditional Approach:**
 ```mojo
@@ -257,10 +272,6 @@ struct DFAEngine:
 
 ⚡ **O(n) guaranteed** - No backtracking!
 
----
-
-<!-- .slide: class="center-slide" -->
-# Part 3: Performance Optimizations
 
 ---
 
