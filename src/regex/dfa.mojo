@@ -589,10 +589,8 @@ struct DFAEngine(Engine):
             self._create_accepting_state()
             return
 
-        # TODO: Enable SIMD optimization for digit-heavy patterns
         # This addresses performance regression in patterns like [0-9]+[.]?[0-9]*
-        # Currently disabled due to correctness issues - needs better integration with DFA logic
-        # self._try_enable_simd_for_sequence(sequence_info)
+        self._try_enable_simd_for_sequence(sequence_info)
 
         # Build a chain of states for each character class in the sequence
         var current_state_index = 0
