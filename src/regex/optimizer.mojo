@@ -352,9 +352,15 @@ struct PatternAnalyzer:
         if quantifier_complexity.value == PatternComplexity.COMPLEX:
             return PatternComplexity(PatternComplexity.COMPLEX)
 
-        # If group has any quantifier, use NFA for now since DFA doesn't handle group quantifiers properly
+        # Check if group has quantifier and whether it's a simple quantified group that DFA can handle
         if ast.min != 1 or ast.max != 1:
-            return PatternComplexity(PatternComplexity.MEDIUM)
+            # Check if this is a simple quantified group that DFA can handle
+            if self._is_simple_quantified_group(ast):
+                # Simple quantified groups with literal content can use DFA
+                pass  # Continue analysis below
+            else:
+                # Complex quantified groups still need NFA
+                return PatternComplexity(PatternComplexity.MEDIUM)
 
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
@@ -445,6 +451,35 @@ struct PatternAnalyzer:
         # It's a multi-char sequence if it has at least 2 character classes
         # and any number of single literals (like @ and .)
         return char_class_count >= 2
+
+    fn _is_simple_quantified_group(self, ast: ASTNode) -> Bool:
+        """Check if a quantified group is simple enough for DFA compilation.
+        
+        A simple quantified group is one that:
+        - Has simple quantifiers (?, *, +)  
+        - Contains only literal elements (no nested groups or complex patterns)
+        
+        Args:
+            ast: GROUP node with quantifiers.
+            
+        Returns:
+            True if the quantified group can be handled by DFA.
+        """
+        from regex.ast import ELEMENT
+        
+        # Check for simple quantifier patterns
+        if not ((ast.min == 0 and ast.max == 1) or      # ?
+                (ast.min == 0 and ast.max == -1) or     # *
+                (ast.min == 1 and ast.max == -1)):      # +
+            return False
+            
+        # Check that all children are simple literal elements
+        for i in range(ast.get_children_len()):
+            var child = ast.get_child(i)
+            if child.type != ELEMENT or child.min != 1 or child.max != 1:
+                return False
+                
+        return True
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:

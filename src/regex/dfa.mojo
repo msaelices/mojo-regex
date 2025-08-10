@@ -835,6 +835,127 @@ struct DFAEngine(Engine):
                     self.states[current_state_index].add_transition(char_code, next_index)
                     current_state_index = next_index
 
+    fn compile_quantified_group(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
+        """Compile a quantified group pattern like (abc)+, (test)*, (a)? into a DFA.
+        
+        Creates a state machine with loops and optional paths based on quantifiers.
+        
+        Args:
+            ast: AST node representing the quantified group pattern.
+        """
+        from regex.ast import RE, GROUP, ELEMENT
+        
+        # Clear existing states
+        self.states.clear()
+        
+        # Create start state  
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+        
+        # Navigate to the quantified group: RE -> GROUP -> GROUP (with quantifier)
+        var outer_group = ast.get_child(0)  # First GROUP
+        var inner_group = outer_group.get_child(0)  # Second GROUP (with quantifier)
+        
+        var min_matches = inner_group.min
+        var max_matches = inner_group.max
+        
+        # Extract the literal text from the group
+        var group_text = _extract_group_text(inner_group)
+        if len(group_text) == 0:
+            raise Error("Empty quantified group")
+            
+        # Create accepting state
+        var accepting_state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(accepting_state)
+        var accepting_index = len(self.states) - 1
+        
+        # Handle different quantifier types
+        if min_matches == 0 and max_matches == 1:
+            # Optional: (pattern)?
+            self._compile_optional_group(group_text, accepting_index)
+        elif min_matches == 0 and max_matches == -1:
+            # Zero or more: (pattern)*
+            self._compile_zero_or_more_group(group_text, accepting_index)
+        elif min_matches == 1 and max_matches == -1:
+            # One or more: (pattern)+
+            self._compile_one_or_more_group(group_text, accepting_index)
+        else:
+            raise Error("Unsupported quantifier range for group")
+
+    fn _compile_optional_group(mut self, group_text: String, accepting_index: Int):
+        """Compile an optional group (pattern)? - match 0 or 1 times."""
+        # Start state can go directly to accepting (0 matches) or through pattern (1 match)
+        
+        # Direct path to accepting state (0 matches)
+        self.states[0].add_transition(0, accepting_index)  # epsilon transition
+        
+        # Path through pattern (1 match)
+        var current_state_index = 0
+        for i in range(len(group_text)):
+            var char_code = ord(group_text[i])
+            
+            if i == len(group_text) - 1:
+                # Last character - go to accepting state
+                self.states[current_state_index].add_transition(char_code, accepting_index)
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state)
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(char_code, next_index)
+                current_state_index = next_index
+
+    fn _compile_zero_or_more_group(mut self, group_text: String, accepting_index: Int):
+        """Compile a zero-or-more group (pattern)* - match 0 or more times."""
+        # Start state can go directly to accepting or start the pattern
+        
+        # Direct path to accepting state (0 matches) 
+        # For DFA, we'll make start state accepting
+        self.states[0].is_accepting = True
+        
+        # Create loop through pattern
+        var current_state_index = 0
+        for i in range(len(group_text)):
+            var char_code = ord(group_text[i])
+            
+            if i == len(group_text) - 1:
+                # Last character - loop back to start (for more matches) or stay accepting
+                self.states[current_state_index].add_transition(char_code, 0)
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state) 
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(char_code, next_index)
+                current_state_index = next_index
+
+    fn _compile_one_or_more_group(mut self, group_text: String, accepting_index: Int):
+        """Compile a one-or-more group (pattern)+ - match 1 or more times."""
+        # Must match at least once, then can loop
+        
+        var current_state_index = 0
+        for i in range(len(group_text)):
+            var char_code = ord(group_text[i])
+            
+            if i == len(group_text) - 1:
+                # Last character - create accepting state that can loop back
+                var loop_state = DFAState(is_accepting=True)
+                self.states.append(loop_state)
+                var loop_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(char_code, loop_index)
+                
+                # From loop state, can start pattern again or stay accepting
+                self.states[loop_index].add_transition(ord(group_text[0]), 
+                    1 if len(group_text) > 1 else loop_index)
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state)
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(char_code, next_index)
+                current_state_index = next_index
+
     @always_inline
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
@@ -1383,6 +1504,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.has_start_anchor = has_start
         dfa.has_end_anchor = has_end
+    elif _is_quantified_group(ast):
+        # Handle quantified group patterns like (abc)+, (test)*, (a)?
+        dfa.compile_quantified_group(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
     else:
         # Pattern too complex for current DFA implementation
         raise Error("Pattern too complex for current DFA implementation")
@@ -1907,3 +2035,71 @@ fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
         return result
     
     return String("")
+
+
+fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a simple quantified group like (abc)+, (test)*, (a)?.
+    
+    Args:
+        ast: Root AST node.
+        
+    Returns:
+        True if pattern is a simple quantified group pattern.
+    """
+    from regex.ast import RE, GROUP
+    
+    # Pattern should be RE -> GROUP -> GROUP (with quantifier)
+    if ast.type == RE and ast.get_children_len() == 1:
+        var child = ast.get_child(0)
+        if child.type == GROUP and child.get_children_len() == 1:
+            var grandchild = child.get_child(0)
+            if grandchild.type == GROUP:
+                # Check if grandchild has quantifier information
+                if grandchild.min != 1 or grandchild.max != 1:
+                    # Has quantifier - check if group content is simple
+                    return _group_content_is_simple(grandchild)
+    
+    return False
+
+
+fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if a quantified group contains simple literal content.
+    
+    Args:
+        group: GROUP node to check.
+        
+    Returns:
+        True if the group contains only simple literal elements.
+    """
+    from regex.ast import ELEMENT, GROUP
+    
+    if group.type != GROUP:
+        return False
+        
+    # Group should contain only ELEMENT nodes (literals)
+    for i in range(group.get_children_len()):
+        var child = group.get_child(i)
+        if child.type != ELEMENT:
+            return False
+            
+    return True
+
+
+fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
+    """Extract the literal text from a quantified group.
+    
+    Args:
+        group: GROUP node containing literal elements.
+        
+    Returns:
+        Concatenated text from all ELEMENT nodes in the group.
+    """
+    from regex.ast import ELEMENT
+    
+    var result = String()
+    for i in range(group.get_children_len()):
+        var child = group.get_child(i)
+        if child.type == ELEMENT:
+            result += child.get_value().value()
+    
+    return result
