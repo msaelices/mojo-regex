@@ -790,7 +790,9 @@ struct DFAEngine(Engine):
             return None  # Start anchor requires match at position 0
 
         # Python only allows matching at the start of the string
-        return self._try_match_at_position(text, start)
+        return self._try_match_at_position(
+            text, start, require_exact_position=True
+        )
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
@@ -817,19 +819,22 @@ struct DFAEngine(Engine):
         return None
 
     fn _try_match_at_position(
-        self, text: String, start_pos: Int
+        self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
         """Try to match pattern starting at a specific position.
 
         Args:
             text: Input text to match against.
             start_pos: Position to start matching from.
+            require_exact_position: If True, only match at exact start_pos (for match_first).
 
         Returns:
             Optional Match if pattern matches at this position, None otherwise.
         """
         if start_pos > len(text):
             return None
+
+        # Skip SIMD path - removed for performance
 
         if start_pos == len(text):
             # Check if we can match empty string
@@ -902,6 +907,8 @@ struct DFAEngine(Engine):
             if match_result:
                 matches.append(match_result.value())
             return matches
+
+        # Skip SIMD path - removed for performance
 
         var pos = 0
         var text_len = len(text)

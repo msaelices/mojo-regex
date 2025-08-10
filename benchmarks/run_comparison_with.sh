@@ -64,6 +64,18 @@ run_and_parse_benchmarks() {
 
     if [ -f "$output_json" ]; then
         echo "✓ Results saved to $output_json"
+
+        # Show engine usage summary if available
+        if grep -q "\[ENGINE\]" "$output_txt" 2>/dev/null; then
+            echo ""
+            echo "Engine Usage Summary for $branch:"
+            echo "=============================="
+            echo "DFA Engine: $(grep -c "Engine: DFA" "$output_txt" 2>/dev/null || echo 0) patterns"
+            echo "NFA Engine: $(grep -c "Engine: NFA" "$output_txt" 2>/dev/null || echo 0) patterns"
+            echo "SIMPLE Complexity: $(grep -c "Complexity: SIMPLE" "$output_txt" 2>/dev/null || echo 0) patterns"
+            echo "MEDIUM Complexity: $(grep -c "Complexity: MEDIUM" "$output_txt" 2>/dev/null || echo 0) patterns"
+            echo "COMPLEX Complexity: $(grep -c "Complexity: COMPLEX" "$output_txt" 2>/dev/null || echo 0) patterns"
+        fi
     else
         echo "✗ Failed to generate results for $branch branch"
         exit 1
@@ -107,6 +119,21 @@ echo ""
 echo "Step 5: Comparing benchmark results..."
 echo "--------------------------------------"
 python3 benchmarks/compare_benchmarks.py "$TARGET_RESULTS" "$CURRENT_RESULTS" "$COMPARISON_FILE"
+
+# Show engine usage comparison if engine data is available
+CURRENT_OUTPUT="benchmarks/results/${SAFE_CURRENT_BRANCH}_results_output.txt"
+TARGET_OUTPUT="benchmarks/results/${SAFE_TARGET_BRANCH}_results_output.txt"
+if [[ -f "$CURRENT_OUTPUT" && -f "$TARGET_OUTPUT" ]] && grep -q "\[ENGINE\]" "$CURRENT_OUTPUT" 2>/dev/null; then
+    echo ""
+    echo "Engine Usage Comparison:"
+    echo "========================"
+    echo "Branch: $CURRENT_BRANCH"
+    echo "  DFA Engine: $(grep -c "Engine: DFA" "$CURRENT_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "  NFA Engine: $(grep -c "Engine: NFA" "$CURRENT_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "Branch: $TARGET_BRANCH"
+    echo "  DFA Engine: $(grep -c "Engine: DFA" "$TARGET_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "  NFA Engine: $(grep -c "Engine: NFA" "$TARGET_OUTPUT" 2>/dev/null || echo 0) patterns"
+fi
 echo ""
 
 # Step 6: Generate visualizations (if matplotlib is available)
