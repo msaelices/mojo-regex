@@ -7,6 +7,7 @@ from sys import stderr
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from regex import match_first, findall
+from regex.matcher import compile_regex
 from time import perf_counter_ns as now
 from pathlib import Path
 
@@ -398,27 +399,68 @@ fn bench_alternation_common_prefix(mut b: Bencher) raises:
 
 
 # ===-----------------------------------------------------------------------===#
+# Engine Detection Utilities
+# ===-----------------------------------------------------------------------===#
+fn detect_and_report_engine(pattern: String, test_name: String) raises:
+    """Detect which engine is used for a pattern and report it."""
+    try:
+        var compiled = compile_regex(pattern)
+        var _ = compiled.get_stats()
+        var engine_type = compiled.matcher.get_engine_type()
+        var complexity = compiled.matcher.get_complexity()
+
+        var complexity_str: String
+        if complexity.value == 0:  # PatternComplexity.SIMPLE
+            complexity_str = "SIMPLE"
+        elif complexity.value == 1:  # PatternComplexity.MEDIUM
+            complexity_str = "MEDIUM"
+        else:  # PatternComplexity.COMPLEX
+            complexity_str = "COMPLEX"
+
+        print(
+            "[ENGINE] "
+            + test_name
+            + " -> Pattern: '"
+            + pattern
+            + "' | Engine: "
+            + engine_type
+            + " | Complexity: "
+            + complexity_str
+        )
+    except e:
+        print(
+            "[ENGINE] "
+            + test_name
+            + " -> Pattern: '"
+            + pattern
+            + "' | Engine: ERROR | compilation failed"
+        )
+
+
+# ===-----------------------------------------------------------------------===#
 # JSON Export Function
 # ===-----------------------------------------------------------------------===#
 fn export_json_results(m: Bench) raises:
     """Export benchmark results to JSON file."""
-    # For now, write a placeholder since Mojo benchmark API access is limited
-    # The actual results will be parsed from the console output
     var json_content = String("{\n")
     json_content += '  "engine": "mojo",\n'
     json_content += '  "timestamp": "' + String(now()) + '",\n'
-    json_content += '  "note": "Results to be parsed from console output",\n'
+    json_content += (
+        '  "note": "Engine detection results shown in console output above",\n'
+    )
     json_content += '  "results": {}\n'
     json_content += "}\n"
 
     # Write to file
-    var results_path = Path("benchmarks/results/mojo_results.json")
+    var results_path = Path("benchmarks/results/mojo_results_with_engines.json")
     with open(results_path, "w") as f:
         f.write(json_content)
 
+    print("\n=== BENCHMARK COMPLETE ===")
+    print("Engine detection results shown above.")
     print(
-        "\nPlaceholder JSON exported. Run with output redirection to capture"
-        " results."
+        "\nPlaceholder JSON exported to:"
+        " benchmarks/results/mojo_results_with_engines.json"
     )
 
 
@@ -429,121 +471,159 @@ def main():
     seed()
     var m = Bench(BenchConfig(num_repetitions=1))
 
+    print("=== REGEX ENGINE DETECTION & BENCHMARKS ===")
+    print("")
+
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
+    detect_and_report_engine("hello", "literal_match_short")
     m.bench_function[bench_literal_match[1000, "hello"]](
         BenchId(String("literal_match_short"))
     )
+    detect_and_report_engine("hello", "literal_match_long")
     m.bench_function[bench_literal_match[10000, "hello"]](
         BenchId(String("literal_match_long"))
     )
 
     # Wildcard and quantifiers
     print("=== Wildcard and Quantifier Benchmarks ===")
+    detect_and_report_engine(".*", "wildcard_match_any")
     m.bench_function[bench_wildcard_match[1000, ".*"]](
         BenchId(String("wildcard_match_any"))
     )
+    detect_and_report_engine("a*", "quantifier_zero_or_more")
     m.bench_function[bench_wildcard_match[1000, "a*"]](
         BenchId(String("quantifier_zero_or_more"))
     )
+    detect_and_report_engine("a+", "quantifier_one_or_more")
     m.bench_function[bench_wildcard_match[1000, "a+"]](
         BenchId(String("quantifier_one_or_more"))
     )
+    detect_and_report_engine("a?", "quantifier_zero_or_one")
     m.bench_function[bench_wildcard_match[1000, "a?"]](
         BenchId(String("quantifier_zero_or_one"))
     )
 
     # Character ranges
     print("=== Character Range Benchmarks ===")
+    detect_and_report_engine("[a-z]+", "range_lowercase")
     m.bench_function[bench_range_match[1000, "[a-z]+"]](
         BenchId(String("range_lowercase"))
     )
+    detect_and_report_engine("[0-9]+", "range_digits")
     m.bench_function[bench_range_match[1000, "[0-9]+"]](
         BenchId(String("range_digits"))
     )
+    detect_and_report_engine("[a-zA-Z0-9]+", "range_alphanumeric")
     m.bench_function[bench_range_match[1000, "[a-zA-Z0-9]+"]](
         BenchId(String("range_alphanumeric"))
     )
 
     # Anchors
     print("=== Anchor Benchmarks ===")
+    detect_and_report_engine("^abc", "anchor_start")
     m.bench_function[bench_anchor_match[1000, "^abc"]](
         BenchId(String("anchor_start"))
     )
+    detect_and_report_engine("xyz$", "anchor_end")
     m.bench_function[bench_anchor_match[1000, "xyz$"]](
         BenchId(String("anchor_end"))
     )
 
     # Alternation
     print("=== Alternation Benchmarks ===")
+    detect_and_report_engine("a|b|c", "alternation_simple")
     m.bench_function[bench_alternation_match[1000, "a|b|c"]](
         BenchId(String("alternation_simple"))
     )
+    detect_and_report_engine("abc|def|ghi", "alternation_words")
     m.bench_function[bench_alternation_match[1000, "abc|def|ghi"]](
         BenchId(String("alternation_words"))
     )
 
     # Groups
     print("=== Group Benchmarks ===")
+    detect_and_report_engine("(abc)+", "group_quantified")
     m.bench_function[bench_group_match[1000, "(abc)+"]](
         BenchId(String("group_quantified"))
     )
+    detect_and_report_engine("(a|b)*", "group_alternation")
     m.bench_function[bench_group_match[1000, "(a|b)*"]](
         BenchId(String("group_alternation"))
     )
 
     # Global matching
     print("=== Global Matching Benchmarks ===")
+    detect_and_report_engine("a", "match_all_simple")
     m.bench_function[bench_match_all[1000, "a"]](
         BenchId(String("match_all_simple"))
     )
+    detect_and_report_engine("[a-z]+", "match_all_pattern")
     m.bench_function[bench_match_all[1000, "[a-z]+"]](
         BenchId(String("match_all_pattern"))
     )
 
     # Complex real-world patterns
     print("=== Complex Pattern Benchmarks ===")
+    detect_and_report_engine(
+        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}",
+        "complex_email_extraction",
+    )
     m.bench_function[bench_complex_email_match[100]](
         BenchId(String("complex_email_extraction"))
     )
+    detect_and_report_engine("[0-9]+[.]?[0-9]*", "complex_number_extraction")
     m.bench_function[bench_complex_number_extraction[1000]](
         BenchId(String("complex_number_extraction"))
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)
     print("=== SIMD-Optimized Character Filtering Benchmarks ===")
+    detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_large")
     m.bench_function[bench_simd_heavy_filtering[10000, "[a-zA-Z0-9]+"]](
         BenchId(String("simd_alphanumeric_large"))
     )
+    detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_xlarge")
     m.bench_function[bench_simd_heavy_filtering[50000, "[a-zA-Z0-9]+"]](
         BenchId(String("simd_alphanumeric_xlarge"))
     )
+    detect_and_report_engine("[^a-zA-Z0-9]+", "simd_negated_alphanumeric")
     m.bench_function[bench_simd_heavy_filtering[10000, "[^a-zA-Z0-9]+"]](
         BenchId(String("simd_negated_alphanumeric"))
     )
+    detect_and_report_engine("[a-z]+[0-9]+", "simd_multi_char_class")
     m.bench_function[bench_simd_heavy_filtering[10000, "[a-z]+[0-9]+"]](
         BenchId(String("simd_multi_char_class"))
     )
 
     # Literal Optimization Benchmarks
     print("=== Literal Optimization Benchmarks ===")
+    detect_and_report_engine("hello.*world", "literal_prefix_short")
     m.bench_function[bench_literal_prefix_short](
         BenchId(String("literal_prefix_short"))
     )
+    detect_and_report_engine("hello.*", "literal_prefix_medium")
     m.bench_function[bench_literal_prefix_medium](
         BenchId(String("literal_prefix_medium"))
     )
+    detect_and_report_engine("hello.*", "literal_prefix_long")
     m.bench_function[bench_literal_prefix_long](
         BenchId(String("literal_prefix_long"))
     )
+    detect_and_report_engine(".*@example\\.com", "required_literal_short")
     m.bench_function[bench_required_literal_short](
         BenchId(String("required_literal_short"))
     )
+    detect_and_report_engine(".*@example\\.com", "required_literal_long")
     m.bench_function[bench_required_literal_long](
         BenchId("required_literal_long")
     )
+    detect_and_report_engine("[a-z]+", "no_literal_baseline")
     m.bench_function[bench_no_literal_baseline](
         BenchId(String("no_literal_baseline"))
+    )
+    detect_and_report_engine(
+        "(hello|help|helicopter)", "alternation_common_prefix"
     )
     m.bench_function[bench_alternation_common_prefix](
         BenchId(String("alternation_common_prefix"))
