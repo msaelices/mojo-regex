@@ -104,20 +104,6 @@ A regex library for Mojo featuring:
 - Build a regex engine in Mojo "from scratch"
 - Thanks to LLMs, entry barrier was much lower
 
----
-
-### Mojo's Unique Advantages
-
-- 🚀 **Zero-cost abstractions** - High-level code, low-level performance
-- 🔧 **Native SIMD support** - Built-in vectorization
-- 🐍 **Python-like syntax** - Easy to understand and maintain
-- 💾 **Manual memory control** - No GC overhead
-- 🔥 **Compile-time optimizations** - Parameters and specialization
-
-_Perfect storm for building a regex engine!_
-
----
-
 ### Performance Comparison
 
 | Pattern Type | Python `re` | mojo-regex | Speedup |
