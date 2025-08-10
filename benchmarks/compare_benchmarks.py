@@ -85,7 +85,7 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
         # If both are mojo, it's likely a branch comparison
         if baseline_engine.lower() == "mojo" and test_engine.lower() == "mojo":
             baseline_name = "Other Branch"
-            test_name = "Current Branch"
+            test_name = "Branch"
             title = "CURRENT BRANCH VS OTHER BRANCH BENCHMARK COMPARISON"
         else:
             title = (
@@ -150,6 +150,7 @@ def create_comparison_report(
                 "speedup": speedup,
                 f"{baseline_name.lower()}_iterations": baseline_result["iterations"],
                 f"{test_name.lower()}_iterations": test_result["iterations"],
+                "engine": test_result.get("engine", "N/A"),
             }
 
             speedups.append(speedup)
@@ -196,11 +197,11 @@ def create_comparison_report(
 
     # Detailed results
     report.append("DETAILED RESULTS:")
-    report.append("-" * 100)
+    report.append("-" * 110)
     report.append(
-        f"{'Benchmark':<35} {f'{baseline_name} (ms)':>15} {f'{test_name} (ms)':>15} {'Speedup':>10} {'Status':>15}"
+        f"{'Benchmark':<35} {f'{baseline_name} (ms)':>15} {f'{test_name} (ms)':>15} {'Speedup':>10} {'Engine':>8} {'Status':>15}"
     )
-    report.append("-" * 100)
+    report.append("-" * 110)
 
     for benchmark, data in sorted(comparison_data["benchmarks"].items()):
         baseline_time = data[f"{baseline_name.lower()}_time_ms"]
@@ -220,12 +221,13 @@ def create_comparison_report(
         else:
             status = f"⚠ {baseline_name} faster"
 
+        engine = data.get("engine", "N/A")
         report.append(
             f"{benchmark:<35} {format_time(baseline_time):>15} "
-            f"{format_time(test_time):>15} {speedup:>9.2f}x {status:>15}"
+            f"{format_time(test_time):>15} {speedup:>9.2f}x {engine:>8} {status:>15}"
         )
 
-    report.append("-" * 100)
+    report.append("-" * 110)
     report.append("")
 
     # Top performers

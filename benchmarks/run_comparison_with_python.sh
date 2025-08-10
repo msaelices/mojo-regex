@@ -48,12 +48,40 @@ echo "Step 2: Running Mojo regex benchmarks..."
 echo "----------------------------------------"
 # Capture Mojo output and parse it
 mojo run "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt" | python3 benchmarks/parse_mojo_output.py "$MOJO_RESULTS"
+
+# Show engine usage summary if available
+MOJO_OUTPUT="benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt"
+if grep -q "\[ENGINE\]" "$MOJO_OUTPUT" 2>/dev/null; then
+    echo ""
+    echo "Mojo Engine Usage Summary:"
+    echo "=========================="
+    echo "DFA Engine: $(grep -c "Engine: DFA" "$MOJO_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "NFA Engine: $(grep -c "Engine: NFA" "$MOJO_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "SIMPLE Complexity: $(grep -c "Complexity: SIMPLE" "$MOJO_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "MEDIUM Complexity: $(grep -c "Complexity: MEDIUM" "$MOJO_OUTPUT" 2>/dev/null || echo 0) patterns"
+    echo "COMPLEX Complexity: $(grep -c "Complexity: COMPLEX" "$MOJO_OUTPUT" 2>/dev/null || echo 0) patterns"
+fi
 echo ""
 
 # Compare results
 echo "Step 3: Comparing benchmark results..."
 echo "--------------------------------------"
 python3 benchmarks/compare_benchmarks.py "$PYTHON_RESULTS" "$MOJO_RESULTS" "benchmarks/results/${OUTPUT_PREFIX}comparison.json"
+
+# Show detailed engine information
+if grep -q "\[ENGINE\]" "$MOJO_OUTPUT" 2>/dev/null; then
+    echo ""
+    echo "Mojo vs Python Engine Analysis:"
+    echo "================================"
+    echo "Python uses a single regex engine, while Mojo uses a hybrid approach:"
+    echo "  - DFA Engine: High-performance deterministic automaton for simple patterns"
+    echo "  - NFA Engine: Flexible nondeterministic automaton for complex patterns"
+    echo "  - Hybrid Matcher: Intelligently routes patterns to optimal engine"
+    echo ""
+    echo "This hybrid approach allows Mojo to achieve optimal performance across"
+    echo "different pattern types, leveraging DFA speed for simple patterns and"
+    echo "NFA flexibility for complex ones."
+fi
 echo ""
 
 # Generate visualizations (if matplotlib is available)
