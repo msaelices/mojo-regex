@@ -489,6 +489,9 @@ struct NFAEngine(Engine):
             OR,
             GROUP,
         )
+        
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_node type =", ast.type, "str_i =", str_i, "min =", ast.min, "max =", ast.max)
 
         if ast.type == ELEMENT:
             return self._match_element(
@@ -790,6 +793,8 @@ struct NFAEngine(Engine):
         """Match GROUP node - process children sequentially with backtracking.
         """
         var start_pos = str_i
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_group children_len =", ast.get_children_len())
 
         # Check if this group itself has a quantifier
         if self._has_quantifier(ast):
@@ -885,7 +890,10 @@ struct NFAEngine(Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
         var children_len = ast_parent.get_children_len()
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_sequence child_index =", child_index, "children_len =", children_len)
         if child_index >= children_len:
+            # print("DEBUG: No more children, returning success at pos", str_i)
             return (True, str_i)
 
         if child_index == children_len - 1:
@@ -1065,6 +1073,9 @@ struct NFAEngine(Engine):
         """Apply quantifier logic to a matched element."""
         var min_matches = ast.min
         var max_matches = ast.max
+        
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _apply_quantifier str_i =", str_i, "min =", min_matches, "max =", max_matches)
 
         if max_matches == -1:  # Unlimited
             max_matches = len(str) - str_i
@@ -1077,11 +1088,15 @@ struct NFAEngine(Engine):
         from regex.ast import DIGIT, SPACE, RANGE
 
         if ast.is_simd_optimizable(min_matches, max_matches):
+            # DEBUG: Uncomment to debug
+            # print("DEBUG: Using SIMD optimization for quantifier")
             var simd_result = self._apply_quantifier_simd(
                 ast, str, str_i, min_matches, max_matches
             )
             # Always return SIMD result when SIMD optimization is used
             # Don't fall through to regular matching
+            # DEBUG: Uncomment to debug
+            # print("DEBUG: SIMD result =", simd_result[0], simd_result[1])
             return simd_result
 
         # Use regular greedy matching, but with early termination for match_first_mode
@@ -1103,6 +1118,8 @@ struct NFAEngine(Engine):
                 break
 
         # Check if we have enough matches
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: quantifier matches_count =", matches_count, "min_matches =", min_matches, "current_pos =", current_pos)
         if matches_count >= min_matches:
             return (True, current_pos)
         else:
@@ -1343,8 +1360,49 @@ struct NFAEngine(Engine):
                             return (True, pos)
                         else:
                             return (False, str_i)
+                
+                # Fallback for simple ranges like [c-n] that don't use SIMD
+                # Use character-by-character matching
+                var pos = str_i
+                var match_count = 0
+                var actual_max = max_matches
+                if actual_max == -1:
+                    actual_max = len(str) - str_i
+
+                while pos < len(str) and match_count < actual_max:
+                    var ch_code = ord(str[pos])
+                    var is_match = self._match_char_in_range(range_pattern, ch_code)
+                    if is_match == ast.positive_logic:
+                        match_count += 1
+                        pos += 1
+                    else:
+                        break
+
+                if match_count >= min_matches:
+                    return (True, pos)
+                else:
+                    return (False, str_i)
 
         return (False, str_i)
+
+    fn _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
+        """Helper function to check if a character matches a range pattern."""
+        if range_pattern.startswith("[") and range_pattern.endswith("]"):
+            var inner = range_pattern[1:-1]
+            
+            # Handle simple ranges like [c-n]
+            if len(inner) == 3 and inner[1] == "-":
+                var start_char = ord(inner[0])
+                var end_char = ord(inner[2])
+                return ch_code >= start_char and ch_code <= end_char
+            
+            # For more complex patterns, fall back to character inclusion
+            var ch = chr(ch_code)
+            return ch in inner
+        else:
+            # Not a bracketed pattern
+            var ch = chr(ch_code)
+            return ch in range_pattern
 
 
 fn findall(
