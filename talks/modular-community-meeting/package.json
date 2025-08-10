@@ -1,7 +1,7 @@
 {
-  "name": "mojo-gpu-programming",
+  "name": "mojo-regex-talk",
   "version": "1.0.0",
-  "description": "Mojo GPU Programming Workshop Slides",
+  "description": "Mojo Regex Slides",
   "main": "index.html",
   "scripts": {
     "start": "npx serve . -p 3033",
