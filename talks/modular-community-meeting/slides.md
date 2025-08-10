@@ -60,14 +60,35 @@ pixi add mojo-regex
 ---
 
 ### What is mojo-regex?
+- Regex engine written in Mojo
+- Familiar API to Python's `re` module
+- Hybrid DFA/NFA Architecture
+- SIMD optimizations for performance
+- **Disclaimer**: Not a full regex implementation yet!
 
-A regex library for Mojo featuring:
+---
 
-- 🏎️ **Hybrid DFA/NFA Architecture** - Best of both worlds
-- ⚡ **SIMD-Accelerated Matching** - Vectorized operations
-- 🐍 **Python-Compatible API** - Familiar interface
-- 🚀 **O(n) Performance** - For common patterns
-- 🔧 **Zero-Copy Operations** (WIP) - Memory efficient
+### Basic Usage
+
+```mojo
+from regex import match_first, findall, search
+
+var result = match_first("hello", "hello world")
+if result:
+    print("Match found:", result.value().get_match_text())
+
+var emails = findall(
+    "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}",
+    "Contact john@example.com or mary@test.org"
+)
+for m in emails:
+    print("Email:", m.get_match_text())
+
+var search_result = search("world", "hello world")
+print("Search found:", search_result.value().get_match_text())
+```
+
+* Note: *The `match_first` should be just `match` but `match` is a reserved keyword in Mojo*
 
 ---
 
@@ -79,7 +100,6 @@ A regex library for Mojo featuring:
 - Quantifiers: `*`, `+`, `?`, `{n}`, `{n,m}`
 - Anchors: `^`, `$`
 - Groups and alternation: `(abc)`, `a|b`
-- Global matching: `findall()`
 
 #### 🚧 In Progress
 - Predefined classes: `\d`, `\w`, `\s`
@@ -185,7 +205,7 @@ fn parse(tokens: List[Token]) -> ASTNode:
 struct DFAEngine:  # or NFAEngine
     
     fn match_first(self, text: String, start: Int) -> Optional[Match]:
-        # Fast O(n) matching using precomputed states
+        ...
 ```
 
 **Our Solution: Intelligent Routing**
@@ -414,29 +434,6 @@ var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
 
 ---
 
-### Basic Usage
-
-```mojo
-from regex import match_first, findall, search
-
-# Simple literal matching
-var result = match_first("hello", "hello world")
-if result:
-    print("Match found:", result.value().get_match_text())
-    # Output: Match found: hello
-
-# Find all matches
-var matches = findall("a", "banana")
-print("Found", len(matches), "matches")
-# Output: Found 3 matches
-
-# Character classes
-var emails = findall(
-    "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
-    "Contact john@example.com or mary@test.org"
-)
-# Finds both email addresses
-```
 
 ---
 
