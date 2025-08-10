@@ -85,7 +85,7 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
         # If both are mojo, it's likely a branch comparison
         if baseline_engine.lower() == "mojo" and test_engine.lower() == "mojo":
             baseline_name = "Other Branch"
-            test_name = "Current Branch"
+            test_name = "Branch"
             title = "CURRENT BRANCH VS OTHER BRANCH BENCHMARK COMPARISON"
         else:
             title = (
