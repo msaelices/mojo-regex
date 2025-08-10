@@ -779,6 +779,62 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
+    fn compile_alternation(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
+        """Compile an alternation pattern like a|b or (cat|dog) into a DFA.
+        
+        Creates a state machine with parallel branches that converge to accepting states.
+        
+        Args:
+            ast: AST node representing the alternation pattern.
+        """
+        from regex.ast import RE, OR, GROUP, ELEMENT
+        
+        # Clear existing states
+        self.states.clear()
+        
+        # Create start state  
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+        
+        # Extract the OR node
+        var or_node_opt = _find_or_node(ast)
+        if not or_node_opt:
+            raise Error("No OR node found in alternation pattern")
+            
+        var or_node = or_node_opt.value()
+            
+        # Create accepting state that all branches will lead to
+        var accepting_state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(accepting_state)
+        var accepting_index = len(self.states) - 1
+        
+        # Process each branch of the alternation
+        for i in range(or_node.get_children_len()):
+            ref branch = or_node.get_child(i)
+            
+            # Extract the literal text for this branch
+            var branch_text = _extract_branch_text(branch)
+            if len(branch_text) == 0:
+                continue
+                
+            # Create states for this branch
+            var current_state_index = 0  # Start from start state
+            
+            for j in range(len(branch_text)):
+                var char_code = ord(branch_text[j])
+                
+                if j == len(branch_text) - 1:
+                    # Last character - transition to accepting state
+                    self.states[current_state_index].add_transition(char_code, accepting_index)
+                else:
+                    # Intermediate character - create or reuse state
+                    var next_state = DFAState()
+                    self.states.append(next_state)
+                    var next_index = len(self.states) - 1
+                    self.states[current_state_index].add_transition(char_code, next_index)
+                    current_state_index = next_index
+
     @always_inline
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
@@ -1320,6 +1376,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         dfa.compile_multi_character_class_sequence(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
+    elif _is_alternation_pattern(ast):
+        # Handle alternation patterns like a|b, cat|dog, (a|b)
+        dfa.compile_alternation(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
     else:
         # Pattern too complex for current DFA implementation
         raise Error("Pattern too complex for current DFA implementation")
@@ -1697,3 +1760,150 @@ fn _extract_mixed_sequential_pattern_info(
     # For now, reuse the multi-class sequence extraction logic
     # It already handles ELEMENT types correctly
     return _extract_multi_class_sequence_info(ast)
+
+
+fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a simple alternation like a|b, cat|dog, (a|b).
+    
+    Args:
+        ast: Root AST node.
+        
+    Returns:
+        True if pattern is a simple alternation pattern.
+    """
+    from regex.ast import RE, OR, GROUP, ELEMENT
+    
+    # Direct alternation: a|b
+    if ast.type == OR:
+        return _is_simple_alternation_branches(ast)
+        
+    # Search for OR node within nested structure
+    return _find_and_check_or_node(ast)
+
+
+fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if alternation branches are simple (literal elements only).
+    
+    Args:
+        ast: OR node to check branches of.
+        
+    Returns:
+        True if all branches are simple literal elements.
+    """
+    from regex.ast import OR, ELEMENT, GROUP
+    
+    if ast.type != OR:
+        return False
+        
+    # Check that all branches are simple
+    for i in range(ast.get_children_len()):
+        ref branch = ast.get_child(i)
+        
+        # Each branch should be a group containing literal elements
+        if branch.type == GROUP:
+            # Check that the group contains only literal elements
+            if not _group_contains_only_literals(branch):
+                return False
+        elif branch.type == ELEMENT:
+            # Single literal element - good
+            continue
+        else:
+            # Complex branch - not supported yet
+            return False
+            
+    return True
+
+
+fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if a group contains only literal elements.
+    
+    Args:
+        group: GROUP node to check.
+        
+    Returns:
+        True if the group contains only ELEMENT nodes.
+    """
+    from regex.ast import ELEMENT, GROUP
+    
+    if group.type != GROUP:
+        return False
+        
+    # All children should be ELEMENT nodes
+    for i in range(group.get_children_len()):
+        ref child = group.get_child(i)
+        if child.type != ELEMENT:
+            return False
+            
+    return True
+
+
+fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Recursively search for an OR node and check if its branches are simple.
+    
+    Args:
+        ast: AST node to search within.
+        
+    Returns:
+        True if an OR node with simple branches is found.
+    """
+    from regex.ast import OR, GROUP, RE
+    
+    if ast.type == OR:
+        return _is_simple_alternation_branches(ast)
+    
+    # Recursively search children
+    for i in range(ast.get_children_len()):
+        var child = ast.get_child(i)
+        if _find_and_check_or_node(child):
+            return True
+    
+    return False
+
+
+fn _find_or_node(ast: ASTNode[MutableAnyOrigin]) -> Optional[ASTNode[MutableAnyOrigin]]:
+    """Recursively find the first OR node in the AST.
+    
+    Args:
+        ast: AST node to search within.
+        
+    Returns:
+        The first OR node found, or None if no OR node exists.
+    """
+    from regex.ast import OR
+    
+    if ast.type == OR:
+        return ast
+    
+    # Recursively search children
+    for i in range(ast.get_children_len()):
+        var child = ast.get_child(i)
+        var found = _find_or_node(child)
+        if found:
+            return found
+    
+    return None
+
+
+fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
+    """Extract the literal text from an alternation branch.
+    
+    Args:
+        branch: Branch node (ELEMENT or GROUP containing ELEMENTs).
+        
+    Returns:
+        Literal string for this branch.
+    """
+    from regex.ast import ELEMENT, GROUP
+    
+    if branch.type == ELEMENT and branch.get_value():
+        return String(branch.get_value().value())
+    elif branch.type == GROUP:
+        # Concatenate all literal elements in the group
+        var result = String("")
+        for i in range(branch.get_children_len()):
+            var child = branch.get_child(i)
+            if child.type == ELEMENT and child.get_value():
+                result += child.get_value().value()
+        return result
+    
+    return String("")
