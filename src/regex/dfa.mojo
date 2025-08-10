@@ -813,18 +813,16 @@ struct DFAEngine(Engine):
                 if i == 0:
                     first_element_is_digits = True
 
-        # Enable SIMD only for the specific complex number pattern [0-9]+[.]?[0-9]*
-        # This is very conservative to avoid breaking other multi-character patterns
+        # DISABLE SIMD for complex number pattern [0-9]+[.]?[0-9]*
+        # DFA cannot handle this pattern correctly due to state transitions at dots
+        # The pattern will fall back to NFA which handles it correctly
+        # Instead, enable SIMD for simpler patterns that work well with DFA
         if (
-            total_elements == 3
-            and first_element_is_digits
+            first_element_is_digits
+            and total_elements == 1
             and sequence_info.elements[0].min_matches >= 1
-            and sequence_info.elements[1].char_class == "."
-            and sequence_info.elements[1].min_matches == 0
-            and sequence_info.elements[1].max_matches == 1
-            and sequence_info.elements[2].char_class == DIGITS
-            and sequence_info.elements[2].min_matches == 0
         ):
+            # Simple patterns like [0-9]+ work great with DFA + SIMD
             self.simd_char_matcher = CharacterClassSIMD(DIGITS)
             self.simd_char_pattern = "[0-9]"
 
@@ -1146,22 +1144,49 @@ struct DFAEngine(Engine):
 
         # State-aware SIMD matching for complex patterns
         # Detect if this is specifically the complex number pattern [0-9]+[.]?[0-9]*
-        if (
-            len(self.states) == 4
-            and self.simd_char_pattern == "[0-9]"
-            and self._is_complex_number_pattern()
-        ):
-            # This is the complex number pattern, use segmented matching
-            var complex_match = self._try_match_complex_number_pattern(
-                text, start_pos
-            )
-            if complex_match:
-                return complex_match
+        # DISABLED: The segmented matching approach adds too much overhead
+        # Instead, we rely on the SIMD enablement in _try_enable_simd_for_sequence
+        # and let the regular DFA handle the state transitions
+        # if (
+        #     len(self.states) == 4
+        #     and self.simd_char_pattern == "[0-9]"
+        #     and self._is_complex_number_pattern()
+        # ):
+        #     # This is the complex number pattern, use segmented matching
+        #     var complex_match = self._try_match_complex_number_pattern(
+        #         text, start_pos
+        #     )
+        #     if complex_match:
+        #         return complex_match
 
-        # Use SIMD to count consecutive matching characters (original logic for simple patterns)
+        # Use SIMD to count consecutive matching characters with vectorized processing
         var pos = start_pos
         var match_count = 0
 
+        # Fast path: use vectorized SIMD operations for consecutive character matching
+        while pos + 16 <= text_len:
+            var chunk = text.unsafe_ptr().load[width=16](pos)
+            var matches = simd_matcher.match_chunk(chunk)
+
+            # Count consecutive matches in this chunk
+            var consecutive_count = 0
+            for i in range(16):
+                if matches[i]:
+                    consecutive_count += 1
+                else:
+                    break
+
+            if consecutive_count < 16:
+                # Found non-matching character, stop here
+                match_count += consecutive_count
+                pos += consecutive_count
+                break
+            else:
+                # Full chunk matched, continue
+                match_count += 16
+                pos += 16
+
+        # Handle remaining characters (less than 16) with scalar processing
         while pos < text_len:
             var ch_code = ord(text[pos])
             if simd_matcher.contains(ch_code):
@@ -1249,10 +1274,10 @@ struct DFAEngine(Engine):
     ) -> Optional[Match]:
         """SIMD-optimized matching for complex number patterns like [0-9]+[.]?[0-9]*.
 
-        This method uses segmented matching:
-        1. SIMD match initial digits ([0-9]+)
+        This method uses vectorized SIMD processing for optimal performance:
+        1. Bulk SIMD scan for consecutive digits ([0-9]+)
         2. Check for optional dot ([.]?)
-        3. SIMD match trailing digits ([0-9]*)
+        3. Bulk SIMD scan for trailing digits ([0-9]*)
 
         Args:
             text: Input text to match against.
@@ -1268,8 +1293,32 @@ struct DFAEngine(Engine):
         var text_len = len(text)
         var pos = start_pos
 
+        # Fast path: use vectorized SIMD operations for consecutive digit matching
         # Segment 1: Match initial digits [0-9]+ (required)
         var initial_digits = 0
+        while pos + 16 <= text_len:
+            var chunk = text.unsafe_ptr().load[width=16](pos)
+            var matches = simd_matcher.match_chunk(chunk)
+
+            # Count consecutive matches in this chunk
+            var consecutive_count = 0
+            for i in range(16):
+                if matches[i]:
+                    consecutive_count += 1
+                else:
+                    break
+
+            if consecutive_count < 16:
+                # Found non-matching character, stop here
+                initial_digits += consecutive_count
+                pos += consecutive_count
+                break
+            else:
+                # Full chunk matched, continue
+                initial_digits += 16
+                pos += 16
+
+        # Handle remaining characters (less than 16)
         while pos < text_len:
             var ch_code = ord(text[pos])
             if simd_matcher.contains(ch_code):
@@ -1288,8 +1337,31 @@ struct DFAEngine(Engine):
             has_dot = True
             pos += 1
 
-        # Segment 3: Match trailing digits [0-9]* (optional)
+        # Segment 3: Match trailing digits [0-9]* (optional) with vectorized SIMD
         var trailing_digits = 0
+        while pos + 16 <= text_len:
+            var chunk = text.unsafe_ptr().load[width=16](pos)
+            var matches = simd_matcher.match_chunk(chunk)
+
+            # Count consecutive matches in this chunk
+            var consecutive_count = 0
+            for i in range(16):
+                if matches[i]:
+                    consecutive_count += 1
+                else:
+                    break
+
+            if consecutive_count < 16:
+                # Found non-matching character, stop here
+                trailing_digits += consecutive_count
+                pos += consecutive_count
+                break
+            else:
+                # Full chunk matched, continue
+                trailing_digits += 16
+                pos += 16
+
+        # Handle remaining characters (less than 16)
         while pos < text_len:
             var ch_code = ord(text[pos])
             if simd_matcher.contains(ch_code):
