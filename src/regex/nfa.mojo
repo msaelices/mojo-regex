@@ -393,6 +393,18 @@ struct NFAEngine(Engine):
                 # This will be handled in _apply_quantifier_simd
                 return None
             else:
+                # Check if pattern contains alphanumeric + special chars
+                # Common email/identifier patterns like [a-zA-Z0-9._%-+]
+                var has_lower = "a-z" in inner
+                var has_upper = "A-Z" in inner
+                var has_digits = "0-9" in inner
+                var has_alnum = has_lower and has_upper and has_digits
+
+                # If it has alphanumeric ranges plus special chars, return None
+                # to signal specialized handling
+                if has_alnum and len(inner) > 10:  # e.g. "a-zA-Z0-9._%-+"
+                    return None
+
                 # More complex pattern, use helper to expand
                 from regex.dfa import expand_character_range
 
@@ -635,17 +647,50 @@ struct NFAEngine(Engine):
                 var alpha_matcher = get_alpha_matcher()
                 ch_found = alpha_matcher.contains(ch_code)
             else:
-                # Try to use SIMD matcher for other patterns
-                var simd_matcher = self._create_range_matcher(
-                    String(range_pattern)
-                )
-                if simd_matcher:
-                    ch_found = simd_matcher.value().contains(ch_code)
+                # Check if it's a complex pattern with alphanumeric + special chars
+                if range_pattern.startswith("[") and range_pattern.endswith(
+                    "]"
+                ):
+                    var inner = range_pattern[1:-1]
+                    var has_lower = "a-z" in inner
+                    var has_upper = "A-Z" in inner
+                    var has_digits = "0-9" in inner
+                    var has_alnum = has_lower and has_upper and has_digits
+
+                    if has_alnum and len(inner) > 10:
+                        # Complex pattern like [a-zA-Z0-9._%+-]
+                        # Check alphanumeric first (common case)
+                        var alnum_matcher = get_alnum_matcher()
+                        if alnum_matcher.contains(ch_code):
+                            ch_found = True
+                        else:
+                            # Not alphanumeric, check special chars
+                            var ch = String(str[str_i])
+                            ch_found = ch in inner
+                    else:
+                        # Try to use SIMD matcher for other patterns
+                        var simd_matcher = self._create_range_matcher(
+                            String(range_pattern)
+                        )
+                        if simd_matcher:
+                            ch_found = simd_matcher.value().contains(ch_code)
+                        else:
+                            # Fallback to regular range matching
+                            ch_found = ast._is_char_in_range(
+                                String(str[str_i]), range_pattern
+                            )
                 else:
-                    # Fallback to regular range matching
-                    ch_found = ast._is_char_in_range(
-                        String(str[str_i]), range_pattern
+                    # Try to use SIMD matcher for other patterns
+                    var simd_matcher = self._create_range_matcher(
+                        String(range_pattern)
                     )
+                    if simd_matcher:
+                        ch_found = simd_matcher.value().contains(ch_code)
+                    else:
+                        # Fallback to regular range matching
+                        ch_found = ast._is_char_in_range(
+                            String(str[str_i]), range_pattern
+                        )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -1200,6 +1245,51 @@ struct NFAEngine(Engine):
                     else:
                         return (False, str_i)
             else:
+                # Check if it's a complex pattern with alphanumeric + special chars
+                var is_complex_pattern = False
+                if range_pattern.startswith("[") and range_pattern.endswith(
+                    "]"
+                ):
+                    var inner = range_pattern[1:-1]
+                    var has_lower = "a-z" in inner
+                    var has_upper = "A-Z" in inner
+                    var has_digits = "0-9" in inner
+                    var has_alnum = has_lower and has_upper and has_digits
+                    is_complex_pattern = has_alnum and len(inner) > 10
+
+                if is_complex_pattern:
+                    # Handle complex patterns like [a-zA-Z0-9._%+-] efficiently
+                    var alnum_matcher = get_alnum_matcher()
+                    var inner = range_pattern[1:-1]
+                    var pos = str_i
+                    var match_count = 0
+                    var actual_max = max_matches
+                    if actual_max == -1:
+                        actual_max = len(str) - str_i
+
+                    while pos < len(str) and match_count < actual_max:
+                        var ch_code = ord(str[pos])
+                        var is_match = False
+
+                        # Check alphanumeric first (common case)
+                        if alnum_matcher.contains(ch_code):
+                            is_match = True
+                        else:
+                            # Check special characters
+                            var ch = String(str[pos])
+                            is_match = ch in inner
+
+                        if is_match == ast.positive_logic:
+                            match_count += 1
+                            pos += 1
+                        else:
+                            break
+
+                    if match_count >= min_matches:
+                        return (True, pos)
+                    else:
+                        return (False, str_i)
+
                 var range_matcher = self._create_range_matcher(range_pattern)
                 if range_matcher:
                     var matcher = range_matcher.value()
