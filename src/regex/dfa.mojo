@@ -1067,26 +1067,9 @@ struct DFAEngine(Engine):
             else:
                 break
 
-        # Determine if we have a valid match based on the DFA pattern
-        var is_valid_match = False
-        var match_end = start_pos + match_count
-
-        if match_count == 0:
-            # No characters matched - only valid if start state accepts (e.g., [a-z]*)
-            if start_accepting:
-                is_valid_match = True
-                match_end = start_pos
-        else:
-            # Some characters matched - check if this satisfies the pattern
-            # For character class patterns, any positive match count is typically valid
-            is_valid_match = True
-
-        if is_valid_match:
-            # Check end anchor constraint
-            if self.has_end_anchor and match_end != text_len:
-                return None
-            return Match(0, start_pos, match_end, text)
-
+        # For now, fall back to regular DFA execution for character class patterns
+        # to ensure correct quantifier handling
+        # TODO: Properly integrate SIMD with DFA state machine
         return None
 
 
