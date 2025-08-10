@@ -79,7 +79,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.use_shuffle = (
             self.size_hint >= SHUFFLE_MIN_SIZE
             and self.size_hint <= SHUFFLE_MAX_SIZE
-            and (USE_SHUFFLE)
+            and USE_SHUFFLE
         )
 
         # Set bits for each character in the class
@@ -105,7 +105,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.size_hint = end_code - start_code + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and (USE_SHUFFLE)
+        self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
