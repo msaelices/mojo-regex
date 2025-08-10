@@ -813,14 +813,17 @@ struct DFAEngine(Engine):
                 if i == 0:
                     first_element_is_digits = True
 
-        # Enable SIMD for patterns where:
-        # 1. First element is digits with min_matches >= 1 (like [0-9]+)
-        # 2. At least half the elements are digit-related
-        # This covers patterns like [0-9]+[.]?[0-9]*
+        # Enable SIMD only for the specific complex number pattern [0-9]+[.]?[0-9]*
+        # This is very conservative to avoid breaking other multi-character patterns
         if (
-            first_element_is_digits
+            total_elements == 3
+            and first_element_is_digits
             and sequence_info.elements[0].min_matches >= 1
-            and digit_elements * 2 >= total_elements
+            and sequence_info.elements[1].char_class == "."
+            and sequence_info.elements[1].min_matches == 0
+            and sequence_info.elements[1].max_matches == 1
+            and sequence_info.elements[2].char_class == DIGITS
+            and sequence_info.elements[2].min_matches == 0
         ):
             self.simd_char_matcher = CharacterClassSIMD(DIGITS)
             self.simd_char_pattern = "[0-9]"
@@ -1142,9 +1145,13 @@ struct DFAEngine(Engine):
                     return None
 
         # State-aware SIMD matching for complex patterns
-        # Detect if this is a digit-heavy multi-character pattern like [0-9]+[.]?[0-9]*
-        if len(self.states) == 4 and self.simd_char_pattern == "[0-9]":
-            # This appears to be a complex number pattern, use segmented matching
+        # Detect if this is specifically the complex number pattern [0-9]+[.]?[0-9]*
+        if (
+            len(self.states) == 4
+            and self.simd_char_pattern == "[0-9]"
+            and self._is_complex_number_pattern()
+        ):
+            # This is the complex number pattern, use segmented matching
             var complex_match = self._try_match_complex_number_pattern(
                 text, start_pos
             )
@@ -1187,6 +1194,55 @@ struct DFAEngine(Engine):
             return Match(0, start_pos, match_end, text)
 
         return None
+
+    fn _is_complex_number_pattern(self) -> Bool:
+        """Check if the DFA structure matches the complex number pattern [0-9]+[.]?[0-9]*.
+
+        The pattern has this specific structure:
+        - State 0: Non-accepting, transitions digits->1, dot->255 (no match)
+        - State 1: Accepting, transitions digits->1 (self-loop), dot->2
+        - State 2: Accepting, transitions digits->3, dot->255 (no match)
+        - State 3: Accepting, transitions digits->3 (self-loop), dot->255 (no match)
+
+        Returns:
+            True if this matches the complex number pattern structure.
+        """
+        if len(self.states) != 4:
+            return False
+
+        # Check state 0: non-accepting, digits go to 1
+        if (
+            self.states[0].is_accepting
+            or self.states[0].get_transition(ord("0")) != 1
+            or self.states[0].get_transition(ord(".")) != 255
+        ):
+            return False
+
+        # Check state 1: accepting, digits self-loop, dot goes to 2
+        if (
+            not self.states[1].is_accepting
+            or self.states[1].get_transition(ord("0")) != 1
+            or self.states[1].get_transition(ord(".")) != 2
+        ):
+            return False
+
+        # Check state 2: accepting, digits go to 3
+        if (
+            not self.states[2].is_accepting
+            or self.states[2].get_transition(ord("0")) != 3
+            or self.states[2].get_transition(ord(".")) != 255
+        ):
+            return False
+
+        # Check state 3: accepting, digits self-loop
+        if (
+            not self.states[3].is_accepting
+            or self.states[3].get_transition(ord("0")) != 3
+            or self.states[3].get_transition(ord(".")) != 255
+        ):
+            return False
+
+        return True
 
     fn _try_match_complex_number_pattern(
         self, text: String, start_pos: Int
