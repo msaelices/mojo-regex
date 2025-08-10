@@ -489,7 +489,7 @@ struct NFAEngine(Engine):
             OR,
             GROUP,
         )
-        
+
         # DEBUG: Uncomment to debug
         # print("DEBUG: _match_node type =", ast.type, "str_i =", str_i, "min =", ast.min, "max =", ast.max)
 
@@ -1073,7 +1073,7 @@ struct NFAEngine(Engine):
         """Apply quantifier logic to a matched element."""
         var min_matches = ast.min
         var max_matches = ast.max
-        
+
         # DEBUG: Uncomment to debug
         # print("DEBUG: _apply_quantifier str_i =", str_i, "min =", min_matches, "max =", max_matches)
 
@@ -1360,7 +1360,7 @@ struct NFAEngine(Engine):
                             return (True, pos)
                         else:
                             return (False, str_i)
-                
+
                 # Fallback for simple ranges like [c-n] that don't use SIMD
                 # Use character-by-character matching
                 var pos = str_i
@@ -1371,7 +1371,9 @@ struct NFAEngine(Engine):
 
                 while pos < len(str) and match_count < actual_max:
                     var ch_code = ord(str[pos])
-                    var is_match = self._match_char_in_range(range_pattern, ch_code)
+                    var is_match = self._match_char_in_range(
+                        range_pattern, ch_code
+                    )
                     if is_match == ast.positive_logic:
                         match_count += 1
                         pos += 1
@@ -1389,13 +1391,13 @@ struct NFAEngine(Engine):
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             var inner = range_pattern[1:-1]
-            
+
             # Handle simple ranges like [c-n]
             if len(inner) == 3 and inner[1] == "-":
                 var start_char = ord(inner[0])
                 var end_char = ord(inner[2])
                 return ch_code >= start_char and ch_code <= end_char
-            
+
             # For more complex patterns, fall back to character inclusion
             var ch = chr(ch_code)
             return ch in inner

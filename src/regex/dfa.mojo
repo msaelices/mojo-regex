@@ -1042,7 +1042,10 @@ struct DFAEngine(Engine):
         return matches
 
     fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
-        """SIMD-optimized matching for character class patterns.
+        """SIMD-optimized matching for character class patterns with quantifier support.
+
+        This hybrid approach uses SIMD for fast character matching while respecting
+        DFA quantifier constraints by validating the result through state machine simulation.
 
         Args:
             text: Input text to match against.
@@ -1055,16 +1058,18 @@ struct DFAEngine(Engine):
             return None
 
         var simd_matcher = self.simd_char_matcher.value()
-        var pos = start_pos
-        var match_count = 0
         var text_len = len(text)
 
-        # Check if start state is accepting (for patterns like [a-z]*)
-        var start_accepting = (
-            len(self.states) > 0 and self.states[self.start_state].is_accepting
-        )
+        if len(self.states) == 0:
+            return None
 
-        # Count consecutive matching characters using SIMD
+        # Check if start state is accepting (for patterns like [a-z]*)
+        var _ = self.states[self.start_state].is_accepting
+
+        # Use SIMD to count consecutive matching characters
+        var pos = start_pos
+        var match_count = 0
+
         while pos < text_len:
             var ch_code = ord(text[pos])
             if simd_matcher.contains(ch_code):
@@ -1073,9 +1078,51 @@ struct DFAEngine(Engine):
             else:
                 break
 
-        # For now, fall back to regular DFA execution for character class patterns
-        # to ensure correct quantifier handling
-        # TODO: Properly integrate SIMD with DFA state machine
+        # Now validate this match by simulating DFA execution with the matched characters
+        # This ensures we respect quantifier constraints properly
+        var current_state = self.start_state
+        var last_accepting_pos = -1
+        var sim_pos = start_pos
+
+        # Check if start state is accepting (for * quantifiers)
+        if (
+            current_state < len(self.states)
+            and self.states[current_state].is_accepting
+        ):
+            last_accepting_pos = sim_pos
+
+        # Simulate DFA execution for the characters we matched with SIMD
+        var chars_to_process = match_count
+        while chars_to_process > 0 and sim_pos < text_len:
+            var char_code = ord(text[sim_pos])
+
+            if current_state >= len(self.states):
+                break
+
+            var next_state = self.states[current_state].get_transition(
+                char_code
+            )
+            if next_state == -1:
+                break
+
+            current_state = next_state
+            sim_pos += 1
+            chars_to_process -= 1
+
+            # Check if current state is accepting
+            if (
+                current_state < len(self.states)
+                and self.states[current_state].is_accepting
+            ):
+                last_accepting_pos = sim_pos
+
+        # Check if we have a valid match from the simulation
+        if last_accepting_pos != -1:
+            # Check end anchor constraint
+            if self.has_end_anchor and last_accepting_pos != text_len:
+                return None
+            return Match(0, start_pos, last_accepting_pos, text)
+
         return None
 
 
