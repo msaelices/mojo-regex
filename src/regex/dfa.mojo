@@ -1141,7 +1141,17 @@ struct DFAEngine(Engine):
                     # Range quantifier like {2,4} - disable SIMD, fall back to DFA
                     return None
 
-        # Use SIMD to count consecutive matching characters
+        # State-aware SIMD matching for complex patterns
+        # Detect if this is a digit-heavy multi-character pattern like [0-9]+[.]?[0-9]*
+        if len(self.states) == 4 and self.simd_char_pattern == "[0-9]":
+            # This appears to be a complex number pattern, use segmented matching
+            var complex_match = self._try_match_complex_number_pattern(
+                text, start_pos
+            )
+            if complex_match:
+                return complex_match
+
+        # Use SIMD to count consecutive matching characters (original logic for simple patterns)
         var pos = start_pos
         var match_count = 0
 
@@ -1177,6 +1187,73 @@ struct DFAEngine(Engine):
             return Match(0, start_pos, match_end, text)
 
         return None
+
+    fn _try_match_complex_number_pattern(
+        self, text: String, start_pos: Int
+    ) -> Optional[Match]:
+        """SIMD-optimized matching for complex number patterns like [0-9]+[.]?[0-9]*.
+
+        This method uses segmented matching:
+        1. SIMD match initial digits ([0-9]+)
+        2. Check for optional dot ([.]?)
+        3. SIMD match trailing digits ([0-9]*)
+
+        Args:
+            text: Input text to match against.
+            start_pos: Position to start matching from.
+
+        Returns:
+            Optional Match if pattern matches, None otherwise.
+        """
+        if not self.simd_char_matcher:
+            return None
+
+        var simd_matcher = self.simd_char_matcher.value()
+        var text_len = len(text)
+        var pos = start_pos
+
+        # Segment 1: Match initial digits [0-9]+ (required)
+        var initial_digits = 0
+        while pos < text_len:
+            var ch_code = ord(text[pos])
+            if simd_matcher.contains(ch_code):
+                initial_digits += 1
+                pos += 1
+            else:
+                break
+
+        # Must have at least one digit for [0-9]+
+        if initial_digits == 0:
+            return None
+
+        # Segment 2: Check for optional dot [.]?
+        var has_dot = False
+        if pos < text_len and text[pos] == ".":
+            has_dot = True
+            pos += 1
+
+        # Segment 3: Match trailing digits [0-9]* (optional)
+        var trailing_digits = 0
+        while pos < text_len:
+            var ch_code = ord(text[pos])
+            if simd_matcher.contains(ch_code):
+                trailing_digits += 1
+                pos += 1
+            else:
+                break
+
+        # The pattern [0-9]+[.]?[0-9]* is valid if:
+        # - We have at least one initial digit (already checked)
+        # - The trailing digits are optional (any count >= 0 is valid)
+        var match_end = (
+            start_pos + initial_digits + (1 if has_dot else 0) + trailing_digits
+        )
+
+        # Check end anchor constraint
+        if self.has_end_anchor and match_end != text_len:
+            return None
+
+        return Match(0, start_pos, match_end, text)
 
 
 struct BoyerMoore:
