@@ -1,4 +1,4 @@
-## High-Performance Regex in Mojo
+## Regex in Mojo
 
 ### Building a Hybrid DFA/NFA Engine with SIMD Optimization
 
@@ -8,7 +8,7 @@
 
 ---
 
-# Presentation Agenda
+# Agenda
 
 ### Part 1: Introduction & Motivation
 
@@ -48,11 +48,9 @@
 pixi add mojo-regex
 ```
 
-- **Performance Tips** [/docs/performance-tips.md](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
+- **Performance Tips** [docs/performance-tips.md](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
 
 - **Contributing Guide** [CONTRIBUTING.md](https://github.com/msaelices/mojo-regex/blob/main/CONTRIBUTING.md)
-
-- **Mojo Documentation** [docs.modular.com/mojo](https://docs.modular.com/mojo)
 
 ---
 
@@ -69,7 +67,7 @@ A regex library for Mojo featuring:
 - ⚡ **SIMD-Accelerated Matching** - Vectorized operations
 - 🐍 **Python-Compatible API** - Familiar interface
 - 🚀 **O(n) Performance** - For common patterns
-- 🔧 **Zero-Copy Operations** - Memory efficient
+- 🔧 **Zero-Copy Operations** (WIP) - Memory efficient
 
 ---
 
