@@ -387,7 +387,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn _is_char_in_range(
         self,
-        ch: String,
+        ch: StringSlice,
         range_pattern: StringSlice[__origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
         """Check if a character is in a range pattern like '[a-z]' or 'abcxyz'.
@@ -404,7 +404,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn _char_matches_range_syntax(
         self,
-        ch: String,
+        ch: StringSlice,
         range_syntax: StringSlice[__origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
         """Check if a character matches range syntax like 'a-z' or 'abc'."""

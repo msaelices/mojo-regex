@@ -382,7 +382,7 @@ struct NFAEngine(Engine):
         return self.pattern.startswith(self.literal_prefix)
 
     fn _create_range_matcher(
-        self, range_pattern: String
+        self, range_pattern: StringSlice
     ) -> Optional[CharacterClassSIMD]:
         """Create SIMD matcher for a range pattern.
 
@@ -435,7 +435,7 @@ struct NFAEngine(Engine):
                 char_class = String()
         else:
             # Already expanded
-            char_class = range_pattern
+            char_class = String(range_pattern)
 
         # Create SIMD matcher
         if char_class:
@@ -692,12 +692,12 @@ struct NFAEngine(Engine):
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
-                            ast, String(range_pattern), str[str_i], ch_code
+                            ast, range_pattern, str[str_i], ch_code
                         )
                 else:
                     # Not a bracketed pattern, try SIMD matcher
                     ch_found = self._match_with_simd_or_fallback(
-                        ast, String(range_pattern), str[str_i], ch_code
+                        ast, range_pattern, str[str_i], ch_code
                     )
 
         if ch_found == ast.positive_logic:
@@ -730,8 +730,8 @@ struct NFAEngine(Engine):
     fn _match_with_simd_or_fallback(
         self,
         ast: ASTNode,
-        range_pattern: String,
-        ch: String,
+        range_pattern: StringSlice[__origin_of(ast.regex_ptr[].pattern)],
+        ch: StringSlice,
         ch_code: Int,
     ) -> Bool:
         """Try to match with SIMD matcher, fallback to regular matching."""
@@ -740,7 +740,7 @@ struct NFAEngine(Engine):
             return simd_matcher.value().contains(ch_code)
         else:
             # Fallback to regular range matching
-            return ast._is_char_in_range(ch, StringSlice(range_pattern))
+            return ast._is_char_in_range(ch, range_pattern)
 
     fn _match_or(
         self,
