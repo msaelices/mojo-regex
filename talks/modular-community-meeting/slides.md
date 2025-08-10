@@ -12,30 +12,11 @@
 
 ### Part 1: Introduction & Motivation
 
-**1. What is mojo-regex?**
-<!-- .element: class="fragment" data-fragment-index="1" -->
-
-**2. Why Build a Regex Engine in Mojo?**
-<!-- .element: class="fragment" data-fragment-index="2" -->
-
-**3. Performance Comparison**
-<!-- .element: class="fragment" data-fragment-index="3" -->
-
 ### Part 2: Architecture Deep Dive
-
-**4. Hybrid DFA/NFA Design**
-<!-- .element: class="fragment" data-fragment-index="4" -->
-
-**5. Component Overview**
-<!-- .element: class="fragment" data-fragment-index="5" -->
 
 ### Part 3: Performance Optimizations
 
-**6. SIMD and Memory Optimizations**
-<!-- .element: class="fragment" data-fragment-index="6" -->
-
-**7. Practical Examples & Benchmarks**
-<!-- .element: class="fragment" data-fragment-index="7" -->
+### Part 4: Roadmap
 
 ---
 
@@ -111,16 +92,16 @@ print("Search found:", search_result.value().get_match_text())
 
 ### Why Build a Regex Engine in Mojo?
 
-**Just problem solving!**
+**Just to solve a problem**
 - At Smith.ai, needed a high-performance phone number parser
 - Built smith-phonenums, based on python-phonenumbers
 - Turns out regex was the bottleneck
 
-**Alternatives:**
+**Alternatives**
 - Import Python's `re` module from Mojo
 - Parse numbers without regex
 
-**Hard mode:**
+**The hard mode**
 - Build a regex engine in Mojo "from scratch"
 - Thanks to LLMs, entry barrier was much lower
 
@@ -403,103 +384,7 @@ var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
 ---
 
 <!-- .slide: class="center-slide" -->
-# Part 4: Practical Examples
-
----
-
-
----
-
-### Advanced Patterns
-
-```mojo
-# Quantifiers
-match_first("a+", "aaaa")      # Matches "aaaa"
-match_first("a{2,4}", "aaaaa") # Matches "aaaa"
-
-# Anchors
-match_first("^hello", "hello world")  # ✓ Matches
-match_first("^world", "hello world")  # ✗ No match
-
-# Groups and alternation
-match_first("(com|org|net)", "example.com")  # Matches "com"
-
-# Complex patterns
-var url_pattern = "^https?://[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}"
-match_first(url_pattern, "https://example.com")  # ✓ Valid URL
-```
-
----
-
-### Performance Best Practices
-
-**1. Reuse Compiled Patterns**
-```mojo
-# Good: Compile once
-var pattern = CompiledRegex("[0-9]+")
-for text in texts:
-    var matches = pattern.match_all(text)
-
-# Bad: Recompile every time
-for text in texts:
-    var matches = findall("[0-9]+", text)
-```
-
-**2. Use Simple Patterns When Possible**
-```mojo
-# Prefer DFA-eligible patterns
-match_first("error", log_line)  # O(n) with SIMD
-
-# Over complex alternatives
-match_first("err(or)?", log_line)  # May use NFA
-```
-
----
-
-### Benchmarking Example
-
-```mojo
-from time import perf_counter_ns as now
-from regex import match_first
-
-fn benchmark_literal_match():
-    var text = "hello world" * 1000
-    var pattern = "world"
-    
-    var start = now()
-    for _ in range(1000):
-        var result = match_first(pattern, text)
-        keep(result.__bool__())  # Prevent optimization
-    
-    var elapsed = now() - start
-    print("Time per match:", elapsed / 1000, "ns")
-
-# Results:
-# mojo-regex: ~50ns per match
-# Python re:  ~120ns per match
-```
-
----
-
-### Integration Tips
-
-**1. Error Handling**
-```mojo
-try:
-    var result = match_first(user_pattern, text)
-except:
-    print("Invalid regex pattern")
-```
-
-**2. Building Complex Patterns**
-```mojo
-# Use raw strings for cleaner patterns
-alias EMAIL_PATTERN = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-
-# Build patterns programmatically
-var words = ["error", "warning", "fatal"]
-var pattern = "(" + "|".join(words) + ")"
-```
+# Part 4: Roadmap
 
 ---
 
@@ -534,22 +419,6 @@ var pattern = "(" + "|".join(words) + ")"
 - Add case-insensitive flag
 - Improve error messages
 - Add more benchmarks
-
----
-
-### Performance Tips Summary
-
-**Do's:**
-- ✅ Use DFA-eligible patterns when possible
-- ✅ Reuse compiled patterns
-- ✅ Leverage SIMD for character classes
-- ✅ Profile before optimizing
-
-**Don'ts:**
-- ❌ Don't use complex patterns for simple tasks
-- ❌ Don't recompile patterns in loops
-- ❌ Don't ignore pattern complexity
-- ❌ Don't assume NFA is always slower
 
 ---
 
