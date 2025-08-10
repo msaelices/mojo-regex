@@ -93,12 +93,12 @@ A regex library for Mojo featuring:
 
 **Just problem solving!**
 - At Smith.ai, needed a high-performance phone number parser
-- Build smith-phonenums, based on python-phonenumbers
-- Turns out regex is the bottleneck
+- Built smith-phonenums, based on python-phonenumbers
+- Turns out regex was the bottleneck
 
 **Alternatives:**
 - Import Python's `re` module from Mojo
-- Parsing numbers without regexs
+- Parse numbers without regex
 
 **Hard mode:**
 - Build a regex engine in Mojo "from scratch"
@@ -120,11 +120,11 @@ TODO: Update with latest benchmarks
 ---
 
 ### Key Performance Insights
-- Not competing with Python but with 25 y/o C library.
+- Not competing with Python but with 25-year-old C library.
 - Not a regex/SIMD expert. Just learning as I go.
 - Difficult to trace copies and allocations.
   - Use `__call_location` in `__init__` or `__copyinit__`
-  - Not easy in 3rd party structs (e.g. `List`, `String`).
+  - Not easy in 3rd-party structs (e.g. `List`, `String`).
 
 ---
 
@@ -554,7 +554,7 @@ var pattern = "(" + "|".join(words) + ")"
 
 **How to Contribute:**
 
-1. **Check the TO-DO list** in README.md
+1. **Check the TODO list** in README.md
 2. **Read CONTRIBUTING.md** for architecture details
 3. **Run benchmarks** before/after changes
 4. **Add tests** for new features
