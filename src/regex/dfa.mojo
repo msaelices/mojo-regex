@@ -977,7 +977,11 @@ struct DFAEngine(Engine):
                 last_accepting_pos = pos
 
         # Check if we ended in an accepting state (important for exact matches)
-        if pos == len(text) and current_state < len(self.states) and self.states[current_state].is_accepting:
+        if (
+            pos == len(text)
+            and current_state < len(self.states)
+            and self.states[current_state].is_accepting
+        ):
             last_accepting_pos = pos
 
         # Return longest match found
