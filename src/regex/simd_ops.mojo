@@ -542,7 +542,8 @@ struct SIMDStringSearch:
             return False
 
         for i in range(self.pattern_length):
-            if ord(text[pos + i]) != Int(self.pattern_ptr[][i]):
+            var ptr = self.pattern_ptr + i
+            if ord(text[pos + i]) != Int(ptr[]):
                 return False
 
         return True
