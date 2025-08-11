@@ -812,13 +812,13 @@ struct DFAEngine(Engine):
         # Collect all branch texts (flattening nested OR structures)
         var all_branches = _collect_all_alternation_branches(or_node)
 
-        # Process each branch of the alternation
+        # Build trie-like DFA structure to handle shared prefixes
         for i in range(len(all_branches)):
             var branch_text = all_branches[i]
             if len(branch_text) == 0:
                 continue
 
-            # Create states for this branch
+            # Navigate/create path for this branch
             var current_state_index = 0  # Start from start state
 
             for j in range(len(branch_text)):
@@ -830,14 +830,9 @@ struct DFAEngine(Engine):
                         char_code, accepting_index
                     )
                 else:
-                    # Intermediate character - create or reuse state
-                    var next_state = DFAState()
-                    self.states.append(next_state)
-                    var next_index = len(self.states) - 1
-                    self.states[current_state_index].add_transition(
-                        char_code, next_index
-                    )
-                    current_state_index = next_index
+                    # Intermediate character - find existing state or create new one
+                    var next_state_index = self._find_or_create_state(current_state_index, char_code)
+                    current_state_index = next_state_index
 
     fn compile_quantified_group(
         mut self, ast: ASTNode[MutableAnyOrigin]
@@ -980,6 +975,29 @@ struct DFAEngine(Engine):
                     char_code, next_index
                 )
                 current_state_index = next_index
+
+    fn _find_or_create_state(mut self, from_state: Int, char_code: Int) -> Int:
+        """Find existing state for transition or create new one.
+        
+        Args:
+            from_state: Source state index.
+            char_code: Character code for the transition.
+            
+        Returns:
+            State index for the target of this transition.
+        """
+        # Check if transition already exists
+        var existing_target = Int(self.states[from_state].transitions[char_code])
+        if existing_target != 255:  # 255 is -1 in uint8
+            # Transition already exists, reuse the target state
+            return existing_target
+        else:
+            # Create new state and add transition
+            var new_state = DFAState()
+            self.states.append(new_state)
+            var new_state_index = len(self.states) - 1
+            self.states[from_state].add_transition(char_code, new_state_index)
+            return new_state_index
 
     @always_inline
     fn _create_accepting_state(mut self: Self):
