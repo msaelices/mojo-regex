@@ -324,6 +324,21 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Early optimization: Check for wildcard match any pattern (.*)
         self.is_wildcard_match_any = _is_wildcard_match_any(pattern)
 
+        # Fast path: Skip all expensive operations for .* pattern
+        if self.is_wildcard_match_any:
+            # Initialize with minimal state for .* pattern
+            self.literal_info = OptimizedLiteralInfo(None, False, False)
+            self.is_exact_literal = False
+            self.prefilter = None
+            self.complexity = PatternComplexity(PatternComplexity.SIMPLE)
+            self.dfa_matcher = None
+            # Create minimal NFA matcher (required field, but won't be used)
+            var dummy_ast = parse(
+                "a"
+            )  # Simple dummy pattern for required initialization
+            self.nfa_matcher = NFAMatcher(dummy_ast, "a")
+            return
+
         var ast = parse(pattern)
 
         # Early optimization: Skip prefilter analysis for very simple patterns
