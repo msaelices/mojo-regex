@@ -339,13 +339,32 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     @always_inline
     fn is_simd_optimizable(self, min_matches: Int, max_matches: Int) -> Bool:
-        """Check if the AST node is a SIMD quantifier."""
-        if (SIMD_QUANTIFIERS == self.type).reduce_or() and (
-            min_matches > 1 or max_matches != 1
-        ):
-            return True
-        else:
+        """Check if the AST node would benefit from SIMD quantifier optimization.
+
+        Only use SIMD for patterns that will truly benefit, avoiding overhead
+        for simple cases that can be handled more efficiently by regular matching.
+        """
+        if not (SIMD_QUANTIFIERS == self.type).reduce_or():
             return False
+
+        if min_matches == 1 and max_matches == 1:
+            return False  # No quantifier
+
+        # Only use SIMD for complex patterns or significant repetition
+        if max_matches == -1:  # Unlimited quantifiers like *, +
+            # For unlimited quantifiers, only use SIMD if min > 3
+            # Simple patterns like [0-9]+ (min=1) should use regular matching
+            return min_matches > 3
+        elif max_matches > 8:  # Large bounded quantifiers {9,} or {5,20}
+            return True
+        elif self.type == RANGE and self.get_value():
+            # Complex character classes benefit more from SIMD
+            ref range_pattern = String(self.get_value().value())
+            return (
+                len(range_pattern) > 8
+            )  # Complex patterns like [a-zA-Z0-9._%+-]
+        else:
+            return False  # Simple quantifiers use regular matching
 
     fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
