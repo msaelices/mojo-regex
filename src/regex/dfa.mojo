@@ -1985,7 +1985,7 @@ struct DFAEngine(Engine):
         return None
 
 
-struct BoyerMoore:
+struct BoyerMoore(Copyable, Movable):
     """Boyer-Moore string search algorithm for fast literal string matching."""
 
     var pattern: String

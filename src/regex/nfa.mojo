@@ -18,6 +18,7 @@ from regex.simd_ops import (
     apply_quantifier_simd_generic,
     find_in_text_simd,
 )
+from regex.dfa import BoyerMoore
 from regex.simd_matchers import (
     get_digit_matcher,
     get_whitespace_matcher,
@@ -40,6 +41,47 @@ alias MIN_PREFIX_LITERAL_LENGTH = 3
 # Non-prefix literals need even longer length to be worth the overhead
 alias MIN_REQUIRED_LITERAL_LENGTH = 4
 
+# Pattern length thresholds for searcher selection
+alias BOYER_MOORE_MIN_LENGTH = 17
+alias BOYER_MOORE_MAX_LENGTH = 64
+
+
+struct LiteralSearcher(Copyable, Movable):
+    """Flexible literal searcher that uses the optimal algorithm based on pattern length.
+    """
+
+    var searcher_type: Int
+    """0 = TwoWaySearcher, 1 = BoyerMoore"""
+    var two_way: Optional[TwoWaySearcher]
+    var boyer_moore: Optional[BoyerMoore]
+
+    fn __init__(out self, pattern: String):
+        """Initialize with optimal searcher based on pattern length."""
+        var pattern_len = len(pattern)
+
+        if (
+            pattern_len >= BOYER_MOORE_MIN_LENGTH
+            and pattern_len <= BOYER_MOORE_MAX_LENGTH
+        ):
+            # Use Boyer-Moore for medium-length patterns (17-64 chars)
+            self.searcher_type = 1
+            self.two_way = None
+            self.boyer_moore = BoyerMoore(pattern)
+        else:
+            # Use TwoWaySearcher for short or very long patterns
+            self.searcher_type = 0
+            self.two_way = TwoWaySearcher(pattern)
+            self.boyer_moore = None
+
+    fn search(self, text: String, start: Int = 0) -> Int:
+        """Search for pattern in text using the optimal algorithm."""
+        if self.searcher_type == 1 and self.boyer_moore:
+            return self.boyer_moore.value().search(text, start)
+        elif self.two_way:
+            return self.two_way.value().search(text, start)
+        else:
+            return -1
+
 
 struct NFAEngine(Engine):
     """A regex engine that can match regex patterns against text."""
@@ -56,8 +98,8 @@ struct NFAEngine(Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
-    """SIMD searcher for literal prefix."""
+    var literal_searcher: Optional[LiteralSearcher]
+    """Optimal searcher for literal prefix (Boyer-Moore or Two-Way)."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -97,7 +139,7 @@ struct NFAEngine(Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
+                            self.literal_searcher = LiteralSearcher(
                                 self.literal_prefix
                             )
                         elif (
@@ -109,7 +151,7 @@ struct NFAEngine(Engine):
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
+                            self.literal_searcher = LiteralSearcher(
                                 self.literal_prefix
                             )
         except:
