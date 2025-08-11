@@ -1,635 +1,326 @@
-from os import abort
-from pathlib import _dir_of_current_file
-from random import random_si64, seed
-from sys import stderr
+#!/usr/bin/env mojo
 
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex import match_first, findall
-from regex.matcher import compile_regex
-from time import perf_counter_ns as now
-from pathlib import Path
+"""Mojo regex benchmarks using manual timing (Python-compatible)."""
+
+from time import perf_counter_ns
+from regex import match_first, findall, search
 
 
 # ===-----------------------------------------------------------------------===#
-# Benchmark Data Generation
+# Test Data Generation
 # ===-----------------------------------------------------------------------===#
 
-# Literal optimization test texts - scaled up for meaningful timing
-alias SHORT_TEXT = "hello world this is a test with hello again and hello there"
-alias MEDIUM_TEXT = SHORT_TEXT * 100  # Increased from 10 to 100
-alias LONG_TEXT = SHORT_TEXT * 1000  # Increased from 100 to 1000
-alias EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-alias EMAIL_LONG = EMAIL_TEXT * 50  # Increased from 5 to 50
 
-
-fn make_test_string[
-    length: Int
-](pattern: String = "abcdefghijklmnopqrstuvwxyz") -> String:
-    """Generate a test string of specified length by repeating a pattern.
-
-    Parameters:
-        length: The desired length of the test string.
-
-    Args:
-        pattern: The pattern to repeat to create the test string.
-    """
-    if length <= 0:
-        return ""
-
+fn make_test_string(length: Int) -> String:
+    """Generate test string by repeating alphabet."""
     var result = String()
+    var pattern = "abcdefghijklmnopqrstuvwxyz"
     var pattern_len = len(pattern)
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
 
-    # Add full pattern repeats
     for _ in range(full_repeats):
         result += pattern
-
-    # Add partial pattern for remainder
     for i in range(remainder):
         result += pattern[i]
-
     return result
 
 
 # ===-----------------------------------------------------------------------===#
-# Basic Literal Matching Benchmarks
+# Manual Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_literal_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark literal string matching."""
-    var test_text = make_test_string[text_length]()
-    test_text += "hello world" + test_text
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(2000):  # Increased from 100 to 2000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
 
 
-# ===-----------------------------------------------------------------------===#
-# Wildcard and Quantifier Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_wildcard_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark wildcard and quantifier patterns."""
-    var test_text = make_test_string[text_length]()
+fn benchmark_match_first(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark match_first with manual timing."""
 
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(1000):  # Increased from 50 to 1000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
+    # Warmup (3 iterations like Python)
+    for _ in range(3):
+        _ = match_first(pattern, text)
 
-    b.iter[call_fn]()
-    keep(Bool(test_text))
+    # Target runtime: 100ms like Python
+    var target_runtime = 100_000_000  # 100ms in nanoseconds
+    var total_time: Int = 0
+    var actual_iterations = 0
 
+    # Run until we hit target runtime or max iterations
+    while total_time < target_runtime and actual_iterations < 100_000:
+        var start_time = perf_counter_ns()
 
-# ===-----------------------------------------------------------------------===#
-# Character Range Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_range_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark character range patterns."""
-    var test_text = make_test_string[text_length]("abc123XYZ")
+        # Internal loop matches Python benchmark structure
+        for _ in range(internal_iterations):
+            var result = match_first(pattern, text)
+            if not result:
+                print("ERROR: No match in", name, "for pattern:", pattern)
+                return
 
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(1000):  # Increased from 50 to 1000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
+        var end_time = perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
 
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Anchor Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_anchor_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark anchor patterns (^ and $)."""
-    var test_text = make_test_string[text_length]()
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(2000):  # Increased from 100 to 2000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Alternation (OR) Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_alternation_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark alternation patterns (|)."""
-    var test_text = make_test_string[text_length]("abcdefghijklmnopqrstuvwxyz")
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(1000):  # Increased from 50 to 1000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Group Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_group_match[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark group patterns with quantifiers."""
-    var test_text = make_test_string[text_length]("abcabcabc")
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(1000):  # Increased from 50 to 1000
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Global Matching Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_match_all[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark finding all matches in text."""
-    var test_text = make_test_string[text_length]()
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(200):  # Increased from 10 to 200
-            var results = findall(pattern, test_text)
-            var count = len(results)
-            keep(count)
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Complex Pattern Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
-    """Benchmark complex email validation pattern."""
-    var base_text = make_test_string[text_length // 2]()
-    var emails = " user@example.com more text john@test.org "
-    var email_text = base_text + emails + base_text + emails
-    alias pattern = "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}"
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(40):  # Increased from 2 to 40
-            var results = findall(pattern, email_text)
-            var count = len(results)
-            keep(count)
-
-    b.iter[call_fn]()
-    keep(Bool(email_text))
-
-
-@parameter
-fn bench_complex_number_extraction[text_length: Int](mut b: Bencher) raises:
-    """Benchmark extracting numbers from text."""
-    var base_number_text = make_test_string[text_length // 2]("abc def ghi ")
-    var number_text = (
-        base_number_text + " 123 price 456.78 quantity 789 " + base_number_text
+    # Calculate and print results
+    var mean_time_per_match = (
+        Float64(total_time)
+        / Float64(actual_iterations)
+        / Float64(internal_iterations)
     )
-    alias pattern = "[0-9]+[.]?[0-9]*"
+    var time_ms = mean_time_per_match / 1_000_000.0
+    var total_matches = actual_iterations * internal_iterations
 
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(500):  # Increased from 25 to 500
-            var results = findall(pattern, number_text)
-            var count = len(results)
-            keep(count)
-
-    b.iter[call_fn]()
-    keep(Bool(number_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# SIMD-Heavy Character Filtering Benchmarks
-# ===-----------------------------------------------------------------------===#
-fn make_mixed_content_text[length: Int]() -> String:
-    """Generate large mixed content text optimal for SIMD character class testing.
-
-    Parameters:
-        length: The desired length of the test string.
-
-    Returns:
-        String with mixed alphanumeric, punctuation, and whitespace content.
-    """
-    if length <= 0:
-        return ""
-
-    # Pattern that creates realistic mixed content with plenty of alphanumeric sequences
-    var base_pattern = "User123 sent email to user456@domain.com with ID abc789! Status: ACTIVE_2024 (priority=HIGH). "
-    var pattern_len = len(base_pattern)
-    var result = String()
-    var full_repeats = length // pattern_len
-    var remainder = length % pattern_len
-
-    # Add full pattern repeats
-    for _ in range(full_repeats):
-        result += base_pattern
-
-    # Add partial pattern for remainder
-    for i in range(remainder):
-        result += base_pattern[i]
-
-    return result
-
-
-@parameter
-fn bench_simd_heavy_filtering[
-    text_length: Int, pattern: StaticString
-](mut b: Bencher) raises:
-    """Benchmark SIMD-optimized character class filtering on large mixed content.
-
-    This benchmark is designed to show maximum SIMD performance benefits by:
-    - Using character classes that benefit from SIMD lookup tables
-    - Processing large amounts of text to amortize SIMD setup costs
-    - Using realistic mixed content with alphanumeric sequences
-    """
-    var test_text = make_mixed_content_text[text_length]()
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        for _ in range(200):  # Increased from 10 to 200
-            var result = match_first(pattern, test_text)
-            keep(result.__bool__())
-
-    b.iter[call_fn]()
-    keep(Bool(test_text))
-
-
-# ===-----------------------------------------------------------------------===#
-# Literal Optimization Benchmarks
-# ===-----------------------------------------------------------------------===#
-@parameter
-fn bench_literal_prefix_short(mut b: Bencher) raises:
-    """Benchmark literal prefix pattern on short text."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall("hello.*world", SHORT_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_literal_prefix_medium(mut b: Bencher) raises:
-    """Benchmark literal prefix pattern on medium text."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall("hello.*", MEDIUM_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_literal_prefix_long(mut b: Bencher) raises:
-    """Benchmark literal prefix pattern on long text."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall("hello.*", LONG_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_required_literal_short(mut b: Bencher) raises:
-    """Benchmark required literal (not prefix) on short text."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall(".*@example\\.com", EMAIL_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_required_literal_long(mut b: Bencher) raises:
-    """Benchmark required literal (not prefix) on long text."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall(".*@example\\.com", EMAIL_LONG)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_no_literal_baseline(mut b: Bencher) raises:
-    """Benchmark pattern with no literals as baseline."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall("[a-z]+", MEDIUM_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-@parameter
-fn bench_alternation_common_prefix(mut b: Bencher) raises:
-    """Benchmark alternation with common prefix."""
-
-    @always_inline
-    @parameter
-    fn call_fn() raises:
-        var results = findall("(hello|help|helicopter)", MEDIUM_TEXT)
-        keep(len(results))
-
-    b.iter[call_fn]()
-
-
-# ===-----------------------------------------------------------------------===#
-# Engine Detection Utilities
-# ===-----------------------------------------------------------------------===#
-fn detect_and_report_engine(pattern: String, test_name: String) raises:
-    """Detect which engine is used for a pattern and report it."""
-    try:
-        var compiled = compile_regex(pattern)
-        var _ = compiled.get_stats()
-        var engine_type = compiled.matcher.get_engine_type()
-        var complexity = compiled.matcher.get_complexity()
-
-        var complexity_str: String
-        if complexity.value == 0:  # PatternComplexity.SIMPLE
-            complexity_str = "SIMPLE"
-        elif complexity.value == 1:  # PatternComplexity.MEDIUM
-            complexity_str = "MEDIUM"
-        else:  # PatternComplexity.COMPLEX
-            complexity_str = "COMPLEX"
-
-        print(
-            "[ENGINE] "
-            + test_name
-            + " -> Pattern: '"
-            + pattern
-            + "' | Engine: "
-            + engine_type
-            + " | Complexity: "
-            + complexity_str
-        )
-    except e:
-        print(
-            "[ENGINE] "
-            + test_name
-            + " -> Pattern: '"
-            + pattern
-            + "' | Engine: ERROR | compilation failed"
-        )
-
-
-# ===-----------------------------------------------------------------------===#
-# JSON Export Function
-# ===-----------------------------------------------------------------------===#
-fn export_json_results(m: Bench) raises:
-    """Export benchmark results to JSON file."""
-    var json_content = String("{\n")
-    json_content += '  "engine": "mojo",\n'
-    json_content += '  "timestamp": "' + String(now()) + '",\n'
-    json_content += (
-        '  "note": "Engine detection results shown in console output above",\n'
-    )
-    json_content += '  "results": {}\n'
-    json_content += "}\n"
-
-    # Write to file
-    var results_path = Path("benchmarks/results/mojo_results_with_engines.json")
-    with open(results_path, "w") as f:
-        f.write(json_content)
-
-    print("\n=== BENCHMARK COMPLETE ===")
-    print("Engine detection results shown above.")
+    # Format output to match Mojo's benchmark format
+    var padded_name = name + " " * (25 - len(name))
     print(
-        "\nPlaceholder JSON exported to:"
-        " benchmarks/results/mojo_results_with_engines.json"
+        "| "
+        + padded_name
+        + " | "
+        + String(time_ms)[:20]
+        + " " * (21 - len(String(time_ms)[:20]))
+        + " | "
+        + String(total_matches)
+        + " " * (6 - len(String(total_matches)))
+        + " |"
     )
 
 
-# ===-----------------------------------------------------------------------===#
-# Benchmark Main
-# ===-----------------------------------------------------------------------===#
-def main():
-    seed()
-    var m = Bench(BenchConfig(num_repetitions=1))
+fn benchmark_search(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark search (match_next) with manual timing."""
 
-    print("=== REGEX ENGINE DETECTION & BENCHMARKS ===")
-    print("")
+    # Warmup (3 iterations like Python)
+    for _ in range(3):
+        _ = search(pattern, text)
 
-    # Basic literal matching
-    print("=== Literal Matching Benchmarks ===")
+    # Target runtime: 100ms like Python
+    var target_runtime = 100_000_000  # 100ms in nanoseconds
+    var total_time: Int = 0
+    var actual_iterations = 0
+
+    # Run until we hit target runtime or max iterations
+    while total_time < target_runtime and actual_iterations < 100_000:
+        var start_time = perf_counter_ns()
+
+        # Internal loop matches Python benchmark structure
+        for _ in range(internal_iterations):
+            var result = search(pattern, text)
+            if not result:
+                print(
+                    "ERROR: No search match in", name, "for pattern:", pattern
+                )
+                return
+
+        var end_time = perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
+
+    # Calculate and print results
+    var mean_time_per_match = (
+        Float64(total_time)
+        / Float64(actual_iterations)
+        / Float64(internal_iterations)
+    )
+    var time_ms = mean_time_per_match / 1_000_000.0
+    var total_matches = actual_iterations * internal_iterations
+
+    # Format output to match Mojo's benchmark format
+    var padded_name = name + " " * (25 - len(name))
+    print(
+        "| "
+        + padded_name
+        + " | "
+        + String(time_ms)[:20]
+        + " " * (21 - len(String(time_ms)[:20]))
+        + " | "
+        + String(total_matches)
+        + " " * (6 - len(String(total_matches)))
+        + " |"
+    )
+
+
+fn benchmark_findall(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark findall with manual timing."""
+
+    # Warmup
+    for _ in range(3):
+        _ = findall(pattern, text)
+
+    var target_runtime = 100_000_000
+    var total_time: Int = 0
+    var actual_iterations = 0
+
+    while total_time < target_runtime and actual_iterations < 100_000:
+        var start_time = perf_counter_ns()
+
+        for _ in range(internal_iterations):
+            var results = findall(pattern, text)
+            # Touch the result to ensure it's not optimized away
+            if len(results) < 0:  # Always false, but compiler doesn't know
+                print("ERROR: Unexpected result")
+
+        var end_time = perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
+
+    # Calculate and print results
+    var mean_time_per_match = (
+        Float64(total_time)
+        / Float64(actual_iterations)
+        / Float64(internal_iterations)
+    )
+    var time_ms = mean_time_per_match / 1_000_000.0
+    var total_matches = actual_iterations * internal_iterations
+
+    var padded_name = name + " " * (25 - len(name))
+    print(
+        "| "
+        + padded_name
+        + " | "
+        + String(time_ms)[:20]
+        + " " * (21 - len(String(time_ms)[:20]))
+        + " | "
+        + String(total_matches)
+        + " " * (6 - len(String(total_matches)))
+        + " |"
+    )
+
+
+fn detect_and_report_engine(pattern: String, test_name: String):
+    """Simple pattern reporting."""
+    print("# Testing pattern:", pattern)
+
+
+# ===-----------------------------------------------------------------------===#
+# Main Benchmark Runner
+# ===-----------------------------------------------------------------------===#
+
+
+fn main() raises:
+    """Run all regex benchmarks with manual timing."""
+    print("=== REGEX ENGINE BENCHMARKS (Manual Timing) ===")
+    print("Using Python-compatible time.perf_counter_ns() for fair comparison")
+    print()
+
+    # Prepare test data - same as original benchmarks
+    var text_1000 = make_test_string(1000)
+    var text_5000 = make_test_string(5000)
+    var text_10000 = make_test_string(10000)
+    var text_range_10000 = make_test_string(10000) + "0123456789"
+
+    # Add hello to texts to ensure literal matches
+    text_1000 += "hello world"
+    text_5000 += "hello world"
+    text_10000 += "hello world"
+
+    # Test data for optimization benchmarks
+    var short_text = (
+        "hello world this is a test with hello again and hello there"
+    )
+    var medium_text = short_text * 100
+    var long_text = short_text * 1000
+    var email_text = (
+        "test@example.com user@test.org admin@example.com support@example.com"
+        " no-reply@example.com"
+        * 50
+    )
+
+    print("| name                      | met (ms)              | iters  |")
+    print("|---------------------------|-----------------------|--------|")
+
+    # ===== Literal Matching Benchmarks =====
+    print("# Literal Matching")
     detect_and_report_engine("hello", "literal_match_short")
-    m.bench_function[bench_literal_match[10000, "hello"]](
-        BenchId(String("literal_match_short"))
-    )
+    benchmark_search("literal_match_short", "hello", text_1000, 2000)
+
     detect_and_report_engine("hello", "literal_match_long")
-    m.bench_function[bench_literal_match[100000, "hello"]](
-        BenchId(String("literal_match_long"))
-    )
+    benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
-    # Wildcard and quantifiers
-    print("=== Wildcard and Quantifier Benchmarks ===")
+    # ===== Wildcard and Quantifier Benchmarks =====
+    print("# Wildcard and Quantifiers")
     detect_and_report_engine(".*", "wildcard_match_any")
-    m.bench_function[bench_wildcard_match[10000, ".*"]](
-        BenchId(String("wildcard_match_any"))
-    )
+    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
+
     detect_and_report_engine("a*", "quantifier_zero_or_more")
-    m.bench_function[bench_wildcard_match[10000, "a*"]](
-        BenchId(String("quantifier_zero_or_more"))
-    )
+    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
+
     detect_and_report_engine("a+", "quantifier_one_or_more")
-    m.bench_function[bench_wildcard_match[10000, "a+"]](
-        BenchId(String("quantifier_one_or_more"))
-    )
+    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
+
     detect_and_report_engine("a?", "quantifier_zero_or_one")
-    m.bench_function[bench_wildcard_match[10000, "a?"]](
-        BenchId(String("quantifier_zero_or_one"))
-    )
+    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
 
-    # Character ranges
-    print("=== Character Range Benchmarks ===")
+    # ===== Character Range Benchmarks =====
+    print("# Character Ranges")
     detect_and_report_engine("[a-z]+", "range_lowercase")
-    m.bench_function[bench_range_match[10000, "[a-z]+"]](
-        BenchId(String("range_lowercase"))
-    )
+    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
+
     detect_and_report_engine("[0-9]+", "range_digits")
-    m.bench_function[bench_range_match[10000, "[0-9]+"]](
-        BenchId(String("range_digits"))
-    )
+    benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
+
     detect_and_report_engine("[a-zA-Z0-9]+", "range_alphanumeric")
-    m.bench_function[bench_range_match[10000, "[a-zA-Z0-9]+"]](
-        BenchId(String("range_alphanumeric"))
+    benchmark_match_first(
+        "range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
     )
 
-    # Anchors
-    print("=== Anchor Benchmarks ===")
+    # ===== Anchor Benchmarks =====
+    print("# Anchors")
     detect_and_report_engine("^abc", "anchor_start")
-    m.bench_function[bench_anchor_match[10000, "^abc"]](
-        BenchId(String("anchor_start"))
-    )
+    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
+
     detect_and_report_engine("xyz$", "anchor_end")
-    m.bench_function[bench_anchor_match[10000, "xyz$"]](
-        BenchId(String("anchor_end"))
-    )
+    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
 
-    # Alternation
-    print("=== Alternation Benchmarks ===")
+    # ===== Alternation Benchmarks =====
+    print("# Alternations")
     detect_and_report_engine("a|b|c", "alternation_simple")
-    m.bench_function[bench_alternation_match[10000, "a|b|c"]](
-        BenchId(String("alternation_simple"))
+    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
+
+    detect_and_report_engine("(a|b)", "group_alternation")
+    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
+
+    # ===== Global Matching (findall) =====
+    print("# Global Matching")
+    benchmark_findall("match_all_simple", "hello", medium_text, 200)
+    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 200)
+
+    # ===== Literal Optimization Benchmarks =====
+    print("# Literal Optimizations")
+    benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
+    benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
+    benchmark_findall(
+        "required_literal_short", ".*@example\\.com", email_text, 1
     )
-    detect_and_report_engine("abc|def|ghi", "alternation_words")
-    m.bench_function[bench_alternation_match[10000, "abc|def|ghi"]](
-        BenchId(String("alternation_words"))
+    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_match_first(
+        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
     )
 
-    # Groups
-    print("=== Group Benchmarks ===")
-    detect_and_report_engine("(abc)+", "group_quantified")
-    m.bench_function[bench_group_match[10000, "(abc)+"]](
-        BenchId(String("group_quantified"))
-    )
-    detect_and_report_engine("(a|b)*", "group_alternation")
-    m.bench_function[bench_group_match[10000, "(a|b)*"]](
-        BenchId(String("group_alternation"))
-    )
-
-    # Global matching
-    print("=== Global Matching Benchmarks ===")
-    detect_and_report_engine("a", "match_all_simple")
-    m.bench_function[bench_match_all[10000, "a"]](
-        BenchId(String("match_all_simple"))
-    )
-    detect_and_report_engine("[a-z]+", "match_all_pattern")
-    m.bench_function[bench_match_all[10000, "[a-z]+"]](
-        BenchId(String("match_all_pattern"))
-    )
-
-    # Complex real-world patterns
-    print("=== Complex Pattern Benchmarks ===")
-    detect_and_report_engine(
-        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}",
-        "complex_email_extraction",
-    )
-    m.bench_function[bench_complex_email_match[2000]](
-        BenchId(String("complex_email_extraction"))
-    )
-    detect_and_report_engine("[0-9]+[.]?[0-9]*", "complex_number_extraction")
-    m.bench_function[bench_complex_number_extraction[20000]](
-        BenchId(String("complex_number_extraction"))
-    )
-
-    # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)
-    print("=== SIMD-Optimized Character Filtering Benchmarks ===")
-    detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_large")
-    m.bench_function[bench_simd_heavy_filtering[100000, "[a-zA-Z0-9]+"]](
-        BenchId(String("simd_alphanumeric_large"))
-    )
-    detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_xlarge")
-    m.bench_function[bench_simd_heavy_filtering[500000, "[a-zA-Z0-9]+"]](
-        BenchId(String("simd_alphanumeric_xlarge"))
-    )
-    detect_and_report_engine("[^a-zA-Z0-9]+", "simd_negated_alphanumeric")
-    m.bench_function[bench_simd_heavy_filtering[100000, "[^a-zA-Z0-9]+"]](
-        BenchId(String("simd_negated_alphanumeric"))
-    )
-    detect_and_report_engine("[a-z]+[0-9]+", "simd_multi_char_class")
-    m.bench_function[bench_simd_heavy_filtering[100000, "[a-z]+[0-9]+"]](
-        BenchId(String("simd_multi_char_class"))
-    )
-
-    # Literal Optimization Benchmarks
-    print("=== Literal Optimization Benchmarks ===")
-    detect_and_report_engine("hello.*world", "literal_prefix_short")
-    m.bench_function[bench_literal_prefix_short](
-        BenchId(String("literal_prefix_short"))
-    )
-    detect_and_report_engine("hello.*", "literal_prefix_medium")
-    m.bench_function[bench_literal_prefix_medium](
-        BenchId(String("literal_prefix_medium"))
-    )
-    detect_and_report_engine("hello.*", "literal_prefix_long")
-    m.bench_function[bench_literal_prefix_long](
-        BenchId(String("literal_prefix_long"))
-    )
-    detect_and_report_engine(".*@example\\.com", "required_literal_short")
-    m.bench_function[bench_required_literal_short](
-        BenchId(String("required_literal_short"))
-    )
-    detect_and_report_engine(".*@example\\.com", "required_literal_long")
-    m.bench_function[bench_required_literal_long](
-        BenchId("required_literal_long")
-    )
-    detect_and_report_engine("[a-z]+", "no_literal_baseline")
-    m.bench_function[bench_no_literal_baseline](
-        BenchId(String("no_literal_baseline"))
+    # ===== Complex Pattern Benchmarks =====
+    print("# Complex Patterns")
+    var complex_email_text = (
+        "Contact: john@example.com, support@test.org, admin@company.net" * 20
     )
     detect_and_report_engine(
-        "(hello|help|helicopter)", "alternation_common_prefix"
+        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "complex_email"
     )
-    m.bench_function[bench_alternation_common_prefix](
-        BenchId(String("alternation_common_prefix"))
+    benchmark_findall(
+        "complex_email",
+        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+        complex_email_text,
+        40,
     )
 
-    # Results summary
-    print("\n=== Benchmark Results ===")
-    m.dump_report()
+    var complex_number_text = (
+        "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
+    )
+    detect_and_report_engine("[0-9]+\\.[0-9]+", "complex_number")
+    benchmark_findall(
+        "complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500
+    )
 
-    # Export results to JSON
-    export_json_results(m)
+    print()
+    print("=== Manual Timing Benchmark Complete ===")
+    print("Results are directly comparable with Python benchmarks")
