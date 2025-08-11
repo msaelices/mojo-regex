@@ -11,27 +11,19 @@
 # Agenda
 
 ### Part 1: Introduction & Motivation
+<!-- .element: class="fragment" -->
 
 ### Part 2: Architecture Deep Dive
+<!-- .element: class="fragment" -->
 
 ### Part 3: Performance Optimizations
+<!-- .element: class="fragment" -->
 
 ### Part 4: Roadmap
+<!-- .element: class="fragment" -->
 
----
-
-# 📚 Resources
-
-- **GitHub Repository** [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
-
-- **Installation Guide**
-```bash
-pixi add mojo-regex
-```
-
-- **Performance Tips** [docs/performance-tips.md](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
-
-- **Contributing Guide** [CONTRIBUTING.md](https://github.com/msaelices/mojo-regex/blob/main/CONTRIBUTING.md)
+### Part 5: Q&A
+<!-- .element: class="fragment" -->
 
 ---
 
@@ -104,28 +96,6 @@ print("Search found:", search_result.value().get_match_text())
 **The hard mode**
 - Build a regex engine in Mojo "from scratch"
 - Thanks to LLMs, entry barrier was much lower
-
----
-
-### Performance Comparison
-
-TODO: Update with latest benchmarks
-
-| Pattern Type | Python `re` | mojo-regex | Speedup |
-|--------------|-------------|------------|---------|
-| Literal match | 0.120ms | 0.050ms | 2.4x |
-| Character class | 0.007ms | 0.005ms | 1.4x |
-| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
-| Complex patterns | 17ms | 20ms | 0.85x |
-
----
-
-### Key Performance Insights
-- Not competing with Python but with 25-year-old C library.
-- Not a regex/SIMD expert. Just learning as I go.
-- Difficult to trace copies and allocations.
-  - Use `__call_location` in `__init__` or `__copyinit__`
-  - Not easy in 3rd-party structs (e.g. `List`, `String`).
 
 ---
 
@@ -230,6 +200,61 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 
 ---
 
+### Spoiler Alert: Not even close to SOTA yet!
+
+- Not a regex/SIMD expert. Just learning as I go.
+- Benchmarking is hard.
+- Performance is a Journey. We are lagging behind
+- Difficult to trace copies and allocations.
+  - Use `__call_location` in `__init__` or `__copyinit__`
+  - Not easy in 3rd-party structs (e.g. `List`, `String`).
+- LLM generated code is not optimal (Python-like).
+- Origins with recursive structs are hard
+  - Function/structs coloring.
+  - Less readable code.
+
+---
+
+### Performance Comparison vs Rust
+
+TODO: Update with latest benchmarks
+
+| Pattern Type | Rust `regex` | mojo-regex | Speedup |
+|--------------|-------------|------------|---------|
+| Literal match | 0.120ms | 0.050ms | 2.4x |
+| Character class | 0.007ms | 0.005ms | 1.4x |
+| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
+| Complex patterns | 17ms | 20ms | 0.85x |
+
+### Key Performance Insights
+- No prefilters, no precompiled regexes.
+<!-- .element: class="fragment" -->
+- Rust is zero-copy, Mojo version is not yet.
+<!-- .element: class="fragment" -->
+- Rust claims use DFA for all inputs, Mojo uses hybrid DFA/NFA.
+<!-- .element: class="fragment" -->
+
+---
+
+### Performance Comparison vs Python
+
+TODO: Update with latest benchmarks
+
+| Pattern Type | Python `re` | mojo-regex | Speedup |
+|--------------|-------------|------------|---------|
+| Literal match | 0.120ms | 0.050ms | 2.4x |
+| Character class | 0.007ms | 0.005ms | 1.4x |
+| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
+| Complex patterns | 17ms | 20ms | 0.85x |
+
+### Key Performance Insights
+- Not competing with Python but with 25-year-old C library.
+<!-- .element: class="fragment" -->
+- Compiled patterns in a bytecode VM.
+<!-- .element: class="fragment" -->
+
+---
+
 ### AST: Index-Based Architecture
 
 **Traditional Approach:**
@@ -319,21 +344,28 @@ struct SIMDStringSearch:
 
 ### Caching Strategies
 
-**Global SIMD Matcher Cache**
+**Global Cache for Matchers, Regex, etc.**
+
 ```mojo
-var _digit_matcher_cache = _Global[
-    Optional[RangeBasedMatcher],
-    Optional[RangeBasedMatcher](None),
-    _initialize_digit_matcher,
+alias RangeMatchers = Dict[Int, RangeBasedMatcher]
+alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
+    "RangeMatchers", RangeMatchers, _init_range_matchers
 ]
+fn _init_range_matchers() -> RangeMatchers: ...
+
+fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
+    var matchers_ptr = _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
+    try:
+        return matchers_ptr[][matcher_type]  # try from cache
+    except:
+        # Create and cache the matcher
+        var matcher = _create_range_matcher_for_type(matcher_type)
+        matchers[matcher_type] = matcher
+        return matcher
 
 fn get_digit_matcher() -> RangeBasedMatcher:
-    """Get cached matcher, creating if necessary."""
-    var cached = _digit_matcher_cache.get_value()
-    if not cached:
-        cached = Optional(create_digit_matcher())
-        _digit_matcher_cache.set_value(cached)
-    return cached.value()
+    """Get cached digit matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_DIGITS)
 ```
 
 🎯 **One allocation, used everywhere!**
@@ -402,36 +434,31 @@ var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
 - 🔗 Backreferences
 - 📊 Compile-time pattern optimization
 - 🚀 GPU acceleration for parallel matching
+- When fast enough, integration with [rebar](https://github.com/BurntSushi/rebar) benchmarks.
 
 ---
 
-### Contributing
+## 📚 Resources
 
-**How to Contribute:**
+- **GitHub Repository** [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
 
-1. **Check the TODO list** in README.md
-2. **Read CONTRIBUTING.md** for architecture details
-3. **Run benchmarks** before/after changes
-4. **Add tests** for new features
+- **Installation Guide**
+```bash
+pixi add mojo-regex
+```
 
-**Good First Issues:**
-- Implement `\d` character class
-- Add case-insensitive flag
-- Improve error messages
-- Add more benchmarks
+- **Performance Tips** [docs/performance-tips.md](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
+
+- **Contributing Guide** [CONTRIBUTING.md](https://github.com/msaelices/mojo-regex/blob/main/CONTRIBUTING.md)
 
 ---
 
 <!-- .slide: class="center-slide" -->
 # Thank You! 🔥
 
-## Questions & Discussion
+Feel free to contribute, report issues, or share your use cases.
 
-**Resources:**
-- GitHub: [github.com/msaelices/mojo-regex](https://github.com/msaelices/mojo-regex)
-- Docs: [Performance Tips](https://github.com/msaelices/mojo-regex/blob/main/docs/performance-tips.md)
-- Install: `pixi add mojo-regex`
+## Questions?
 
-_Let's build high-performance text processing together!_
+---
 
-Note: Thank you for your interest in mojo-regex! Feel free to contribute, report issues, or share your use cases. The Mojo ecosystem is growing, and regex is a fundamental building block.
