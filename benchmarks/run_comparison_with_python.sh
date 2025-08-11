@@ -40,7 +40,7 @@ fi
 # Run Python benchmarks
 echo "Step 1: Running Python regex benchmarks..."
 echo "-----------------------------------------"
-python3 "benchmarks/${BENCHMARK_TYPE}.py"
+python3 "benchmarks/python/${BENCHMARK_TYPE}.py"
 echo ""
 
 # Run Mojo benchmarks and parse output
