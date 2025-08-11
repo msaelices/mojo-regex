@@ -213,14 +213,9 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 
 ### Performance Comparison vs Rust
 
-TODO: Update with latest benchmarks
-
 | Pattern Type | Rust `regex` | mojo-regex | Speedup |
 |--------------|-------------|------------|---------|
-| Literal match | 0.120ms | 0.050ms | 2.4x |
-| Character class | 0.007ms | 0.005ms | 1.4x |
-| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
-| Complex patterns | 17ms | 20ms | 0.85x |
+COMPLETE
 
 ### Key Performance Insights
 - No prefilters, no precompiled regexes.
@@ -234,21 +229,57 @@ TODO: Update with latest benchmarks
 
 ### Performance Comparison vs Python
 
-TODO: Update with latest benchmarks
-
 | Pattern Type | Python `re` | mojo-regex | Speedup |
 |--------------|-------------|------------|---------|
-| Literal match | 0.120ms | 0.050ms | 2.4x |
-| Character class | 0.007ms | 0.005ms | 1.4x |
-| Simple quantifiers | 0.007ms | 0.010ms | 0.7x |
-| Complex patterns | 17ms | 20ms | 0.85x |
+COMPLETE
 
 ### Key Performance Insights
 - Not competing with Python but with 25-year-old C library.
 <!-- .element: class="fragment" -->
 - Compiled patterns in a bytecode VM.
 <!-- .element: class="fragment" -->
-- Suspicious about my benchmark setup (based on `Bench`).
+- Suspicious about my benchmark setup (based on Bench).
+<!-- .element: class="fragment" -->
+
+---
+
+### Benchmarking Setup
+
+* Used `Bench` module for benchmarking in Mojo.
+* Equivalent custom code in Python/Rust that mimic `Bench`.
+* Logic that output JSON and compare results.
+
+<img src="./image/bench-results.png" width="500" alt="bench results">
+<!-- .element: class="fragment" -->
+
+---
+
+#### Suspicious Points 1/3
+
+* Optimized the .* pattern to bypass the engine.
+* In the benchmarks, there was something off:
+<img src="./image/wildcard-bench-python-1.png" alt="wild card python 1">
+<!-- .element: class="fragment" -->
+<img src="./image/wildcard-bench-rust-1.png" alt="wild card rust 1">
+<!-- .element: class="fragment" -->
+
+---
+
+#### Suspicious Points 2/3
+
+* When I tried specific scripts without the `Bench` module, the results were different.
+
+<img src="./image/wildcard-bench-python-2.png" alt="wild card python 2">
+<!-- .element: class="fragment" -->
+
+---
+
+#### Suspicious Points 3/3
+
+* Even faster than Rust's!
+
+<img src="./image/wildcard-bench-rust-2.png" alt="wild card rust 2">
+<!-- .element: class="fragment" -->
 
 ---
 
