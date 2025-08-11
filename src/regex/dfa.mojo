@@ -1742,7 +1742,11 @@ struct DFAEngine(Engine):
             else:
                 return None
 
-        # Try to find a match starting from each position from 'start' onwards
+        # Optimization: Use SIMD to quickly find candidate positions for character class patterns
+        if self.simd_char_matcher and not self.has_end_anchor:
+            return self._optimized_simd_search(text, start)
+
+        # Fallback: Try to find a match starting from each position from 'start' onwards
         for try_pos in range(start, len(text) + 1):
             var match_result = self._try_match_at_position(text, try_pos)
             if match_result:
@@ -1983,6 +1987,93 @@ struct DFAEngine(Engine):
             return Match(0, start_pos, match_end, text)
 
         return None
+
+    fn _optimized_simd_search(
+        self, text: String, start: Int
+    ) -> Optional[Match]:
+        """Optimized SIMD-based search for character class patterns.
+
+        This method uses SIMD to quickly scan through the text and find positions
+        where the character class might match, avoiding the O(n²) problem of
+        trying every position individually.
+
+        Args:
+            text: Input text to search.
+            start: Starting position for search.
+
+        Returns:
+            Optional Match if found, None otherwise.
+        """
+        if not self.simd_char_matcher:
+            return None
+
+        ref simd_matcher = self.simd_char_matcher.value()
+        var text_len = len(text)
+        var pos = start
+
+        # Use SIMD to scan for potential match positions
+        while pos < text_len:
+            # Find next character that matches our character class
+            var found_pos = self._find_next_matching_char(
+                text, pos, simd_matcher
+            )
+            if found_pos == -1:
+                # No more matching characters found
+                return None
+
+            # Try to match the full pattern starting at this position
+            var match_result = self._try_match_at_position(text, found_pos)
+            if match_result:
+                return match_result
+
+            # Move to next position to continue searching
+            pos = found_pos + 1
+
+        return None
+
+    fn _find_next_matching_char(
+        self, text: String, start: Int, simd_matcher: CharacterClassSIMD
+    ) -> Int:
+        """Use SIMD to find the next character that matches the character class.
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+            simd_matcher: SIMD matcher for the character class.
+
+        Returns:
+            Position of next matching character, or -1 if not found.
+        """
+        var pos = start
+        var text_len = len(text)
+
+        # Process characters in SIMD chunks for maximum efficiency
+        alias CHUNK_SIZE = 16  # Process 16 characters at once
+
+        while pos + CHUNK_SIZE <= text_len:
+            # Load a chunk of characters
+            var chars = SIMD[DType.uint8, CHUNK_SIZE]()
+            for i in range(CHUNK_SIZE):
+                chars[i] = ord(text[pos + i])
+
+            # Use SIMD matcher to check all characters at once
+            var matches = simd_matcher.match_chunk[CHUNK_SIZE](chars)
+
+            # Find first matching position in this chunk
+            for i in range(CHUNK_SIZE):
+                if matches[i]:
+                    return pos + i
+
+            pos += CHUNK_SIZE
+
+        # Handle remaining characters one by one
+        while pos < text_len:
+            var char_code = ord(text[pos])
+            if simd_matcher.contains(char_code):
+                return pos
+            pos += 1
+
+        return -1
 
 
 struct BoyerMoore:
