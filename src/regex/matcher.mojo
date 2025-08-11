@@ -16,12 +16,79 @@ from regex.dfa import DFAEngine, compile_simple_pattern
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
 from regex.prefilter import (
-    LiteralExtractor,
-    LiteralInfo,
     MemchrPrefilter,
     PrefilterMatcher,
-    create_prefilter,
 )
+from regex.literal_optimizer import (
+    extract_literals,
+    LiteralSet,
+    has_literal_prefix,
+)
+
+
+# Adapter struct to maintain compatibility while using optimized literal_optimizer
+struct OptimizedLiteralInfo(Copyable, Movable):
+    """Optimized literal info that wraps literal extraction results for better performance.
+    """
+
+    var best_literal: Optional[String]
+    """Best literal for prefiltering, extracted once and cached."""
+    var has_anchors: Bool
+    """True if pattern has start or end anchors."""
+    var is_exact_match: Bool
+    """True if pattern matches only exact literals."""
+
+    fn __init__(
+        out self,
+        best_literal: Optional[String],
+        has_anchors: Bool,
+        is_exact_match: Bool,
+    ):
+        """Initialize with extracted literal info."""
+        self.best_literal = best_literal
+        self.has_anchors = has_anchors
+        self.is_exact_match = is_exact_match
+
+    fn __copyinit__(out self, other: Self):
+        """Copy constructor."""
+        self.best_literal = other.best_literal
+        self.has_anchors = other.has_anchors
+        self.is_exact_match = other.is_exact_match
+
+    fn __moveinit__(out self, owned other: Self):
+        """Move constructor."""
+        self.best_literal = other.best_literal^
+        self.has_anchors = other.has_anchors
+        self.is_exact_match = other.is_exact_match
+
+    fn get_best_required_literal(self) -> Optional[String]:
+        """Get the best required literal for matching."""
+        return self.best_literal
+
+
+fn create_optimized_prefilter(
+    literal_info: OptimizedLiteralInfo,
+) -> Optional[MemchrPrefilter]:
+    """Create optimized prefilter using the better literal selection."""
+    if literal_info.best_literal:
+        var literal = literal_info.best_literal.value()
+        # Only use literals that are long enough to be effective
+        if len(literal) >= 2:
+            return MemchrPrefilter(literal, False)
+    return None
+
+
+fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if AST contains start or end anchors."""
+    from regex.ast import START, END, RE, GROUP
+
+    if ast.type == START or ast.type == END:
+        return True
+    elif ast.type == GROUP or ast.type == RE:
+        for i in range(ast.get_children_len()):
+            if check_ast_for_anchors(ast.get_child(i)):
+                return True
+    return False
 
 
 trait RegexMatcher:
@@ -153,11 +220,11 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
 
     # Check for regex metacharacters
     var has_quantifiers = False
-    var has_alternation = False  
+    var has_alternation = False
     var has_char_classes = False
     var has_anchors = False
     var has_wildcards = False
-    
+
     for i in range(pattern_len):
         var c = pattern[i]
         if c == "*" or c == "+" or c == "?":
@@ -174,14 +241,14 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
             has_wildcards = True
 
     # Patterns likely to yield poor prefilters (mostly single-char literals):
-    
+
     # 1. Simple quantifiers on single characters (a*, a+, [0-9]+)
     #    These rarely have multi-char literals that are required
     if has_quantifiers and not has_alternation and not has_wildcards:
         # Patterns like "a*", "a+", "[0-9]+" typically yield no useful literals
         return True
-    
-    # 2. Simple alternations of single characters (a|b|c)  
+
+    # 2. Simple alternations of single characters (a|b|c)
     #    These yield only single-char literals which aren't very selective
     if has_alternation and pattern_len <= 8 and not has_wildcards:
         # Short alternation patterns like "a|b|c" yield single-char literals
@@ -190,7 +257,9 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
             if pattern[i] == "|":
                 alternation_chars += 1
         # If it's mostly single chars separated by |, skip
-        if alternation_chars >= pattern_len // 3:  # Lots of | relative to length
+        if (
+            alternation_chars >= pattern_len // 3
+        ):  # Lots of | relative to length
             return True
 
     # 3. Simple anchored patterns
@@ -198,15 +267,15 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
         return True
 
     # Patterns likely to yield good prefilters:
-    
+
     # 1. Patterns with literals mixed with wildcards (.*.domain.com, hello.*world)
     if has_wildcards and pattern_len >= 8:
         return False
-        
+
     # 2. Complex alternations that might have common prefixes
     if has_alternation and pattern_len >= 10:
         return False
-        
+
     # 3. Longer patterns are more likely to have useful literals
     if pattern_len >= 12:
         return False
@@ -227,7 +296,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """Analyzed complexity level of the regex pattern."""
     var prefilter: Optional[MemchrPrefilter]
     """Optional prefilter for fast candidate identification."""
-    var literal_info: LiteralInfo
+    var literal_info: OptimizedLiteralInfo
     """Extracted literal information for optimization."""
     var is_exact_literal: Bool
     """True if pattern matches only exact literals (can bypass regex entirely)."""
@@ -247,18 +316,37 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         )
 
         if should_analyze_prefilter:
-            # Extract literal information for prefilter optimization
-            var literal_extractor = LiteralExtractor()
-            self.literal_info = literal_extractor.extract(ast)
+            # Extract literal information using optimized implementation
+            # Use MutableAnyOrigin since that's what the AST has
+            var literal_set = extract_literals(ast)
+            var has_anchors = check_ast_for_anchors(ast)
 
-            # Check if this is an exact literal match that can bypass regex entirely
-            self.is_exact_literal = self.literal_info.is_exact_match
+            # Get the best literal from the optimized selection
+            var best_literal_opt: Optional[String] = None
+            var is_exact = False
+
+            var best_literal_info = literal_set.get_best_literal()
+            if best_literal_info:
+                var literal = best_literal_info.value().get_literal()
+                if len(literal) > 0:
+                    best_literal_opt = literal
+                    # Simple heuristic: if we have a required literal and no complex regex constructs
+                    is_exact = (
+                        best_literal_info.value().is_required
+                        and has_literal_prefix(ast)
+                        and not has_anchors
+                    )
+
+            self.literal_info = OptimizedLiteralInfo(
+                best_literal_opt, has_anchors, is_exact
+            )
+            self.is_exact_literal = is_exact
 
             # Create prefilter if beneficial
-            self.prefilter = create_prefilter(self.literal_info)
+            self.prefilter = create_optimized_prefilter(self.literal_info)
         else:
             # Initialize with empty info for simple patterns
-            self.literal_info = LiteralInfo()
+            self.literal_info = OptimizedLiteralInfo(None, False, False)
             self.is_exact_literal = False
             self.prefilter = None
 
@@ -331,13 +419,18 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Prefilter path: Use literal scanning for candidates (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
-            var candidate_pos = self.prefilter.value().find_first_candidate(text, start)
+            var candidate_pos = self.prefilter.value().find_first_candidate(
+                text, start
+            )
             if not candidate_pos:
                 return None  # No candidates found
-            
+
             var search_start = candidate_pos.value()
             # Use appropriate engine for the filtered position
-            if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+            if (
+                self.dfa_matcher
+                and self.complexity.value == PatternComplexity.SIMPLE
+            ):
                 return self.dfa_matcher.value().match_next(text, search_start)
             else:
                 return self.nfa_matcher.match_next(text, search_start)
