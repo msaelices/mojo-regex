@@ -200,6 +200,18 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_all(text)
 
 
+fn _is_wildcard_match_any(pattern: String) -> Bool:
+    """Check if pattern is exactly .* which matches any string.
+
+    Args:
+        pattern: The regex pattern string.
+
+    Returns:
+        True if pattern is exactly .* (dot star - match any character zero or more times).
+    """
+    return pattern == ".*"
+
+
 fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     """Check if pattern is too simple to benefit from prefilter analysis.
 
@@ -300,6 +312,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """Extracted literal information for optimization."""
     var is_exact_literal: Bool
     """True if pattern matches only exact literals (can bypass regex entirely)."""
+    var is_wildcard_match_any: Bool
+    """True if pattern is exactly .* (matches any string)."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -307,6 +321,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         Args:
             pattern: Regex pattern string to compile.
         """
+        # Early optimization: Check for wildcard match any pattern (.*)
+        self.is_wildcard_match_any = _is_wildcard_match_any(pattern)
+
         var ast = parse(pattern)
 
         # Early optimization: Skip prefilter analysis for very simple patterns
@@ -375,6 +392,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.prefilter = other.prefilter
         self.literal_info = other.literal_info
         self.is_exact_literal = other.is_exact_literal
+        self.is_wildcard_match_any = other.is_wildcard_match_any
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -384,10 +402,17 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.prefilter = other.prefilter^
         self.literal_info = other.literal_info^
         self.is_exact_literal = other.is_exact_literal
+        self.is_wildcard_match_any = other.is_wildcard_match_any
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
+        # Fast path: Wildcard match any (.* pattern) always matches from start to end
+        if self.is_wildcard_match_any:
+            if start <= len(text):
+                return Match(0, start, len(text), text)
+            else:
+                return None
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
@@ -401,6 +426,12 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
+        # Fast path: Wildcard match any (.* pattern) always matches from start to end
+        if self.is_wildcard_match_any:
+            if start <= len(text):
+                return Match(0, start, len(text), text)
+            else:
+                return None
         # Fast path: Exact literal bypass (only for non-anchored patterns)
         if self.is_exact_literal and not self.literal_info.has_anchors:
             var best_literal = self.literal_info.get_best_required_literal()
@@ -448,6 +479,12 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self, text: String
     ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using optimal engine."""
+        # Fast path: Wildcard match any (.* pattern) matches entire text once
+        if self.is_wildcard_match_any:
+            var matches = List[Match, hint_trivial_type=True]()
+            if len(text) >= 0:  # .* matches even empty strings
+                matches.append(Match(0, 0, len(text), text))
+            return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
             var matches = List[Match, hint_trivial_type=True]()
