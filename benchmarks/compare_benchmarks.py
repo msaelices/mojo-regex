@@ -70,12 +70,19 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
     baseline_engine = baseline_results.get("engine", "unknown")
     test_engine = test_results.get("engine", "unknown")
 
-    # Check if it's Python vs Mojo comparison
+    # Check for specific engine comparisons
     if baseline_engine.lower() == "python" and test_engine.lower() == "mojo":
         return ("Python", "Mojo", "MOJO REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
     elif baseline_engine.lower() == "mojo" and test_engine.lower() == "python":
-        # Reverse case - swap them
         return ("Mojo", "Python", "PYTHON REGEX VS MOJO REGEX BENCHMARK COMPARISON")
+    elif baseline_engine.lower() == "rust" and test_engine.lower() == "mojo":
+        return ("Rust", "Mojo", "MOJO REGEX VS RUST REGEX BENCHMARK COMPARISON")
+    elif baseline_engine.lower() == "mojo" and test_engine.lower() == "rust":
+        return ("Mojo", "Rust", "RUST REGEX VS MOJO REGEX BENCHMARK COMPARISON")
+    elif baseline_engine.lower() == "python" and test_engine.lower() == "rust":
+        return ("Python", "Rust", "RUST REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
+    elif baseline_engine.lower() == "rust" and test_engine.lower() == "python":
+        return ("Rust", "Python", "PYTHON REGEX VS RUST REGEX BENCHMARK COMPARISON")
     else:
         # Branch comparison or generic comparison
         # Try to extract branch info from timestamp or use generic names
