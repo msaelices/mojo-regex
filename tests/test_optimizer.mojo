@@ -85,9 +85,9 @@ fn test_pattern_analyzer_character_class_negated() raises:
 fn test_pattern_analyzer_medium_groups() raises:
     """Test pattern analyzer with medium complexity groups."""
     var analyzer = PatternAnalyzer()
-    # Simple groups should be MEDIUM
+    # Simple quantified groups are now SIMPLE (can use DFA)
     var ast1 = parse("(abc)+")
-    assert_equal(analyzer.classify(ast1).value, PatternComplexity.MEDIUM)
+    assert_equal(analyzer.classify(ast1).value, PatternComplexity.SIMPLE)
 
 
 fn test_pattern_analyzer_medium_alternation() raises:
