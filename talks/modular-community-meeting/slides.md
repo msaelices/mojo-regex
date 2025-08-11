@@ -206,7 +206,7 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 - Hard to trace copies and allocations.
   - Use `__call_location` in `__init__` or `__copyinit__` (thanks to @rd4com!)
   - Not easy in 3rd-party structs (e.g. `List`, `String`).
-- LLM generated code is not optimal (Python-like).
+- AI generated code is not optimal (Python-like).
 - Origins with recursive structs (e.g. AST) are difficult
 
 ---
@@ -216,20 +216,9 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 | Pattern Type | Rust `regex` | mojo-regex | Speedup |
 |--------------|-------------|------------|---------|
 | literal_match_short | 0.298 μs | 0.415 ms | 0.00x ⚠️ |
-| literal_match_long | 0.004 ms | 0.375 ms | 0.01x ⚠️ |
 | wildcard_match_any | 0.024 μs | 0.123 ms | 0.00x ⚠️ |
 | quantifier_zero_or_more | 0.025 μs | 0.175 ms | 0.00x ⚠️ |
-| quantifier_one_or_more | 0.030 μs | 0.215 ms | 0.00x ⚠️ |
-| quantifier_zero_or_one | 0.020 μs | 0.199 ms | 0.00x ⚠️ |
-| range_lowercase | 0.014 μs | 0.229 ms | 0.00x ⚠️ |
-| range_digits | 0.026 μs | 0.192 ms | 0.00x ⚠️ |
-| range_alphanumeric | 0.012 μs | 57.80 ms | 0.00x ⚠️ |
-| anchor_start | 0.013 μs | 0.436 ms | 0.00x ⚠️ |
-| anchor_end | 0.013 μs | 0.362 ms | 0.00x ⚠️ |
-| alternation_simple | 0.011 μs | 0.188 ms | 0.00x ⚠️ |
-| alternation_words | 0.015 μs | 0.262 ms | 0.00x ⚠️ |
-| group_quantified | 0.036 ms | 0.224 ms | 0.16x ⚠️ |
-| group_alternation | 0.038 μs | 0.206 ms | 0.00x ⚠️ |
+| ... | ... | ... | ... |
 | **Best Case**: required_literal_short | 0.226 μs | 0.410 μs | 0.55x |
 | **Close**: literal_prefix_short | 0.327 μs | 0.377 μs | 0.87x |
 
@@ -247,20 +236,11 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 
 | Pattern Type | Python `re` | mojo-regex | Speedup |
 |--------------|-------------|------------|---------|
-| literal_match_short | 0.006 ms | 0.434 ms | 0.01x ⚠️ |
 | literal_match_long | 0.095 ms | 0.400 ms | 0.24x ⚠️ |
-| wildcard_match_any | 0.003 ms | 0.124 ms | 0.03x ⚠️ |
 | quantifier_zero_or_more | 0.315 ms | 0.188 ms | **1.68x** ✅ |
-| quantifier_one_or_more | 0.331 ms | 0.219 ms | **1.51x** ✅ |
 | quantifier_zero_or_one | 0.327 ms | 0.185 ms | **1.77x** ✅ |
-| range_lowercase | 0.347 μs | 0.234 ms | 0.00x ⚠️ |
-| range_digits | 0.293 μs | 0.202 ms | 0.00x ⚠️ |
-| range_alphanumeric | 0.018 ms | 49.91 ms | 0.00x ⚠️ |
-| anchor_start | 0.502 μs | 0.433 ms | 0.00x ⚠️ |
-| anchor_end | 0.376 μs | 0.381 ms | 0.00x ⚠️ |
-| alternation_simple | 0.360 μs | 0.181 ms | 0.00x ⚠️ |
+| ... | ... | ... | ... |
 | group_quantified | 0.063 ms | 0.211 ms | 0.30x ⚠️ |
-| no_literal_baseline | 0.103 ms | 0.093 ms | **1.11x** ✅ |
 | **Best Case**: literal_prefix_short | 0.816 μs | 0.289 μs | **2.82x** 🎉 |
 | required_literal_short | 0.535 μs | 0.515 μs | 1.04x ≈ |
 
@@ -268,8 +248,6 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 - Not competing with Python but with 25-year-old C library.
 <!-- .element: class="fragment" -->
 - Compiled patterns in a bytecode VM.
-<!-- .element: class="fragment" -->
-- Suspicious about my benchmark setup (based on Bench).
 <!-- .element: class="fragment" -->
 
 ---
