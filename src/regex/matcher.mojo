@@ -135,54 +135,65 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
 fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     """Check if pattern is too simple to benefit from prefilter analysis.
-    
-    This function identifies patterns that are so simple that the overhead of 
+
+    This function identifies patterns that are so simple that the overhead of
     prefilter analysis exceeds any potential benefit. These patterns include:
     - Very short literals (≤ 6 chars)
-    - Simple anchored patterns  
+    - Simple anchored patterns
     - Patterns with only basic regex characters (no complex constructs)
-    
+
     Args:
         pattern: The regex pattern string.
-        
+
     Returns:
         True if prefilter analysis should be skipped for performance.
     """
     var pattern_len = len(pattern)
-    
+
     # Skip very short patterns - prefilter overhead exceeds benefit
     if pattern_len <= 6:
         return True
-    
+
     # Skip simple anchored patterns
     var has_start_anchor = pattern.startswith("^")
     var has_end_anchor = pattern.endswith("$")
-    
+
     if has_start_anchor or has_end_anchor:
         # For anchored patterns, check if the content is simple
         var content_start = 1 if has_start_anchor else 0
         var content_end = pattern_len - (1 if has_end_anchor else 0)
         var content_length = content_end - content_start
-        
+
         # Anchored patterns with simple content won't benefit from prefilters
         if content_length <= 8:
             return True
-    
+
     # Skip patterns that appear to be simple literals (no regex metacharacters)
     # This is a fast heuristic check to avoid expensive analysis
     var has_regex_chars = False
     for i in range(pattern_len):
         var c = pattern[i]
-        if (c == '.' or c == '*' or c == '+' or c == '?' or 
-            c == '|' or c == '(' or c == ')' or c == '[' or c == ']' or
-            c == '{' or c == '}' or c == '\\'):
+        if (
+            c == "."
+            or c == "*"
+            or c == "+"
+            or c == "?"
+            or c == "|"
+            or c == "("
+            or c == ")"
+            or c == "["
+            or c == "]"
+            or c == "{"
+            or c == "}"
+            or c == "\\"
+        ):
             has_regex_chars = True
             break
-    
+
     # If no regex metacharacters and pattern is short, skip prefilter
     if not has_regex_chars and pattern_len <= 12:
         return True
-        
+
     return False
 
 
@@ -213,8 +224,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Early optimization: Skip prefilter analysis for very simple patterns
         # that are unlikely to benefit from the overhead
-        var should_analyze_prefilter = not _is_simple_pattern_skip_prefilter(pattern)
-        
+        var should_analyze_prefilter = not _is_simple_pattern_skip_prefilter(
+            pattern
+        )
+
         if should_analyze_prefilter:
             # Extract literal information for prefilter optimization
             var literal_extractor = LiteralExtractor()
@@ -266,7 +279,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.literal_info = other.literal_info^
         self.is_exact_literal = other.is_exact_literal
 
-
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -306,7 +318,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             pass
 
         # Standard path: Regular matching without prefilters
-        if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+        if (
+            self.dfa_matcher
+            and self.complexity.value == PatternComplexity.SIMPLE
+        ):
             return self.dfa_matcher.value().match_next(text, start)
         else:
             return self.nfa_matcher.match_next(text, start)
@@ -323,14 +338,14 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 var literal = best_literal.value()
                 var literal_len = len(literal)
                 var text_len = len(text)
-                
+
                 # Bounds check to avoid issues
                 if literal_len > text_len:
                     return matches^
-                
+
                 var start = 0
                 var max_start = text_len - literal_len
-                
+
                 # Safe loop with explicit bounds checking
                 while start <= max_start:
                     var pos = text.find(literal, start)
@@ -354,7 +369,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             pass
 
         # Standard path: Use regular engine matching
-        if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+        if (
+            self.dfa_matcher
+            and self.complexity.value == PatternComplexity.SIMPLE
+        ):
             return self.dfa_matcher.value().match_all(text)
         else:
             return self.nfa_matcher.match_all(text)
