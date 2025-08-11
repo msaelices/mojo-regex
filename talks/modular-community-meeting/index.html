@@ -1,0 +1,479 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+
+    <title>Mojo🔥 Regex Presentation</title>
+
+    <link rel="stylesheet" href="node_modules/reveal.js/dist/reset.css">
+    <link rel="stylesheet" href="node_modules/reveal.js/dist/reveal.css">
+    <link rel="stylesheet" href="node_modules/reveal.js/dist/theme/white.css">
+
+    <!-- Theme used for syntax highlighted code -->
+    <link rel="stylesheet" href="node_modules/reveal.js/plugin/highlight/monokai.css">
+
+    <!-- Local Fonts -->
+    <link rel="stylesheet" href="fonts/fonts.css">
+
+    <style>
+        /* No need to import fonts - they're loaded locally */
+
+        /* Remove global background - clean white background for all slides */
+        .reveal .backgrounds .slide-background {
+            background: #ffffff !important;
+        }
+
+        /* First slide only - background image */
+        .reveal .backgrounds .slide-background:first-child {
+            background-image: url('image/bg.jpg') !important;
+            background-size: 100% 100% !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+        }
+
+        /* All other slides - clean white background */
+        .reveal .slides section:not(:first-child) {
+            background: #ffffff !important;
+        }
+
+        /* CSS Variables for custom highlight.css */
+        :root {
+            --modular-code-bg: #1a1a1a;
+            --modular-secondary-text: #f8f8f2;
+            --modular-code-constant: #6a9955;
+        }
+
+        /* Import emoji fonts for PDF support */
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Color+Emoji&display=swap');
+
+        /* Root font configuration */
+        .reveal {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', 'Twemoji Mozilla', sans-serif;
+            font-size: 32px;
+            font-weight: 400;
+            color: #2c3e50;
+            letter-spacing: 0.02em;
+            word-spacing: 0.02em;
+        }
+
+        /* First slide - keep white text for background image */
+        .reveal .slides section:first-child,
+        .reveal .slides section:first-child h1,
+        .reveal .slides section:first-child h2,
+        .reveal .slides section:first-child h3,
+        .reveal .slides section:first-child p,
+        .reveal .slides section:first-child li,
+        .reveal .slides section:first-child strong {
+            color: #ffffff !important;
+        }
+
+        /* Headings - dark for non-background slides */
+        .reveal h1,
+        .reveal h2,
+        .reveal h3,
+        .reveal h4,
+        .reveal h5,
+        .reveal h6 {
+            font-family: 'Inter', 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', 'Twemoji Mozilla', sans-serif;
+            font-weight: 600;
+            line-height: 1.2;
+            margin: 0 0 20px 0;
+            color: #2c3e50;
+            letter-spacing: 0.01em;
+            word-spacing: 0em;
+            text-transform: none !important;
+        }
+
+        .reveal h1 {
+            font-size: 2.5em;
+            font-weight: 700;
+        }
+
+        .reveal h2 {
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        .reveal h3 {
+            font-size: 1.4em;
+            font-weight: 500;
+        }
+
+        /* Paragraphs and text */
+        .reveal p {
+            font-size: 0.9em;
+            line-height: 1.6;
+            margin: 0 0 16px 0;
+        }
+
+        /* Lists */
+        .reveal ul,
+        .reveal ol {
+            font-size: 0.85em;
+            line-height: 1.5;
+            margin: 0 0 16px 0;
+        }
+
+        .reveal li {
+            margin-bottom: 8px;
+        }
+
+        /* Code blocks - enhanced contrast for white background */
+        .reveal pre {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.65em;
+            line-height: 1.4;
+            margin: 20px auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            background: #1a1a1a !important;
+            border: 1px solid #e0e0e0;
+            max-width: 90%;
+            text-align: left;
+        }
+
+        .reveal pre code {
+            background: #1a1a1a !important;
+            color: #f8f8f2 !important;
+            padding: 20px !important;
+            display: block;
+            border-radius: 8px;
+        }
+
+        .reveal code {
+            font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+            font-size: 0.8em;
+            color: #e74c3c;
+            background: #f8f9fa;
+            padding: 3px 8px;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+
+        /* Blockquotes - updated for white background */
+        .reveal blockquote {
+            font-size: 0.9em;
+            font-style: italic;
+            background: #f8f9fa;
+            border-left: 4px solid #0984e3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #2c3e50;
+        }
+
+        /* Strong text - dark for readability */
+        .reveal strong {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        /* Links - better contrast for white background */
+        .reveal a {
+            color: #0984e3;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .reveal a:hover {
+            color: #2d3436;
+            border-bottom-color: #2d3436;
+        }
+
+        /* Fragment highlights - better contrast for white background */
+        .reveal .slides section .fragment.highlight-red.visible {
+            color: #e74c3c;
+            background: #ffeaa7;
+        }
+
+        .reveal .slides section .fragment.highlight-green.visible {
+            color: #00b894;
+            background: #d1f2eb;
+        }
+
+        .reveal .slides section .fragment.highlight-blue.visible {
+            color: #0984e3;
+            background: #d6eaf8;
+        }
+
+        /* Progress bar and controls - updated colors */
+        .reveal .progress {
+            color: #0984e3;
+        }
+
+        .reveal .controls {
+            color: #0984e3;
+        }
+
+        /* Slide backgrounds */
+        .reveal .slides section {
+            text-align: left;
+        }
+
+        .reveal .slides section[data-markdown] {
+            text-align: left;
+        }
+
+        /* Title slide centering */
+        .reveal .slides section:first-child {
+            text-align: center;
+        }
+
+        /* Center specific slides with center-slide class */
+        .reveal .slides section.center-slide {
+            text-align: center !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
+        .reveal .slides section.center-slide h2,
+        .reveal .slides section.center-slide h3 {
+            text-align: center !important;
+            margin: 10px 0 !important;
+        }
+
+        /* Center specific slides with center-slide class */
+        .reveal .slides section.center-slide {
+            text-align: center !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+            align-items: center !important;
+        }
+
+        .reveal .slides section.center-slide h2,
+        .reveal .slides section.center-slide h3 {
+            text-align: center !important;
+            margin: 10px 0 !important;
+        }
+
+        /* Slide transitions */
+        .reveal .slides section {
+            transition: all 0.3s ease;
+        }
+
+        /* Custom utility classes */
+        .reveal .text-center {
+            text-align: center !important;
+        }
+
+        .reveal .text-small {
+            font-size: 0.7em !important;
+        }
+
+        .reveal .text-large {
+            font-size: 1.2em !important;
+        }
+
+        /* NUCLEAR OPTION - Force top alignment with maximum specificity */
+        .reveal .slides section .r-hstack>div[data-id="box1"],
+        .reveal .slides section .r-hstack>div[data-id="box2"] {
+            display: block !important;
+            position: relative !important;
+            vertical-align: top !important;
+            text-align: left !important;
+            padding-top: 20px !important;
+            height: auto !important;
+            min-height: 300px !important;
+        }
+
+        .reveal .slides section .r-hstack>div[data-id="box1"] *,
+        .reveal .slides section .r-hstack>div[data-id="box2"] * {
+            text-align: left !important;
+            margin-top: 0 !important;
+            vertical-align: top !important;
+            position: static !important;
+            transform: none !important;
+            top: auto !important;
+            left: auto !important;
+        }
+
+        .reveal .slides section .r-hstack>div[data-id="box1"] h3:first-child,
+        .reveal .slides section .r-hstack>div[data-id="box1"] h2:first-child,
+        .reveal .slides section .r-hstack>div[data-id="box2"] h3:first-child,
+        .reveal .slides section .r-hstack>div[data-id="box2"] h2:first-child {
+            margin-top: 0 !important;
+            margin-bottom: 15px !important;
+            position: static !important;
+            top: auto !important;
+            transform: none !important;
+            line-height: 1.2 !important;
+            padding-top: 0 !important;
+        }
+
+        /* Force same top position for both h2 and h3 in boxes */
+        .reveal .slides section .r-hstack>div[data-id="box1"] h3:first-child,
+        .reveal .slides section .r-hstack>div[data-id="box2"] h2:first-child {
+            position: absolute !important;
+            top: 20px !important;
+            left: 25px !important;
+            right: 25px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Adjust content below headings */
+        .reveal .slides section .r-hstack>div[data-id="box1"] strong:first-of-type,
+        .reveal .slides section .r-hstack>div[data-id="box2"] strong:first-of-type {
+            margin-top: 60px !important;
+            display: block !important;
+        }
+
+        /* Make headings same size and remove extra margins */
+        .reveal .slides section .r-hstack>div[data-id="box1"] h3:first-child,
+        .reveal .slides section .r-hstack>div[data-id="box2"] h2:first-child {
+            font-size: 1.4em !important;
+            line-height: 1.2 !important;
+            margin: 0 0 20px 0 !important;
+            padding: 0 !important;
+        }
+
+        /* Override reveal.js centering completely */
+        .reveal .slides section .r-hstack {
+            display: flex !important;
+            align-items: stretch !important;
+            vertical-align: top !important;
+            justify-content: center !important;
+        }
+
+        /* Disable all centering transforms */
+        .reveal .slides section .r-hstack>div {
+            transform: none !important;
+            top: auto !important;
+            left: auto !important;
+            position: relative !important;
+        }
+
+        /* Table styling */
+        .reveal table {
+            font-size: 0.8em;
+            border-collapse: collapse;
+            margin: 20px 0;
+        }
+
+        .reveal table th,
+        .reveal table td {
+            padding: 10px 15px;
+            border: 1px solid #dee2e6;
+        }
+
+        .reveal table th {
+            background: #e9ecef;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        /* Special emoji rendering rules for PDF export */
+        @media print {
+            * {
+                font-family: 'Inter', 'Noto Color Emoji', 'Apple Color Emoji', 'Segoe UI Emoji', sans-serif !important;
+            }
+
+            /* Ensure emojis are visible in print */
+            .reveal {
+                -webkit-print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+        }
+
+        /* Enhanced syntax highlighting for better visibility */
+        .reveal .hljs-keyword {
+            color: #66d9ef !important;
+            font-weight: bold !important;
+        }
+
+        .reveal .hljs-string {
+            color: #a6e22e !important;
+        }
+
+        .reveal .hljs-comment {
+            color: #75715e !important;
+            font-style: italic !important;
+        }
+
+        .reveal .hljs-number {
+            color: #ae81ff !important;
+        }
+
+        .reveal .hljs-type {
+            color: #f92672 !important;
+            font-weight: bold !important;
+        }
+
+        .reveal .hljs-function {
+            color: #fd971f !important;
+        }
+
+        .reveal .hljs-built_in {
+            color: #66d9ef !important;
+        }
+
+        .reveal .hljs-meta {
+            color: #f92672 !important;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="reveal">
+        <div class="slides">
+            <section data-markdown="slides.md" data-separator="^\n---\n$" data-separator-vertical="^\n--\n$"
+                data-separator-notes="^Note:" data-charset="utf-8">
+            </section>
+        </div>
+    </div>
+
+    <script src="node_modules/reveal.js/dist/reveal.js"></script>
+    <script src="node_modules/reveal.js/plugin/notes/notes.js"></script>
+    <script src="node_modules/reveal.js/plugin/markdown/markdown.js"></script>
+    <script src="node_modules/reveal.js/plugin/highlight/highlight.js"></script>
+    <script src="highlight.js"></script>
+    <script src="mojolang.js"></script>
+    <script>
+        Reveal.initialize({
+            hash: true,
+            controls: true,
+            progress: true,
+            center: true,
+            transition: 'slide',
+            transitionSpeed: 'default',
+            backgroundTransition: 'fade',
+            autoAnimateEasing: 'ease',
+            autoAnimateUnmatched: false,
+            autoAnimateDuration: 1.0,
+            viewDistance: 3,
+            mobileViewDistance: 2,
+            // No global background - handled by CSS for first slide only
+            plugins: [RevealMarkdown, RevealHighlight, RevealNotes]
+        });
+
+        // Ensure Mojo language highlighting works after Reveal.js loads
+        Reveal.on('ready', function () {
+            // Re-highlight all code blocks to ensure Mojo syntax is applied
+            setTimeout(function () {
+                document.querySelectorAll('pre code').forEach(function (block) {
+                    // Check if it's a mojo code block
+                    if (block.className.includes('language-mojo') ||
+                        block.className.includes('mojo') ||
+                        block.textContent.includes('fn ') ||
+                        block.textContent.includes('struct ')) {
+                        block.className = 'language-mojo hljs';
+                        // Try multiple highlight methods
+                        if (typeof hljs !== 'undefined' && hljs.highlightElement) {
+                            hljs.highlightElement(block);
+                        } else if (window.RevealHighlight && window.RevealHighlight.highlightBlock) {
+                            window.RevealHighlight.highlightBlock(block);
+                        }
+                    }
+                });
+            }, 100);
+        });
+    </script>
+</body>
+
+</html>

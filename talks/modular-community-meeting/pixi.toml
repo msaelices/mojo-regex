@@ -1,0 +1,15 @@
+[workspace]
+authors = ["Modular <hello@modular.com>"]
+channels = ["conda-forge"]
+name = "mojo-gpu-programming"
+platforms = ["osx-arm64", "linux-64"]
+version = "0.0.0"
+
+[tasks]
+install = "npm install"
+dev-slides = "npm run dev"
+slides = "npm start"
+pdf = "npm run pdf"
+
+[dependencies]
+nodejs = ">=22.13.0,<22.14"

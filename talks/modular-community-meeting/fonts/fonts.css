@@ -1,0 +1,59 @@
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Inter Regular"),
+    local("Inter-Regular"),
+    url('./Inter-Regular.woff2') format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: local("Inter Italic"),
+    local("Inter-Italic"),
+    url('./Inter-Italic.woff2') format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: local("Inter Medium"),
+    local("Inter-Medium"),
+    url('./Inter-Medium.woff2') format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 500;
+  font-display: swap;
+  src: local("Inter Medium Italic"),
+    local("InterMedium-Italic"),
+    url('./Inter-MediumItalic.woff2') format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: local("Inter SemiBold"),
+    local("Inter-SemiBold"),
+    url('./Inter-SemiBold.woff2') format("woff2");
+}
+
+@font-face {
+  font-family: "Inter";
+  font-style: italic;
+  font-weight: 600;
+  font-display: swap;
+  src: local("Inter SemiBold Italic"),
+    local("Inter-SemiBoldItalic"),
+    url('./Inter-SemiBoldItalic.woff2') format("woff2");
+}
