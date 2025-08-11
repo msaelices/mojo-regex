@@ -286,13 +286,13 @@ fn export_json_results(results: &HashMap<String, BenchmarkResult>) -> Result<(),
         results: results.clone(),
     };
 
-    std::fs::create_dir_all("benchmarks/results")?;
+    std::fs::create_dir_all("../results")?;
 
     let json_content = serde_json::to_string_pretty(&benchmark_results)?;
-    std::fs::write("benchmarks/results/rust_results.json", json_content)?;
+    std::fs::write("../results/rust_results.json", json_content)?;
 
     println!("\n=== BENCHMARK COMPLETE ===");
-    println!("Results exported to: benchmarks/results/rust_results.json");
+    println!("Results exported to: ../results/rust_results.json");
 
     Ok(())
 }
