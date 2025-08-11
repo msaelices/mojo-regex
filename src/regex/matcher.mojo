@@ -15,6 +15,13 @@ from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_simple_pattern
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
+from regex.prefilter import (
+    LiteralExtractor,
+    LiteralInfo,
+    MemchrPrefilter,
+    PrefilterMatcher,
+    create_prefilter,
+)
 
 
 trait RegexMatcher:
@@ -136,6 +143,12 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """NFA matcher as fallback for complex patterns."""
     var complexity: PatternComplexity
     """Analyzed complexity level of the regex pattern."""
+    var prefilter: Optional[MemchrPrefilter]
+    """Optional prefilter for fast candidate identification."""
+    var literal_info: LiteralInfo
+    """Extracted literal information for optimization."""
+    var is_exact_literal: Bool
+    """True if pattern matches only exact literals (can bypass regex entirely)."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -144,6 +157,16 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             pattern: Regex pattern string to compile.
         """
         var ast = parse(pattern)
+
+        # Extract literal information for prefilter optimization
+        var literal_extractor = LiteralExtractor()
+        self.literal_info = literal_extractor.extract(ast)
+
+        # Check if this is an exact literal match that can bypass regex entirely
+        self.is_exact_literal = self.literal_info.is_exact_match
+
+        # Create prefilter if beneficial
+        self.prefilter = create_prefilter(self.literal_info)
 
         # Analyze pattern complexity
         var analyzer = PatternAnalyzer()
@@ -167,12 +190,18 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.dfa_matcher = other.dfa_matcher
         self.nfa_matcher = other.nfa_matcher
         self.complexity = other.complexity
+        self.prefilter = other.prefilter
+        self.literal_info = other.literal_info
+        self.is_exact_literal = other.is_exact_literal
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
         self.dfa_matcher = other.dfa_matcher^
         self.nfa_matcher = other.nfa_matcher^
         self.complexity = other.complexity
+        self.prefilter = other.prefilter^
+        self.literal_info = other.literal_info^
+        self.is_exact_literal = other.is_exact_literal
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
@@ -190,43 +219,141 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
+        # Fast path: For exact literal patterns without anchors, bypass regex engine entirely
         if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
+            self.is_exact_literal
+            and self.literal_info.has_prefilter_candidates()
+            and not self.literal_info.has_anchors
         ):
-            # Use high-performance DFA for simple patterns
-            return self.dfa_matcher.value().match_next(text, start)
+            var best_literal = self.literal_info.get_best_required_literal()
+            if best_literal:
+                var literal = best_literal.value()
+                var pos = text.find(literal, start)
+                if pos != -1:
+                    return Match(0, pos, pos + len(literal), text)
+                else:
+                    return None
+
+        # Use prefilter to find candidates if available (but not for anchored patterns)
+        if self.prefilter and not self.literal_info.has_anchors:
+            var prefilter_ref = self.prefilter.value()
+            var candidate_pos = prefilter_ref.find_first_candidate(text, start)
+            if not candidate_pos:
+                # No candidates found by prefilter, no match possible
+                return None
+
+            # Try regex engines starting from candidate position
+            var search_start = candidate_pos.value()
+
+            if (
+                self.dfa_matcher
+                and self.complexity.value == PatternComplexity.SIMPLE
+            ):
+                # Use high-performance DFA for simple patterns
+                return self.dfa_matcher.value().match_next(text, search_start)
+            else:
+                # Fall back to NFA for complex patterns
+                return self.nfa_matcher.match_next(text, search_start)
         else:
-            # Fall back to NFA for complex patterns
-            return self.nfa_matcher.match_next(text, start)
+            # No prefilter available, use regular matching
+            if (
+                self.dfa_matcher
+                and self.complexity.value == PatternComplexity.SIMPLE
+            ):
+                # Use high-performance DFA for simple patterns
+                return self.dfa_matcher.value().match_next(text, start)
+            else:
+                # Fall back to NFA for complex patterns
+                return self.nfa_matcher.match_next(text, start)
 
     fn match_all(
         self, text: String
     ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using optimal engine."""
+        var matches = List[Match, hint_trivial_type=True]()
+
+        # Fast path: For exact literal patterns without anchors, find all occurrences directly
         if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
+            self.is_exact_literal
+            and self.literal_info.has_prefilter_candidates()
+            and not self.literal_info.has_anchors
         ):
-            # Use high-performance DFA for simple patterns
-            return self.dfa_matcher.value().match_all(text)
+            var best_literal = self.literal_info.get_best_required_literal()
+            if best_literal:
+                var literal = best_literal.value()
+                var start = 0
+                while start <= len(text) - len(literal):
+                    var pos = text.find(literal, start)
+                    if pos == -1:
+                        break
+                    matches.append(Match(0, pos, pos + len(literal), text))
+                    start = (
+                        pos + 1
+                    )  # Move past this match for overlapping search
+                return matches^
+
+        # Use prefilter to find candidates if available (but not for anchored patterns)
+        if self.prefilter and not self.literal_info.has_anchors:
+            var prefilter_ref = self.prefilter.value()
+            var candidates = prefilter_ref.find_candidates(text)
+
+            # For each candidate position, try to match with regex engine
+            for i in range(len(candidates)):
+                var candidate_pos = candidates[i]
+                var match_result: Optional[Match]
+
+                if (
+                    self.dfa_matcher
+                    and self.complexity.value == PatternComplexity.SIMPLE
+                ):
+                    # Use high-performance DFA for simple patterns
+                    match_result = self.dfa_matcher.value().match_next(
+                        text, candidate_pos
+                    )
+                else:
+                    # Fall back to NFA for complex patterns
+                    match_result = self.nfa_matcher.match_next(
+                        text, candidate_pos
+                    )
+
+                if match_result:
+                    matches.append(match_result.value())
+
+            return matches^
         else:
-            # Fall back to NFA for complex patterns
-            return self.nfa_matcher.match_all(text)
+            # No prefilter available, use regular matching
+            if (
+                self.dfa_matcher
+                and self.complexity.value == PatternComplexity.SIMPLE
+            ):
+                # Use high-performance DFA for simple patterns
+                return self.dfa_matcher.value().match_all(text)
+            else:
+                # Fall back to NFA for complex patterns
+                return self.nfa_matcher.match_all(text)
 
     fn get_engine_type(self) -> String:
         """Get the type of engine being used (for debugging/profiling).
 
         Returns:
-            String indicating which engine is active ("DFA", "NFA", or "Hybrid").
+            String indicating which engine is active with prefilter info.
         """
+        var base_engine: String
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
-            return "DFA"
+            base_engine = "DFA"
         else:
-            return "NFA"
+            base_engine = "NFA"
+
+        # Add prefilter information
+        if self.is_exact_literal:
+            return base_engine + "+ExactLiteral"
+        elif self.prefilter:
+            return base_engine + "+Prefilter"
+        else:
+            return base_engine
 
     fn get_complexity(self) -> PatternComplexity:
         """Get the analyzed complexity of the pattern.
