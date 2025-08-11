@@ -226,7 +226,7 @@ struct NFAEngine(Engine):
                 )
                 if result[0]:  # Match found
                     var match_start = current_pos
-                    var match_end = result[1]
+                    ref match_end = result[1]
 
                     # Create match object
                     var matched = Match(0, match_start, match_end, text)
@@ -279,7 +279,7 @@ struct NFAEngine(Engine):
             required_start_pos=start,
         )
         if result[0]:  # Match found
-            var end_idx = result[1]
+            ref end_idx = result[1]
             # Create the match object
             return Match(0, str_i, end_idx, text)
 
@@ -370,7 +370,7 @@ struct NFAEngine(Engine):
                     required_start_pos=-1,
                 )
                 if result[0]:  # Match found
-                    var end_idx = result[1]
+                    ref end_idx = result[1]
                     return Match(0, search_pos, end_idx, text)
                 search_pos += 1
 
