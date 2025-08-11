@@ -781,95 +781,103 @@ struct DFAEngine(Engine):
 
     fn compile_alternation(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
         """Compile an alternation pattern like a|b or (cat|dog) into a DFA.
-        
+
         Creates a state machine with parallel branches that converge to accepting states.
-        
+
         Args:
             ast: AST node representing the alternation pattern.
         """
         from regex.ast import RE, OR, GROUP, ELEMENT
-        
+
         # Clear existing states
         self.states.clear()
-        
-        # Create start state  
+
+        # Create start state
         var start_state = DFAState()
         self.states.append(start_state)
         self.start_state = 0
-        
+
         # Extract the OR node
         var or_node_opt = _find_or_node(ast)
         if not or_node_opt:
             raise Error("No OR node found in alternation pattern")
-            
+
         var or_node = or_node_opt.value()
-            
+
         # Create accepting state that all branches will lead to
         var accepting_state = DFAState(is_accepting=True, match_length=0)
         self.states.append(accepting_state)
         var accepting_index = len(self.states) - 1
-        
-        # Collect all branch texts (flattening nested OR structures)  
+
+        # Collect all branch texts (flattening nested OR structures)
         var all_branches = _collect_all_alternation_branches(or_node)
-        
+
         # Process each branch of the alternation
         for i in range(len(all_branches)):
             var branch_text = all_branches[i]
             if len(branch_text) == 0:
                 continue
-                
+
             # Create states for this branch
             var current_state_index = 0  # Start from start state
-            
+
             for j in range(len(branch_text)):
                 var char_code = ord(branch_text[j])
-                
+
                 if j == len(branch_text) - 1:
                     # Last character - transition to accepting state
-                    self.states[current_state_index].add_transition(char_code, accepting_index)
+                    self.states[current_state_index].add_transition(
+                        char_code, accepting_index
+                    )
                 else:
                     # Intermediate character - create or reuse state
                     var next_state = DFAState()
                     self.states.append(next_state)
                     var next_index = len(self.states) - 1
-                    self.states[current_state_index].add_transition(char_code, next_index)
+                    self.states[current_state_index].add_transition(
+                        char_code, next_index
+                    )
                     current_state_index = next_index
 
-    fn compile_quantified_group(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
+    fn compile_quantified_group(
+        mut self, ast: ASTNode[MutableAnyOrigin]
+    ) raises:
         """Compile a quantified group pattern like (abc)+, (test)*, (a)? into a DFA.
-        
+
         Creates a state machine with loops and optional paths based on quantifiers.
-        
+
         Args:
             ast: AST node representing the quantified group pattern.
         """
         from regex.ast import RE, GROUP, ELEMENT
-        
+
         # Clear existing states
         self.states.clear()
-        
-        # Create start state  
+
+        # Create start state
         var start_state = DFAState()
         self.states.append(start_state)
         self.start_state = 0
-        
+
         # Navigate to the quantified group: RE -> GROUP -> GROUP (with quantifier)
         var outer_group = ast.get_child(0)  # First GROUP
-        var inner_group = outer_group.get_child(0)  # Second GROUP (with quantifier)
-        
+        var inner_group = outer_group.get_child(
+            0
+        )  # Second GROUP (with quantifier)
+
         var min_matches = inner_group.min
         var max_matches = inner_group.max
-        
+
         # Extract the literal text from the group
         var group_text = _extract_group_text(inner_group)
         if len(group_text) == 0:
             raise Error("Empty quantified group")
-            
+
         # Create accepting state
         var accepting_state = DFAState(is_accepting=True, match_length=0)
         self.states.append(accepting_state)
         var accepting_index = len(self.states) - 1
-        
+
         # Handle different quantifier types
         if min_matches == 0 and max_matches == 1:
             # Optional: (pattern)?
@@ -883,77 +891,94 @@ struct DFAEngine(Engine):
         else:
             raise Error("Unsupported quantifier range for group")
 
-    fn _compile_optional_group(mut self, group_text: String, accepting_index: Int):
+    fn _compile_optional_group(
+        mut self, group_text: String, accepting_index: Int
+    ):
         """Compile an optional group (pattern)? - match 0 or 1 times."""
         # Start state can go directly to accepting (0 matches) or through pattern (1 match)
-        
+
         # Direct path to accepting state (0 matches)
         self.states[0].add_transition(0, accepting_index)  # epsilon transition
-        
+
         # Path through pattern (1 match)
         var current_state_index = 0
         for i in range(len(group_text)):
             var char_code = ord(group_text[i])
-            
+
             if i == len(group_text) - 1:
                 # Last character - go to accepting state
-                self.states[current_state_index].add_transition(char_code, accepting_index)
+                self.states[current_state_index].add_transition(
+                    char_code, accepting_index
+                )
             else:
                 # Intermediate character - create new state
                 var next_state = DFAState()
                 self.states.append(next_state)
                 var next_index = len(self.states) - 1
-                self.states[current_state_index].add_transition(char_code, next_index)
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
                 current_state_index = next_index
 
-    fn _compile_zero_or_more_group(mut self, group_text: String, accepting_index: Int):
+    fn _compile_zero_or_more_group(
+        mut self, group_text: String, accepting_index: Int
+    ):
         """Compile a zero-or-more group (pattern)* - match 0 or more times."""
         # Start state can go directly to accepting or start the pattern
-        
-        # Direct path to accepting state (0 matches) 
+
+        # Direct path to accepting state (0 matches)
         # For DFA, we'll make start state accepting
         self.states[0].is_accepting = True
-        
+
         # Create loop through pattern
         var current_state_index = 0
         for i in range(len(group_text)):
             var char_code = ord(group_text[i])
-            
+
             if i == len(group_text) - 1:
                 # Last character - loop back to start (for more matches) or stay accepting
                 self.states[current_state_index].add_transition(char_code, 0)
             else:
                 # Intermediate character - create new state
                 var next_state = DFAState()
-                self.states.append(next_state) 
+                self.states.append(next_state)
                 var next_index = len(self.states) - 1
-                self.states[current_state_index].add_transition(char_code, next_index)
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
                 current_state_index = next_index
 
-    fn _compile_one_or_more_group(mut self, group_text: String, accepting_index: Int):
+    fn _compile_one_or_more_group(
+        mut self, group_text: String, accepting_index: Int
+    ):
         """Compile a one-or-more group (pattern)+ - match 1 or more times."""
         # Must match at least once, then can loop
-        
+
         var current_state_index = 0
         for i in range(len(group_text)):
             var char_code = ord(group_text[i])
-            
+
             if i == len(group_text) - 1:
                 # Last character - create accepting state that can loop back
                 var loop_state = DFAState(is_accepting=True)
                 self.states.append(loop_state)
                 var loop_index = len(self.states) - 1
-                self.states[current_state_index].add_transition(char_code, loop_index)
-                
+                self.states[current_state_index].add_transition(
+                    char_code, loop_index
+                )
+
                 # From loop state, can start pattern again or stay accepting
-                self.states[loop_index].add_transition(ord(group_text[0]), 
-                    1 if len(group_text) > 1 else loop_index)
+                self.states[loop_index].add_transition(
+                    ord(group_text[0]), 1 if len(group_text) > 1 else loop_index
+                )
             else:
                 # Intermediate character - create new state
                 var next_state = DFAState()
                 self.states.append(next_state)
                 var next_index = len(self.states) - 1
-                self.states[current_state_index].add_transition(char_code, next_index)
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
                 current_state_index = next_index
 
     @always_inline
@@ -1892,41 +1917,41 @@ fn _extract_mixed_sequential_pattern_info(
 
 fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if pattern is a simple alternation like a|b, cat|dog, (a|b).
-    
+
     Args:
         ast: Root AST node.
-        
+
     Returns:
         True if pattern is a simple alternation pattern.
     """
     from regex.ast import RE, OR, GROUP, ELEMENT
-    
+
     # Direct alternation: a|b
     if ast.type == OR:
         return _is_simple_alternation_branches(ast)
-        
+
     # Search for OR node within nested structure
     return _find_and_check_or_node(ast)
 
 
 fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if alternation branches are simple (literal elements only).
-    
+
     Args:
         ast: OR node to check branches of.
-        
+
     Returns:
         True if all branches are simple literal elements.
     """
     from regex.ast import OR, ELEMENT, GROUP
-    
+
     if ast.type != OR:
         return False
-        
+
     # Check that all branches are simple
     for i in range(ast.get_children_len()):
         ref branch = ast.get_child(i)
-        
+
         # Each branch should be a group containing literal elements, single element, or nested OR
         if branch.type == GROUP:
             # Check that the group contains only literal elements
@@ -1942,91 +1967,93 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         else:
             # Complex branch - not supported yet
             return False
-            
+
     return True
 
 
 fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if a group contains only literal elements.
-    
+
     Args:
         group: GROUP node to check.
-        
+
     Returns:
         True if the group contains only ELEMENT nodes.
     """
     from regex.ast import ELEMENT, GROUP
-    
+
     if group.type != GROUP:
         return False
-        
+
     # All children should be ELEMENT nodes
     for i in range(group.get_children_len()):
         ref child = group.get_child(i)
         if child.type != ELEMENT:
             return False
-            
+
     return True
 
 
 fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Recursively search for an OR node and check if its branches are simple.
-    
+
     Args:
         ast: AST node to search within.
-        
+
     Returns:
         True if an OR node with simple branches is found.
     """
     from regex.ast import OR, GROUP, RE
-    
+
     if ast.type == OR:
         return _is_simple_alternation_branches(ast)
-    
+
     # Recursively search children
     for i in range(ast.get_children_len()):
         var child = ast.get_child(i)
         if _find_and_check_or_node(child):
             return True
-    
+
     return False
 
 
-fn _find_or_node(ast: ASTNode[MutableAnyOrigin]) -> Optional[ASTNode[MutableAnyOrigin]]:
+fn _find_or_node(
+    ast: ASTNode[MutableAnyOrigin],
+) -> Optional[ASTNode[MutableAnyOrigin]]:
     """Recursively find the first OR node in the AST.
-    
+
     Args:
         ast: AST node to search within.
-        
+
     Returns:
         The first OR node found, or None if no OR node exists.
     """
     from regex.ast import OR
-    
+
     if ast.type == OR:
         return ast
-    
+
     # Recursively search children
     for i in range(ast.get_children_len()):
         var child = ast.get_child(i)
         var found = _find_or_node(child)
         if found:
             return found
-    
+
     return None
 
 
 fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
     """Extract the literal text from an alternation branch.
-    
+
     Args:
         branch: Branch node (ELEMENT or GROUP containing ELEMENTs).
-        
+
     Returns:
         Literal string for this branch.
     """
     from regex.ast import ELEMENT, GROUP
-    
+
     if branch.type == ELEMENT and branch.get_value():
         return String(branch.get_value().value())
     elif branch.type == GROUP:
@@ -2037,21 +2064,21 @@ fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
             if child.type == ELEMENT and child.get_value():
                 result += child.get_value().value()
         return result
-    
+
     return String("")
 
 
 fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantified group like (abc)+, (test)*, (a)?.
-    
+
     Args:
         ast: Root AST node.
-        
+
     Returns:
         True if pattern is a simple quantified group pattern.
     """
     from regex.ast import RE, GROUP
-    
+
     # Pattern should be RE -> GROUP -> GROUP (with quantifier)
     if ast.type == RE and ast.get_children_len() == 1:
         var child = ast.get_child(0)
@@ -2062,69 +2089,71 @@ fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
                 if grandchild.min != 1 or grandchild.max != 1:
                     # Has quantifier - check if group content is simple
                     return _group_content_is_simple(grandchild)
-    
+
     return False
 
 
 fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
     """Check if a quantified group contains simple literal content.
-    
+
     Args:
         group: GROUP node to check.
-        
+
     Returns:
         True if the group contains only simple literal elements.
     """
     from regex.ast import ELEMENT, GROUP
-    
+
     if group.type != GROUP:
         return False
-        
+
     # Group should contain only ELEMENT nodes (literals)
     for i in range(group.get_children_len()):
         var child = group.get_child(i)
         if child.type != ELEMENT:
             return False
-            
+
     return True
 
 
 fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
     """Extract the literal text from a quantified group.
-    
+
     Args:
         group: GROUP node containing literal elements.
-        
+
     Returns:
         Concatenated text from all ELEMENT nodes in the group.
     """
     from regex.ast import ELEMENT
-    
+
     var result = String()
     for i in range(group.get_children_len()):
         var child = group.get_child(i)
         if child.type == ELEMENT:
             result += child.get_value().value()
-    
+
     return result
 
 
-fn _collect_all_alternation_branches(or_node: ASTNode[MutableAnyOrigin]) -> List[String]:
+fn _collect_all_alternation_branches(
+    or_node: ASTNode[MutableAnyOrigin],
+) -> List[String]:
     """Recursively collect all branch texts from a potentially nested OR structure.
-    
+
     Args:
         or_node: OR node that may have nested OR children.
-        
+
     Returns:
         List of all branch texts flattened from the nested structure.
     """
     from regex.ast import OR, ELEMENT, GROUP
-    
+
     var branches = List[String]()
-    
+
     for i in range(or_node.get_children_len()):
         var branch = or_node.get_child(i)
-        
+
         if branch.type == OR:
             # Nested OR - recursively collect its branches
             var nested_branches = _collect_all_alternation_branches(branch)
@@ -2135,5 +2164,5 @@ fn _collect_all_alternation_branches(or_node: ASTNode[MutableAnyOrigin]) -> List
             var branch_text = _extract_branch_text(branch)
             if len(branch_text) > 0:
                 branches.append(branch_text)
-                
+
     return branches
