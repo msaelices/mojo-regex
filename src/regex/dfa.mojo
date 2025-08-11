@@ -978,6 +978,176 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
+    fn compile_simple_quantifier(
+        mut self, ast: ASTNode[MutableAnyOrigin]
+    ) raises:
+        """Compile a simple quantifier pattern like a*, test+, char? into a DFA.
+
+        Creates a state machine based on the quantifier type applied to literal sequences.
+
+        Args:
+            ast: AST node representing the simple quantifier pattern.
+        """
+        from regex.ast import RE, GROUP, ELEMENT
+
+        # Clear existing states
+        self.states.clear()
+
+        # Create start state
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+
+        # Navigate to the group containing elements with quantifiers
+        var group = ast.get_child(0)  # GROUP
+
+        # Extract pattern text and find quantifier info
+        var pattern_parts = List[String]()
+        var quantifier_type = String("")
+        var quantifier_min = 1
+        var quantifier_max = 1
+
+        # Process each element to build pattern and detect quantifier
+        for i in range(group.get_children_len()):
+            var element = group.get_child(i)
+            var char_text = String(element.get_value().value())
+
+            if element.min == 0 and element.max == -1:  # *
+                quantifier_type = "*"
+                quantifier_min = 0
+                quantifier_max = -1
+            elif element.min == 1 and element.max == -1:  # +
+                quantifier_type = "+"
+                quantifier_min = 1
+                quantifier_max = -1
+            elif element.min == 0 and element.max == 1:  # ?
+                quantifier_type = "?"
+                quantifier_min = 0
+                quantifier_max = 1
+
+            pattern_parts.append(char_text)
+
+        # Build the pattern string
+        var pattern_text = String("")
+        for i in range(len(pattern_parts)):
+            pattern_text += pattern_parts[i]
+
+        if len(pattern_text) == 0:
+            raise Error("Empty quantifier pattern")
+
+        # Create accepting state
+        var accepting_state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(accepting_state)
+        var accepting_index = len(self.states) - 1
+
+        # Handle different quantifier types
+        if quantifier_min == 0 and quantifier_max == 1:
+            # Optional: pattern?
+            self._compile_simple_optional(pattern_text, accepting_index)
+        elif quantifier_min == 0 and quantifier_max == -1:
+            # Zero or more: pattern*
+            self._compile_simple_zero_or_more(pattern_text, accepting_index)
+        elif quantifier_min == 1 and quantifier_max == -1:
+            # One or more: pattern+
+            self._compile_simple_one_or_more(pattern_text, accepting_index)
+        else:
+            raise Error("Unsupported quantifier type for simple quantifier")
+
+    fn _compile_simple_optional(
+        mut self, pattern_text: String, accepting_index: Int
+    ):
+        """Compile a simple optional pattern (pattern?) - match 0 or 1 times."""
+        # Start state can go directly to accepting (0 matches) or through pattern (1 match)
+
+        # Direct path to accepting state (0 matches)
+        self.states[
+            0
+        ].is_accepting = True  # Make start state accepting for empty match
+
+        # Path through pattern (1 match)
+        var current_state_index = 0
+        for i in range(len(pattern_text)):
+            var char_code = ord(pattern_text[i])
+
+            if i == len(pattern_text) - 1:
+                # Last character - go to accepting state
+                self.states[current_state_index].add_transition(
+                    char_code, accepting_index
+                )
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state)
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
+                current_state_index = next_index
+
+    fn _compile_simple_zero_or_more(
+        mut self, pattern_text: String, accepting_index: Int
+    ):
+        """Compile a simple zero-or-more pattern (pattern*) - match 0 or more times.
+        """
+        # Start state can go directly to accepting or start the pattern
+
+        # Direct path to accepting state (0 matches)
+        # For DFA, we'll make start state accepting
+        self.states[0].is_accepting = True
+
+        # Create loop through pattern
+        var current_state_index = 0
+        for i in range(len(pattern_text)):
+            var char_code = ord(pattern_text[i])
+
+            if i == len(pattern_text) - 1:
+                # Last character - loop back to start (for more matches) or stay accepting
+                self.states[current_state_index].add_transition(char_code, 0)
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state)
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
+                current_state_index = next_index
+
+    fn _compile_simple_one_or_more(
+        mut self, pattern_text: String, accepting_index: Int
+    ):
+        """Compile a simple one-or-more pattern (pattern+) - match 1 or more times.
+        """
+        # Must match at least once, then can loop
+
+        var current_state_index = 0
+        for i in range(len(pattern_text)):
+            var char_code = ord(pattern_text[i])
+
+            if i == len(pattern_text) - 1:
+                # Last character - create accepting state that can loop back
+                var loop_state = DFAState(is_accepting=True)
+                self.states.append(loop_state)
+                var loop_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(
+                    char_code, loop_index
+                )
+
+                # From loop state, can start pattern again or stay accepting
+                self.states[loop_index].add_transition(
+                    ord(pattern_text[0]),
+                    1 if len(pattern_text) > 1 else loop_index,
+                )
+            else:
+                # Intermediate character - create new state
+                var next_state = DFAState()
+                self.states.append(next_state)
+                var next_index = len(self.states) - 1
+                self.states[current_state_index].add_transition(
+                    char_code, next_index
+                )
+                current_state_index = next_index
+
     fn _find_or_create_state(mut self, from_state: Int, char_code: Int) -> Int:
         """Find existing state for transition or create new one.
 
@@ -1554,6 +1724,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     elif _is_quantified_group(ast):
         # Handle quantified group patterns like (abc)+, (test)*, (a)?
         dfa.compile_quantified_group(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
+    elif _is_simple_quantifier_pattern(ast):
+        # Handle simple quantifier patterns like a*, test+, char?
+        dfa.compile_simple_quantifier(ast)
         # Check for anchors in the original pattern
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.has_start_anchor = has_start
@@ -2224,3 +2401,44 @@ fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
             return _is_simple_alternation_branches(grandchild)
 
     return False
+
+
+fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a simple quantifier like a*, test+, char?.
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a simple quantifier pattern.
+    """
+    from regex.ast import RE, GROUP, ELEMENT
+
+    # Pattern should be RE -> GROUP -> ELEMENTs where at least one has quantifier
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var group = ast.get_child(0)
+    if group.type != GROUP:
+        return False
+
+    # Must have at least one ELEMENT
+    if group.get_children_len() == 0:
+        return False
+
+    # Check if any element has quantifier and all children are ELEMENTs
+    var has_quantifier = False
+    for i in range(group.get_children_len()):
+        var child = group.get_child(i)
+        if child.type != ELEMENT:
+            return False
+
+        # Check for quantifiers: *, +, ?
+        if (
+            (child.min == 0 and child.max == -1)  # *
+            or (child.min == 1 and child.max == -1)  # +
+            or (child.min == 0 and child.max == 1)  # ?
+        ):
+            has_quantifier = True
+
+    return has_quantifier
