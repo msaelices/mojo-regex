@@ -285,9 +285,19 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """
         # Fast path: Exact literal bypass (only for non-anchored patterns)
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            # Disabled for now to isolate performance issue
-            # TODO: Fix exact literal bypass performance
-            pass
+            var best_literal = self.literal_info.get_best_required_literal()
+            if best_literal:
+                var literal = best_literal.value()
+                # Simple bounds check to avoid issues
+                if start >= len(text):
+                    return None
+                var pos = text.find(literal, start)
+                if pos != -1:
+                    # Ensure we don't exceed text bounds
+                    var end_pos = pos + len(literal)
+                    if end_pos <= len(text):
+                        return Match(0, pos, end_pos, text)
+                return None
 
         # Prefilter path: Use literal scanning for candidates (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
@@ -307,9 +317,35 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Find all matches using optimal engine."""
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            # For now, fall back to regular matching to isolate the performance issue
-            # TODO: Fix exact literal bypass performance
-            pass
+            var matches = List[Match, hint_trivial_type=True]()
+            var best_literal = self.literal_info.get_best_required_literal()
+            if best_literal:
+                var literal = best_literal.value()
+                var literal_len = len(literal)
+                var text_len = len(text)
+                
+                # Bounds check to avoid issues
+                if literal_len > text_len:
+                    return matches^
+                
+                var start = 0
+                var max_start = text_len - literal_len
+                
+                # Safe loop with explicit bounds checking
+                while start <= max_start:
+                    var pos = text.find(literal, start)
+                    if pos == -1:
+                        break
+                    # Double-check bounds before creating Match
+                    var end_pos = pos + literal_len
+                    if end_pos <= text_len:
+                        matches.append(Match(0, pos, end_pos, text))
+                    # Move past this match to avoid infinite loop
+                    start = pos + 1
+                    # Safety check to prevent runaway loops
+                    if start > max_start:
+                        break
+            return matches^
 
         # Prefilter path: Use candidate positions (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
@@ -339,8 +375,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             base_engine = "NFA"
 
         # Add optimization information
-        # Temporarily disabled exact literal reporting while fixing performance issue
-        if self.prefilter and not self.literal_info.has_anchors:
+        if self.is_exact_literal and not self.literal_info.has_anchors:
+            return base_engine + "+ExactLiteral"
+        elif self.prefilter and not self.literal_info.has_anchors:
             return base_engine + "+Prefilter"
         else:
             return base_engine
