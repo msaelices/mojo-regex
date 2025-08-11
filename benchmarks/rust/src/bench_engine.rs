@@ -14,19 +14,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== RUST REGEX BENCHMARKS ===");
     println!();
 
-    // Pre-create test strings to avoid measurement overhead
-    let text_1000 = make_test_string(1000, "abcdefghijklmnopqrstuvwxyz");
-    let text_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz");
-    let text_range_1000 = make_test_string(1000, "abc123XYZ");
-    let text_alternation_1000 = make_test_string(1000, "abcdefghijklmnopqrstuvwxyz");
-    let text_group_1000 = make_test_string(1000, "abcabcabc");
+    // Pre-create test strings to avoid measurement overhead - scaled up to match Mojo benchmarks
+    let text_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz");     // Increased from 1000 to 10000
+    let text_100000 = make_test_string(100000, "abcdefghijklmnopqrstuvwxyz");   // Increased from 10000 to 100000
+    let text_range_10000 = make_test_string(10000, "abc123XYZ");
+    let text_alternation_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz");
+    let text_group_10000 = make_test_string(10000, "abcabcabc");
 
-    // Create complex text patterns
-    let base_text = make_test_string(100, "abcdefghijklmnopqrstuvwxyz");
+    // Create complex text patterns - scaled up to match Mojo benchmarks
+    let base_text = make_test_string(2000, "abcdefghijklmnopqrstuvwxyz");  // Increased from 100 to 2000
     let emails = " user@example.com more text john@test.org ";
     let email_text = format!("{} {} {} {} {}", base_text, emails, base_text, emails, base_text);
 
-    let base_number_text = make_test_string(500, "abc def ghi ");
+    let base_number_text = make_test_string(20000, "abc def ghi ");  // Increased from 500 to 20000
     let number_text = format!("{} 123 price $456.78 quantity 789 {}", base_number_text, base_number_text);
 
     // Pre-compile all regex patterns to avoid compilation overhead in benchmarks
@@ -42,8 +42,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut all_results,
         "literal_match_short",
         &patterns.hello,
-        &format!("{} hello world {}", text_1000, text_1000),
-        100,
+        &format!("{} hello world {}", text_10000, text_10000),  // Updated variable names
+        2000,  // Increased from 100 to 2000
         BenchType::Search
     );
 
@@ -52,8 +52,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         &mut all_results,
         "literal_match_long",
         &patterns.hello,
-        &format!("{} hello world {}", text_10000, text_1000),
-        100,
+        &format!("{} hello world {}", text_100000, text_10000),  // Updated variable names
+        2000,  // Increased from 100 to 2000
         BenchType::Search
     );
 
@@ -62,72 +62,72 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ===-----------------------------------------------------------------------===
     println!("=== Wildcard and Quantifier Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "wildcard_match_any", &patterns.dot_star, &text_1000, 50, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "quantifier_zero_or_more", &patterns.a_star, &text_1000, 50, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "quantifier_one_or_more", &patterns.a_plus, &text_1000, 50, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "quantifier_zero_or_one", &patterns.a_question, &text_1000, 50, BenchType::IsMatch);
+    run_benchmark(&timer, &mut all_results, "wildcard_match_any", &patterns.dot_star, &text_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "quantifier_zero_or_more", &patterns.a_star, &text_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "quantifier_one_or_more", &patterns.a_plus, &text_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "quantifier_zero_or_one", &patterns.a_question, &text_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
     // Character Range Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Character Range Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "range_lowercase", &patterns.range_a_z, &text_range_1000, 50, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "range_digits", &patterns.range_0_9, &text_range_1000, 50, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "range_alphanumeric", &patterns.range_alnum, &text_range_1000, 50, BenchType::IsMatch);
+    run_benchmark(&timer, &mut all_results, "range_lowercase", &patterns.range_a_z, &text_range_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "range_digits", &patterns.range_0_9, &text_range_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "range_alphanumeric", &patterns.range_alnum, &text_range_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
     // Anchor Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Anchor Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "anchor_start", &patterns.anchor_start, &text_1000, 100, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "anchor_end", &patterns.anchor_end, &text_1000, 100, BenchType::IsMatch);
+    run_benchmark(&timer, &mut all_results, "anchor_start", &patterns.anchor_start, &text_10000, 2000, BenchType::IsMatch);  // Updated text size and iterations (100->2000)
+    run_benchmark(&timer, &mut all_results, "anchor_end", &patterns.anchor_end, &text_10000, 2000, BenchType::IsMatch);  // Updated text size and iterations (100->2000)
 
     // ===-----------------------------------------------------------------------===
     // Alternation Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Alternation Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "alternation_simple", &patterns.alt_simple, &text_alternation_1000, 50, BenchType::Search);
-    run_benchmark(&timer, &mut all_results, "alternation_words", &patterns.alt_words, &text_alternation_1000, 50, BenchType::Search);
+    run_benchmark(&timer, &mut all_results, "alternation_simple", &patterns.alt_simple, &text_alternation_10000, 1000, BenchType::Search);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "alternation_words", &patterns.alt_words, &text_alternation_10000, 1000, BenchType::Search);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
     // Group Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Group Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "group_quantified", &patterns.group_quantified, &text_group_1000, 50, BenchType::Search);
-    run_benchmark(&timer, &mut all_results, "group_alternation", &patterns.group_alternation, &text_group_1000, 50, BenchType::Search);
+    run_benchmark(&timer, &mut all_results, "group_quantified", &patterns.group_quantified, &text_group_10000, 1000, BenchType::Search);  // Updated text size and iterations (50->1000)
+    run_benchmark(&timer, &mut all_results, "group_alternation", &patterns.group_alternation, &text_group_10000, 1000, BenchType::Search);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
     // Global Matching Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Global Matching Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "match_all_simple", &patterns.a, &text_1000, 10, BenchType::FindAll);
-    run_benchmark(&timer, &mut all_results, "match_all_pattern", &patterns.range_a_z, &text_1000, 10, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "match_all_simple", &patterns.a, &text_10000, 200, BenchType::FindAll);  // Updated text size and iterations (10->200)
+    run_benchmark(&timer, &mut all_results, "match_all_pattern", &patterns.range_a_z, &text_10000, 200, BenchType::FindAll);  // Updated text size and iterations (10->200)
 
     // ===-----------------------------------------------------------------------===
     // Complex Pattern Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Complex Pattern Benchmarks ===");
 
-    run_benchmark(&timer, &mut all_results, "complex_email_extraction", &patterns.email, &email_text, 2, BenchType::FindAll);
-    run_benchmark(&timer, &mut all_results, "complex_number_extraction", &patterns.number, &number_text, 25, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "complex_email_extraction", &patterns.email, &email_text, 40, BenchType::FindAll);  // Increased from 2 to 40
+    run_benchmark(&timer, &mut all_results, "complex_number_extraction", &patterns.number, &number_text, 500, BenchType::FindAll);  // Increased from 25 to 500
 
     // ===-----------------------------------------------------------------------===
     // SIMD-Optimized Character Filtering Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== SIMD-Optimized Character Filtering Benchmarks ===");
 
-    let large_mixed_text = make_mixed_content_text(10000);
-    let xlarge_mixed_text = make_mixed_content_text(50000);
+    let large_mixed_text = make_mixed_content_text(100000);  // Increased from 10000 to 100000
+    let xlarge_mixed_text = make_mixed_content_text(500000);  // Increased from 50000 to 500000
 
-    run_benchmark(&timer, &mut all_results, "simd_alphanumeric_large", &patterns.range_alnum, &large_mixed_text, 10, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "simd_alphanumeric_xlarge", &patterns.range_alnum, &xlarge_mixed_text, 10, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "simd_negated_alphanumeric", &patterns.negated_alnum, &large_mixed_text, 10, BenchType::IsMatch);
-    run_benchmark(&timer, &mut all_results, "simd_multi_char_class", &patterns.multi_char_class, &large_mixed_text, 10, BenchType::IsMatch);
+    run_benchmark(&timer, &mut all_results, "simd_alphanumeric_large", &patterns.range_alnum, &large_mixed_text, 200, BenchType::IsMatch);  // Increased from 10 to 200
+    run_benchmark(&timer, &mut all_results, "simd_alphanumeric_xlarge", &patterns.range_alnum, &xlarge_mixed_text, 200, BenchType::IsMatch);  // Increased from 10 to 200
+    run_benchmark(&timer, &mut all_results, "simd_negated_alphanumeric", &patterns.negated_alnum, &large_mixed_text, 200, BenchType::IsMatch);  // Increased from 10 to 200
+    run_benchmark(&timer, &mut all_results, "simd_multi_char_class", &patterns.multi_char_class, &large_mixed_text, 200, BenchType::IsMatch);  // Increased from 10 to 200
 
     // ===-----------------------------------------------------------------------===
     // Literal Optimization Benchmarks
