@@ -8,6 +8,7 @@ This module implements the optimization strategies outlined in the optimization 
 - Literal optimization opportunities
 """
 
+from regex.aliases import EMPTY_STRING
 from regex.ast import (
     ASTNode,
     RE,
@@ -459,71 +460,78 @@ struct PatternAnalyzer:
 
     fn _is_simple_quantified_group(self, ast: ASTNode) -> Bool:
         """Check if a quantified group is simple enough for DFA compilation.
-        
+
         A simple quantified group is one that:
-        - Has simple quantifiers (?, *, +)  
+        - Has simple quantifiers (?, *, +)
         - Contains only literal elements (no nested groups or complex patterns)
-        
+
         Args:
             ast: GROUP node with quantifiers.
-            
+
         Returns:
             True if the quantified group can be handled by DFA.
         """
         from regex.ast import ELEMENT
-        
+
         # Check for simple quantifier patterns
-        if not ((ast.min == 0 and ast.max == 1) or      # ?
-                (ast.min == 0 and ast.max == -1) or     # *
-                (ast.min == 1 and ast.max == -1)):      # +
+        if not (
+            (ast.min == 0 and ast.max == 1)
+            or (ast.min == 0 and ast.max == -1)  # ?
+            or (ast.min == 1 and ast.max == -1)  # *
+        ):  # +
             return False
-            
+
         # Check that all children are simple literal elements
         for i in range(ast.get_children_len()):
             var child = ast.get_child(i)
             if child.type != ELEMENT or child.min != 1 or child.max != 1:
                 return False
-                
+
         return True
 
     fn _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
         """Check if alternation tree represents a common prefix alternation.
-        
+
         This checks if a (potentially deep) alternation tree like:
         (hello|help|helicopter) represents branches with meaningful common prefixes.
-        
+
         Args:
             ast: OR node to analyze
-            
+
         Returns:
             True if this is a common prefix alternation that DFA can handle efficiently
         """
         from regex.ast import OR, GROUP, ELEMENT
-        
+
         # Extract all literal branches from the OR tree
         var branches = List[String]()
         if not self._extract_literal_branches_from_tree(ast, branches):
             return False
-        
+
         # Must have at least 2 branches
         if len(branches) < 2:
             return False
-            
+
         # Check if there's a meaningful common prefix (at least 2 characters)
         var common_prefix = self._compute_common_prefix_in_optimizer(branches)
         return len(common_prefix) >= 2
 
-    fn _extract_literal_branches_from_tree(self, node: ASTNode, mut branches: List[String]) -> Bool:
+    fn _extract_literal_branches_from_tree(
+        self, node: ASTNode, mut branches: List[String]
+    ) -> Bool:
         """Extract literal string branches from OR tree."""
         from regex.ast import OR, GROUP, ELEMENT
-        
+
         if node.type == OR:
             # Process both children
-            return (self._extract_literal_branches_from_tree(node.get_child(0), branches) and 
-                    self._extract_literal_branches_from_tree(node.get_child(1), branches))
+            return self._extract_literal_branches_from_tree(
+                node.get_child(0), branches
+            ) and self._extract_literal_branches_from_tree(
+                node.get_child(1), branches
+            )
         elif node.type == GROUP:
             # Extract literal string from GROUP of ELEMENTs
-            var branch_text = String("")
+            var branch_text = String(capacity=String.INLINE_CAPACITY)
             for i in range(node.get_children_len()):
                 var element = node.get_child(i)
                 if element.type != ELEMENT:
@@ -535,37 +543,39 @@ struct PatternAnalyzer:
         else:
             return False  # Unexpected node type
 
-    fn _compute_common_prefix_in_optimizer(self, branches: List[String]) -> String:
+    fn _compute_common_prefix_in_optimizer(
+        self, branches: List[String]
+    ) -> String:
         """Compute the longest common prefix among all branches."""
         if len(branches) == 0:
-            return String("")
+            return EMPTY_STRING
         if len(branches) == 1:
             return branches[0]
-            
-        var prefix = String("")
+
+        var prefix = String(capacity=String.INLINE_CAPACITY)
         var first_branch = branches[0]
         var min_length = len(first_branch)
-        
+
         # Find minimum length
         for i in range(1, len(branches)):
             if len(branches[i]) < min_length:
                 min_length = len(branches[i])
-        
+
         # Find common prefix
         for pos in range(min_length):
             var char_at_pos = first_branch[pos]
             var all_match = True
-            
+
             for i in range(1, len(branches)):
                 if branches[i][pos] != char_at_pos:
                     all_match = False
                     break
-                    
+
             if all_match:
                 prefix += String(char_at_pos)
             else:
                 break
-                
+
         return prefix
 
 
@@ -648,15 +658,15 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
     if ast.type == ELEMENT:
         return String(ast.get_value().value()) if ast.get_value() else ""
     elif ast.type == GROUP:
-        var result = String("")
+        var result = String(capacity=String.INLINE_CAPACITY)
         for i in range(ast.get_children_len()):
             result += _extract_literal_chars(ast.get_child(i))
         return result
     elif ast.type == START or ast.type == END:
         # Anchors don't contribute to literal string
-        return ""
+        return EMPTY_STRING
     else:
-        return ""
+        return EMPTY_STRING  # Non-literal nodes return empty string
 
 
 fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
