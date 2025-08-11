@@ -1,7 +1,3 @@
-#!/usr/bin/env mojo
-
-"""Mojo regex benchmarks using manual timing (Python-compatible)."""
-
 from time import perf_counter_ns
 from regex import match_first, findall, search
 
