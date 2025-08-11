@@ -1,5 +1,5 @@
 #!/bin/bash
-# Run complete benchmark comparison between Mojo and Python regex implementations
+# Run complete benchmark comparison between Mojo and Rust regex implementations
 
 set -e  # Exit on error
 
@@ -17,10 +17,10 @@ if [[ "$BENCHMARK_TYPE" != "bench_engine" && "$BENCHMARK_TYPE" != "simd_focused_
     exit 1
 fi
 
-echo "====================================================================="
-echo "MOJO vs PYTHON REGEX BENCHMARK COMPARISON"
+echo "======================================================================"
+echo "MOJO vs RUST REGEX BENCHMARK COMPARISON"
 echo "Benchmark Type: $BENCHMARK_TYPE"
-echo "====================================================================="
+echo "======================================================================"
 echo ""
 
 # Create results directory if it doesn't exist
@@ -28,19 +28,51 @@ mkdir -p benchmarks/results
 
 # Set output file names based on benchmark type
 if [[ "$BENCHMARK_TYPE" == "simd_focused_benchmark" ]]; then
-    PYTHON_RESULTS="benchmarks/results/python_simd_results.json"
+    RUST_RESULTS="benchmarks/results/rust_simd_results.json"
     MOJO_RESULTS="benchmarks/results/mojo_simd_results.json"
-    OUTPUT_PREFIX="simd_"
+    OUTPUT_PREFIX="rust_simd_"
 else
-    PYTHON_RESULTS="benchmarks/results/python_results.json"
+    RUST_RESULTS="benchmarks/results/rust_results.json"
     MOJO_RESULTS="benchmarks/results/mojo_results.json"
-    OUTPUT_PREFIX=""
+    OUTPUT_PREFIX="rust_"
 fi
 
-# Run Python benchmarks
-echo "Step 1: Running Python regex benchmarks..."
+# Check if Rust is installed
+if ! command -v cargo >/dev/null 2>&1; then
+    echo "Error: Rust/Cargo not found. Please install Rust from https://rustup.rs/"
+    exit 1
+fi
+
+# Check if we're in the right directory
+if [[ ! -f "benchmarks/rust/Cargo.toml" ]]; then
+    echo "Error: Rust benchmark project not found at benchmarks/rust/Cargo.toml"
+    echo "Please ensure you're in the mojo-regex project root directory"
+    exit 1
+fi
+
+# Run Rust benchmarks
+echo "Step 1: Running Rust regex benchmarks..."
 echo "-----------------------------------------"
-python3 "benchmarks/python/${BENCHMARK_TYPE}.py"
+cd benchmarks/rust
+
+# Build in release mode with optimizations
+echo "Building Rust benchmarks with maximum optimizations..."
+export RUSTFLAGS="-C target-cpu=native"
+cargo build --release --bin bench_engine
+
+# Run the benchmark
+echo "Executing Rust benchmarks..."
+cargo run --release --bin bench_engine
+
+# Return to project root
+cd ../..
+
+# Check if Rust results were generated
+if [[ ! -f "$RUST_RESULTS" ]]; then
+    echo "Error: Rust benchmark results not found at $RUST_RESULTS"
+    exit 1
+fi
+
 echo ""
 
 # Run Mojo benchmarks and parse output
@@ -51,7 +83,7 @@ mojo run "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "benchmarks/results/${OUTPUT_
 
 # Show engine usage summary if available
 MOJO_OUTPUT="benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt"
-if grep -q "\[ENGINE\]" "$MOJO_OUTPUT" 2>/dev/null; then
+if grep -q "\\[ENGINE\\]" "$MOJO_OUTPUT" 2>/dev/null; then
     echo ""
     echo "Mojo Engine Usage Summary:"
     echo "=========================="
@@ -63,24 +95,25 @@ if grep -q "\[ENGINE\]" "$MOJO_OUTPUT" 2>/dev/null; then
 fi
 echo ""
 
-# Compare results
+# Compare results (Rust as baseline, Mojo as test)
 echo "Step 3: Comparing benchmark results..."
 echo "--------------------------------------"
-python3 benchmarks/compare_benchmarks.py "$PYTHON_RESULTS" "$MOJO_RESULTS" "benchmarks/results/${OUTPUT_PREFIX}comparison.json"
+python3 benchmarks/compare_benchmarks.py "$RUST_RESULTS" "$MOJO_RESULTS" "benchmarks/results/${OUTPUT_PREFIX}comparison.json"
 
 # Show detailed engine information
-if grep -q "\[ENGINE\]" "$MOJO_OUTPUT" 2>/dev/null; then
+if grep -q "\\[ENGINE\\]" "$MOJO_OUTPUT" 2>/dev/null; then
     echo ""
-    echo "Mojo vs Python Engine Analysis:"
-    echo "================================"
-    echo "Python uses a single regex engine, while Mojo uses a hybrid approach:"
+    echo "Mojo vs Rust Engine Analysis:"
+    echo "=============================="
+    echo "Rust uses a single highly optimized regex engine with lazy DFA construction,"
+    echo "while Mojo uses a hybrid approach:"
     echo "  - DFA Engine: High-performance deterministic automaton for simple patterns"
     echo "  - NFA Engine: Flexible nondeterministic automaton for complex patterns"
     echo "  - Hybrid Matcher: Intelligently routes patterns to optimal engine"
     echo ""
-    echo "This hybrid approach allows Mojo to achieve optimal performance across"
-    echo "different pattern types, leveraging DFA speed for simple patterns and"
-    echo "NFA flexibility for complex ones."
+    echo "Both engines leverage SIMD instructions for character class matching and"
+    echo "string scanning, making this comparison particularly interesting for"
+    echo "understanding the trade-offs between different regex engine architectures."
 fi
 echo ""
 
@@ -97,17 +130,23 @@ else
 fi
 
 echo ""
-echo "====================================================================="
+echo "======================================================================"
 echo "BENCHMARK COMPARISON COMPLETE!"
-echo "====================================================================="
+echo "======================================================================"
 echo ""
 echo "Results saved in benchmarks/results/:"
+echo "  - ${OUTPUT_PREFIX}rust_results.json    : Raw Rust benchmark data"
 echo "  - ${OUTPUT_PREFIX}mojo_results.json    : Raw Mojo benchmark data"
-echo "  - ${OUTPUT_PREFIX}python_results.json  : Raw Python benchmark data"
 echo "  - ${OUTPUT_PREFIX}comparison.json      : Detailed comparison data"
 if python3 -c "import matplotlib" 2>/dev/null; then
     echo "  - ${OUTPUT_PREFIX}speedup_chart.png    : Bar chart of speedup factors"
     echo "  - ${OUTPUT_PREFIX}time_comparison.png  : Side-by-side time comparison"
     echo "  - ${OUTPUT_PREFIX}category_analysis.png: Performance by regex category"
 fi
+echo ""
+echo "Key Insights:"
+echo "  - Rust regex crate is highly optimized with lazy DFA construction"
+echo "  - Mojo's hybrid approach may show different performance characteristics"
+echo "  - SIMD optimizations in both engines provide interesting comparisons"
+echo "  - Pattern complexity significantly affects engine choice in Mojo"
 echo ""
