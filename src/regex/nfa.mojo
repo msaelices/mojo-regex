@@ -74,7 +74,7 @@ struct NFAEngine(Engine):
             # Only apply literal optimization for patterns that benefit from it
             # Skip for simple patterns that will use DFA anyway
             if self.regex:
-                var ast = self.regex.value()
+                ref ast = self.regex.value()
                 var analyzer = PatternAnalyzer()
                 var complexity = analyzer.classify(ast)
 
@@ -87,7 +87,7 @@ struct NFAEngine(Engine):
                     # Use best literal if available and significant
                     ref best_literal = literal_set.get_best_literal()
                     if best_literal:
-                        var best = best_literal.value()
+                        ref best = best_literal.value()
                         # Require longer literals to justify overhead
                         if (
                             best.is_prefix
@@ -160,7 +160,7 @@ struct NFAEngine(Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            var searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher.value()
 
             while current_pos <= len(text):
                 # Find next occurrence of literal
@@ -193,7 +193,7 @@ struct NFAEngine(Engine):
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
-                        var match_end = result[1]
+                        ref match_end = result[1]
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
@@ -226,7 +226,7 @@ struct NFAEngine(Engine):
                 )
                 if result[0]:  # Match found
                     var match_start = current_pos
-                    var match_end = result[1]
+                    ref match_end = result[1]
 
                     # Create match object
                     var matched = Match(0, match_start, match_end, text)
@@ -279,7 +279,7 @@ struct NFAEngine(Engine):
             required_start_pos=start,
         )
         if result[0]:  # Match found
-            var end_idx = result[1]
+            ref end_idx = result[1]
             # Create the match object
             return Match(0, str_i, end_idx, text)
 
@@ -313,7 +313,7 @@ struct NFAEngine(Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            var searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher.value()
 
             while search_pos <= len(text):
                 # Find next occurrence of literal
@@ -347,7 +347,7 @@ struct NFAEngine(Engine):
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
-                        var match_end = result[1]
+                        ref match_end = result[1]
                         # Verify the match includes our literal
                         if self._match_contains_literal(
                             text, try_pos, match_end
@@ -370,7 +370,7 @@ struct NFAEngine(Engine):
                     required_start_pos=-1,
                 )
                 if result[0]:  # Match found
-                    var end_idx = result[1]
+                    ref end_idx = result[1]
                     return Match(0, search_pos, end_idx, text)
                 search_pos += 1
 
@@ -652,7 +652,7 @@ struct NFAEngine(Engine):
         var ch_found = False
 
         if ast.get_value():
-            var range_pattern = ast.get_value().value()
+            ref range_pattern = ast.get_value().value()
 
             # Check for common patterns with specialized matchers
             if range_pattern == "[a-zA-Z0-9]":
@@ -1159,7 +1159,7 @@ struct NFAEngine(Engine):
                 whitespace_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
-            var range_pattern = String(ast.get_value().value())
+            ref range_pattern = String(ast.get_value().value())
 
             # Check for common patterns that should use RangeBasedMatcher
             if range_pattern == "[a-zA-Z0-9]":
@@ -1334,7 +1334,7 @@ struct NFAEngine(Engine):
 
                 var range_matcher = self._create_range_matcher(range_pattern)
                 if range_matcher:
-                    var matcher = range_matcher.value()
+                    ref matcher = range_matcher.value()
                     # Handle negated logic
                     if ast.positive_logic:
                         return apply_quantifier_simd_generic(

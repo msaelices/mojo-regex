@@ -184,6 +184,15 @@ var char = String(token.value)  # Allocates!
 var codepoint = ord(token.value[0])  # No allocation
 ```
 
+Use references instead of var assignments to avoid unnecessary copies:
+
+```mojo
+# This generate a copy
+var child = ast.get_child(i)  # Allocates a new ASTNode
+# Use this to avoid copying
+ref child = ast.get_child(i)  # No allocation, uses reference
+```
+
 ## Compile-Time Optimizations
 
 ### Using Parameters for Static Values

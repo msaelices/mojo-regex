@@ -373,7 +373,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = False
             if self.get_value():
-                var range_pattern = self.get_value().value()
+                ref range_pattern = self.get_value().value()
                 ch_found = self._is_char_in_range(value, range_pattern)
             return not (
                 ch_found ^ self.positive_logic
