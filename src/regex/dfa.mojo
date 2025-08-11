@@ -809,12 +809,12 @@ struct DFAEngine(Engine):
         self.states.append(accepting_state)
         var accepting_index = len(self.states) - 1
         
+        # Collect all branch texts (flattening nested OR structures)  
+        var all_branches = _collect_all_alternation_branches(or_node)
+        
         # Process each branch of the alternation
-        for i in range(or_node.get_children_len()):
-            ref branch = or_node.get_child(i)
-            
-            # Extract the literal text for this branch
-            var branch_text = _extract_branch_text(branch)
+        for i in range(len(all_branches)):
+            var branch_text = all_branches[i]
             if len(branch_text) == 0:
                 continue
                 
@@ -1927,7 +1927,7 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     for i in range(ast.get_children_len()):
         ref branch = ast.get_child(i)
         
-        # Each branch should be a group containing literal elements
+        # Each branch should be a group containing literal elements, single element, or nested OR
         if branch.type == GROUP:
             # Check that the group contains only literal elements
             if not _group_contains_only_literals(branch):
@@ -1935,6 +1935,10 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         elif branch.type == ELEMENT:
             # Single literal element - good
             continue
+        elif branch.type == OR:
+            # Nested OR node - recursively check its branches
+            if not _is_simple_alternation_branches(branch):
+                return False
         else:
             # Complex branch - not supported yet
             return False
@@ -2103,3 +2107,33 @@ fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
             result += child.get_value().value()
     
     return result
+
+
+fn _collect_all_alternation_branches(or_node: ASTNode[MutableAnyOrigin]) -> List[String]:
+    """Recursively collect all branch texts from a potentially nested OR structure.
+    
+    Args:
+        or_node: OR node that may have nested OR children.
+        
+    Returns:
+        List of all branch texts flattened from the nested structure.
+    """
+    from regex.ast import OR, ELEMENT, GROUP
+    
+    var branches = List[String]()
+    
+    for i in range(or_node.get_children_len()):
+        var branch = or_node.get_child(i)
+        
+        if branch.type == OR:
+            # Nested OR - recursively collect its branches
+            var nested_branches = _collect_all_alternation_branches(branch)
+            for j in range(len(nested_branches)):
+                branches.append(nested_branches[j])
+        else:
+            # Leaf branch (ELEMENT or GROUP) - extract its text
+            var branch_text = _extract_branch_text(branch)
+            if len(branch_text) > 0:
+                branches.append(branch_text)
+                
+    return branches
