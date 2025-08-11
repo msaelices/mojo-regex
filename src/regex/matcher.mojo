@@ -136,11 +136,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     """Check if pattern is too simple to benefit from prefilter analysis.
 
-    This function identifies patterns that are so simple that the overhead of
-    prefilter analysis exceeds any potential benefit. These patterns include:
-    - Very short literals (≤ 6 chars)
-    - Simple anchored patterns
-    - Patterns with only basic regex characters (no complex constructs)
+    This function identifies patterns that are unlikely to yield useful prefilters,
+    where the overhead of analysis exceeds any potential benefit.
 
     Args:
         pattern: The regex pattern string.
@@ -150,51 +147,72 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     """
     var pattern_len = len(pattern)
 
-    # Skip very short patterns - prefilter overhead exceeds benefit
-    if pattern_len <= 6:
+    # Skip very short patterns entirely - unlikely to yield useful prefilters
+    if pattern_len <= 4:
         return True
 
-    # Skip simple anchored patterns
-    var has_start_anchor = pattern.startswith("^")
-    var has_end_anchor = pattern.endswith("$")
-
-    if has_start_anchor or has_end_anchor:
-        # For anchored patterns, check if the content is simple
-        var content_start = 1 if has_start_anchor else 0
-        var content_end = pattern_len - (1 if has_end_anchor else 0)
-        var content_length = content_end - content_start
-
-        # Anchored patterns with simple content won't benefit from prefilters
-        if content_length <= 8:
-            return True
-
-    # Skip patterns that appear to be simple literals (no regex metacharacters)
-    # This is a fast heuristic check to avoid expensive analysis
-    var has_regex_chars = False
+    # Check for regex metacharacters
+    var has_quantifiers = False
+    var has_alternation = False  
+    var has_char_classes = False
+    var has_anchors = False
+    var has_wildcards = False
+    
     for i in range(pattern_len):
         var c = pattern[i]
-        if (
-            c == "."
-            or c == "*"
-            or c == "+"
-            or c == "?"
-            or c == "|"
-            or c == "("
-            or c == ")"
-            or c == "["
-            or c == "]"
-            or c == "{"
-            or c == "}"
-            or c == "\\"
-        ):
-            has_regex_chars = True
-            break
+        if c == "*" or c == "+" or c == "?":
+            has_quantifiers = True
+        elif c == "|":
+            has_alternation = True
+        elif c == "[" or c == "]":
+            has_char_classes = True
+        elif c == "^" and i == 0:
+            has_anchors = True
+        elif c == "$" and i == pattern_len - 1:
+            has_anchors = True
+        elif c == ".":
+            has_wildcards = True
 
-    # If no regex metacharacters and pattern is short, skip prefilter
-    if not has_regex_chars and pattern_len <= 12:
+    # Patterns likely to yield poor prefilters (mostly single-char literals):
+    
+    # 1. Simple quantifiers on single characters (a*, a+, [0-9]+)
+    #    These rarely have multi-char literals that are required
+    if has_quantifiers and not has_alternation and not has_wildcards:
+        # Patterns like "a*", "a+", "[0-9]+" typically yield no useful literals
+        return True
+    
+    # 2. Simple alternations of single characters (a|b|c)  
+    #    These yield only single-char literals which aren't very selective
+    if has_alternation and pattern_len <= 8 and not has_wildcards:
+        # Short alternation patterns like "a|b|c" yield single-char literals
+        var alternation_chars = 0
+        for i in range(pattern_len):
+            if pattern[i] == "|":
+                alternation_chars += 1
+        # If it's mostly single chars separated by |, skip
+        if alternation_chars >= pattern_len // 3:  # Lots of | relative to length
+            return True
+
+    # 3. Simple anchored patterns
+    if has_anchors and pattern_len <= 8:
         return True
 
-    return False
+    # Patterns likely to yield good prefilters:
+    
+    # 1. Patterns with literals mixed with wildcards (.*.domain.com, hello.*world)
+    if has_wildcards and pattern_len >= 8:
+        return False
+        
+    # 2. Complex alternations that might have common prefixes
+    if has_alternation and pattern_len >= 10:
+        return False
+        
+    # 3. Longer patterns are more likely to have useful literals
+    if pattern_len >= 12:
+        return False
+
+    # Default: skip analysis for patterns that don't match good prefilter criteria
+    return True
 
 
 struct HybridMatcher(Copyable, Movable, RegexMatcher):
@@ -313,9 +331,16 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Prefilter path: Use literal scanning for candidates (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
-            # Disabled for now to isolate performance issue
-            # TODO: Fix prefilter performance issue
-            pass
+            var candidate_pos = self.prefilter.value().find_first_candidate(text, start)
+            if not candidate_pos:
+                return None  # No candidates found
+            
+            var search_start = candidate_pos.value()
+            # Use appropriate engine for the filtered position
+            if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+                return self.dfa_matcher.value().match_next(text, search_start)
+            else:
+                return self.nfa_matcher.match_next(text, search_start)
 
         # Standard path: Regular matching without prefilters
         if (
