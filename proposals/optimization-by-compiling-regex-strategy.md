@@ -5,7 +5,7 @@
 Our current Mojo regex implementation uses a binary fallback system: attempt DFA compilation, fall back to NFA on failure. Analysis of the Rust `regex-automata` crate reveals significant architectural advantages that could dramatically improve our performance through:
 
 1. **Multi-engine strategy system** with graceful fallbacks
-2. **Comprehensive prefilter optimization** for fast candidate identification  
+2. **Comprehensive prefilter optimization** for fast candidate identification
 3. **Rich pattern information preprocessing** to eliminate redundant analysis
 4. **Compilation-time information denormalization** for optimized engine construction
 
@@ -15,20 +15,20 @@ This proposal outlines a phased approach to implementing these optimizations, wi
 
 ### Compilation Pipeline
 ```mojo
-// src/regex/dfa.mojo:1323-1325
+# src/regex/dfa.mojo
 fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     if is_literal_pattern(ast):
-        // Handle literal patterns...
+        # Handle literal patterns...
     elif _is_alternation_pattern(ast):
-        // Handle alternation patterns...  
-    // ... 10+ elif clauses for different pattern types
+        # Handle alternation patterns...
+    # ... 10+ elif clauses for different pattern types
     else:
         raise Error("Pattern too complex for current DFA implementation")
 ```
 
 ### Engine Selection
 ```mojo
-// src/regex/matcher.mojo:89-95
+# src/regex/matcher.mojo
 fn __init__(out self, pattern: String) raises:
     var complexity = analyzer.classify(ast)
     if complexity.value == PatternComplexity.SIMPLE:
@@ -42,7 +42,7 @@ fn __init__(out self, pattern: String) raises:
 
 1. **Binary Fallback**: If DFA compilation fails, we completely abandon DFA approach
 2. **No Prefilters**: Each engine performs full pattern matching without fast rejection
-3. **Repeated Analysis**: Pattern is re-analyzed by each compilation handler  
+3. **Repeated Analysis**: Pattern is re-analyzed by each compilation handler
 4. **Limited Strategy**: Only DFA vs NFA, no intermediate optimization levels
 
 ## Rust Architecture Deep Dive
@@ -60,12 +60,12 @@ pub(super) trait Strategy: Debug + Send + Sync + RefUnwindSafe + UnwindSafe + 's
     // ... other methods
 }
 
-// rust-regex/regex-automata/src/meta/strategy.rs:632-704  
+// rust-regex/regex-automata/src/meta/strategy.rs:632-704
 struct Core {
     info: RegexInfo,
     pre: Option<Prefilter>,
     nfa: NFA,
-    nfarev: Option<NFA>, 
+    nfarev: Option<NFA>,
     pikevm: wrappers::PikeVM,
     backtrack: wrappers::BoundedBacktracker,
     onepass: wrappers::OnePass,
@@ -86,7 +86,7 @@ fn search(&self, cache: &mut Cache, input: &Input<'_>) -> Option<Match> {
         }
     } else if let Some(e) = self.hybrid.get(input) {
         match e.try_search(&mut cache.hybrid, input) {
-            Ok(x) => x, 
+            Ok(x) => x,
             Err(_err) => self.search_nofail(cache, input)  // Graceful fallback
         }
     } else {
@@ -108,17 +108,17 @@ let pre = if info.is_always_anchored_start() {
 } else if info.config().get_auto_prefilter() {
     let kind = info.config().get_match_kind();
     let prefixes = crate::util::prefilter::prefixes(kind, hirs);
-    
+
     // Complete bypass for exact literal matches
     if let Some(pre) = Pre::from_prefixes(info, &prefixes) {
         return Ok(pre);  // Skip regex engine entirely!
     }
-    
+
     // Aho-Corasick for large alternations
     if let Some(pre) = Pre::from_alternation_literals(info, hirs) {
         return Ok(pre);  // Use Aho-Corasick directly
     }
-    
+
     prefixes.literals().and_then(|strings| {
         Prefilter::new(kind, strings)  // Create prefilter from literals
     })
@@ -140,7 +140,7 @@ pub struct RegexInfo {
 
 // Properties include:
 // - explicit_captures_len()
-// - look_set() (look-around assertions)  
+// - look_set() (look-around assertions)
 // - is_always_anchored_start()
 // - literal requirements
 // - Unicode requirements
@@ -164,21 +164,21 @@ pub struct RegexInfo {
 **Target**: 2-3x performance improvement for patterns with required literals
 
 ```mojo
-// New literal extraction system
+# New literal extraction system
 struct LiteralInfo:
     var required_literals: List[String]
-    var literal_prefixes: List[String] 
+    var literal_prefixes: List[String]
     var literal_suffixes: List[String]
     var is_exact_match: Bool
 
 fn extract_literals(ast: ASTNode) -> LiteralInfo:
-    // Extract all required literal substrings from pattern
-    
-// New prefilter integration  
+    # Extract all required literal substrings from pattern
+
+# New prefilter integration
 trait PrefilterMatcher:
     fn find_candidates(self, text: String) -> List[Int]:
-        // Find candidate positions for full regex match
-        
+        # Find candidate positions for full regex match
+
 struct MemchrPrefilter(PrefilterMatcher):
     # Fast memchr-based literal scanning
 ```
@@ -196,12 +196,12 @@ struct MemchrPrefilter(PrefilterMatcher):
 struct PatternProperties:
     var complexity: PatternComplexity
     var has_start_anchor: Bool
-    var has_end_anchor: Bool  
+    var has_end_anchor: Bool
     var literal_info: LiteralInfo
     var quantifier_bounds: Dict[String, Tuple[Int, Int]]
     var alternation_branches: List[String]
     var character_classes: List[String]
-    
+
 struct EnhancedPatternAnalyzer:
     fn analyze_comprehensive(self, ast: ASTNode) -> PatternProperties:
         # Single traversal extracting ALL pattern information
@@ -210,7 +210,7 @@ struct EnhancedPatternAnalyzer:
 **Compilation Optimization**:
 ```mojo
 fn compile_ast_pattern_optimized(
-    ast: ASTNode, 
+    ast: ASTNode,
     props: PatternProperties  # Pre-computed properties
 ) raises -> DFAEngine:
     # Use pre-analyzed properties instead of re-analyzing AST
@@ -234,7 +234,7 @@ trait MatchStrategy:
 
 struct PrioritizedMatcher:
     var strategies: List[Arc[MatchStrategy]]  # DFA -> Hybrid -> NFA
-    
+
     fn search(self, text: String, start: Int) -> Optional[Match]:
         for strategy in self.strategies:
             try:
@@ -244,7 +244,7 @@ struct PrioritizedMatcher:
         return None
 ```
 
-### Phase 4: Compilation Pipeline Optimization  
+### Phase 4: Compilation Pipeline Optimization
 
 **Target**: Reduce compilation time by 40-50%
 
@@ -253,9 +253,9 @@ struct PrioritizedMatcher:
 struct CompilationContext:
     var props: PatternProperties
     var precomputed_states: Dict[String, Int]
-    var character_class_cache: Dict[String, String] 
+    var character_class_cache: Dict[String, String]
     var transition_cache: Dict[Tuple[Int, UInt8], Int]
-    
+
     fn get_or_create_state(mut self, pattern: String) -> Int:
         # Cached state creation
 ```
@@ -275,12 +275,12 @@ fn compile_dfa_optimized(
 
 ### Milestone 1: Core Prefilter System (4-6 weeks)
 - [ ] Implement `LiteralExtractor` for pattern analysis
-- [ ] Create `MemchrPrefilter` for fast literal scanning  
+- [ ] Create `MemchrPrefilter` for fast literal scanning
 - [ ] Integrate prefilters into existing `DFAMatcher` and `NFAMatcher`
 - [ ] Add bypass logic for exact literal matches
 - [ ] Benchmark against current implementation
 
-### Milestone 2: Enhanced Pattern Analysis (3-4 weeks) 
+### Milestone 2: Enhanced Pattern Analysis (3-4 weeks)
 - [ ] Expand `PatternAnalyzer` to extract comprehensive properties
 - [ ] Implement single-traversal AST analysis
 - [ ] Update all DFA compilation handlers to use pre-computed properties
@@ -296,7 +296,7 @@ fn compile_dfa_optimized(
 
 ### Milestone 4: Compilation Optimization (4-5 weeks)
 - [ ] Implement `CompilationContext` with caching
-- [ ] Optimize DFA state creation and transition building  
+- [ ] Optimize DFA state creation and transition building
 - [ ] Add specialized handlers for common pattern combinations
 - [ ] Implement batch processing for related patterns
 - [ ] Final performance evaluation and tuning
@@ -317,7 +317,7 @@ Based on Rust regex benchmarks and our current performance characteristics:
 
 ### Risks
 1. **Complexity**: Strategy pattern may add significant code complexity
-2. **Memory**: Multiple engines per pattern could increase memory usage  
+2. **Memory**: Multiple engines per pattern could increase memory usage
 3. **Compatibility**: Changes to core compilation pipeline affect all patterns
 
 ### Mitigations
