@@ -48,7 +48,7 @@ Add support for common pattern types causing SIMPLE→NFA fallbacks:
 ```mojo
 # Existing handlers:
 # - Literal patterns
-# - Pure anchors  
+# - Pure anchors
 # - Simple character classes
 # - Multi-character sequences
 # - Sequential patterns
@@ -109,7 +109,7 @@ fn try_search_mayfail(input: Input) -> Option[Result[Match, Error]]:
     if let engine = dfa.get(input):
         return engine.try_search(input)
     elif let engine = hybrid.get(input):
-        return engine.try_search(input)  
+        return engine.try_search(input)
     elif let engine = onepass.get(input):
         return engine.try_search(input)
     else:
@@ -135,7 +135,7 @@ Create wrapper structs for each engine type:
 **Location**: `/src/regex/optimizer.mojo` - PatternAnalyzer
 
 **Current**: Basic SIMPLE/MEDIUM/COMPLEX classification
-**Proposed**: 
+**Proposed**:
 - Add engine-specific suitability metrics
 - Implement pattern complexity scoring
 - Add optimization hints for engine selection
@@ -166,7 +166,7 @@ Create wrapper structs for each engine type:
 ## Implementation Priority
 
 1. **Phase 1**: Direct fix for current gap - expand `compile_ast_pattern()` handlers
-2. **Phase 2**: Add Hybrid DFA for intermediate complexity patterns  
+2. **Phase 2**: Add Hybrid DFA for intermediate complexity patterns
 3. **Phase 3**: Implement full meta strategy system
 4. **Phase 4**: Advanced optimizations and analysis improvements
 
