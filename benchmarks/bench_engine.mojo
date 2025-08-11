@@ -1,5 +1,3 @@
-# RUN: %mojo-no-debug %s -t
-
 from os import abort
 from pathlib import _dir_of_current_file
 from random import random_si64, seed
