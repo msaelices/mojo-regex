@@ -12,13 +12,11 @@ from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
 from regex.simd_ops import (
-    TwoWaySearcher,
     CharacterClassSIMD,
     get_simd_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
 )
-from regex.dfa import BoyerMoore
 from regex.simd_matchers import (
     get_digit_matcher,
     get_whitespace_matcher,
@@ -26,7 +24,13 @@ from regex.simd_matchers import (
     get_alnum_matcher,
     RangeBasedMatcher,
 )
-from regex.literal_optimizer import extract_literals, extract_literal_prefix
+from regex.literal_ops import (
+    extract_literals,
+    extract_literal_prefix,
+    TwoWaySearcher,
+    BoyerMoore,
+    LiteralSearcher,
+)
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
@@ -40,47 +44,6 @@ alias COMPLEX_CHAR_CLASS_THRESHOLD = 10
 alias MIN_PREFIX_LITERAL_LENGTH = 3
 # Non-prefix literals need even longer length to be worth the overhead
 alias MIN_REQUIRED_LITERAL_LENGTH = 4
-
-# Pattern length thresholds for searcher selection
-alias BOYER_MOORE_MIN_LENGTH = 17
-alias BOYER_MOORE_MAX_LENGTH = 64
-
-
-struct LiteralSearcher(Copyable, Movable):
-    """Flexible literal searcher that uses the optimal algorithm based on pattern length.
-    """
-
-    var searcher_type: Int
-    """0 = TwoWaySearcher, 1 = BoyerMoore"""
-    var two_way: Optional[TwoWaySearcher]
-    var boyer_moore: Optional[BoyerMoore]
-
-    fn __init__(out self, pattern: String):
-        """Initialize with optimal searcher based on pattern length."""
-        var pattern_len = len(pattern)
-
-        if (
-            pattern_len >= BOYER_MOORE_MIN_LENGTH
-            and pattern_len <= BOYER_MOORE_MAX_LENGTH
-        ):
-            # Use Boyer-Moore for medium-length patterns (17-64 chars)
-            self.searcher_type = 1
-            self.two_way = None
-            self.boyer_moore = BoyerMoore(pattern)
-        else:
-            # Use TwoWaySearcher for short or very long patterns
-            self.searcher_type = 0
-            self.two_way = TwoWaySearcher(pattern)
-            self.boyer_moore = None
-
-    fn search(self, text: String, start: Int = 0) -> Int:
-        """Search for pattern in text using the optimal algorithm."""
-        if self.searcher_type == 1 and self.boyer_moore:
-            return self.boyer_moore.value().search(text, start)
-        elif self.two_way:
-            return self.two_way.value().search(text, start)
-        else:
-            return -1
 
 
 struct NFAEngine(Engine):

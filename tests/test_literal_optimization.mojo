@@ -10,14 +10,15 @@ from regex import match_first, findall, search
 from regex.ast import ASTNode
 from regex.matcher import HybridMatcher
 from regex.parser import parse
-from regex.literal_optimizer import (
+from regex.literal_ops import (
     has_literal_prefix,
     extract_literals,
     extract_literal_prefix,
     LiteralInfo,
     LiteralSet,
+    TwoWaySearcher,
 )
-from regex.simd_ops import TwoWaySearcher, MultiLiteralSearcher
+from regex.simd_ops import MultiLiteralSearcher
 from regex.optimizer import PatternAnalyzer
 
 

@@ -22,7 +22,7 @@ from regex.ast import (
     OR,
     GROUP,
 )
-from regex.literal_optimizer import (
+from regex.literal_ops import (
     extract_literals,
     has_literal_prefix,
     extract_literal_prefix,

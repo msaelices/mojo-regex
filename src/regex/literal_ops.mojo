@@ -1,12 +1,17 @@
 """
-Literal optimization module for extracting and optimizing literal substrings in regex patterns.
+Literal operations module for extracting, optimizing, and searching literal substrings in regex patterns.
 
-This module implements the literal optimization strategies described in the burntsushi article,
-including literal extraction, selection of optimal search strings, and prefiltering hints.
+This module implements:
+- Literal optimization strategies for extracting and selecting optimal search strings
+- String search algorithms: Boyer-Moore, Two-Way, and automatic algorithm selection
+- SIMD-optimized literal pattern matching
+- Prefiltering hints and literal pattern analysis
 """
 
 from builtin._location import __call_location
+from sys.info import simdwidthof
 from regex.aliases import EMPTY_SLICE
+from regex.simd_ops import SIMDStringSearch
 from regex.ast import (
     ASTNode,
     RE,
@@ -20,6 +25,13 @@ from regex.ast import (
     OR,
     GROUP,
 )
+
+# SIMD width for character operations (uint8)
+alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+
+# Pattern length thresholds for searcher selection
+alias BOYER_MOORE_MIN_LENGTH = 17
+alias BOYER_MOORE_MAX_LENGTH = 64
 
 
 struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
@@ -492,3 +504,313 @@ fn extract_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> String:
 
     # Don't return non-prefix literals as prefix
     return ""
+
+
+struct BoyerMoore(Copyable, Movable):
+    """Boyer-Moore string search algorithm for fast literal string matching."""
+
+    var pattern: String
+    """The literal string pattern to search for."""
+    var bad_char_table: List[Int]
+    """Bad character heuristic table for Boyer-Moore algorithm."""
+
+    fn __init__(out self, pattern: String):
+        """Initialize Boyer-Moore with a pattern.
+
+        Args:
+            pattern: Literal string pattern to search for.
+        """
+        self.pattern = pattern
+        self.bad_char_table = List[Int](capacity=256)
+        self._build_bad_char_table()
+
+    fn _build_bad_char_table(mut self):
+        """Build the bad character heuristic table."""
+        # Initialize all characters to -1 (not in pattern)
+        for _ in range(256):
+            self.bad_char_table.append(-1)
+
+        # Set the last occurrence of each character in pattern
+        for i in range(len(self.pattern)):
+            var char_code = ord(self.pattern[i])
+            self.bad_char_table[char_code] = i
+
+    fn search(self, text: String, start: Int = 0) -> Int:
+        """Search for pattern in text using Boyer-Moore algorithm.
+
+        Args:
+            text: Text to search in.
+            start: Starting position in text.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
+        var m = len(self.pattern)
+        var n = len(text)
+        var s = start  # shift of the pattern
+
+        while s <= n - m:
+            var j = m - 1
+
+            # Compare pattern from right to left
+            while j >= 0 and self.pattern[j] == text[s + j]:
+                j -= 1
+
+            if j < 0:
+                # Pattern found at position s
+                return s
+            else:
+                # Mismatch occurred, use bad character heuristic
+                var bad_char = ord(text[s + j])
+                var shift = j - self.bad_char_table[bad_char]
+                s += max(1, shift)
+
+        return -1  # Pattern not found
+
+    fn search_all(self, text: String) -> List[Int]:
+        """Find all occurrences of pattern in text.
+
+        Args:
+            text: Text to search in.
+
+        Returns:
+            List of starting positions of all matches.
+        """
+        var positions = List[Int]()
+        var start = 0
+
+        while True:
+            var pos = self.search(text, start)
+            if pos == -1:
+                break
+            positions.append(pos)
+            start = pos + 1  # Look for next occurrence
+
+        return positions
+
+
+struct TwoWaySearcher(Copyable & Movable):
+    """SIMD-optimized Two-Way string search algorithm.
+
+    The Two-Way algorithm provides O(n) worst-case time complexity with O(1) space.
+    This implementation enhances it with SIMD for the search phase.
+    """
+
+    var pattern: String
+    """The pattern to search for."""
+    var period: Int
+    """The period of the pattern's critical factorization."""
+    var critical_pos: Int
+    """The position of the critical factorization."""
+    var memory: Int
+    """Memory for the backward search phase."""
+    var memory_fwd: Int
+    """Memory for the forward search phase."""
+
+    fn __init__(out self, pattern: String):
+        """Initialize the Two-Way searcher with a pattern.
+
+        Args:
+            pattern: The pattern to search for.
+        """
+        self.pattern = pattern
+        self.memory = 0
+        self.memory_fwd = -1
+
+        # Compute critical factorization
+        var n = len(self.pattern)
+        if n == 0:
+            self.critical_pos = 0
+            self.period = 1
+            return
+
+        # For the Two-Way algorithm to work correctly, we need a proper critical factorization.
+        # The current simplified approach causes the algorithm to skip potential matches.
+        # For now, we'll use a more conservative approach that ensures correctness.
+
+        # The critical position should be computed using maximal suffix,
+        # but for correctness we can use position 1 which guarantees we won't skip matches
+        self.critical_pos = 1 if n > 1 else 0
+
+        # Compute the actual period of the pattern
+        var period = 1
+        var k = 1
+        while k < n:
+            var i = 0
+            while i < n - k and self.pattern[i] == self.pattern[i + k]:
+                i += 1
+            if i == n - k:
+                period = k
+                break
+            k += 1
+
+        self.period = period
+
+    fn search(self, text: String, start: Int = 0) -> Int:
+        """Search for pattern in text using Two-Way algorithm with SIMD.
+
+        Args:
+            text: Text to search in.
+            start: Starting position.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
+        var n = len(self.pattern)
+        var m = len(text)
+
+        if n == 0:
+            return start
+        if n > m - start:
+            return -1
+
+        # For very short patterns, use simple SIMD search
+        if n <= 4:
+            return self._short_pattern_search(text, start)
+
+        # For patterns where Two-Way's complexity isn't needed, use SIMD search
+        # This ensures correctness while maintaining good performance
+        if n <= 32:
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(text, start)
+
+        # For longer patterns, use the Two-Way algorithm
+        var pos = start
+        var memory = 0
+
+        while pos <= m - n:
+            # Check right part (from critical position to end)
+            var i = max(self.critical_pos, memory)
+
+            # Use SIMD for bulk comparison when possible
+            var mismatch_pos = self._simd_compare_forward(text, pos, i)
+
+            if mismatch_pos == n:
+                # Right part matches, check left part
+                i = self.critical_pos - 1
+
+                while i >= 0 and text[pos + i] == self.pattern[i]:
+                    i -= 1
+
+                if i < 0:
+                    # Full match found
+                    return pos
+
+                # Mismatch in left part
+                pos += self.period
+                memory = n - self.period
+            else:
+                # Mismatch in right part
+                pos += mismatch_pos - memory + 1
+                memory = 0
+
+        return -1
+
+    fn _simd_compare_forward(
+        self, text: String, text_pos: Int, start_offset: Int
+    ) -> Int:
+        """Compare pattern with text starting from given offset using SIMD.
+
+        Args:
+            text: Text to compare against.
+            text_pos: Starting position in text.
+            start_offset: Starting offset in pattern.
+
+        Returns:
+            Position of first mismatch, or pattern length if full match.
+        """
+        var n = len(self.pattern)
+        var i = start_offset
+
+        # SIMD comparison for chunks
+        while i + SIMD_WIDTH <= n:
+            if text_pos + i + SIMD_WIDTH > len(text):
+                break
+
+            var pattern_chunk = self.pattern.unsafe_ptr().load[
+                width=SIMD_WIDTH
+            ](i)
+            var text_chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](
+                text_pos + i
+            )
+
+            var matches = pattern_chunk == text_chunk
+            if not matches.reduce_and():
+                # Find first mismatch
+                for j in range(SIMD_WIDTH):
+                    if not matches[j]:
+                        return i + j
+
+            i += SIMD_WIDTH
+
+        # Handle remaining characters
+        while i < n and text_pos + i < len(text):
+            if self.pattern[i] != text[text_pos + i]:
+                return i
+            i += 1
+
+        return i
+
+    fn _short_pattern_search(self, text: String, start: Int) -> Int:
+        """Optimized search for very short patterns (1-4 bytes).
+
+        Uses SIMD to search for pattern as a small integer.
+        """
+        var n = len(self.pattern)
+        var m = len(text)
+
+        if n == 1:
+            # Single character search
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(text, start)
+
+        # For 2-4 byte patterns, use rolling comparison
+        var pos = start
+        while pos <= m - n:
+            var matched = True
+            for i in range(n):
+                if text[pos + i] != self.pattern[i]:
+                    matched = False
+                    break
+            if matched:
+                return pos
+            pos += 1
+
+        return -1
+
+
+struct LiteralSearcher(Copyable, Movable):
+    """Flexible literal searcher that uses the optimal algorithm based on pattern length.
+    """
+
+    var searcher_type: Int
+    """0 = TwoWaySearcher, 1 = BoyerMoore"""
+    var two_way: Optional[TwoWaySearcher]
+    var boyer_moore: Optional[BoyerMoore]
+
+    fn __init__(out self, pattern: String):
+        """Initialize with optimal searcher based on pattern length."""
+        var pattern_len = len(pattern)
+
+        if (
+            pattern_len >= BOYER_MOORE_MIN_LENGTH
+            and pattern_len <= BOYER_MOORE_MAX_LENGTH
+        ):
+            # Use Boyer-Moore for medium-length patterns (17-64 chars)
+            self.searcher_type = 1
+            self.two_way = None
+            self.boyer_moore = BoyerMoore(pattern)
+        else:
+            # Use TwoWaySearcher for short or very long patterns
+            self.searcher_type = 0
+            self.two_way = TwoWaySearcher(pattern)
+            self.boyer_moore = None
+
+    fn search(self, text: String, start: Int = 0) -> Int:
+        """Search for pattern in text using the optimal algorithm."""
+        if self.searcher_type == 1 and self.boyer_moore:
+            return self.boyer_moore.value().search(text, start)
+        elif self.two_way:
+            return self.two_way.value().search(text, start)
+        else:
+            return -1
