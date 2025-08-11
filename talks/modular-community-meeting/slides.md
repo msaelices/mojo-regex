@@ -1,6 +1,6 @@
 ## Regex in Mojo
 
-### Building a Hybrid DFA/NFA Engine with SIMD Optimization
+### Building Regular Expressions Engine with SIMD Optimization
 
 <div style="text-align: center;">
 <img src="./image/logo.png" alt="regex engine">
@@ -8,12 +8,12 @@
 
 ---
 
-# Agenda
+# Contents
 
 ### Part 1: Introduction & Motivation
 <!-- .element: class="fragment" -->
 
-### Part 2: Architecture Deep Dive
+### Part 2: Architecture Overview
 <!-- .element: class="fragment" -->
 
 ### Part 3: Performance Optimizations
@@ -33,7 +33,7 @@
 ---
 
 ### What is mojo-regex?
-- Regex engine written in Mojo
+- REGular EXpressions engine written in Mojo
 - Familiar API to Python's `re` module
 - Hybrid DFA/NFA Architecture
 - SIMD optimizations for performance
@@ -95,7 +95,7 @@ print("Search found:", search_result.value().get_match_text())
 
 **The hard mode**
 - Build a regex engine in Mojo "from scratch"
-- Thanks to LLMs, entry barrier was much lower
+- Thanks to AI coding, entry barrier was much lower
 
 ---
 
@@ -143,8 +143,6 @@ fn parse(tokens: List[Token]) -> ASTNode:
     # Handle groups, alternation, quantifiers
 ```
 
-**Key Design**: Clean separation of concerns
-
 ---
 
 ### Components: Optimizer and Matcher
@@ -175,7 +173,7 @@ struct DFAMatcher(RegexMatcher):  # or NFAMatcher
 
 ### Component: DFA and NFA Engines
 
-- **Deterministic Finite Automaton**: Fast O(n) but limited features, exponential states
+- **Deterministic Finite Automaton**: Fast O(n) but limited features
 - **Non-deterministic FA**: Full features but O(nm) with backtracking
 
 ```mojo
@@ -185,7 +183,7 @@ struct DFAEngine:  # or NFAEngine
         ...
 ```
 
-**Our Solution: Intelligent Routing**
+**Solution: Intelligent Routing**
 
 ```
 Pattern → Analyzer → Simple? → DFA Engine (O(n))
@@ -200,18 +198,16 @@ Pattern → Analyzer → Simple? → DFA Engine (O(n))
 
 ---
 
-### Spoiler Alert: Not even close to SOTA yet!
+### ⚠️ Spoiler: Not even close to SOTA yet!
 
 - Not a regex/SIMD expert. Just learning as I go.
 - Benchmarking is hard.
-- Performance is a Journey. We are lagging behind
-- Difficult to trace copies and allocations.
-  - Use `__call_location` in `__init__` or `__copyinit__`
+- Performance is a Journey.
+- Hard to trace copies and allocations.
+  - Use `__call_location` in `__init__` or `__copyinit__` (thanks to @rd4com!)
   - Not easy in 3rd-party structs (e.g. `List`, `String`).
 - LLM generated code is not optimal (Python-like).
-- Origins with recursive structs are hard
-  - Function/structs coloring.
-  - Less readable code.
+- Origins with recursive structs (e.g. AST) are difficult
 
 ---
 
@@ -252,6 +248,7 @@ TODO: Update with latest benchmarks
 <!-- .element: class="fragment" -->
 - Compiled patterns in a bytecode VM.
 <!-- .element: class="fragment" -->
+- Suspicious about my benchmark setup (based on `Bench`).
 
 ---
 
@@ -394,27 +391,6 @@ fn create_hex_matcher() -> NibbleBasedMatcher:
 
 ---
 
-### Real-World Performance Impact
-
-**Literal String Search** (SIMD-optimized)
-```mojo
-# Finding "example.com" in text
-var searcher = SIMDStringSearch("example.com")
-var pos = searcher.search(text, 0)
-```
-- ⚡ 2.4x faster than Python's `re`
-- 🎯 Uses Boyer-Moore-style first character check
-
-**Character Class Matching**
-```mojo
-# Pattern: [a-z]+
-var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
-```
-- ⚡ Process 16-32 characters per instruction
-- 🎯 Automatic vectorization
-
----
-
 <!-- .slide: class="center-slide" -->
 # Part 4: Roadmap
 
@@ -422,7 +398,9 @@ var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
 
 ### Future Roadmap
 
-**Coming Soon:**
+**Short term:**
+- 🚀 More SIMD optimizations (Thanks @duck_tape!)
+- ⚙️ Compile-time pattern optimization (WIP)
 - 📝 Predefined character classes (`\d`, `\w`, `\s`)
 - 🔄 Non-greedy quantifiers (`*?`, `+?`)
 - 🎯 Named capture groups
@@ -432,9 +410,8 @@ var matcher = CharacterClassSIMD("abcdefghijklmnopqrstuvwxyz")
 **Long Term:**
 - 👀 Lookahead/lookbehind assertions
 - 🔗 Backreferences
-- 📊 Compile-time pattern optimization
 - 🚀 GPU acceleration for parallel matching
-- When fast enough, integration with [rebar](https://github.com/BurntSushi/rebar) benchmarks.
+- 📊 Integration with [rebar](https://github.com/BurntSushi/rebar) benchmarks.
 
 ---
 
@@ -457,6 +434,8 @@ pixi add mojo-regex
 # Thank You! 🔥
 
 Feel free to contribute, report issues, or share your use cases.
+
+Or, for SME, just give me guidance... will implement it!
 
 ## Questions?
 
