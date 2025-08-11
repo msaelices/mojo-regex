@@ -178,7 +178,7 @@ struct DFAMatcher(RegexMatcher):  # or NFAMatcher
 
 ```mojo
 struct DFAEngine:  # or NFAEngine
-    
+
     fn match_first(self, text: String, start: Int) -> Optional[Match]:
         ...
 ```
@@ -321,13 +321,13 @@ struct ASTNode:
 struct PatternAnalyzer:
     fn classify(self, ast: ASTNode) -> PatternComplexity:
         # Analyze pattern features
-        
+
         if self._is_literal_only(ast):
             return PatternComplexity.SIMPLE  # → DFA, so O(n)
-            
+
         if self._has_simple_quantifiers(ast):
             return PatternComplexity.SIMPLE  # → DFA, so O(n)
-            
+
         if self._has_groups_or_alternation(ast):
             return PatternComplexity.COMPLEX  # → NFA, so O(nm)
 ```
@@ -347,7 +347,7 @@ if char >= 'a' and char <= 'z':
 ```mojo
 struct CharacterClassSIMD(SIMDMatcher):
     var lookup_table: SIMD[DType.uint8, 256]  # 'a' to 'z' as 1s
-    
+
     fn match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
@@ -480,4 +480,3 @@ Or, for SME, just give me guidance... will implement it!
 ## Questions?
 
 ---
-
