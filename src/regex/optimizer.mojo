@@ -150,7 +150,7 @@ struct PatternAnalyzer:
 
         # Check for required literals
         if literal_set.get_best_literal():
-            var best = literal_set.get_best_literal().value()
+            ref best = literal_set.get_best_literal().value()
             if best.is_required:
                 info.has_required_literal = True
                 info.required_literal_length = best.get_literal_len()
@@ -393,7 +393,7 @@ struct PatternAnalyzer:
             # Check if all children are literal elements or anchors
             var all_literal = True
             for i in range(ast.get_children_len()):
-                var child = ast.get_child(i)
+                ref child = ast.get_child(i)
                 if not (
                     (
                         child.type == ELEMENT
@@ -438,7 +438,7 @@ struct PatternAnalyzer:
         var literal_count = 0
 
         for i in range(ast.get_children_len()):
-            var element = ast.get_child(i)
+            ref element = ast.get_child(i)
             if (
                 element.type == RANGE
                 or element.type == DIGIT
@@ -486,7 +486,7 @@ struct PatternAnalyzer:
 
         # Check that all children are simple literal elements
         for i in range(ast.get_children_len()):
-            var child = ast.get_child(i)
+            ref child = ast.get_child(i)
             if child.type != ELEMENT or child.min != 1 or child.max != 1:
                 return False
 
@@ -536,10 +536,10 @@ struct PatternAnalyzer:
             # Extract literal string from GROUP of ELEMENTs
             var branch_text = String(capacity=String.INLINE_CAPACITY)
             for i in range(node.get_children_len()):
-                var element = node.get_child(i)
+                ref element = node.get_child(i)
                 if element.type != ELEMENT:
                     return False  # Non-literal element found
-                var char_value = element.get_value().value()
+                ref char_value = element.get_value().value()
                 branch_text += String(char_value)
             branches.append(branch_text)
             return True
@@ -556,7 +556,7 @@ struct PatternAnalyzer:
             return branches[0]
 
         var prefix = String(capacity=String.INLINE_CAPACITY)
-        var first_branch = branches[0]
+        ref first_branch = branches[0]
         var min_length = len(first_branch)
 
         # Find minimum length
@@ -581,51 +581,58 @@ struct PatternAnalyzer:
 
         return prefix
 
-    fn _is_quantified_alternation_group_in_optimizer(self, ast: ASTNode) -> Bool:
+    fn _is_quantified_alternation_group_in_optimizer(
+        self, ast: ASTNode
+    ) -> Bool:
         """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
-        
+
         This version is used by the optimizer to classify patterns.
-        
+
         Args:
             ast: GROUP node to analyze (not root AST node)
-            
+
         Returns:
             True if this group is a quantified alternation group.
         """
         from regex.ast import GROUP, OR, ELEMENT
-        
+
         # Must be quantified (not 1,1)
         if ast.min == 1 and ast.max == 1:
             return False
-        
+
         # Must have exactly one child that is an OR
         if ast.get_children_len() != 1:
             return False
-            
-        var or_node = ast.get_child(0)
+
+        ref or_node = ast.get_child(0)
         if or_node.type != OR:
             return False
-        
+
         # Check if alternation contains only literal branches
         var branches = List[String]()
         return self._extract_literal_branches_from_or(or_node, branches)
 
-    fn _extract_literal_branches_from_or(self, node: ASTNode, mut branches: List[String]) -> Bool:
+    fn _extract_literal_branches_from_or(
+        self, node: ASTNode, mut branches: List[String]
+    ) -> Bool:
         """Extract literal branches from OR node for optimizer."""
         from regex.ast import OR, GROUP, ELEMENT
-        
+
         if node.type == OR:
             # Process both children
-            return (self._extract_literal_branches_from_or(node.get_child(0), branches) and 
-                    self._extract_literal_branches_from_or(node.get_child(1), branches))
+            return self._extract_literal_branches_from_or(
+                node.get_child(0), branches
+            ) and self._extract_literal_branches_from_or(
+                node.get_child(1), branches
+            )
         elif node.type == GROUP:
             # Extract literal string from GROUP of ELEMENTs
             var branch_text = String("")
             for i in range(node.get_children_len()):
-                var element = node.get_child(i)
+                ref element = node.get_child(i)
                 if element.type != ELEMENT:
                     return False  # Non-literal element found
-                var char_value = element.get_value().value()
+                ref char_value = element.get_value().value()
                 branch_text += String(char_value)
             branches.append(branch_text)
             return True
@@ -670,7 +677,7 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         # For literal pattern detection, check if this group contains nested GROUP nodes
         # If it does, it means there are explicit capturing groups, making it non-literal
         for i in range(ast.get_children_len()):
-            var child = ast.get_child(i)
+            ref child = ast.get_child(i)
             if child.type == GROUP:
                 # Nested groups make the pattern non-literal (explicit capturing groups)
                 return False
@@ -736,7 +743,7 @@ fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     var has_end = False
 
     if ast.type == RE and ast.has_children():
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         has_start, has_end = _check_anchors_recursive(child)
 
     return (has_start, has_end)

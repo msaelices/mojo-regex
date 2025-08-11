@@ -52,7 +52,7 @@ fn check_for_quantifiers[
     regex_origin: ImmutableOrigin
 ](mut i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]) raises:
     """Check for quantifiers after an element and set min/max accordingly."""
-    var next_token = tokens[i + 1]
+    ref next_token = tokens[i + 1]
     if next_token.type == Token.ASTERISK:
         elem.min = 0
         elem.max = -1  # -1 means unlimited
@@ -199,7 +199,7 @@ fn parse_token_list[
     var bracket_depth = 0
     var paren_depth_validation = 0
     for validation_i in range(len(tokens)):
-        var validation_token = tokens[validation_i]
+        ref validation_token = tokens[validation_i]
         if validation_token.type == Token.LEFTBRACKET:
             bracket_depth += 1
         elif validation_token.type == Token.RIGHTBRACKET:
@@ -226,7 +226,7 @@ fn parse_token_list[
     var i = 0
 
     while i < len(tokens):
-        var token = tokens[i]
+        ref token = tokens[i]
 
         if token.type == Token.ELEMENT:
             var elem = Element[regex_origin](

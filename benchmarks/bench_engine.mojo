@@ -1,5 +1,3 @@
-# RUN: %mojo-no-debug %s -t
-
 from os import abort
 from pathlib import _dir_of_current_file
 from random import random_si64, seed
@@ -16,12 +14,12 @@ from pathlib import Path
 # Benchmark Data Generation
 # ===-----------------------------------------------------------------------===#
 
-# Literal optimization test texts
+# Literal optimization test texts - scaled up for meaningful timing
 alias SHORT_TEXT = "hello world this is a test with hello again and hello there"
-alias MEDIUM_TEXT = SHORT_TEXT * 10
-alias LONG_TEXT = SHORT_TEXT * 100
+alias MEDIUM_TEXT = SHORT_TEXT * 100  # Increased from 10 to 100
+alias LONG_TEXT = SHORT_TEXT * 1000  # Increased from 100 to 1000
 alias EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-alias EMAIL_LONG = EMAIL_TEXT * 5
+alias EMAIL_LONG = EMAIL_TEXT * 50  # Increased from 5 to 50
 
 
 fn make_test_string[
@@ -68,7 +66,7 @@ fn bench_literal_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(100):
+        for _ in range(2000):  # Increased from 100 to 2000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -89,7 +87,7 @@ fn bench_wildcard_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -110,7 +108,7 @@ fn bench_range_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -131,7 +129,7 @@ fn bench_anchor_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(100):
+        for _ in range(2000):  # Increased from 100 to 2000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -152,7 +150,7 @@ fn bench_alternation_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -173,7 +171,7 @@ fn bench_group_match[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -194,7 +192,7 @@ fn bench_match_all[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(10):  # Fewer iterations since findall is more expensive
+        for _ in range(200):  # Increased from 10 to 200
             var results = findall(pattern, test_text)
             var count = len(results)
             keep(count)
@@ -217,7 +215,7 @@ fn bench_complex_email_match[text_length: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(2):
+        for _ in range(40):  # Increased from 2 to 40
             var results = findall(pattern, email_text)
             var count = len(results)
             keep(count)
@@ -238,7 +236,7 @@ fn bench_complex_number_extraction[text_length: Int](mut b: Bencher) raises:
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(25):
+        for _ in range(500):  # Increased from 25 to 500
             var results = findall(pattern, number_text)
             var count = len(results)
             keep(count)
@@ -296,7 +294,7 @@ fn bench_simd_heavy_filtering[
     @always_inline
     @parameter
     fn call_fn() raises:
-        for _ in range(10):  # Fewer iterations due to large text size
+        for _ in range(200):  # Increased from 10 to 200
             var result = match_first(pattern, test_text)
             keep(result.__bool__())
 
@@ -477,89 +475,89 @@ def main():
     # Basic literal matching
     print("=== Literal Matching Benchmarks ===")
     detect_and_report_engine("hello", "literal_match_short")
-    m.bench_function[bench_literal_match[1000, "hello"]](
+    m.bench_function[bench_literal_match[10000, "hello"]](
         BenchId(String("literal_match_short"))
     )
     detect_and_report_engine("hello", "literal_match_long")
-    m.bench_function[bench_literal_match[10000, "hello"]](
+    m.bench_function[bench_literal_match[100000, "hello"]](
         BenchId(String("literal_match_long"))
     )
 
     # Wildcard and quantifiers
     print("=== Wildcard and Quantifier Benchmarks ===")
     detect_and_report_engine(".*", "wildcard_match_any")
-    m.bench_function[bench_wildcard_match[1000, ".*"]](
+    m.bench_function[bench_wildcard_match[10000, ".*"]](
         BenchId(String("wildcard_match_any"))
     )
     detect_and_report_engine("a*", "quantifier_zero_or_more")
-    m.bench_function[bench_wildcard_match[1000, "a*"]](
+    m.bench_function[bench_wildcard_match[10000, "a*"]](
         BenchId(String("quantifier_zero_or_more"))
     )
     detect_and_report_engine("a+", "quantifier_one_or_more")
-    m.bench_function[bench_wildcard_match[1000, "a+"]](
+    m.bench_function[bench_wildcard_match[10000, "a+"]](
         BenchId(String("quantifier_one_or_more"))
     )
     detect_and_report_engine("a?", "quantifier_zero_or_one")
-    m.bench_function[bench_wildcard_match[1000, "a?"]](
+    m.bench_function[bench_wildcard_match[10000, "a?"]](
         BenchId(String("quantifier_zero_or_one"))
     )
 
     # Character ranges
     print("=== Character Range Benchmarks ===")
     detect_and_report_engine("[a-z]+", "range_lowercase")
-    m.bench_function[bench_range_match[1000, "[a-z]+"]](
+    m.bench_function[bench_range_match[10000, "[a-z]+"]](
         BenchId(String("range_lowercase"))
     )
     detect_and_report_engine("[0-9]+", "range_digits")
-    m.bench_function[bench_range_match[1000, "[0-9]+"]](
+    m.bench_function[bench_range_match[10000, "[0-9]+"]](
         BenchId(String("range_digits"))
     )
     detect_and_report_engine("[a-zA-Z0-9]+", "range_alphanumeric")
-    m.bench_function[bench_range_match[1000, "[a-zA-Z0-9]+"]](
+    m.bench_function[bench_range_match[10000, "[a-zA-Z0-9]+"]](
         BenchId(String("range_alphanumeric"))
     )
 
     # Anchors
     print("=== Anchor Benchmarks ===")
     detect_and_report_engine("^abc", "anchor_start")
-    m.bench_function[bench_anchor_match[1000, "^abc"]](
+    m.bench_function[bench_anchor_match[10000, "^abc"]](
         BenchId(String("anchor_start"))
     )
     detect_and_report_engine("xyz$", "anchor_end")
-    m.bench_function[bench_anchor_match[1000, "xyz$"]](
+    m.bench_function[bench_anchor_match[10000, "xyz$"]](
         BenchId(String("anchor_end"))
     )
 
     # Alternation
     print("=== Alternation Benchmarks ===")
     detect_and_report_engine("a|b|c", "alternation_simple")
-    m.bench_function[bench_alternation_match[1000, "a|b|c"]](
+    m.bench_function[bench_alternation_match[10000, "a|b|c"]](
         BenchId(String("alternation_simple"))
     )
     detect_and_report_engine("abc|def|ghi", "alternation_words")
-    m.bench_function[bench_alternation_match[1000, "abc|def|ghi"]](
+    m.bench_function[bench_alternation_match[10000, "abc|def|ghi"]](
         BenchId(String("alternation_words"))
     )
 
     # Groups
     print("=== Group Benchmarks ===")
     detect_and_report_engine("(abc)+", "group_quantified")
-    m.bench_function[bench_group_match[1000, "(abc)+"]](
+    m.bench_function[bench_group_match[10000, "(abc)+"]](
         BenchId(String("group_quantified"))
     )
     detect_and_report_engine("(a|b)*", "group_alternation")
-    m.bench_function[bench_group_match[1000, "(a|b)*"]](
+    m.bench_function[bench_group_match[10000, "(a|b)*"]](
         BenchId(String("group_alternation"))
     )
 
     # Global matching
     print("=== Global Matching Benchmarks ===")
     detect_and_report_engine("a", "match_all_simple")
-    m.bench_function[bench_match_all[1000, "a"]](
+    m.bench_function[bench_match_all[10000, "a"]](
         BenchId(String("match_all_simple"))
     )
     detect_and_report_engine("[a-z]+", "match_all_pattern")
-    m.bench_function[bench_match_all[1000, "[a-z]+"]](
+    m.bench_function[bench_match_all[10000, "[a-z]+"]](
         BenchId(String("match_all_pattern"))
     )
 
@@ -569,30 +567,30 @@ def main():
         "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+[.][a-zA-Z]{2,}",
         "complex_email_extraction",
     )
-    m.bench_function[bench_complex_email_match[100]](
+    m.bench_function[bench_complex_email_match[2000]](
         BenchId(String("complex_email_extraction"))
     )
     detect_and_report_engine("[0-9]+[.]?[0-9]*", "complex_number_extraction")
-    m.bench_function[bench_complex_number_extraction[1000]](
+    m.bench_function[bench_complex_number_extraction[20000]](
         BenchId(String("complex_number_extraction"))
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit)
     print("=== SIMD-Optimized Character Filtering Benchmarks ===")
     detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_large")
-    m.bench_function[bench_simd_heavy_filtering[10000, "[a-zA-Z0-9]+"]](
+    m.bench_function[bench_simd_heavy_filtering[100000, "[a-zA-Z0-9]+"]](
         BenchId(String("simd_alphanumeric_large"))
     )
     detect_and_report_engine("[a-zA-Z0-9]+", "simd_alphanumeric_xlarge")
-    m.bench_function[bench_simd_heavy_filtering[50000, "[a-zA-Z0-9]+"]](
+    m.bench_function[bench_simd_heavy_filtering[500000, "[a-zA-Z0-9]+"]](
         BenchId(String("simd_alphanumeric_xlarge"))
     )
     detect_and_report_engine("[^a-zA-Z0-9]+", "simd_negated_alphanumeric")
-    m.bench_function[bench_simd_heavy_filtering[10000, "[^a-zA-Z0-9]+"]](
+    m.bench_function[bench_simd_heavy_filtering[100000, "[^a-zA-Z0-9]+"]](
         BenchId(String("simd_negated_alphanumeric"))
     )
     detect_and_report_engine("[a-z]+[0-9]+", "simd_multi_char_class")
-    m.bench_function[bench_simd_heavy_filtering[10000, "[a-z]+[0-9]+"]](
+    m.bench_function[bench_simd_heavy_filtering[100000, "[a-z]+[0-9]+"]](
         BenchId(String("simd_multi_char_class"))
     )
 
