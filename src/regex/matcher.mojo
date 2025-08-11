@@ -200,6 +200,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_all(text)
 
 
+@always_inline
 fn _is_wildcard_match_any(pattern: String) -> Bool:
     """Check if pattern is exactly .* which matches any string.
 
