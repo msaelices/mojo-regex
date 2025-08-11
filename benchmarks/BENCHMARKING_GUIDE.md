@@ -7,11 +7,11 @@ This directory contains a comprehensive benchmarking system to compare the perfo
 The benchmarking system consists of:
 
 ### Core Benchmark Suites
-1. **bench_engine.mojo** & **bench_engine.py** - Main regex engine benchmarks
+1. **bench_engine.mojo** & **python/bench_engine.py** - Main regex engine benchmarks
    - Comprehensive test coverage for all regex features
    - Performance comparison across various pattern types
 
-2. **simd_focused_benchmark.mojo** & **simd_focused_benchmark.py** - SIMD optimization benchmarks
+2. **simd_focused_benchmark.mojo** & **python/simd_focused_benchmark.py** - SIMD optimization benchmarks
    - Direct NFA engine testing
    - Focus on character class operations that benefit from SIMD
 
@@ -106,8 +106,8 @@ You can also run the benchmark pipeline components individually:
 
 ```bash
 # Run only Python benchmarks
-python3 benchmarks/bench_engine.py
-python3 benchmarks/simd_focused_benchmark.py
+python3 benchmarks/python/bench_engine.py
+python3 benchmarks/python/simd_focused_benchmark.py
 
 # Run only Mojo benchmarks
 mojo run benchmarks/bench_engine.mojo
