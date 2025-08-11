@@ -798,11 +798,11 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
         # Extract the OR node
-        var or_node_opt = _find_or_node(ast)
+        ref or_node_opt = _find_or_node(ast)
         if not or_node_opt:
             raise Error("No OR node found in alternation pattern")
 
-        var or_node = or_node_opt.value()
+        ref or_node = or_node_opt.value()
 
         # Create accepting state that all branches will lead to
         var accepting_state = DFAState(is_accepting=True, match_length=0)
@@ -810,11 +810,11 @@ struct DFAEngine(Engine):
         var accepting_index = len(self.states) - 1
 
         # Collect all branch texts (flattening nested OR structures)
-        var all_branches = _collect_all_alternation_branches(or_node)
+        ref all_branches = _collect_all_alternation_branches(or_node)
 
         # Build trie-like DFA structure to handle shared prefixes
         for i in range(len(all_branches)):
-            var branch_text = all_branches[i]
+            ref branch_text = all_branches[i]
             if len(branch_text) == 0:
                 continue
 
@@ -857,7 +857,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
         # Navigate to the quantified group: RE -> GROUP -> GROUP (with quantifier)
-        var outer_group = ast.get_child(0)  # First GROUP
+        ref outer_group = ast.get_child(0)  # First GROUP
         var inner_group = outer_group.get_child(
             0
         )  # Second GROUP (with quantifier)
@@ -866,7 +866,7 @@ struct DFAEngine(Engine):
         var max_matches = inner_group.max
 
         # Extract the literal text from the group
-        var group_text = _extract_group_text(inner_group)
+        ref group_text = _extract_group_text(inner_group)
         if len(group_text) == 0:
             raise Error("Empty quantified group")
 
