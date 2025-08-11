@@ -133,28 +133,56 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_all(text)
 
 
-fn _is_simple_anchor_only(pattern: String) -> Bool:
-    """Check if pattern is a simple anchor-only pattern that won't benefit from prefilters.
+fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
+    """Check if pattern is too simple to benefit from prefilter analysis.
+    
+    This function identifies patterns that are so simple that the overhead of 
+    prefilter analysis exceeds any potential benefit. These patterns include:
+    - Very short literals (≤ 6 chars)
+    - Simple anchored patterns  
+    - Patterns with only basic regex characters (no complex constructs)
     
     Args:
         pattern: The regex pattern string.
         
     Returns:
-        True if this is a simple anchored pattern like '^a', 'a$', '^a$'.
+        True if prefilter analysis should be skipped for performance.
     """
-    # Patterns starting with ^ or ending with $ that are very short
+    var pattern_len = len(pattern)
+    
+    # Skip very short patterns - prefilter overhead exceeds benefit
+    if pattern_len <= 6:
+        return True
+    
+    # Skip simple anchored patterns
     var has_start_anchor = pattern.startswith("^")
     var has_end_anchor = pattern.endswith("$")
     
     if has_start_anchor or has_end_anchor:
-        # For anchored patterns, check if the content is very simple
+        # For anchored patterns, check if the content is simple
         var content_start = 1 if has_start_anchor else 0
-        var content_end = len(pattern) - (1 if has_end_anchor else 0)
+        var content_end = pattern_len - (1 if has_end_anchor else 0)
         var content_length = content_end - content_start
         
-        # Very short anchored patterns (like "^a", "a$", "^a$") won't benefit from prefilters
-        return content_length <= 3
+        # Anchored patterns with simple content won't benefit from prefilters
+        if content_length <= 8:
+            return True
     
+    # Skip patterns that appear to be simple literals (no regex metacharacters)
+    # This is a fast heuristic check to avoid expensive analysis
+    var has_regex_chars = False
+    for i in range(pattern_len):
+        var c = pattern[i]
+        if (c == '.' or c == '*' or c == '+' or c == '?' or 
+            c == '|' or c == '(' or c == ')' or c == '[' or c == ']' or
+            c == '{' or c == '}' or c == '\\'):
+            has_regex_chars = True
+            break
+    
+    # If no regex metacharacters and pattern is short, skip prefilter
+    if not has_regex_chars and pattern_len <= 12:
+        return True
+        
     return False
 
 
@@ -184,8 +212,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         var ast = parse(pattern)
 
         # Early optimization: Skip prefilter analysis for very simple patterns
-        # that are unlikely to benefit (short literals, pure anchors)
-        var should_analyze_prefilter = len(pattern) > 2 and not _is_simple_anchor_only(pattern)
+        # that are unlikely to benefit from the overhead
+        var should_analyze_prefilter = not _is_simple_pattern_skip_prefilter(pattern)
         
         if should_analyze_prefilter:
             # Extract literal information for prefilter optimization
@@ -257,26 +285,15 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """
         # Fast path: Exact literal bypass (only for non-anchored patterns)
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var best_literal = self.literal_info.get_best_required_literal()
-            if best_literal:
-                var literal = best_literal.value()
-                var pos = text.find(literal, start)
-                if pos != -1:
-                    return Match(0, pos, pos + len(literal), text)
-                return None
+            # Disabled for now to isolate performance issue
+            # TODO: Fix exact literal bypass performance
+            pass
 
         # Prefilter path: Use literal scanning for candidates (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
-            var candidate_pos = self.prefilter.value().find_first_candidate(text, start)
-            if not candidate_pos:
-                return None  # No candidates found
-            
-            var search_start = candidate_pos.value()
-            # Use appropriate engine for the filtered position
-            if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
-                return self.dfa_matcher.value().match_next(text, search_start)
-            else:
-                return self.nfa_matcher.match_next(text, search_start)
+            # Disabled for now to isolate performance issue
+            # TODO: Fix prefilter performance issue
+            pass
 
         # Standard path: Regular matching without prefilters
         if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
@@ -290,37 +307,15 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Find all matches using optimal engine."""
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var matches = List[Match, hint_trivial_type=True]()
-            var best_literal = self.literal_info.get_best_required_literal()
-            if best_literal:
-                var literal = best_literal.value()
-                var start = 0
-                while start <= len(text) - len(literal):
-                    var pos = text.find(literal, start)
-                    if pos == -1:
-                        break
-                    matches.append(Match(0, pos, pos + len(literal), text))
-                    start = pos + 1  # Move past this match for overlapping search
-            return matches^
+            # For now, fall back to regular matching to isolate the performance issue
+            # TODO: Fix exact literal bypass performance
+            pass
 
         # Prefilter path: Use candidate positions (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
-            var matches = List[Match, hint_trivial_type=True]()
-            var candidates = self.prefilter.value().find_candidates(text)
-
-            for i in range(len(candidates)):
-                var candidate_pos = candidates[i]
-                var match_result: Optional[Match]
-
-                if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
-                    match_result = self.dfa_matcher.value().match_next(text, candidate_pos)
-                else:
-                    match_result = self.nfa_matcher.match_next(text, candidate_pos)
-
-                if match_result:
-                    matches.append(match_result.value())
-
-            return matches^
+            # Disabled for now to isolate performance issue
+            # TODO: Fix prefilter performance issue
+            pass
 
         # Standard path: Use regular engine matching
         if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
@@ -344,9 +339,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             base_engine = "NFA"
 
         # Add optimization information
-        if self.is_exact_literal and not self.literal_info.has_anchors:
-            return base_engine + "+ExactLiteral"
-        elif self.prefilter and not self.literal_info.has_anchors:
+        # Temporarily disabled exact literal reporting while fixing performance issue
+        if self.prefilter and not self.literal_info.has_anchors:
             return base_engine + "+Prefilter"
         else:
             return base_engine
