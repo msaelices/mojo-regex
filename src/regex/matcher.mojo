@@ -234,7 +234,6 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     # Check for regex metacharacters
     var has_quantifiers = False
     var has_alternation = False
-    var has_char_classes = False
     var has_anchors = False
     var has_wildcards = False
 
@@ -244,8 +243,6 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
             has_quantifiers = True
         elif c == "|":
             has_alternation = True
-        elif c == "[" or c == "]":
-            has_char_classes = True
         elif c == "^" and i == 0:
             has_anchors = True
         elif c == "$" and i == pattern_len - 1:
