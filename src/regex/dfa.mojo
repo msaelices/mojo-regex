@@ -1266,6 +1266,140 @@ struct DFAEngine(Engine):
             if i != ord("\n"):  # Wildcard doesn't match newline by default
                 self.states[0].add_transition(i, accepting_index)
 
+    fn compile_common_prefix_alternation(
+        mut self, ast: ASTNode[MutableAnyOrigin]
+    ) raises:
+        """Compile common prefix alternation patterns like (hello|help|helicopter) into a DFA.
+
+        Creates a trie-like DFA structure that shares common prefixes and branches for suffixes.
+
+        Args:
+            ast: AST node representing the common prefix alternation pattern.
+        """
+        from regex.ast import RE, GROUP, OR
+
+        # Clear existing states
+        self.states.clear()
+
+        # Create start state
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+
+        # Navigate to the OR structure inside the group
+        # Pattern structure: RE -> GROUP -> GROUP -> OR tree
+        var outer_group = ast.get_child(0)  # Outer GROUP
+        var inner_group = outer_group.get_child(0)  # Inner GROUP
+        var or_node = inner_group.get_child(0)  # OR node
+
+        # Extract all alternation branches
+        var branches = List[String]()
+        self._extract_all_prefix_branches(or_node, branches)
+
+        # Build trie-like DFA structure
+        self._build_prefix_trie(branches)
+
+    fn _extract_all_prefix_branches(
+        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    ):
+        """Extract all string branches from nested OR structure."""
+        from regex.ast import OR, GROUP, ELEMENT
+
+        if node.type == OR:
+            # Get left and right children
+            var left_child = node.get_child(0)
+            var right_child = node.get_child(1)
+
+            # Recursively process both sides
+            self._extract_all_prefix_branches(left_child, branches)
+            self._extract_all_prefix_branches(right_child, branches)
+        elif node.type == GROUP:
+            # Extract string from GROUP of ELEMENTs
+            var branch_text = String("")
+            for i in range(node.get_children_len()):
+                var element = node.get_child(i)
+                if element.type == ELEMENT:
+                    var char_value = element.get_value().value()
+                    branch_text += String(char_value)
+            branches.append(branch_text)
+
+    fn _build_prefix_trie(mut self, branches: List[String]) raises:
+        """Build a trie-like DFA structure from alternation branches."""
+        if len(branches) == 0:
+            return
+
+        # Find the common prefix among all branches
+        var common_prefix = self._find_common_prefix(branches)
+        var prefix_len = len(common_prefix)
+
+        # Build states for the common prefix
+        var current_state = 0
+        for i in range(prefix_len):
+            var char_code = ord(common_prefix[i])
+            var next_state_index = self._find_or_create_state(
+                current_state, char_code
+            )
+            current_state = next_state_index
+
+        # Process each branch after common prefix
+        for i in range(len(branches)):
+            var branch = branches[i]
+            if len(branch) == prefix_len:
+                # Branch ends at common prefix - make current state accepting
+                self.states[current_state].is_accepting = True
+            else:
+                # Branch continues - build suffix directly
+                var suffix = branch[prefix_len:]
+                var suffix_current_state = current_state
+
+                for j in range(len(suffix)):
+                    var char_code = ord(suffix[j])
+
+                    if j == len(suffix) - 1:
+                        # Last character - create or mark accepting state
+                        var target_state = self._find_or_create_state(
+                            suffix_current_state, char_code
+                        )
+                        self.states[target_state].is_accepting = True
+                    else:
+                        # Intermediate character
+                        suffix_current_state = self._find_or_create_state(
+                            suffix_current_state, char_code
+                        )
+
+    fn _find_common_prefix(self, branches: List[String]) -> String:
+        """Find the longest common prefix among all branches."""
+        if len(branches) == 0:
+            return String("")
+        if len(branches) == 1:
+            return branches[0]
+
+        var prefix = String("")
+        var first_branch = branches[0]
+        var min_length = len(first_branch)
+
+        # Find minimum length
+        for i in range(1, len(branches)):
+            if len(branches[i]) < min_length:
+                min_length = len(branches[i])
+
+        # Find common prefix
+        for pos in range(min_length):
+            var char_at_pos = first_branch[pos]
+            var all_match = True
+
+            for i in range(1, len(branches)):
+                if branches[i][pos] != char_at_pos:
+                    all_match = False
+                    break
+
+            if all_match:
+                prefix += String(char_at_pos)
+            else:
+                break
+
+        return prefix
+
     @always_inline
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
@@ -1831,6 +1965,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     elif _is_wildcard_quantifier_pattern(ast):
         # Handle wildcard quantifier patterns like .*, .+, .?
         dfa.compile_wildcard_quantifier(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
+    elif _is_common_prefix_alternation_pattern(ast):
+        # Handle common prefix alternation patterns like (hello|help|helicopter)
+        dfa.compile_common_prefix_alternation(ast)
         # Check for anchors in the original pattern
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.has_start_anchor = has_start
@@ -2574,3 +2715,108 @@ fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         or (wildcard.min == 0 and wildcard.max == 1)  # +
         or (wildcard.min == 1 and wildcard.max == 1)  # ?  # single dot
     )
+
+
+fn _is_common_prefix_alternation_pattern(
+    ast: ASTNode[MutableAnyOrigin],
+) -> Bool:
+    """Check if pattern is a common prefix alternation like (hello|help|helicopter).
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a common prefix alternation pattern.
+    """
+    from regex.ast import RE, GROUP, OR, ELEMENT
+
+    # Pattern should be RE -> GROUP -> GROUP -> OR tree
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var outer_group = ast.get_child(0)
+    if outer_group.type != GROUP or outer_group.get_children_len() != 1:
+        return False
+
+    var inner_group = outer_group.get_child(0)
+    if inner_group.type != GROUP or inner_group.get_children_len() != 1:
+        return False
+
+    var or_node = inner_group.get_child(0)
+    if or_node.type != OR:
+        return False
+
+    # Check if this is a literal-only alternation with potential common prefix
+    # Extract all branches and check for common prefix
+    var branches = List[String]()
+    if not _extract_literal_branches(or_node, branches):
+        return False
+
+    # Must have at least 2 branches
+    if len(branches) < 2:
+        return False
+
+    # Check if there's a meaningful common prefix (at least 2 characters)
+    var common_prefix = _compute_common_prefix(branches)
+    return len(common_prefix) >= 2
+
+
+fn _extract_literal_branches(
+    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+) -> Bool:
+    """Extract literal string branches from OR tree. Returns False if non-literal elements found.
+    """
+    from regex.ast import OR, GROUP, ELEMENT
+
+    if node.type == OR:
+        # Process both children
+        return _extract_literal_branches(
+            node.get_child(0), branches
+        ) and _extract_literal_branches(node.get_child(1), branches)
+    elif node.type == GROUP:
+        # Extract literal string from GROUP of ELEMENTs
+        var branch_text = String("")
+        for i in range(node.get_children_len()):
+            var element = node.get_child(i)
+            if element.type != ELEMENT:
+                return False  # Non-literal element found
+            var char_value = element.get_value().value()
+            branch_text += String(char_value)
+        branches.append(branch_text)
+        return True
+    else:
+        return False  # Unexpected node type
+
+
+fn _compute_common_prefix(branches: List[String]) -> String:
+    """Compute the longest common prefix among all branches."""
+    if len(branches) == 0:
+        return String("")
+    if len(branches) == 1:
+        return branches[0]
+
+    var prefix = String("")
+    var first_branch = branches[0]
+    var min_length = len(first_branch)
+
+    # Find minimum length
+    for i in range(1, len(branches)):
+        if len(branches[i]) < min_length:
+            min_length = len(branches[i])
+
+    # Find common prefix
+    for pos in range(min_length):
+        var char_at_pos = first_branch[pos]
+        var all_match = True
+
+        for i in range(1, len(branches)):
+            if branches[i][pos] != char_at_pos:
+                all_match = False
+                break
+
+        if all_match:
+            prefix += String(char_at_pos)
+        else:
+            break
+
+    return prefix

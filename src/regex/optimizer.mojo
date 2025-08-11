@@ -309,7 +309,12 @@ struct PatternAnalyzer:
             PatternComplexity of the alternation
         """
         if depth > 2:
-            # Deep nesting - too complex for simple DFA
+            # Check if this is a common prefix alternation before giving up
+            # These can be efficiently handled with trie-like DFA structures
+            if self._is_common_prefix_alternation_in_tree(ast):
+                # Common prefix alternation - can be handled by specialized DFA
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            # Otherwise, deep nesting - too complex for simple DFA
             return PatternComplexity(PatternComplexity.COMPLEX)
 
         var max_complexity = PatternComplexity(PatternComplexity.SIMPLE)
@@ -480,6 +485,88 @@ struct PatternAnalyzer:
                 return False
                 
         return True
+
+    fn _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
+        """Check if alternation tree represents a common prefix alternation.
+        
+        This checks if a (potentially deep) alternation tree like:
+        (hello|help|helicopter) represents branches with meaningful common prefixes.
+        
+        Args:
+            ast: OR node to analyze
+            
+        Returns:
+            True if this is a common prefix alternation that DFA can handle efficiently
+        """
+        from regex.ast import OR, GROUP, ELEMENT
+        
+        # Extract all literal branches from the OR tree
+        var branches = List[String]()
+        if not self._extract_literal_branches_from_tree(ast, branches):
+            return False
+        
+        # Must have at least 2 branches
+        if len(branches) < 2:
+            return False
+            
+        # Check if there's a meaningful common prefix (at least 2 characters)
+        var common_prefix = self._compute_common_prefix_in_optimizer(branches)
+        return len(common_prefix) >= 2
+
+    fn _extract_literal_branches_from_tree(self, node: ASTNode, mut branches: List[String]) -> Bool:
+        """Extract literal string branches from OR tree."""
+        from regex.ast import OR, GROUP, ELEMENT
+        
+        if node.type == OR:
+            # Process both children
+            return (self._extract_literal_branches_from_tree(node.get_child(0), branches) and 
+                    self._extract_literal_branches_from_tree(node.get_child(1), branches))
+        elif node.type == GROUP:
+            # Extract literal string from GROUP of ELEMENTs
+            var branch_text = String("")
+            for i in range(node.get_children_len()):
+                var element = node.get_child(i)
+                if element.type != ELEMENT:
+                    return False  # Non-literal element found
+                var char_value = element.get_value().value()
+                branch_text += String(char_value)
+            branches.append(branch_text)
+            return True
+        else:
+            return False  # Unexpected node type
+
+    fn _compute_common_prefix_in_optimizer(self, branches: List[String]) -> String:
+        """Compute the longest common prefix among all branches."""
+        if len(branches) == 0:
+            return String("")
+        if len(branches) == 1:
+            return branches[0]
+            
+        var prefix = String("")
+        var first_branch = branches[0]
+        var min_length = len(first_branch)
+        
+        # Find minimum length
+        for i in range(1, len(branches)):
+            if len(branches[i]) < min_length:
+                min_length = len(branches[i])
+        
+        # Find common prefix
+        for pos in range(min_length):
+            var char_at_pos = first_branch[pos]
+            var all_match = True
+            
+            for i in range(1, len(branches)):
+                if branches[i][pos] != char_at_pos:
+                    all_match = False
+                    break
+                    
+            if all_match:
+                prefix += String(char_at_pos)
+            else:
+                break
+                
+        return prefix
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
