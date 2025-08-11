@@ -581,43 +581,50 @@ struct PatternAnalyzer:
 
         return prefix
 
-    fn _is_quantified_alternation_group_in_optimizer(self, ast: ASTNode) -> Bool:
+    fn _is_quantified_alternation_group_in_optimizer(
+        self, ast: ASTNode
+    ) -> Bool:
         """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
-        
+
         This version is used by the optimizer to classify patterns.
-        
+
         Args:
             ast: GROUP node to analyze (not root AST node)
-            
+
         Returns:
             True if this group is a quantified alternation group.
         """
         from regex.ast import GROUP, OR, ELEMENT
-        
+
         # Must be quantified (not 1,1)
         if ast.min == 1 and ast.max == 1:
             return False
-        
+
         # Must have exactly one child that is an OR
         if ast.get_children_len() != 1:
             return False
-            
+
         var or_node = ast.get_child(0)
         if or_node.type != OR:
             return False
-        
+
         # Check if alternation contains only literal branches
         var branches = List[String]()
         return self._extract_literal_branches_from_or(or_node, branches)
 
-    fn _extract_literal_branches_from_or(self, node: ASTNode, mut branches: List[String]) -> Bool:
+    fn _extract_literal_branches_from_or(
+        self, node: ASTNode, mut branches: List[String]
+    ) -> Bool:
         """Extract literal branches from OR node for optimizer."""
         from regex.ast import OR, GROUP, ELEMENT
-        
+
         if node.type == OR:
             # Process both children
-            return (self._extract_literal_branches_from_or(node.get_child(0), branches) and 
-                    self._extract_literal_branches_from_or(node.get_child(1), branches))
+            return self._extract_literal_branches_from_or(
+                node.get_child(0), branches
+            ) and self._extract_literal_branches_from_or(
+                node.get_child(1), branches
+            )
         elif node.type == GROUP:
             # Extract literal string from GROUP of ELEMENTs
             var branch_text = String("")
