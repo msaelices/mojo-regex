@@ -155,12 +155,13 @@ struct PatternAnalyzer:
                 info.has_required_literal = True
                 info.required_literal_length = best.get_literal_len()
 
-        # Check for SIMD optimization opportunities
+        # Check for SIMD optimization opportunities - be more selective
         info.benefits_from_simd = self._check_simd_benefits(ast)
 
         # Determine suggested engine
         var complexity = self.classify(ast)
         if complexity.value == PatternComplexity.SIMPLE:
+            # For SIMPLE patterns, prefer pure DFA without SIMD overhead
             if info.has_literal_prefix and info.literal_prefix_length > 3:
                 info.suggested_engine = "DFA with literal prefilter"
             else:
@@ -178,6 +179,52 @@ struct PatternAnalyzer:
 
         return info^
 
+    fn should_use_pure_dfa(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+        """Determine if pattern should use pure DFA without SIMD integration.
+
+        Pure DFA is best for simple patterns where SIMD overhead exceeds benefits.
+
+        Args:
+            ast: The root AST node.
+
+        Returns:
+            True if pattern should use pure DFA without SIMD processing.
+        """
+        var complexity = self.classify(ast)
+        if complexity.value != PatternComplexity.SIMPLE:
+            return False
+
+        # Simple patterns with minimal character class usage should use pure DFA
+        var simd_node_count = self._count_simd_nodes(ast)
+
+        # If pattern has very few SIMD-benefiting nodes, use pure DFA
+        if simd_node_count <= 1:
+            return True
+
+        # Single quantified character classes like [0-9]+ should still use DFA
+        # when the pattern is otherwise simple
+        if simd_node_count == 1:
+            return self._is_single_quantified_char_class(ast)
+
+        return False
+
+    fn _is_single_quantified_char_class(self, ast: ASTNode) -> Bool:
+        """Check if pattern is a single quantified character class."""
+        from regex.ast import RE, RANGE, DIGIT, SPACE
+
+        if ast.type != RE:
+            return False
+
+        if ast.get_children_len() != 1:
+            return False
+
+        ref child = ast.get_child(0)
+        if child.type in (RANGE, DIGIT, SPACE):
+            # Check if it has a quantifier
+            return child.min != 1 or child.max != 1
+
+        return False
+
     fn _check_simd_benefits(self, ast: ASTNode) -> Bool:
         """Check if pattern would benefit from SIMD optimizations.
 
@@ -187,7 +234,11 @@ struct PatternAnalyzer:
         Returns:
             True if SIMD would provide significant benefits.
         """
-        return self._count_simd_nodes(ast) > 0
+        var simd_nodes = self._count_simd_nodes(ast)
+
+        # Only benefit from SIMD if there are multiple character class operations
+        # or complex quantified patterns. Simple single character classes should use DFA.
+        return simd_nodes > 2
 
     fn _count_simd_nodes(self, ast: ASTNode) -> Int:
         """Count nodes that benefit from SIMD optimization."""
@@ -331,12 +382,15 @@ struct PatternAnalyzer:
                 max_complexity = PatternComplexity(PatternComplexity.MEDIUM)
 
         # Simple alternation between simple patterns can often be handled by DFA
+        # But be more conservative - small alternations should not cause NFA fallback
         if (
             max_complexity.value == PatternComplexity.SIMPLE
-            and ast.get_children_len() <= 5
+            and ast.get_children_len()
+            <= 3  # Reduced from 5 to avoid NFA overhead
         ):
             return PatternComplexity(PatternComplexity.SIMPLE)
         else:
+            # Mark as MEDIUM instead of falling back, to avoid slow NFA path
             return PatternComplexity(PatternComplexity.MEDIUM)
 
     fn _analyze_group(self, ast: ASTNode, depth: Int) -> PatternComplexity:

@@ -236,6 +236,7 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     var has_alternation = False
     var has_anchors = False
     var has_wildcards = False
+    var has_character_classes = False
 
     for i in range(pattern_len):
         var c = pattern[i]
@@ -249,18 +250,23 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
             has_anchors = True
         elif c == ".":
             has_wildcards = True
+        elif c == "[":
+            has_character_classes = True
 
     # Patterns likely to yield poor prefilters (mostly single-char literals):
 
     # 1. Simple quantifiers on single characters (a*, a+, [0-9]+)
     #    These rarely have multi-char literals that are required
     if has_quantifiers and not has_alternation and not has_wildcards:
-        # Patterns like "a*", "a+", "[0-9]+" typically yield no useful literals
+        # Simple quantified character classes like [0-9]+ should skip prefilter
+        if has_character_classes and pattern_len <= 8:
+            return True
+        # Other simple quantified patterns like "a*", "a+"
         return True
 
     # 2. Simple alternations of single characters (a|b|c)
     #    These yield only single-char literals which aren't very selective
-    if has_alternation and pattern_len <= 8 and not has_wildcards:
+    if has_alternation and pattern_len <= 10 and not has_wildcards:
         # Short alternation patterns like "a|b|c" yield single-char literals
         var alternation_chars = 0
         for i in range(pattern_len):
@@ -273,7 +279,7 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
             return True
 
     # 3. Simple anchored patterns
-    if has_anchors and pattern_len <= 8:
+    if has_anchors and pattern_len <= 10:
         return True
 
     # Patterns likely to yield good prefilters:
@@ -283,11 +289,11 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
         return False
 
     # 2. Complex alternations that might have common prefixes
-    if has_alternation and pattern_len >= 10:
+    if has_alternation and pattern_len >= 12:
         return False
 
     # 3. Longer patterns are more likely to have useful literals
-    if pattern_len >= 12:
+    if pattern_len >= 15:
         return False
 
     # Default: skip analysis for patterns that don't match good prefilter criteria
@@ -312,6 +318,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """True if pattern matches only exact literals (can bypass regex entirely)."""
     var is_wildcard_match_any: Bool
     """True if pattern is exactly .* (matches any string)."""
+    var use_pure_dfa: Bool
+    """True if pattern should use pure DFA without SIMD integration."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -330,6 +338,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.prefilter = None
             self.complexity = PatternComplexity(PatternComplexity.SIMPLE)
             self.dfa_matcher = None
+            self.use_pure_dfa = False  # Special wildcard handling
             # Create minimal NFA matcher (required field, but won't be used)
             var dummy_ast = parse(
                 "a"
@@ -339,11 +348,19 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         var ast = parse(pattern)
 
+        # Analyze pattern complexity early
+        var analyzer = PatternAnalyzer()
+        self.complexity = analyzer.classify(ast)
+
+        # Check if pattern should use pure DFA
+        self.use_pure_dfa = analyzer.should_use_pure_dfa(ast)
+
         # Early optimization: Skip prefilter analysis for very simple patterns
         # that are unlikely to benefit from the overhead
-        var should_analyze_prefilter = not _is_simple_pattern_skip_prefilter(
-            pattern
-        )
+        var should_analyze_prefilter = (
+            not _is_simple_pattern_skip_prefilter(pattern)
+            and not self.use_pure_dfa
+        )  # Skip prefilter for pure DFA patterns
 
         if should_analyze_prefilter:
             # Extract literal information using optimized implementation
@@ -380,10 +397,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.is_exact_literal = False
             self.prefilter = None
 
-        # Analyze pattern complexity
-        var analyzer = PatternAnalyzer()
-        self.complexity = analyzer.classify(ast)
-
         # Always create NFA matcher as fallback
         self.nfa_matcher = NFAMatcher(ast, pattern)
 
@@ -406,6 +419,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.literal_info = other.literal_info
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
+        self.use_pure_dfa = other.use_pure_dfa
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -416,6 +430,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.literal_info = other.literal_info^
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
+        self.use_pure_dfa = other.use_pure_dfa
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
@@ -426,6 +441,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 return Match(0, start, len(text), text)
             else:
                 return None
+
+        # Prioritize DFA for SIMPLE patterns, especially pure DFA patterns
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
