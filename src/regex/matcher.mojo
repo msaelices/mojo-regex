@@ -133,6 +133,31 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_all(text)
 
 
+fn _is_simple_anchor_only(pattern: String) -> Bool:
+    """Check if pattern is a simple anchor-only pattern that won't benefit from prefilters.
+    
+    Args:
+        pattern: The regex pattern string.
+        
+    Returns:
+        True if this is a simple anchored pattern like '^a', 'a$', '^a$'.
+    """
+    # Patterns starting with ^ or ending with $ that are very short
+    var has_start_anchor = pattern.startswith("^")
+    var has_end_anchor = pattern.endswith("$")
+    
+    if has_start_anchor or has_end_anchor:
+        # For anchored patterns, check if the content is very simple
+        var content_start = 1 if has_start_anchor else 0
+        var content_end = len(pattern) - (1 if has_end_anchor else 0)
+        var content_length = content_end - content_start
+        
+        # Very short anchored patterns (like "^a", "a$", "^a$") won't benefit from prefilters
+        return content_length <= 3
+    
+    return False
+
+
 struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """Intelligent matcher that routes to optimal engine based on pattern complexity.
     """
@@ -158,15 +183,25 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """
         var ast = parse(pattern)
 
-        # Extract literal information for prefilter optimization
-        var literal_extractor = LiteralExtractor()
-        self.literal_info = literal_extractor.extract(ast)
+        # Early optimization: Skip prefilter analysis for very simple patterns
+        # that are unlikely to benefit (short literals, pure anchors)
+        var should_analyze_prefilter = len(pattern) > 2 and not _is_simple_anchor_only(pattern)
+        
+        if should_analyze_prefilter:
+            # Extract literal information for prefilter optimization
+            var literal_extractor = LiteralExtractor()
+            self.literal_info = literal_extractor.extract(ast)
 
-        # Check if this is an exact literal match that can bypass regex entirely
-        self.is_exact_literal = self.literal_info.is_exact_match
+            # Check if this is an exact literal match that can bypass regex entirely
+            self.is_exact_literal = self.literal_info.is_exact_match
 
-        # Create prefilter if beneficial
-        self.prefilter = create_prefilter(self.literal_info)
+            # Create prefilter if beneficial
+            self.prefilter = create_prefilter(self.literal_info)
+        else:
+            # Initialize with empty info for simple patterns
+            self.literal_info = LiteralInfo()
+            self.is_exact_literal = False
+            self.prefilter = None
 
         # Analyze pattern complexity
         var analyzer = PatternAnalyzer()
@@ -203,6 +238,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.literal_info = other.literal_info^
         self.is_exact_literal = other.is_exact_literal
 
+
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -219,65 +255,42 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
-        # Fast path: For exact literal patterns without anchors, bypass regex engine entirely
-        if (
-            self.is_exact_literal
-            and self.literal_info.has_prefilter_candidates()
-            and not self.literal_info.has_anchors
-        ):
+        # Fast path: Exact literal bypass (only for non-anchored patterns)
+        if self.is_exact_literal and not self.literal_info.has_anchors:
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
                 var pos = text.find(literal, start)
                 if pos != -1:
                     return Match(0, pos, pos + len(literal), text)
-                else:
-                    return None
-
-        # Use prefilter to find candidates if available (but not for anchored patterns)
-        if self.prefilter and not self.literal_info.has_anchors:
-            var prefilter_ref = self.prefilter.value()
-            var candidate_pos = prefilter_ref.find_first_candidate(text, start)
-            if not candidate_pos:
-                # No candidates found by prefilter, no match possible
                 return None
 
-            # Try regex engines starting from candidate position
+        # Prefilter path: Use literal scanning for candidates (non-anchored only)
+        if self.prefilter and not self.literal_info.has_anchors:
+            var candidate_pos = self.prefilter.value().find_first_candidate(text, start)
+            if not candidate_pos:
+                return None  # No candidates found
+            
             var search_start = candidate_pos.value()
-
-            if (
-                self.dfa_matcher
-                and self.complexity.value == PatternComplexity.SIMPLE
-            ):
-                # Use high-performance DFA for simple patterns
+            # Use appropriate engine for the filtered position
+            if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
                 return self.dfa_matcher.value().match_next(text, search_start)
             else:
-                # Fall back to NFA for complex patterns
                 return self.nfa_matcher.match_next(text, search_start)
+
+        # Standard path: Regular matching without prefilters
+        if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+            return self.dfa_matcher.value().match_next(text, start)
         else:
-            # No prefilter available, use regular matching
-            if (
-                self.dfa_matcher
-                and self.complexity.value == PatternComplexity.SIMPLE
-            ):
-                # Use high-performance DFA for simple patterns
-                return self.dfa_matcher.value().match_next(text, start)
-            else:
-                # Fall back to NFA for complex patterns
-                return self.nfa_matcher.match_next(text, start)
+            return self.nfa_matcher.match_next(text, start)
 
     fn match_all(
         self, text: String
     ) raises -> List[Match, hint_trivial_type=True]:
         """Find all matches using optimal engine."""
-        var matches = List[Match, hint_trivial_type=True]()
-
-        # Fast path: For exact literal patterns without anchors, find all occurrences directly
-        if (
-            self.is_exact_literal
-            and self.literal_info.has_prefilter_candidates()
-            and not self.literal_info.has_anchors
-        ):
+        # Fast path: Exact literal patterns without anchors
+        if self.is_exact_literal and not self.literal_info.has_anchors:
+            var matches = List[Match, hint_trivial_type=True]()
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
@@ -287,50 +300,33 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                     if pos == -1:
                         break
                     matches.append(Match(0, pos, pos + len(literal), text))
-                    start = (
-                        pos + 1
-                    )  # Move past this match for overlapping search
-                return matches^
+                    start = pos + 1  # Move past this match for overlapping search
+            return matches^
 
-        # Use prefilter to find candidates if available (but not for anchored patterns)
+        # Prefilter path: Use candidate positions (non-anchored only)
         if self.prefilter and not self.literal_info.has_anchors:
-            var prefilter_ref = self.prefilter.value()
-            var candidates = prefilter_ref.find_candidates(text)
+            var matches = List[Match, hint_trivial_type=True]()
+            var candidates = self.prefilter.value().find_candidates(text)
 
-            # For each candidate position, try to match with regex engine
             for i in range(len(candidates)):
                 var candidate_pos = candidates[i]
                 var match_result: Optional[Match]
 
-                if (
-                    self.dfa_matcher
-                    and self.complexity.value == PatternComplexity.SIMPLE
-                ):
-                    # Use high-performance DFA for simple patterns
-                    match_result = self.dfa_matcher.value().match_next(
-                        text, candidate_pos
-                    )
+                if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+                    match_result = self.dfa_matcher.value().match_next(text, candidate_pos)
                 else:
-                    # Fall back to NFA for complex patterns
-                    match_result = self.nfa_matcher.match_next(
-                        text, candidate_pos
-                    )
+                    match_result = self.nfa_matcher.match_next(text, candidate_pos)
 
                 if match_result:
                     matches.append(match_result.value())
 
             return matches^
+
+        # Standard path: Use regular engine matching
+        if self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE:
+            return self.dfa_matcher.value().match_all(text)
         else:
-            # No prefilter available, use regular matching
-            if (
-                self.dfa_matcher
-                and self.complexity.value == PatternComplexity.SIMPLE
-            ):
-                # Use high-performance DFA for simple patterns
-                return self.dfa_matcher.value().match_all(text)
-            else:
-                # Fall back to NFA for complex patterns
-                return self.nfa_matcher.match_all(text)
+            return self.nfa_matcher.match_all(text)
 
     fn get_engine_type(self) -> String:
         """Get the type of engine being used (for debugging/profiling).
@@ -347,10 +343,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             base_engine = "NFA"
 
-        # Add prefilter information
-        if self.is_exact_literal:
+        # Add optimization information
+        if self.is_exact_literal and not self.literal_info.has_anchors:
             return base_engine + "+ExactLiteral"
-        elif self.prefilter:
+        elif self.prefilter and not self.literal_info.has_anchors:
             return base_engine + "+Prefilter"
         else:
             return base_engine
