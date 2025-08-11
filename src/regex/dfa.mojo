@@ -831,7 +831,9 @@ struct DFAEngine(Engine):
                     )
                 else:
                     # Intermediate character - find existing state or create new one
-                    var next_state_index = self._find_or_create_state(current_state_index, char_code)
+                    var next_state_index = self._find_or_create_state(
+                        current_state_index, char_code
+                    )
                     current_state_index = next_state_index
 
     fn compile_quantified_group(
@@ -978,16 +980,18 @@ struct DFAEngine(Engine):
 
     fn _find_or_create_state(mut self, from_state: Int, char_code: Int) -> Int:
         """Find existing state for transition or create new one.
-        
+
         Args:
             from_state: Source state index.
             char_code: Character code for the transition.
-            
+
         Returns:
             State index for the target of this transition.
         """
         # Check if transition already exists
-        var existing_target = Int(self.states[from_state].transitions[char_code])
+        var existing_target = Int(
+            self.states[from_state].transitions[char_code]
+        )
         if existing_target != 255:  # 255 is -1 in uint8
             # Transition already exists, reuse the target state
             return existing_target
@@ -1948,8 +1952,9 @@ fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     if ast.type == OR:
         return _is_simple_alternation_branches(ast)
 
-    # Search for OR node within nested structure
-    return _find_and_check_or_node(ast)
+    # Only allow simple patterns: RE -> GROUP -> OR or RE -> OR
+    # Don't handle complex patterns mixed with wildcards, etc.
+    return _is_pure_alternation_pattern(ast)
 
 
 fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
@@ -2184,3 +2189,38 @@ fn _collect_all_alternation_branches(
                 branches.append(branch_text)
 
     return branches
+
+
+fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a pure alternation without other complex operators.
+
+    Only allows simple structures like:
+    - RE -> OR (direct alternation: a|b)
+    - RE -> GROUP -> OR (grouped alternation: (a|b))
+
+    Rejects complex patterns like .*(a|b), (a|b)+, etc.
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a pure simple alternation.
+    """
+    from regex.ast import RE, OR, GROUP
+
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var child = ast.get_child(0)
+
+    # Case 1: RE -> OR (direct alternation)
+    if child.type == OR:
+        return _is_simple_alternation_branches(child)
+
+    # Case 2: RE -> GROUP -> OR (grouped alternation)
+    if child.type == GROUP and child.get_children_len() == 1:
+        var grandchild = child.get_child(0)
+        if grandchild.type == OR:
+            return _is_simple_alternation_branches(grandchild)
+
+    return False
