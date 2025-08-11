@@ -1407,6 +1407,189 @@ struct DFAEngine(Engine):
         self.states.append(state)
         self.start_state = 0
 
+    fn compile_quantified_alternation_group(
+        mut self, ast: ASTNode[MutableAnyOrigin]
+    ) raises:
+        """Compile quantified alternation groups like (a|b)*, (cat|dog)+ into a DFA.
+
+        Creates a state machine that loops through alternation choices with quantifier behavior.
+
+        Args:
+            ast: AST node representing the quantified alternation group pattern.
+        """
+        from regex.ast import RE, GROUP, OR
+
+        # Clear existing states
+        self.states.clear()
+
+        # Create start state
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+
+        # Navigate to the quantified group and alternation
+        # Pattern structure: RE -> GROUP -> GROUP(quantified) -> OR
+        var outer_group = ast.get_child(0)  # Outer GROUP
+        var quantified_group = outer_group.get_child(0)  # Quantified GROUP
+        var or_node = quantified_group.get_child(0)  # OR node
+
+        # Extract quantifier information
+        var quantifier_min = quantified_group.min
+        var quantifier_max = quantified_group.max
+
+        # Extract alternation branches
+        var branches = List[String]()
+        self._extract_all_alternation_branches_for_quantified(or_node, branches)
+
+        # Handle different quantifier types
+        if quantifier_min == 0 and quantifier_max == 1:
+            # Optional: (a|b)?
+            self._compile_quantified_alternation_optional(branches)
+        elif quantifier_min == 0 and quantifier_max == -1:
+            # Zero or more: (a|b)*
+            self._compile_quantified_alternation_zero_or_more(branches)
+        elif quantifier_min == 1 and quantifier_max == -1:
+            # One or more: (a|b)+
+            self._compile_quantified_alternation_one_or_more(branches)
+        else:
+            raise Error(
+                "Unsupported quantifier type for quantified alternation group"
+            )
+
+    fn _extract_all_alternation_branches_for_quantified(
+        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    ):
+        """Extract all string branches from alternation for quantified groups.
+        """
+        from regex.ast import OR, GROUP, ELEMENT
+
+        if node.type == OR:
+            # Get left and right children
+            var left_child = node.get_child(0)
+            var right_child = node.get_child(1)
+
+            # Recursively process both sides
+            self._extract_all_alternation_branches_for_quantified(
+                left_child, branches
+            )
+            self._extract_all_alternation_branches_for_quantified(
+                right_child, branches
+            )
+        elif node.type == GROUP:
+            # Extract string from GROUP of ELEMENTs
+            var branch_text = String("")
+            for i in range(node.get_children_len()):
+                var element = node.get_child(i)
+                if element.type == ELEMENT:
+                    var char_value = element.get_value().value()
+                    branch_text += String(char_value)
+            branches.append(branch_text)
+
+    fn _compile_quantified_alternation_optional(
+        mut self, branches: List[String]
+    ) raises:
+        """Compile (a|b)? - match one of the alternation branches 0 or 1 times.
+        """
+        # Start state is accepting (0 matches)
+        self.states[0].is_accepting = True
+
+        # Create accepting state for matches
+        var accepting_state = DFAState(is_accepting=True)
+        self.states.append(accepting_state)
+        var accepting_index = len(self.states) - 1
+
+        # Add paths for each branch
+        for i in range(len(branches)):
+            var branch = branches[i]
+            var current_state = 0
+
+            for j in range(len(branch)):
+                var char_code = ord(branch[j])
+
+                if j == len(branch) - 1:
+                    # Last character - go to accepting state
+                    self.states[current_state].add_transition(
+                        char_code, accepting_index
+                    )
+                else:
+                    # Intermediate character - find or create state
+                    current_state = self._find_or_create_state(
+                        current_state, char_code
+                    )
+
+    fn _compile_quantified_alternation_zero_or_more(
+        mut self, branches: List[String]
+    ) raises:
+        """Compile (a|b)* - match any of the alternation branches 0 or more times.
+        """
+        # Start state is accepting (0 matches)
+        self.states[0].is_accepting = True
+
+        # For each branch, create path that loops back to start
+        for i in range(len(branches)):
+            var branch = branches[i]
+            var current_state = 0
+
+            for j in range(len(branch)):
+                var char_code = ord(branch[j])
+
+                if j == len(branch) - 1:
+                    # Last character - loop back to start for more matches
+                    self.states[current_state].add_transition(char_code, 0)
+                else:
+                    # Intermediate character - find or create state
+                    current_state = self._find_or_create_state(
+                        current_state, char_code
+                    )
+
+    fn _compile_quantified_alternation_one_or_more(
+        mut self, branches: List[String]
+    ) raises:
+        """Compile (a|b)+ - match any of the alternation branches 1 or more times.
+        """
+        # Create an accepting state that can loop
+        var loop_state = DFAState(is_accepting=True)
+        self.states.append(loop_state)
+        var loop_index = len(self.states) - 1
+
+        # For each branch, create path to loop state
+        for i in range(len(branches)):
+            var branch = branches[i]
+            var current_state = 0
+
+            for j in range(len(branch)):
+                var char_code = ord(branch[j])
+
+                if j == len(branch) - 1:
+                    # Last character - go to loop state
+                    self.states[current_state].add_transition(
+                        char_code, loop_index
+                    )
+                else:
+                    # Intermediate character - find or create state
+                    current_state = self._find_or_create_state(
+                        current_state, char_code
+                    )
+
+        # From loop state, can match any branch again (loop back through each branch)
+        for i in range(len(branches)):
+            var branch = branches[i]
+            var current_state = loop_index
+
+            for j in range(len(branch)):
+                var char_code = ord(branch[j])
+
+                if j == len(branch) - 1:
+                    # Last character - back to loop state
+                    self.states[current_state].add_transition(
+                        char_code, loop_index
+                    )
+                else:
+                    # Intermediate character - find or create state
+                    current_state = self._find_or_create_state(
+                        current_state, char_code
+                    )
+
     fn _try_enable_simd_for_sequence(
         mut self, sequence_info: SequentialPatternInfo
     ):
@@ -1972,6 +2155,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     elif _is_common_prefix_alternation_pattern(ast):
         # Handle common prefix alternation patterns like (hello|help|helicopter)
         dfa.compile_common_prefix_alternation(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
+    elif _is_quantified_alternation_group(ast):
+        # Handle quantified alternation groups like (a|b)*, (cat|dog)+
+        dfa.compile_quantified_alternation_group(ast)
         # Check for anchors in the original pattern
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.has_start_anchor = has_start
@@ -2820,3 +3010,70 @@ fn _compute_common_prefix(branches: List[String]) -> String:
             break
 
     return prefix
+
+
+fn _is_quantified_alternation_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a quantified alternation group.
+    """
+    from regex.ast import RE, GROUP, OR
+
+    # Pattern should be RE -> GROUP -> GROUP(quantified) -> OR
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var outer_group = ast.get_child(0)
+    if outer_group.type != GROUP or outer_group.get_children_len() != 1:
+        return False
+
+    var quantified_group = outer_group.get_child(0)
+    if (
+        quantified_group.type != GROUP
+        or quantified_group.get_children_len() != 1
+    ):
+        return False
+
+    # Must have quantifier (not 1,1)
+    if quantified_group.min == 1 and quantified_group.max == 1:
+        return False
+
+    # Must contain alternation
+    var or_node = quantified_group.get_child(0)
+    if or_node.type != OR:
+        return False
+
+    # Check if alternation contains only literal branches
+    var branches = List[String]()
+    return _extract_literal_alternation_branches(or_node, branches)
+
+
+fn _extract_literal_alternation_branches(
+    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+) -> Bool:
+    """Extract literal branches from alternation. Returns False if non-literal elements found.
+    """
+    from regex.ast import OR, GROUP, ELEMENT
+
+    if node.type == OR:
+        # Process both children
+        return _extract_literal_alternation_branches(
+            node.get_child(0), branches
+        ) and _extract_literal_alternation_branches(node.get_child(1), branches)
+    elif node.type == GROUP:
+        # Extract literal string from GROUP of ELEMENTs
+        var branch_text = String("")
+        for i in range(node.get_children_len()):
+            var element = node.get_child(i)
+            if element.type != ELEMENT:
+                return False  # Non-literal element found
+            var char_value = element.get_value().value()
+            branch_text += String(char_value)
+        branches.append(branch_text)
+        return True
+    else:
+        return False  # Unexpected node type

@@ -364,6 +364,9 @@ struct PatternAnalyzer:
             if self._is_simple_quantified_group(ast):
                 # Simple quantified groups with literal content can use DFA
                 pass  # Continue analysis below
+            elif self._is_quantified_alternation_group_in_optimizer(ast):
+                # Quantified alternation groups like (a|b)* can use DFA
+                return PatternComplexity(PatternComplexity.SIMPLE)
             else:
                 # Complex quantified groups still need NFA
                 return PatternComplexity(PatternComplexity.MEDIUM)
@@ -577,6 +580,57 @@ struct PatternAnalyzer:
                 break
 
         return prefix
+
+    fn _is_quantified_alternation_group_in_optimizer(self, ast: ASTNode) -> Bool:
+        """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
+        
+        This version is used by the optimizer to classify patterns.
+        
+        Args:
+            ast: GROUP node to analyze (not root AST node)
+            
+        Returns:
+            True if this group is a quantified alternation group.
+        """
+        from regex.ast import GROUP, OR, ELEMENT
+        
+        # Must be quantified (not 1,1)
+        if ast.min == 1 and ast.max == 1:
+            return False
+        
+        # Must have exactly one child that is an OR
+        if ast.get_children_len() != 1:
+            return False
+            
+        var or_node = ast.get_child(0)
+        if or_node.type != OR:
+            return False
+        
+        # Check if alternation contains only literal branches
+        var branches = List[String]()
+        return self._extract_literal_branches_from_or(or_node, branches)
+
+    fn _extract_literal_branches_from_or(self, node: ASTNode, mut branches: List[String]) -> Bool:
+        """Extract literal branches from OR node for optimizer."""
+        from regex.ast import OR, GROUP, ELEMENT
+        
+        if node.type == OR:
+            # Process both children
+            return (self._extract_literal_branches_from_or(node.get_child(0), branches) and 
+                    self._extract_literal_branches_from_or(node.get_child(1), branches))
+        elif node.type == GROUP:
+            # Extract literal string from GROUP of ELEMENTs
+            var branch_text = String("")
+            for i in range(node.get_children_len()):
+                var element = node.get_child(i)
+                if element.type != ELEMENT:
+                    return False  # Non-literal element found
+                var char_value = element.get_value().value()
+                branch_text += String(char_value)
+            branches.append(branch_text)
+            return True
+        else:
+            return False  # Unexpected node type
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
