@@ -45,6 +45,12 @@ from regex.aliases import (
 alias SIMD_WIDTH = simdwidthof[DType.uint8]()
 alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
+# Shuffle optimization thresholds
+# Below this size, simple lookup is faster than shuffle
+alias SHUFFLE_MIN_SIZE = 4
+# Above this size, shuffle becomes inefficient due to sparsity
+alias SHUFFLE_MAX_SIZE = 32
+
 
 @register_passable("trivial")
 struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
@@ -66,10 +72,15 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         self.size_hint = len(char_class)
 
-        # Use shuffle optimization for larger character classes (empirically determined threshold)
+        # Use shuffle optimization for medium-sized character classes
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
-        # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
+        # For large classes (>32 chars like alphanumeric with 62 chars), shuffle becomes inefficient
+        # Optimal range for shuffle: SHUFFLE_MIN_SIZE-SHUFFLE_MAX_SIZE characters
+        self.use_shuffle = (
+            self.size_hint >= SHUFFLE_MIN_SIZE
+            and self.size_hint <= SHUFFLE_MAX_SIZE
+            and USE_SHUFFLE
+        )
 
         # Set bits for each character in the class
         for i in range(len(char_class)):
@@ -94,7 +105,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         self.size_hint = end_code - start_code + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
-        self.use_shuffle = self.size_hint > 3 and (USE_SHUFFLE)
+        self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
 
         for char_code in range(start_code, end_code + 1):
             self.lookup_table[char_code] = 1
@@ -412,11 +423,12 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-struct SIMDStringSearch(Copyable, Movable):
+@register_passable("trivial")
+struct SIMDStringSearch:
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern: String
-    """The literal string pattern to search for."""
+    var pattern_ptr: UnsafePointer[Byte]
+    """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
@@ -428,7 +440,7 @@ struct SIMDStringSearch(Copyable, Movable):
         Args:
             pattern: Literal string pattern to search for.
         """
-        self.pattern = pattern
+        self.pattern_ptr = pattern.unsafe_ptr()
         self.pattern_length = len(pattern)
 
         # Create SIMD vector with first character of pattern
@@ -498,18 +510,20 @@ struct SIMDStringSearch(Copyable, Movable):
 
         if self.pattern_length == 1:
             # Single character - simple scan
-            var target_char = self.pattern[0]
+            var target_char = self.pattern_ptr[][0]
             for i in range(start, text_len):
-                if text[i] == target_char:
+                if ord(text[i]) == Int(target_char):
                     return i
         elif self.pattern_length == 2:
             # Two characters - check pairs
             if text_len - start < 2:
                 return -1
-            var first_char = self.pattern[0]
-            var second_char = self.pattern[1]
+            var first_char = self.pattern_ptr[][0]
+            var second_char = self.pattern_ptr[][1]
             for i in range(start, text_len - 1):
-                if text[i] == first_char and text[i + 1] == second_char:
+                if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
+                    second_char
+                ):
                     return i
 
         return -1
@@ -528,7 +542,8 @@ struct SIMDStringSearch(Copyable, Movable):
             return False
 
         for i in range(self.pattern_length):
-            if String(text[pos + i]) != String(self.pattern[i]):
+            var ptr = self.pattern_ptr + i
+            if ord(text[pos + i]) != Int(ptr[]):
                 return False
 
         return True
@@ -663,11 +678,10 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         The corresponding CharacterClassSIMD matcher.
     """
     var matchers_ptr = _get_simd_matchers()
-    var matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
-        return matchers[matcher_type]
+        return matchers_ptr[][matcher_type]
     except:
         var matcher: CharacterClassSIMD
         if matcher_type == SIMD_MATCHER_WHITESPACE:
@@ -689,7 +703,7 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         else:
             # Custom matcher, create empty one
             matcher = CharacterClassSIMD("")
-        matchers[matcher_type] = matcher
+        matchers_ptr[][matcher_type] = matcher
         return matcher
 
 
@@ -778,6 +792,96 @@ fn process_text_with_matcher[
     return matches
 
 
+fn apply_quantifier_simd_generic[
+    T: SIMDMatcher
+](
+    matcher: T,
+    text: String,
+    start_pos: Int,
+    min_matches: Int,
+    max_matches: Int,
+) -> Tuple[Bool, Int]:
+    """Apply quantifier using SIMD for faster bulk matching.
+
+    This is a generic version that works with any SIMDMatcher implementation.
+
+    Parameters:
+        T: The concrete type implementing SIMDMatcher.
+
+    Args:
+        matcher: The SIMD matcher instance.
+        text: Input string.
+        start_pos: Current position.
+        min_matches: Minimum required matches.
+        max_matches: Maximum allowed matches (-1 for unlimited).
+
+    Returns:
+        Tuple of (success, final_position).
+    """
+    var pos = start_pos
+    var match_count = 0
+    var actual_max = max_matches
+    if actual_max == -1:
+        actual_max = len(text) - start_pos
+
+    # Count consecutive matching characters
+    while pos < len(text) and match_count < actual_max:
+        if matcher.contains(ord(text[pos])):
+            match_count += 1
+            pos += 1
+        else:
+            break
+
+    # Check if we satisfied the quantifier
+    if match_count >= min_matches:
+        return (True, pos)
+    else:
+        return (False, start_pos)
+
+
+fn find_in_text_simd[
+    T: SIMDMatcher
+](matcher: T, text: String, start: Int = 0, end: Int = -1,) -> Int:
+    """Find first occurrence of a character matching the given matcher.
+
+    Parameters:
+        T: The concrete type implementing SIMDMatcher.
+
+    Args:
+        matcher: The SIMD matcher instance.
+        text: Text to search.
+        start: Starting position.
+        end: Ending position (-1 for end of string).
+
+    Returns:
+        Position of first match, or -1 if not found.
+    """
+    var actual_end = end if end != -1 else len(text)
+    var pos = start
+
+    # Process in SIMD chunks for speed
+    while pos + 16 <= actual_end:
+        var chunk = text.unsafe_ptr().load[width=16](pos)
+        var matches = matcher.match_chunk(chunk)
+
+        # Check if any match in chunk
+        if matches.reduce_or():
+            # Find first match position
+            for i in range(16):
+                if matches[i]:
+                    return pos + i
+
+        pos += 16
+
+    # Handle remaining characters
+    while pos < actual_end:
+        if matcher.contains(ord(text[pos])):
+            return pos
+        pos += 1
+
+    return -1
+
+
 struct TwoWaySearcher(Copyable & Movable):
     """SIMD-optimized Two-Way string search algorithm.
 
@@ -813,24 +917,26 @@ struct TwoWaySearcher(Copyable & Movable):
             self.period = 1
             return
 
-        # Simplified critical factorization
-        # For now, use middle position as critical position
-        # A full implementation would use maximal suffix computation
-        var crit_pos = n // 2
-        var period = n
+        # For the Two-Way algorithm to work correctly, we need a proper critical factorization.
+        # The current simplified approach causes the algorithm to skip potential matches.
+        # For now, we'll use a more conservative approach that ensures correctness.
 
-        # Check for actual period
-        for p in range(1, n):
-            var is_period = True
-            for i in range(n - p):
-                if self.pattern[i] != self.pattern[i + p]:
-                    is_period = False
-                    break
-            if is_period:
-                period = p
+        # The critical position should be computed using maximal suffix,
+        # but for correctness we can use position 1 which guarantees we won't skip matches
+        self.critical_pos = 1 if n > 1 else 0
+
+        # Compute the actual period of the pattern
+        var period = 1
+        var k = 1
+        while k < n:
+            var i = 0
+            while i < n - k and self.pattern[i] == self.pattern[i + k]:
+                i += 1
+            if i == n - k:
+                period = k
                 break
+            k += 1
 
-        self.critical_pos = crit_pos
         self.period = period
 
     fn search(self, text: String, start: Int = 0) -> Int:
@@ -855,9 +961,15 @@ struct TwoWaySearcher(Copyable & Movable):
         if n <= 4:
             return self._short_pattern_search(text, start)
 
+        # For patterns where Two-Way's complexity isn't needed, use SIMD search
+        # This ensures correctness while maintaining good performance
+        if n <= 32:
+            var search = SIMDStringSearch(self.pattern)
+            return search.search(text, start)
+
+        # For longer patterns, use the Two-Way algorithm
         var pos = start
-        var memory = self.memory
-        var memory_fwd = self.memory_fwd
+        var memory = 0
 
         while pos <= m - n:
             # Check right part (from critical position to end)
@@ -869,7 +981,6 @@ struct TwoWaySearcher(Copyable & Movable):
             if mismatch_pos == n:
                 # Right part matches, check left part
                 i = self.critical_pos - 1
-                var left_match = True
 
                 while i >= 0 and text[pos + i] == self.pattern[i]:
                     i -= 1

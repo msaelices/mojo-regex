@@ -22,11 +22,11 @@ The most significant performance improvement comes from using different engines 
 # From matcher.mojo
 struct HybridMatcher:
     """Routes patterns to optimal engine based on complexity analysis."""
-    
+
     fn __init__(out self, pattern: String) raises:
         var analyzer = PatternAnalyzer()
         var complexity = analyzer.analyze_pattern(self.ast)
-        
+
         if complexity == PatternComplexity.SIMPLE:
             self._dfa_matcher = DFAMatcher(self.ast)  # O(n) performance
         else:
@@ -45,11 +45,11 @@ fn analyze_pattern(self, ast: ASTNode) -> PatternComplexity:
     # Simple patterns: literals, character classes, basic quantifiers
     if self._is_simple_pattern(ast):
         return PatternComplexity.SIMPLE
-    
+
     # Medium patterns: simple groups, alternations
     if self._has_simple_groups(ast):
         return PatternComplexity.MEDIUM
-    
+
     # Complex patterns: backreferences, lookahead, nested groups
     return PatternComplexity.COMPLEX
 ```
@@ -65,7 +65,7 @@ One of the most impactful optimizations is using SIMD for character class matchi
 fn _check_chunk_simd(self, text: String, pos: Int) -> SIMD[DType.bool, SIMD_WIDTH]:
     """Check a chunk of characters using SIMD operations."""
     var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
-    
+
     @parameter
     if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
         # Fast path: use _dynamic_shuffle for 16/32-byte chunks
@@ -84,7 +84,7 @@ Not all patterns benefit equally from SIMD. Use a hybrid approach:
 # From simd_ops.mojo - commit 3e2cf21
 fn __init__(out self, owned char_class: String):
     self.use_shuffle_optimization = len(char_class) > 3
-    
+
     if self.use_shuffle_optimization:
         # Use lookup table for larger character classes
         self._initialize_lookup_table(char_class)
@@ -104,20 +104,20 @@ Implement vectorized string search for literal patterns:
 @register_passable("trivial")
 struct SIMDStringSearch:
     """SIMD-accelerated string search inspired by Rust's regex engine."""
-    
+
     fn search(self, pattern: String, text: String, start: Int = 0) -> Int:
         # Fast path for short patterns
         if self.pattern_length < 4:
             return self._search_short(pattern, text, start)
-        
+
         # SIMD search for longer patterns
         var first_char_simd = SIMD[DType.uint8, 16](ord(pattern[0]))
         var pos = start
-        
+
         while pos + 16 <= len(text):
             var chunk = text.unsafe_ptr().load[width=16](pos)
             var matches = chunk == first_char_simd
-            
+
             if matches.reduce_or():
                 # Check full pattern at matching positions
                 for i in range(16):
@@ -156,7 +156,7 @@ struct ASTNode:
     var children_indexes: SIMD[DType.uint8, 256]  # Store child indices, not nodes
     var children_len: Int
     var regex_ptr: UnsafePointer[Regex]  # Reference to parent containing all nodes
-    
+
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[ImmutableAnyOrigin]:
         """Get child by index without copying."""
@@ -182,6 +182,15 @@ var char = String(token.value)  # Allocates!
 
 # After: Using codepoints directly
 var codepoint = ord(token.value[0])  # No allocation
+```
+
+Use references instead of var assignments to avoid unnecessary copies:
+
+```mojo
+# This generate a copy
+var child = ast.get_child(i)  # Allocates a new ASTNode
+# Use this to avoid copying
+ref child = ast.get_child(i)  # No allocation, uses reference
 ```
 
 ## Compile-Time Optimizations
@@ -244,7 +253,7 @@ fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
     # Fast path: empty pattern
     if self.ast.num_children == 0:
         return Match(start, start, text)
-    
+
     # Fast path: literal optimization
     if self.literal_prefix:
         var pos = self._find_literal(text, start)
@@ -262,11 +271,11 @@ fn expand_character_range(start: String, end: String) -> String:
     """Expand character range without excessive allocations."""
     var start_code = ord(start[0])
     var end_code = ord(end[0])
-    
+
     # Pre-allocate exact size needed
     var result = String()
     result.reserve(end_code - start_code + 1)
-    
+
     for code in range(start_code, end_code + 1):
         result += chr(code)
     return result
@@ -308,7 +317,7 @@ var _regex_cache = Dict[String, CompiledRegex]()
 fn compile_regex(pattern: String) -> CompiledRegex:
     if pattern in _regex_cache:
         return _regex_cache[pattern]
-    
+
     var compiled = CompiledRegex(pattern)
     _regex_cache[pattern] = compiled
     return compiled
@@ -325,14 +334,14 @@ Structure benchmarks to measure real performance:
 @parameter
 fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher):
     var test_text = make_test_string[text_length]()
-    
+
     @always_inline
     @parameter
     fn call_fn():
         for _ in range(100):  # Multiple iterations for stability
             var result = match_first(pattern, test_text)
             keep(result.__bool__())  # Prevent optimization
-    
+
     b.iter[call_fn]()
 ```
 
@@ -343,7 +352,7 @@ fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher):
    # Bad: Allocates string each iteration
    for i in range(len(text)):
        var char = String(text[i])
-   
+
    # Good: Work with integers
    for i in range(len(text)):
        var char_code = ord(text[i])
@@ -353,7 +362,7 @@ fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher):
    ```mojo
    # Bad: Copies entire AST node
    var child = ast.children[i]
-   
+
    # Good: Use reference
    var child_ref = ast.get_child(i)
    ```
@@ -364,7 +373,7 @@ fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher):
    for i in range(len(text)):
        if is_digit(text[i]):
            count += 1
-   
+
    # Good: Process 16 chars at once
    var digit_matcher = get_digit_matcher()
    var matches = digit_matcher.check_chunk(text, pos)

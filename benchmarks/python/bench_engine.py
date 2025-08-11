@@ -52,19 +52,19 @@ class Benchmark:
         # Calculate mean time per run
         mean_time = total_time / actual_iterations
 
-        # Get internal iteration count for accurate per-operation timing
+        # Get internal iteration count for accurate per-operation timing - scaled up to match Mojo
         iterations_map = {
-            "literal_match": 100,
-            "wildcard_match": 50,
-            "range_": 50,
-            "anchor_": 100,
-            "alternation_": 50,
-            "group_": 50,
-            "match_all_": 10,
-            "complex_email": 2,
-            "complex_number": 25,
-            "simd_": 10,
-            "literal_prefix_": 1,  # Already optimized in Python's re
+            "literal_match": 2000,  # Increased from 100 to 2000
+            "wildcard_match": 1000,  # Increased from 50 to 1000
+            "range_": 1000,          # Increased from 50 to 1000
+            "anchor_": 2000,         # Increased from 100 to 2000
+            "alternation_": 1000,    # Increased from 50 to 1000
+            "group_": 1000,          # Increased from 50 to 1000
+            "match_all_": 200,       # Increased from 10 to 200
+            "complex_email": 40,     # Increased from 2 to 40
+            "complex_number": 500,   # Increased from 25 to 500
+            "simd_": 200,            # Increased from 10 to 200
+            "literal_prefix_": 1,    # Already optimized in Python's re
             "required_literal_": 1,
             "no_literal_baseline": 1,
             "alternation_common_prefix": 1,
@@ -128,12 +128,12 @@ class Benchmark:
 # Benchmark Data Generation
 # ===-----------------------------------------------------------------------===#
 
-# Literal optimization test texts
+# Literal optimization test texts - scaled up to match Mojo benchmarks
 SHORT_TEXT = "hello world this is a test with hello again and hello there"
-MEDIUM_TEXT = SHORT_TEXT * 10
-LONG_TEXT = SHORT_TEXT * 100
+MEDIUM_TEXT = SHORT_TEXT * 100  # Increased from 10 to 100
+LONG_TEXT = SHORT_TEXT * 1000   # Increased from 100 to 1000
 EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-EMAIL_LONG = EMAIL_TEXT * 5
+EMAIL_LONG = EMAIL_TEXT * 50    # Increased from 5 to 50
 
 
 def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -> str:
@@ -158,7 +158,7 @@ def bench_literal_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark literal string matching."""
 
     def benchmark_fn():
-        for _ in range(100):
+        for _ in range(2000):  # Increased from 100 to 2000
             result = re.search(pattern, test_text)
             # Keep result to prevent optimization
             bool(result)
@@ -175,7 +175,7 @@ def bench_wildcard_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark wildcard and quantifier patterns."""
 
     def benchmark_fn():
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             result = re.match(pattern, test_text)
             bool(result)
 
@@ -191,7 +191,7 @@ def bench_range_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark character range patterns."""
 
     def benchmark_fn():
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             result = re.match(pattern, test_text)
             bool(result)
 
@@ -207,7 +207,7 @@ def bench_anchor_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark anchor patterns (^ and $)."""
 
     def benchmark_fn():
-        for _ in range(100):
+        for _ in range(2000):  # Increased from 100 to 2000
             result = re.match(pattern, test_text)
             bool(result)
 
@@ -223,7 +223,7 @@ def bench_alternation_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark alternation patterns (|)."""
 
     def benchmark_fn():
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             result = re.search(pattern, test_text)
             bool(result)
 
@@ -239,7 +239,7 @@ def bench_group_match(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark group patterns with quantifiers."""
 
     def benchmark_fn():
-        for _ in range(50):
+        for _ in range(1000):  # Increased from 50 to 1000
             result = re.search(pattern, test_text)
             bool(result)
 
@@ -255,7 +255,7 @@ def bench_match_all(test_text: str, pattern: str) -> Callable[[], None]:
     """Benchmark finding all matches in text."""
 
     def benchmark_fn():
-        for _ in range(10):  # Fewer iterations since findall is more expensive
+        for _ in range(200):  # Increased from 10 to 200
             results = re.findall(pattern, test_text)
             len(results)  # Keep result
 
@@ -272,7 +272,7 @@ def bench_complex_email_match(email_text: str) -> Callable[[], None]:
     pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
 
     def benchmark_fn():
-        for _ in range(2):
+        for _ in range(40):  # Increased from 2 to 40
             results = re.findall(pattern, email_text)
             len(results)
 
@@ -284,7 +284,7 @@ def bench_complex_number_extraction(number_text: str) -> Callable[[], None]:
     pattern = r"\d+\.?\d*"
 
     def benchmark_fn():
-        for _ in range(25):
+        for _ in range(500):  # Increased from 25 to 500
             results = re.findall(pattern, number_text)
             len(results)
 
@@ -328,7 +328,7 @@ def bench_simd_heavy_filtering(test_text: str, pattern: str) -> Callable[[], Non
     """
 
     def benchmark_fn():
-        for _ in range(10):  # Fewer iterations due to large text size
+        for _ in range(200):  # Increased from 10 to 200
             result = re.match(pattern, test_text)
             bool(result)
 
@@ -362,19 +362,19 @@ def main():
     """Run all benchmarks and display results."""
     m = Benchmark(num_repetitions=5)
 
-    # Pre-create test strings to avoid measurement overhead
-    text_1000 = make_test_string(1000)
-    text_10000 = make_test_string(10000)
-    text_range_1000 = make_test_string(1000, "abc123XYZ")
-    text_alternation_1000 = make_test_string(1000, "abcdefghijklmnopqrstuvwxyz")
-    text_group_1000 = make_test_string(1000, "abcabcabc")
+    # Pre-create test strings to avoid measurement overhead - scaled up to match Mojo
+    text_10000 = make_test_string(10000)     # Increased from 1000 to 10000
+    text_100000 = make_test_string(100000)   # Increased from 10000 to 100000
+    text_range_10000 = make_test_string(10000, "abc123XYZ")
+    text_alternation_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz")
+    text_group_10000 = make_test_string(10000, "abcabcabc")
 
-    # Create complex text patterns
-    base_text = make_test_string(100)
+    # Create complex text patterns - scaled up to match Mojo
+    base_text = make_test_string(2000)  # Increased from 100 to 2000
     emails = " user@example.com more text john@test.org "
     email_text = f"{base_text} {emails} {base_text} {emails} {base_text}"
 
-    base_number_text = make_test_string(500, "abc def ghi ")
+    base_number_text = make_test_string(20000, "abc def ghi ")  # Increased from 500 to 20000
     number_text = (
         f"{base_number_text} 123 price $456.78 quantity 789 {base_number_text}"
     )
@@ -383,51 +383,51 @@ def main():
     m.bench_function(
         "literal_match_short",
         bench_literal_match(
-            text_1000 + " hello world" + text_1000,  # Ensure "hello" is present
+            text_10000 + " hello world" + text_10000,  # Ensure "hello" is present
             "hello",
         ),
     )
     m.bench_function(
         "literal_match_long",
         bench_literal_match(
-            text_10000 + " hello world" + text_1000,  # Ensure "hello" is present
+            text_100000 + " hello world" + text_10000,  # Ensure "hello" is present
             "hello",
         ),
     )
 
     # Wildcard and quantifiers
-    m.bench_function("wildcard_match_any", bench_wildcard_match(text_1000, ".*"))
-    m.bench_function("quantifier_zero_or_more", bench_wildcard_match(text_1000, "a*"))
-    m.bench_function("quantifier_one_or_more", bench_wildcard_match(text_1000, "a+"))
-    m.bench_function("quantifier_zero_or_one", bench_wildcard_match(text_1000, "a?"))
+    m.bench_function("wildcard_match_any", bench_wildcard_match(text_10000, ".*"))
+    m.bench_function("quantifier_zero_or_more", bench_wildcard_match(text_10000, "a*"))
+    m.bench_function("quantifier_one_or_more", bench_wildcard_match(text_10000, "a+"))
+    m.bench_function("quantifier_zero_or_one", bench_wildcard_match(text_10000, "a?"))
 
     # Character ranges
-    m.bench_function("range_lowercase", bench_range_match(text_range_1000, "[a-z]+"))
-    m.bench_function("range_digits", bench_range_match(text_range_1000, "[0-9]+"))
+    m.bench_function("range_lowercase", bench_range_match(text_range_10000, "[a-z]+"))
+    m.bench_function("range_digits", bench_range_match(text_range_10000, "[0-9]+"))
     m.bench_function(
-        "range_alphanumeric", bench_range_match(text_range_1000, "[a-zA-Z0-9]+")
+        "range_alphanumeric", bench_range_match(text_range_10000, "[a-zA-Z0-9]+")
     )
 
     # Anchors
-    m.bench_function("anchor_start", bench_anchor_match(text_1000, "^abc"))
-    m.bench_function("anchor_end", bench_anchor_match(text_1000, "xyz$"))
+    m.bench_function("anchor_start", bench_anchor_match(text_10000, "^abc"))
+    m.bench_function("anchor_end", bench_anchor_match(text_10000, "xyz$"))
 
     # Alternation
     m.bench_function(
-        "alternation_simple", bench_alternation_match(text_alternation_1000, "a|b|c")
+        "alternation_simple", bench_alternation_match(text_alternation_10000, "a|b|c")
     )
     m.bench_function(
         "alternation_words",
-        bench_alternation_match(text_alternation_1000, "abc|def|ghi"),
+        bench_alternation_match(text_alternation_10000, "abc|def|ghi"),
     )
 
     # Groups
-    m.bench_function("group_quantified", bench_group_match(text_group_1000, "(abc)+"))
-    m.bench_function("group_alternation", bench_group_match(text_group_1000, "(a|b)*"))
+    m.bench_function("group_quantified", bench_group_match(text_group_10000, "(abc)+"))
+    m.bench_function("group_alternation", bench_group_match(text_group_10000, "(a|b)*"))
 
     # Global matching (unique to our implementation)
-    m.bench_function("match_all_simple", bench_match_all(text_1000, "a"))
-    m.bench_function("match_all_pattern", bench_match_all(text_1000, "[a-z]+"))
+    m.bench_function("match_all_simple", bench_match_all(text_10000, "a"))
+    m.bench_function("match_all_pattern", bench_match_all(text_10000, "[a-z]+"))
 
     # Complex real-world patterns
     m.bench_function("complex_email_extraction", bench_complex_email_match(email_text))
@@ -436,8 +436,8 @@ def main():
     )
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit in Mojo comparison)
-    large_mixed_text = make_mixed_content_text(10000)
-    xlarge_mixed_text = make_mixed_content_text(50000)
+    large_mixed_text = make_mixed_content_text(100000)  # Increased from 10000 to 100000
+    xlarge_mixed_text = make_mixed_content_text(500000)  # Increased from 50000 to 500000
 
     m.bench_function(
         "simd_alphanumeric_large",

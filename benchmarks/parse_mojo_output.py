@@ -21,13 +21,27 @@ def parse_mojo_benchmark_output(output: str) -> dict:
         Dictionary of benchmark results
     """
     results = {}
+    engine_map = {}
+
+    # Pattern to match engine detection lines:
+    # [ENGINE] literal_match_short -> Pattern: 'hello' | Engine: DFA | Complexity: SIMPLE
+    engine_pattern = r'\[ENGINE\]\s+(\S+)\s+->.*?Engine:\s+(\S+)'
 
     # Pattern to match benchmark result lines:
     # | literal_match_short       |   0.00001621246337890 |   8300 |
-    pattern = r'\|\s*(\S+)\s*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|'
+    result_pattern = r'\|\s*(\S+)\s*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|'
 
+    # First pass: extract engine information
     for line in output.split('\n'):
-        match = re.match(pattern, line)
+        engine_match = re.search(engine_pattern, line)
+        if engine_match:
+            name = engine_match.group(1)
+            engine = engine_match.group(2)
+            engine_map[name] = engine
+
+    # Second pass: extract benchmark results
+    for line in output.split('\n'):
+        match = re.match(result_pattern, line)
         if match:
             name = match.group(1)
             time_ms = float(match.group(2))
@@ -39,7 +53,8 @@ def parse_mojo_benchmark_output(output: str) -> dict:
             results[name] = {
                 "time_ns": time_ns,
                 "time_ms": time_ms,
-                "iterations": iterations
+                "iterations": iterations,
+                "engine": engine_map.get(name, "N/A")
             }
 
     return results

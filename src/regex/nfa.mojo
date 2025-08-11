@@ -15,6 +15,8 @@ from regex.simd_ops import (
     TwoWaySearcher,
     CharacterClassSIMD,
     get_simd_matcher,
+    apply_quantifier_simd_generic,
+    find_in_text_simd,
 )
 from regex.simd_matchers import (
     get_digit_matcher,
@@ -23,12 +25,20 @@ from regex.simd_matchers import (
     get_alnum_matcher,
     RangeBasedMatcher,
 )
-from regex.parametric_nfa_helpers import (
-    apply_quantifier_simd_generic,
-    find_in_text_simd,
-)
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity
+
+
+# Threshold for complex character class patterns (e.g. [a-zA-Z0-9._%+-])
+# When a pattern has alphanumeric ranges plus more than this many characters,
+# use optimized two-phase matching (check alphanumeric first, then special chars)
+alias COMPLEX_CHAR_CLASS_THRESHOLD = 10
+
+# Minimum literal length thresholds for optimization
+# Prefix literals need to be longer than this to justify optimization overhead
+alias MIN_PREFIX_LITERAL_LENGTH = 3
+# Non-prefix literals need even longer length to be worth the overhead
+alias MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
 struct NFAEngine(Engine):
@@ -64,7 +74,7 @@ struct NFAEngine(Engine):
             # Only apply literal optimization for patterns that benefit from it
             # Skip for simple patterns that will use DFA anyway
             if self.regex:
-                var ast = self.regex.value()
+                ref ast = self.regex.value()
                 var analyzer = PatternAnalyzer()
                 var complexity = analyzer.classify(ast)
 
@@ -77,16 +87,24 @@ struct NFAEngine(Engine):
                     # Use best literal if available and significant
                     ref best_literal = literal_set.get_best_literal()
                     if best_literal:
-                        var best = best_literal.value()
+                        ref best = best_literal.value()
                         # Require longer literals to justify overhead
-                        if best.is_prefix and best.get_literal_len() > 3:
+                        if (
+                            best.is_prefix
+                            and best.get_literal_len()
+                            > MIN_PREFIX_LITERAL_LENGTH
+                        ):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
                             self.literal_searcher = TwoWaySearcher(
                                 self.literal_prefix
                             )
-                        elif best.is_required and best.get_literal_len() > 4:
+                        elif (
+                            best.is_required
+                            and best.get_literal_len()
+                            > MIN_REQUIRED_LITERAL_LENGTH
+                        ):
                             # Use required literal for prefiltering
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
@@ -142,7 +160,7 @@ struct NFAEngine(Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            var searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher.value()
 
             while current_pos <= len(text):
                 # Find next occurrence of literal
@@ -175,7 +193,7 @@ struct NFAEngine(Engine):
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
-                        var match_end = result[1]
+                        ref match_end = result[1]
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
@@ -208,7 +226,7 @@ struct NFAEngine(Engine):
                 )
                 if result[0]:  # Match found
                     var match_start = current_pos
-                    var match_end = result[1]
+                    ref match_end = result[1]
 
                     # Create match object
                     var matched = Match(0, match_start, match_end, text)
@@ -261,7 +279,7 @@ struct NFAEngine(Engine):
             required_start_pos=start,
         )
         if result[0]:  # Match found
-            var end_idx = result[1]
+            ref end_idx = result[1]
             # Create the match object
             return Match(0, str_i, end_idx, text)
 
@@ -295,7 +313,7 @@ struct NFAEngine(Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            var searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher.value()
 
             while search_pos <= len(text):
                 # Find next occurrence of literal
@@ -329,7 +347,7 @@ struct NFAEngine(Engine):
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
-                        var match_end = result[1]
+                        ref match_end = result[1]
                         # Verify the match includes our literal
                         if self._match_contains_literal(
                             text, try_pos, match_end
@@ -352,7 +370,7 @@ struct NFAEngine(Engine):
                     required_start_pos=-1,
                 )
                 if result[0]:  # Match found
-                    var end_idx = result[1]
+                    ref end_idx = result[1]
                     return Match(0, search_pos, end_idx, text)
                 search_pos += 1
 
@@ -364,7 +382,7 @@ struct NFAEngine(Engine):
         return self.pattern.startswith(self.literal_prefix)
 
     fn _create_range_matcher(
-        self, range_pattern: String
+        self, range_pattern: StringSlice
     ) -> Optional[CharacterClassSIMD]:
         """Create SIMD matcher for a range pattern.
 
@@ -375,7 +393,7 @@ struct NFAEngine(Engine):
             Optional SIMD matcher for the pattern.
         """
         # Try to create a SIMD matcher for common patterns
-        var char_class = String()
+        var char_class: String
 
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
@@ -383,23 +401,32 @@ struct NFAEngine(Engine):
             var inner = range_pattern[1:-1]
 
             # Handle common patterns with specialized matchers
-            if inner == "a-z":
-                # For now, still use CharacterClassSIMD but could return RangeBasedMatcher
-                char_class = "abcdefghijklmnopqrstuvwxyz"
-            elif inner == "A-Z":
-                char_class = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            elif inner == "0-9":
-                # Could use create_digit_matcher() here but keeping CharacterClassSIMD for compatibility
-                char_class = "0123456789"
+            # Return None for simple ranges to use RangeBasedMatcher instead
+            if inner == "a-z" or inner == "A-Z" or inner == "0-9":
+                # These simple ranges should use RangeBasedMatcher for better performance
+                return None
             elif inner == "a-zA-Z":
-                # Could use create_alpha_matcher() here
-                char_class = (
-                    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                )
+                # This can also use RangeBasedMatcher with two ranges
+                return None
             elif inner == "a-zA-Z0-9":
-                # Could use create_alnum_matcher() here
-                char_class = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+                # Return None to signal that specialized matcher should be used
+                # This will be handled in _apply_quantifier_simd
+                return None
             else:
+                # Check if pattern contains alphanumeric + special chars
+                # Common email/identifier patterns like [a-zA-Z0-9._%-+]
+                var has_lower = "a-z" in inner
+                var has_upper = "A-Z" in inner
+                var has_digits = "0-9" in inner
+                var has_alnum = has_lower and has_upper and has_digits
+
+                # If it has alphanumeric ranges plus special chars, return None
+                # to signal specialized handling
+                if (
+                    has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                ):  # e.g. "a-zA-Z0-9._%-+"
+                    return None
+
                 # More complex pattern, use helper to expand
                 from regex.dfa import expand_character_range
 
@@ -408,7 +435,7 @@ struct NFAEngine(Engine):
                 char_class = String()
         else:
             # Already expanded
-            char_class = range_pattern
+            char_class = String(range_pattern)
 
         # Create SIMD matcher
         if char_class:
@@ -462,6 +489,9 @@ struct NFAEngine(Engine):
             OR,
             GROUP,
         )
+
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_node type =", ast.type, "str_i =", str_i, "min =", ast.min, "max =", ast.max)
 
         if ast.type == ELEMENT:
             return self._match_element(
@@ -622,17 +652,56 @@ struct NFAEngine(Engine):
         var ch_found = False
 
         if ast.get_value():
-            var range_pattern = ast.get_value().value()
+            ref range_pattern = ast.get_value().value()
 
-            # Try to use SIMD matcher for common patterns
-            var simd_matcher = self._create_range_matcher(String(range_pattern))
-            if simd_matcher:
-                ch_found = simd_matcher.value().contains(ch_code)
+            # Check for common patterns with specialized matchers
+            if range_pattern == "[a-zA-Z0-9]":
+                var alnum_matcher = get_alnum_matcher()
+                ch_found = alnum_matcher.contains(ch_code)
+            elif range_pattern == "[a-z]":
+                # Use RangeBasedMatcher for simple lowercase range
+                ch_found = ch_code >= ord("a") and ch_code <= ord("z")
+            elif range_pattern == "[A-Z]":
+                # Use RangeBasedMatcher for simple uppercase range
+                ch_found = ch_code >= ord("A") and ch_code <= ord("Z")
+            elif range_pattern == "[0-9]":
+                # Use RangeBasedMatcher for digit range
+                ch_found = ch_code >= ord("0") and ch_code <= ord("9")
+            elif range_pattern == "[a-zA-Z]":
+                # Use RangeBasedMatcher for alphabetic range
+                var alpha_matcher = get_alpha_matcher()
+                ch_found = alpha_matcher.contains(ch_code)
             else:
-                # Fallback to regular range matching
-                ch_found = ast._is_char_in_range(
-                    String(str[str_i]), range_pattern
-                )
+                # Check if it's a complex pattern with alphanumeric + special chars
+                if range_pattern.startswith("[") and range_pattern.endswith(
+                    "]"
+                ):
+                    var inner = range_pattern[1:-1]
+                    var has_lower = "a-z" in inner
+                    var has_upper = "A-Z" in inner
+                    var has_digits = "0-9" in inner
+                    var has_alnum = has_lower and has_upper and has_digits
+
+                    if has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD:
+                        # Complex pattern like [a-zA-Z0-9._%+-]
+                        # Check alphanumeric first (common case)
+                        var alnum_matcher = get_alnum_matcher()
+                        if alnum_matcher.contains(ch_code):
+                            ch_found = True
+                        else:
+                            # Not alphanumeric, check special chars
+                            var ch = String(str[str_i])
+                            ch_found = ch in inner
+                    else:
+                        # Try to use SIMD matcher for other patterns
+                        ch_found = self._match_with_simd_or_fallback(
+                            ast, range_pattern, str[str_i], ch_code
+                        )
+                else:
+                    # Not a bracketed pattern, try SIMD matcher
+                    ch_found = self._match_with_simd_or_fallback(
+                        ast, range_pattern, str[str_i], ch_code
+                    )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -660,6 +729,21 @@ struct NFAEngine(Engine):
             return (True, str_i)
         else:
             return (False, str_i)
+
+    fn _match_with_simd_or_fallback(
+        self,
+        ast: ASTNode,
+        range_pattern: StringSlice[__origin_of(ast.regex_ptr[].pattern)],
+        ch: StringSlice,
+        ch_code: Int,
+    ) -> Bool:
+        """Try to match with SIMD matcher, fallback to regular matching."""
+        var simd_matcher = self._create_range_matcher(range_pattern)
+        if simd_matcher:
+            return simd_matcher.value().contains(ch_code)
+        else:
+            # Fallback to regular range matching
+            return ast._is_char_in_range(ch, range_pattern)
 
     fn _match_or(
         self,
@@ -709,6 +793,8 @@ struct NFAEngine(Engine):
         """Match GROUP node - process children sequentially with backtracking.
         """
         var start_pos = str_i
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_group children_len =", ast.get_children_len())
 
         # Check if this group itself has a quantifier
         if self._has_quantifier(ast):
@@ -804,7 +890,10 @@ struct NFAEngine(Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
         var children_len = ast_parent.get_children_len()
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _match_sequence child_index =", child_index, "children_len =", children_len)
         if child_index >= children_len:
+            # print("DEBUG: No more children, returning success at pos", str_i)
             return (True, str_i)
 
         if child_index == children_len - 1:
@@ -985,6 +1074,9 @@ struct NFAEngine(Engine):
         var min_matches = ast.min
         var max_matches = ast.max
 
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: _apply_quantifier str_i =", str_i, "min =", min_matches, "max =", max_matches)
+
         if max_matches == -1:  # Unlimited
             max_matches = len(str) - str_i
 
@@ -996,11 +1088,16 @@ struct NFAEngine(Engine):
         from regex.ast import DIGIT, SPACE, RANGE
 
         if ast.is_simd_optimizable(min_matches, max_matches):
+            # DEBUG: Uncomment to debug
+            # print("DEBUG: Using SIMD optimization for quantifier")
             var simd_result = self._apply_quantifier_simd(
                 ast, str, str_i, min_matches, max_matches
             )
-            if simd_result[0]:
-                return simd_result
+            # Always return SIMD result when SIMD optimization is used
+            # Don't fall through to regular matching
+            # DEBUG: Uncomment to debug
+            # print("DEBUG: SIMD result =", simd_result[0], simd_result[1])
+            return simd_result
 
         # Use regular greedy matching, but with early termination for match_first_mode
         var matches_count = 0
@@ -1021,6 +1118,8 @@ struct NFAEngine(Engine):
                 break
 
         # Check if we have enough matches
+        # DEBUG: Uncomment to debug
+        # print("DEBUG: quantifier matches_count =", matches_count, "min_matches =", min_matches, "current_pos =", current_pos)
         if matches_count >= min_matches:
             return (True, current_pos)
         else:
@@ -1060,17 +1159,17 @@ struct NFAEngine(Engine):
                 whitespace_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
-            var range_pattern = String(ast.get_value().value())
-            var range_matcher = self._create_range_matcher(range_pattern)
-            if range_matcher:
-                var matcher = range_matcher.value()
-                # Handle negated logic
+            ref range_pattern = String(ast.get_value().value())
+
+            # Check for common patterns that should use RangeBasedMatcher
+            if range_pattern == "[a-zA-Z0-9]":
+                var alnum_matcher = get_alnum_matcher()
                 if ast.positive_logic:
                     return apply_quantifier_simd_generic(
-                        matcher, str, str_i, min_matches, max_matches
+                        alnum_matcher, str, str_i, min_matches, max_matches
                     )
                 else:
-                    # For negated ranges, we need custom logic
+                    # For negated alphanumeric, use custom logic
                     var pos = str_i
                     var match_count = 0
                     var actual_max = max_matches
@@ -1079,7 +1178,150 @@ struct NFAEngine(Engine):
 
                     while pos < len(str) and match_count < actual_max:
                         var ch_code = ord(str[pos])
-                        if not matcher.contains(ch_code):  # Negated
+                        if not alnum_matcher.contains(ch_code):  # Negated
+                            match_count += 1
+                            pos += 1
+                        else:
+                            break
+
+                    if match_count >= min_matches:
+                        return (True, pos)
+                    else:
+                        return (False, str_i)
+            elif range_pattern == "[a-z]":
+                # Use optimized path for simple lowercase range
+                var pos = str_i
+                var match_count = 0
+                var actual_max = max_matches
+                if actual_max == -1:
+                    actual_max = len(str) - str_i
+
+                while pos < len(str) and match_count < actual_max:
+                    var ch_code = ord(str[pos])
+                    var is_match = ch_code >= ord("a") and ch_code <= ord("z")
+                    if is_match == ast.positive_logic:
+                        match_count += 1
+                        pos += 1
+                    else:
+                        break
+
+                if match_count >= min_matches:
+                    return (True, pos)
+                else:
+                    return (False, str_i)
+            elif range_pattern == "[A-Z]":
+                # Use optimized path for simple uppercase range
+                var pos = str_i
+                var match_count = 0
+                var actual_max = max_matches
+                if actual_max == -1:
+                    actual_max = len(str) - str_i
+
+                while pos < len(str) and match_count < actual_max:
+                    var ch_code = ord(str[pos])
+                    var is_match = ch_code >= ord("A") and ch_code <= ord("Z")
+                    if is_match == ast.positive_logic:
+                        match_count += 1
+                        pos += 1
+                    else:
+                        break
+
+                if match_count >= min_matches:
+                    return (True, pos)
+                else:
+                    return (False, str_i)
+            elif range_pattern == "[0-9]":
+                # Use digit matcher for digit range
+                var digit_matcher = get_digit_matcher()
+                if ast.positive_logic:
+                    return apply_quantifier_simd_generic(
+                        digit_matcher, str, str_i, min_matches, max_matches
+                    )
+                else:
+                    # For negated digits, use custom logic
+                    var pos = str_i
+                    var match_count = 0
+                    var actual_max = max_matches
+                    if actual_max == -1:
+                        actual_max = len(str) - str_i
+
+                    while pos < len(str) and match_count < actual_max:
+                        var ch_code = ord(str[pos])
+                        if not digit_matcher.contains(ch_code):  # Negated
+                            match_count += 1
+                            pos += 1
+                        else:
+                            break
+
+                    if match_count >= min_matches:
+                        return (True, pos)
+                    else:
+                        return (False, str_i)
+            elif range_pattern == "[a-zA-Z]":
+                # Use alpha matcher for alphabetic range
+                var alpha_matcher = get_alpha_matcher()
+                if ast.positive_logic:
+                    return apply_quantifier_simd_generic(
+                        alpha_matcher, str, str_i, min_matches, max_matches
+                    )
+                else:
+                    # For negated alpha, use custom logic
+                    var pos = str_i
+                    var match_count = 0
+                    var actual_max = max_matches
+                    if actual_max == -1:
+                        actual_max = len(str) - str_i
+
+                    while pos < len(str) and match_count < actual_max:
+                        var ch_code = ord(str[pos])
+                        if not alpha_matcher.contains(ch_code):  # Negated
+                            match_count += 1
+                            pos += 1
+                        else:
+                            break
+
+                    if match_count >= min_matches:
+                        return (True, pos)
+                    else:
+                        return (False, str_i)
+            else:
+                # Check if it's a complex pattern with alphanumeric + special chars
+                var is_complex_pattern = False
+                if range_pattern.startswith("[") and range_pattern.endswith(
+                    "]"
+                ):
+                    var inner = range_pattern[1:-1]
+                    var has_lower = "a-z" in inner
+                    var has_upper = "A-Z" in inner
+                    var has_digits = "0-9" in inner
+                    var has_alnum = has_lower and has_upper and has_digits
+                    is_complex_pattern = (
+                        has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                    )
+
+                if is_complex_pattern:
+                    # Handle complex patterns like [a-zA-Z0-9._%+-] efficiently
+                    var alnum_matcher = get_alnum_matcher()
+                    var inner = range_pattern[1:-1]
+                    var pos = str_i
+                    var match_count = 0
+                    var actual_max = max_matches
+                    if actual_max == -1:
+                        actual_max = len(str) - str_i
+
+                    while pos < len(str) and match_count < actual_max:
+                        var ch_code = ord(str[pos])
+                        var is_match: Bool
+
+                        # Check alphanumeric first (common case)
+                        if alnum_matcher.contains(ch_code):
+                            is_match = True
+                        else:
+                            # Check special characters
+                            var ch = String(str[pos])
+                            is_match = ch in inner
+
+                        if is_match == ast.positive_logic:
                             match_count += 1
                             pos += 1
                         else:
@@ -1090,7 +1332,79 @@ struct NFAEngine(Engine):
                     else:
                         return (False, str_i)
 
+                var range_matcher = self._create_range_matcher(range_pattern)
+                if range_matcher:
+                    ref matcher = range_matcher.value()
+                    # Handle negated logic
+                    if ast.positive_logic:
+                        return apply_quantifier_simd_generic(
+                            matcher, str, str_i, min_matches, max_matches
+                        )
+                    else:
+                        # For negated ranges, we need custom logic
+                        var pos = str_i
+                        var match_count = 0
+                        var actual_max = max_matches
+                        if actual_max == -1:
+                            actual_max = len(str) - str_i
+
+                        while pos < len(str) and match_count < actual_max:
+                            var ch_code = ord(str[pos])
+                            if not matcher.contains(ch_code):  # Negated
+                                match_count += 1
+                                pos += 1
+                            else:
+                                break
+
+                        if match_count >= min_matches:
+                            return (True, pos)
+                        else:
+                            return (False, str_i)
+
+                # Fallback for simple ranges like [c-n] that don't use SIMD
+                # Use character-by-character matching
+                var pos = str_i
+                var match_count = 0
+                var actual_max = max_matches
+                if actual_max == -1:
+                    actual_max = len(str) - str_i
+
+                while pos < len(str) and match_count < actual_max:
+                    var ch_code = ord(str[pos])
+                    var is_match = self._match_char_in_range(
+                        range_pattern, ch_code
+                    )
+                    if is_match == ast.positive_logic:
+                        match_count += 1
+                        pos += 1
+                    else:
+                        break
+
+                if match_count >= min_matches:
+                    return (True, pos)
+                else:
+                    return (False, str_i)
+
         return (False, str_i)
+
+    fn _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
+        """Helper function to check if a character matches a range pattern."""
+        if range_pattern.startswith("[") and range_pattern.endswith("]"):
+            var inner = range_pattern[1:-1]
+
+            # Handle simple ranges like [c-n]
+            if len(inner) == 3 and inner[1] == "-":
+                var start_char = ord(inner[0])
+                var end_char = ord(inner[2])
+                return ch_code >= start_char and ch_code <= end_char
+
+            # For more complex patterns, fall back to character inclusion
+            var ch = chr(ch_code)
+            return ch in inner
+        else:
+            # Not a bracketed pattern
+            var ch = chr(ch_code)
+            return ch in range_pattern
 
 
 fn findall(

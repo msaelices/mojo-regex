@@ -373,7 +373,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = False
             if self.get_value():
-                var range_pattern = self.get_value().value()
+                ref range_pattern = self.get_value().value()
                 ch_found = self._is_char_in_range(value, range_pattern)
             return not (
                 ch_found ^ self.positive_logic
@@ -387,7 +387,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn _is_char_in_range(
         self,
-        ch: String,
+        ch: StringSlice,
         range_pattern: StringSlice[__origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
         """Check if a character is in a range pattern like '[a-z]' or 'abcxyz'.
@@ -404,7 +404,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn _char_matches_range_syntax(
         self,
-        ch: String,
+        ch: StringSlice,
         range_syntax: StringSlice[__origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
         """Check if a character matches range syntax like 'a-z' or 'abc'."""
@@ -456,19 +456,6 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
             length=self.end_idx - self.start_idx,
         )
-
-    @always_inline
-    fn get_immutable[
-        self_origin: MutableOrigin,
-    ](ref [self_origin]self) -> ref [
-        ImmutableOrigin.cast_from[self_origin]
-    ] Self:
-        """Return an immutable version of self.
-
-        Returns:
-            An immutable version of the same ASTNode.
-        """
-        return rebind[ImmutableOrigin.cast_from[self]](self)
 
 
 @always_inline

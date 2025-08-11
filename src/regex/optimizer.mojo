@@ -8,6 +8,7 @@ This module implements the optimization strategies outlined in the optimization 
 - Literal optimization opportunities
 """
 
+from regex.aliases import EMPTY_STRING
 from regex.ast import (
     ASTNode,
     RE,
@@ -149,7 +150,7 @@ struct PatternAnalyzer:
 
         # Check for required literals
         if literal_set.get_best_literal():
-            var best = literal_set.get_best_literal().value()
+            ref best = literal_set.get_best_literal().value()
             if best.is_required:
                 info.has_required_literal = True
                 info.required_literal_length = best.get_literal_len()
@@ -309,7 +310,12 @@ struct PatternAnalyzer:
             PatternComplexity of the alternation
         """
         if depth > 2:
-            # Deep nesting - too complex for simple DFA
+            # Check if this is a common prefix alternation before giving up
+            # These can be efficiently handled with trie-like DFA structures
+            if self._is_common_prefix_alternation_in_tree(ast):
+                # Common prefix alternation - can be handled by specialized DFA
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            # Otherwise, deep nesting - too complex for simple DFA
             return PatternComplexity(PatternComplexity.COMPLEX)
 
         var max_complexity = PatternComplexity(PatternComplexity.SIMPLE)
@@ -352,9 +358,18 @@ struct PatternAnalyzer:
         if quantifier_complexity.value == PatternComplexity.COMPLEX:
             return PatternComplexity(PatternComplexity.COMPLEX)
 
-        # If group has any quantifier, use NFA for now since DFA doesn't handle group quantifiers properly
+        # Check if group has quantifier and whether it's a simple quantified group that DFA can handle
         if ast.min != 1 or ast.max != 1:
-            return PatternComplexity(PatternComplexity.MEDIUM)
+            # Check if this is a simple quantified group that DFA can handle
+            if self._is_simple_quantified_group(ast):
+                # Simple quantified groups with literal content can use DFA
+                pass  # Continue analysis below
+            elif self._is_quantified_alternation_group_in_optimizer(ast):
+                # Quantified alternation groups like (a|b)* can use DFA
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            else:
+                # Complex quantified groups still need NFA
+                return PatternComplexity(PatternComplexity.MEDIUM)
 
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
@@ -378,7 +393,7 @@ struct PatternAnalyzer:
             # Check if all children are literal elements or anchors
             var all_literal = True
             for i in range(ast.get_children_len()):
-                var child = ast.get_child(i)
+                ref child = ast.get_child(i)
                 if not (
                     (
                         child.type == ELEMENT
@@ -423,7 +438,7 @@ struct PatternAnalyzer:
         var literal_count = 0
 
         for i in range(ast.get_children_len()):
-            var element = ast.get_child(i)
+            ref element = ast.get_child(i)
             if (
                 element.type == RANGE
                 or element.type == DIGIT
@@ -445,6 +460,184 @@ struct PatternAnalyzer:
         # It's a multi-char sequence if it has at least 2 character classes
         # and any number of single literals (like @ and .)
         return char_class_count >= 2
+
+    fn _is_simple_quantified_group(self, ast: ASTNode) -> Bool:
+        """Check if a quantified group is simple enough for DFA compilation.
+
+        A simple quantified group is one that:
+        - Has simple quantifiers (?, *, +)
+        - Contains only literal elements (no nested groups or complex patterns)
+
+        Args:
+            ast: GROUP node with quantifiers.
+
+        Returns:
+            True if the quantified group can be handled by DFA.
+        """
+        from regex.ast import ELEMENT
+
+        # Check for simple quantifier patterns
+        if not (
+            (ast.min == 0 and ast.max == 1)
+            or (ast.min == 0 and ast.max == -1)  # ?
+            or (ast.min == 1 and ast.max == -1)  # *
+        ):  # +
+            return False
+
+        # Check that all children are simple literal elements
+        for i in range(ast.get_children_len()):
+            ref child = ast.get_child(i)
+            if child.type != ELEMENT or child.min != 1 or child.max != 1:
+                return False
+
+        return True
+
+    fn _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
+        """Check if alternation tree represents a common prefix alternation.
+
+        This checks if a (potentially deep) alternation tree like:
+        (hello|help|helicopter) represents branches with meaningful common prefixes.
+
+        Args:
+            ast: OR node to analyze
+
+        Returns:
+            True if this is a common prefix alternation that DFA can handle efficiently
+        """
+        from regex.ast import OR, GROUP, ELEMENT
+
+        # Extract all literal branches from the OR tree
+        var branches = List[String]()
+        if not self._extract_literal_branches_from_tree(ast, branches):
+            return False
+
+        # Must have at least 2 branches
+        if len(branches) < 2:
+            return False
+
+        # Check if there's a meaningful common prefix (at least 2 characters)
+        var common_prefix = self._compute_common_prefix_in_optimizer(branches)
+        return len(common_prefix) >= 2
+
+    fn _extract_literal_branches_from_tree(
+        self, node: ASTNode, mut branches: List[String]
+    ) -> Bool:
+        """Extract literal string branches from OR tree."""
+        from regex.ast import OR, GROUP, ELEMENT
+
+        if node.type == OR:
+            # Process both children
+            return self._extract_literal_branches_from_tree(
+                node.get_child(0), branches
+            ) and self._extract_literal_branches_from_tree(
+                node.get_child(1), branches
+            )
+        elif node.type == GROUP:
+            # Extract literal string from GROUP of ELEMENTs
+            var branch_text = String(capacity=String.INLINE_CAPACITY)
+            for i in range(node.get_children_len()):
+                ref element = node.get_child(i)
+                if element.type != ELEMENT:
+                    return False  # Non-literal element found
+                ref char_value = element.get_value().value()
+                branch_text += String(char_value)
+            branches.append(branch_text)
+            return True
+        else:
+            return False  # Unexpected node type
+
+    fn _compute_common_prefix_in_optimizer(
+        self, branches: List[String]
+    ) -> String:
+        """Compute the longest common prefix among all branches."""
+        if len(branches) == 0:
+            return EMPTY_STRING
+        if len(branches) == 1:
+            return branches[0]
+
+        var prefix = String(capacity=String.INLINE_CAPACITY)
+        ref first_branch = branches[0]
+        var min_length = len(first_branch)
+
+        # Find minimum length
+        for i in range(1, len(branches)):
+            if len(branches[i]) < min_length:
+                min_length = len(branches[i])
+
+        # Find common prefix
+        for pos in range(min_length):
+            var char_at_pos = first_branch[pos]
+            var all_match = True
+
+            for i in range(1, len(branches)):
+                if branches[i][pos] != char_at_pos:
+                    all_match = False
+                    break
+
+            if all_match:
+                prefix += String(char_at_pos)
+            else:
+                break
+
+        return prefix
+
+    fn _is_quantified_alternation_group_in_optimizer(
+        self, ast: ASTNode
+    ) -> Bool:
+        """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
+
+        This version is used by the optimizer to classify patterns.
+
+        Args:
+            ast: GROUP node to analyze (not root AST node)
+
+        Returns:
+            True if this group is a quantified alternation group.
+        """
+        from regex.ast import GROUP, OR, ELEMENT
+
+        # Must be quantified (not 1,1)
+        if ast.min == 1 and ast.max == 1:
+            return False
+
+        # Must have exactly one child that is an OR
+        if ast.get_children_len() != 1:
+            return False
+
+        ref or_node = ast.get_child(0)
+        if or_node.type != OR:
+            return False
+
+        # Check if alternation contains only literal branches
+        var branches = List[String]()
+        return self._extract_literal_branches_from_or(or_node, branches)
+
+    fn _extract_literal_branches_from_or(
+        self, node: ASTNode, mut branches: List[String]
+    ) -> Bool:
+        """Extract literal branches from OR node for optimizer."""
+        from regex.ast import OR, GROUP, ELEMENT
+
+        if node.type == OR:
+            # Process both children
+            return self._extract_literal_branches_from_or(
+                node.get_child(0), branches
+            ) and self._extract_literal_branches_from_or(
+                node.get_child(1), branches
+            )
+        elif node.type == GROUP:
+            # Extract literal string from GROUP of ELEMENTs
+            var branch_text = String("")
+            for i in range(node.get_children_len()):
+                ref element = node.get_child(i)
+                if element.type != ELEMENT:
+                    return False  # Non-literal element found
+                ref char_value = element.get_value().value()
+                branch_text += String(char_value)
+            branches.append(branch_text)
+            return True
+        else:
+            return False  # Unexpected node type
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
@@ -484,7 +677,7 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         # For literal pattern detection, check if this group contains nested GROUP nodes
         # If it does, it means there are explicit capturing groups, making it non-literal
         for i in range(ast.get_children_len()):
-            var child = ast.get_child(i)
+            ref child = ast.get_child(i)
             if child.type == GROUP:
                 # Nested groups make the pattern non-literal (explicit capturing groups)
                 return False
@@ -526,15 +719,15 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
     if ast.type == ELEMENT:
         return String(ast.get_value().value()) if ast.get_value() else ""
     elif ast.type == GROUP:
-        var result = String("")
+        var result = String(capacity=String.INLINE_CAPACITY)
         for i in range(ast.get_children_len()):
             result += _extract_literal_chars(ast.get_child(i))
         return result
     elif ast.type == START or ast.type == END:
         # Anchors don't contribute to literal string
-        return ""
+        return EMPTY_STRING
     else:
-        return ""
+        return EMPTY_STRING  # Non-literal nodes return empty string
 
 
 fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
@@ -550,7 +743,7 @@ fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     var has_end = False
 
     if ast.type == RE and ast.has_children():
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         has_start, has_end = _check_anchors_recursive(child)
 
     return (has_start, has_end)
