@@ -484,7 +484,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
 
         for element_idx in range(len(pattern_info.elements)):
-            var element = pattern_info.elements[element_idx]
+            ref element = pattern_info.elements[element_idx]
             var is_last_element = element_idx == len(pattern_info.elements) - 1
 
             # Create states for this element based on its quantifier
@@ -598,7 +598,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
 
         for element_idx in range(len(sequence_info.elements)):
-            var element = sequence_info.elements[element_idx]
+            ref element = sequence_info.elements[element_idx]
             var is_last_element = element_idx == len(sequence_info.elements) - 1
 
             # Check if all remaining elements are optional
@@ -685,7 +685,7 @@ struct DFAEngine(Engine):
                 # we also need to add transitions from the optional element's match state
                 if element_idx == 1 and current_state_index == 0:
                     # The previous element was optional, add transitions from its match state too
-                    var prev_element = sequence_info.elements[0]
+                    ref prev_element = sequence_info.elements[0]
                     if prev_element.min_matches == 0:
                         # Add transitions from the optional element's match state (which should be state 1)
                         self._add_character_class_transitions_with_logic(
@@ -858,7 +858,7 @@ struct DFAEngine(Engine):
 
         # Navigate to the quantified group: RE -> GROUP -> GROUP (with quantifier)
         ref outer_group = ast.get_child(0)  # First GROUP
-        var inner_group = outer_group.get_child(
+        ref inner_group = outer_group.get_child(
             0
         )  # Second GROUP (with quantifier)
 
@@ -999,7 +999,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
         # Navigate to the group containing elements with quantifiers
-        var group = ast.get_child(0)  # GROUP
+        ref group = ast.get_child(0)  # GROUP
 
         # Extract pattern text and find quantifier info
         var pattern_parts = List[String]()
@@ -1009,8 +1009,8 @@ struct DFAEngine(Engine):
 
         # Process each element to build pattern and detect quantifier
         for i in range(group.get_children_len()):
-            var element = group.get_child(i)
-            var char_text = String(element.get_value().value())
+            ref element = group.get_child(i)
+            ref char_text = String(element.get_value().value())
 
             if element.min == 0 and element.max == -1:  # *
                 quantifier_type = "*"
@@ -1194,8 +1194,8 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
         # Navigate to the wildcard element
-        var group = ast.get_child(0)  # GROUP
-        var wildcard = group.get_child(0)  # WILDCARD
+        ref group = ast.get_child(0)  # GROUP
+        ref wildcard = group.get_child(0)  # WILDCARD
 
         # Extract quantifier information
         var quantifier_min = wildcard.min
@@ -1288,9 +1288,9 @@ struct DFAEngine(Engine):
 
         # Navigate to the OR structure inside the group
         # Pattern structure: RE -> GROUP -> GROUP -> OR tree
-        var outer_group = ast.get_child(0)  # Outer GROUP
-        var inner_group = outer_group.get_child(0)  # Inner GROUP
-        var or_node = inner_group.get_child(0)  # OR node
+        ref outer_group = ast.get_child(0)  # Outer GROUP
+        ref inner_group = outer_group.get_child(0)  # Inner GROUP
+        ref or_node = inner_group.get_child(0)  # OR node
 
         # Extract all alternation branches
         var branches = List[String]()
@@ -1307,8 +1307,8 @@ struct DFAEngine(Engine):
 
         if node.type == OR:
             # Get left and right children
-            var left_child = node.get_child(0)
-            var right_child = node.get_child(1)
+            ref left_child = node.get_child(0)
+            ref right_child = node.get_child(1)
 
             # Recursively process both sides
             self._extract_all_prefix_branches(left_child, branches)
@@ -1317,9 +1317,9 @@ struct DFAEngine(Engine):
             # Extract string from GROUP of ELEMENTs
             var branch_text = String("")
             for i in range(node.get_children_len()):
-                var element = node.get_child(i)
+                ref element = node.get_child(i)
                 if element.type == ELEMENT:
-                    var char_value = element.get_value().value()
+                    ref char_value = element.get_value().value()
                     branch_text += String(char_value)
             branches.append(branch_text)
 
@@ -1329,7 +1329,7 @@ struct DFAEngine(Engine):
             return
 
         # Find the common prefix among all branches
-        var common_prefix = self._find_common_prefix(branches)
+        ref common_prefix = self._find_common_prefix(branches)
         var prefix_len = len(common_prefix)
 
         # Build states for the common prefix
@@ -1343,7 +1343,7 @@ struct DFAEngine(Engine):
 
         # Process each branch after common prefix
         for i in range(len(branches)):
-            var branch = branches[i]
+            ref branch = branches[i]
             if len(branch) == prefix_len:
                 # Branch ends at common prefix - make current state accepting
                 self.states[current_state].is_accepting = True
@@ -1375,7 +1375,7 @@ struct DFAEngine(Engine):
             return branches[0]
 
         var prefix = String("")
-        var first_branch = branches[0]
+        ref first_branch = branches[0]
         var min_length = len(first_branch)
 
         # Find minimum length
@@ -1429,9 +1429,9 @@ struct DFAEngine(Engine):
 
         # Navigate to the quantified group and alternation
         # Pattern structure: RE -> GROUP -> GROUP(quantified) -> OR
-        var outer_group = ast.get_child(0)  # Outer GROUP
-        var quantified_group = outer_group.get_child(0)  # Quantified GROUP
-        var or_node = quantified_group.get_child(0)  # OR node
+        ref outer_group = ast.get_child(0)  # Outer GROUP
+        ref quantified_group = outer_group.get_child(0)  # Quantified GROUP
+        ref or_node = quantified_group.get_child(0)  # OR node
 
         # Extract quantifier information
         var quantifier_min = quantified_group.min
@@ -1465,8 +1465,8 @@ struct DFAEngine(Engine):
 
         if node.type == OR:
             # Get left and right children
-            var left_child = node.get_child(0)
-            var right_child = node.get_child(1)
+            ref left_child = node.get_child(0)
+            ref right_child = node.get_child(1)
 
             # Recursively process both sides
             self._extract_all_alternation_branches_for_quantified(
@@ -1479,9 +1479,9 @@ struct DFAEngine(Engine):
             # Extract string from GROUP of ELEMENTs
             var branch_text = String("")
             for i in range(node.get_children_len()):
-                var element = node.get_child(i)
+                ref element = node.get_child(i)
                 if element.type == ELEMENT:
-                    var char_value = element.get_value().value()
+                    ref char_value = element.get_value().value()
                     branch_text += String(char_value)
             branches.append(branch_text)
 
@@ -1500,7 +1500,7 @@ struct DFAEngine(Engine):
 
         # Add paths for each branch
         for i in range(len(branches)):
-            var branch = branches[i]
+            ref branch = branches[i]
             var current_state = 0
 
             for j in range(len(branch)):
@@ -1527,7 +1527,7 @@ struct DFAEngine(Engine):
 
         # For each branch, create path that loops back to start
         for i in range(len(branches)):
-            var branch = branches[i]
+            ref branch = branches[i]
             var current_state = 0
 
             for j in range(len(branch)):
@@ -1554,7 +1554,7 @@ struct DFAEngine(Engine):
 
         # For each branch, create path to loop state
         for i in range(len(branches)):
-            var branch = branches[i]
+            ref branch = branches[i]
             var current_state = 0
 
             for j in range(len(branch)):
@@ -1573,7 +1573,7 @@ struct DFAEngine(Engine):
 
         # From loop state, can match any branch again (loop back through each branch)
         for i in range(len(branches)):
-            var branch = branches[i]
+            ref branch = branches[i]
             var current_state = loop_index
 
             for j in range(len(branch)):
@@ -1767,7 +1767,7 @@ struct DFAEngine(Engine):
 
         # Fast path for pure literal patterns using SIMD
         if self.is_pure_literal and self.simd_string_search:
-            var searcher = self.simd_string_search.value()
+            ref searcher = self.simd_string_search.value()
             if require_exact_position:
                 # For match_first, must match at exact position
                 if searcher._verify_match(text, start_pos):
@@ -1877,7 +1877,7 @@ struct DFAEngine(Engine):
             # Try to match at current position directly
             var match_result = self._try_match_at_position(text, pos)
             if match_result:
-                var match_obj = match_result.value()
+                ref match_obj = match_result.value()
                 matches.append(match_obj)
                 # Move past this match to find next one
                 if match_obj.end_idx == match_obj.start_idx:
@@ -1907,7 +1907,7 @@ struct DFAEngine(Engine):
         if not self.simd_char_matcher:
             return None
 
-        var simd_matcher = self.simd_char_matcher.value()
+        ref simd_matcher = self.simd_char_matcher.value()
         var text_len = len(text)
 
         if len(self.states) == 0:
@@ -2096,7 +2096,7 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         var char_class, min_matches, max_matches, has_start, has_end, positive_logic = _extract_character_class_info(
             ast
         )
-        var char_class_str = char_class.value()
+        ref char_class_str = char_class.value()
         var expanded_char_class = expand_character_range(char_class_str)
         dfa.compile_character_class_with_logic(
             expanded_char_class,
@@ -2108,19 +2108,19 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         dfa.has_end_anchor = has_end
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
-        var sequence_info = _extract_multi_class_sequence_info(ast)
+        ref sequence_info = _extract_multi_class_sequence_info(ast)
         dfa.compile_multi_character_class_sequence(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
-        var sequence_info = _extract_sequential_pattern_info(ast)
+        ref sequence_info = _extract_sequential_pattern_info(ast)
         dfa.compile_sequential_pattern(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
-        var sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        ref sequence_info = _extract_mixed_sequential_pattern_info(ast)
         dfa.compile_multi_character_class_sequence(sequence_info)
         dfa.has_start_anchor = sequence_info.has_start_anchor
         dfa.has_end_anchor = sequence_info.has_end_anchor
@@ -2205,12 +2205,12 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         return False
 
     if ast.type == RE and ast.get_children_len() == 1:
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         if child.type == DIGIT or child.type == RANGE:
             return True
         elif child.type == GROUP and child.get_children_len() == 1:
             # Check if group contains single digit or range element
-            var inner = child.get_child(0)
+            ref inner = child.get_child(0)
             return inner.type == DIGIT or inner.type == RANGE
     elif ast.type == DIGIT or ast.type == RANGE:
         return True
@@ -2324,13 +2324,13 @@ fn _is_sequential_character_class_pattern(
     if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.get_child(0)
+    ref child = ast.get_child(0)
     if child.type != GROUP:
         return False
 
     # Check if all children are character classes (RANGE or DIGIT)
     for i in range(child.get_children_len()):
-        var element = child.get_child(i)
+        ref element = child.get_child(i)
         if element.type != RANGE and element.type != DIGIT:
             return False
 
@@ -2357,11 +2357,11 @@ fn _extract_sequential_pattern_info(
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
     if ast.type == RE and ast.get_children_len() == 1:
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         if child.type == GROUP:
             # Extract each character class element
             for i in range(child.get_children_len()):
-                var element = child.get_child(i)
+                ref element = child.get_child(i)
                 var char_class: String
 
                 if element.type == DIGIT:
@@ -2397,7 +2397,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.get_child(0)
+    ref child = ast.get_child(0)
     if child.type != GROUP:
         return False
 
@@ -2451,7 +2451,7 @@ fn _extract_multi_class_sequence_info(
     info.has_start_anchor, info.has_end_anchor = pattern_has_anchors(ast)
 
     if ast.type == RE and ast.get_children_len() == 1:
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         if child.type == GROUP:
             # Extract each character class element
             for i in range(child.get_children_len()):
@@ -2504,7 +2504,7 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.get_child(0)
+    ref child = ast.get_child(0)
     if child.type != GROUP:
         return False
 
@@ -2667,7 +2667,7 @@ fn _find_or_node(
     # Recursively search children
     for i in range(ast.get_children_len()):
         var child = ast.get_child(i)
-        var found = _find_or_node(child)
+        ref found = _find_or_node(child)
         if found:
             return found
 
@@ -2712,7 +2712,7 @@ fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
     # Pattern should be RE -> GROUP -> GROUP (with quantifier)
     if ast.type == RE and ast.get_children_len() == 1:
-        var child = ast.get_child(0)
+        ref child = ast.get_child(0)
         if child.type == GROUP and child.get_children_len() == 1:
             var grandchild = child.get_child(0)
             if grandchild.type == GROUP:
@@ -2787,12 +2787,12 @@ fn _collect_all_alternation_branches(
 
         if branch.type == OR:
             # Nested OR - recursively collect its branches
-            var nested_branches = _collect_all_alternation_branches(branch)
+            ref nested_branches = _collect_all_alternation_branches(branch)
             for j in range(len(nested_branches)):
                 branches.append(nested_branches[j])
         else:
             # Leaf branch (ELEMENT or GROUP) - extract its text
-            var branch_text = _extract_branch_text(branch)
+            ref branch_text = _extract_branch_text(branch)
             if len(branch_text) > 0:
                 branches.append(branch_text)
 
@@ -2819,7 +2819,7 @@ fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     if ast.type != RE or ast.get_children_len() != 1:
         return False
 
-    var child = ast.get_child(0)
+    ref child = ast.get_child(0)
 
     # Case 1: RE -> OR (direct alternation)
     if child.type == OR:
@@ -2970,7 +2970,7 @@ fn _extract_literal_branches(
             var element = node.get_child(i)
             if element.type != ELEMENT:
                 return False  # Non-literal element found
-            var char_value = element.get_value().value()
+            ref char_value = element.get_value().value()
             branch_text += String(char_value)
         branches.append(branch_text)
         return True
@@ -2986,7 +2986,7 @@ fn _compute_common_prefix(branches: List[String]) -> String:
         return branches[0]
 
     var prefix = String("")
-    var first_branch = branches[0]
+    ref first_branch = branches[0]
     var min_length = len(first_branch)
 
     # Find minimum length
@@ -3071,7 +3071,7 @@ fn _extract_literal_alternation_branches(
             var element = node.get_child(i)
             if element.type != ELEMENT:
                 return False  # Non-literal element found
-            var char_value = element.get_value().value()
+            ref char_value = element.get_value().value()
             branch_text += String(char_value)
         branches.append(branch_text)
         return True
