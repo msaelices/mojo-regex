@@ -1173,6 +1173,99 @@ struct DFAEngine(Engine):
             self.states[from_state].add_transition(char_code, new_state_index)
             return new_state_index
 
+    fn compile_wildcard_quantifier(
+        mut self, ast: ASTNode[MutableAnyOrigin]
+    ) raises:
+        """Compile a wildcard quantifier pattern like .*, .+, .? into a DFA.
+
+        Creates a state machine that matches any character with the specified quantifier.
+
+        Args:
+            ast: AST node representing the wildcard quantifier pattern.
+        """
+        from regex.ast import RE, GROUP, WILDCARD
+
+        # Clear existing states
+        self.states.clear()
+
+        # Create start state
+        var start_state = DFAState()
+        self.states.append(start_state)
+        self.start_state = 0
+
+        # Navigate to the wildcard element
+        var group = ast.get_child(0)  # GROUP
+        var wildcard = group.get_child(0)  # WILDCARD
+
+        # Extract quantifier information
+        var quantifier_min = wildcard.min
+        var quantifier_max = wildcard.max
+
+        # Create accepting state
+        var accepting_state = DFAState(is_accepting=True, match_length=0)
+        self.states.append(accepting_state)
+        var accepting_index = len(self.states) - 1
+
+        # Handle different quantifier types
+        if quantifier_min == 0 and quantifier_max == 1:
+            # Optional: .?
+            self._compile_wildcard_optional(accepting_index)
+        elif quantifier_min == 0 and quantifier_max == -1:
+            # Zero or more: .*
+            self._compile_wildcard_zero_or_more(accepting_index)
+        elif quantifier_min == 1 and quantifier_max == -1:
+            # One or more: .+
+            self._compile_wildcard_one_or_more(accepting_index)
+        elif quantifier_min == 1 and quantifier_max == 1:
+            # Single dot: .
+            self._compile_wildcard_single(accepting_index)
+        else:
+            raise Error("Unsupported quantifier type for wildcard quantifier")
+
+    fn _compile_wildcard_optional(mut self, accepting_index: Int):
+        """Compile .? - match any character 0 or 1 times."""
+        # Start state is accepting (0 matches)
+        self.states[0].is_accepting = True
+
+        # Add transitions from start state to accepting for any character except newline
+        for i in range(256):
+            if i != ord("\n"):  # Wildcard doesn't match newline by default
+                self.states[0].add_transition(i, accepting_index)
+
+    fn _compile_wildcard_zero_or_more(mut self, accepting_index: Int):
+        """Compile .* - match any character 0 or more times."""
+        # Start state is accepting (0 matches)
+        self.states[0].is_accepting = True
+
+        # Add transitions from start state back to itself for any character except newline
+        for i in range(256):
+            if i != ord("\n"):  # Wildcard doesn't match newline by default
+                self.states[0].add_transition(i, 0)  # Loop back to start
+
+    fn _compile_wildcard_one_or_more(mut self, accepting_index: Int):
+        """Compile .+ - match any character 1 or more times."""
+        # Create an accepting state that can loop
+        var loop_state = DFAState(is_accepting=True)
+        self.states.append(loop_state)
+        var loop_index = len(self.states) - 1
+
+        # Add transitions from start state to loop state for any character except newline
+        for i in range(256):
+            if i != ord("\n"):  # Wildcard doesn't match newline by default
+                self.states[0].add_transition(i, loop_index)
+
+        # Add transitions from loop state back to itself for any character except newline
+        for i in range(256):
+            if i != ord("\n"):
+                self.states[loop_index].add_transition(i, loop_index)
+
+    fn _compile_wildcard_single(mut self, accepting_index: Int):
+        """Compile . - match any single character."""
+        # Add transitions from start state to accepting for any character except newline
+        for i in range(256):
+            if i != ord("\n"):  # Wildcard doesn't match newline by default
+                self.states[0].add_transition(i, accepting_index)
+
     @always_inline
     fn _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
@@ -1731,6 +1824,13 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     elif _is_simple_quantifier_pattern(ast):
         # Handle simple quantifier patterns like a*, test+, char?
         dfa.compile_simple_quantifier(ast)
+        # Check for anchors in the original pattern
+        var has_start, has_end = pattern_has_anchors(ast)
+        dfa.has_start_anchor = has_start
+        dfa.has_end_anchor = has_end
+    elif _is_wildcard_quantifier_pattern(ast):
+        # Handle wildcard quantifier patterns like .*, .+, .?
+        dfa.compile_wildcard_quantifier(ast)
         # Check for anchors in the original pattern
         var has_start, has_end = pattern_has_anchors(ast)
         dfa.has_start_anchor = has_start
@@ -2442,3 +2542,35 @@ fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
             has_quantifier = True
 
     return has_quantifier
+
+
+fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    """Check if pattern is a wildcard quantifier like .*, .+, .?.
+
+    Args:
+        ast: Root AST node.
+
+    Returns:
+        True if pattern is a wildcard quantifier pattern.
+    """
+    from regex.ast import RE, GROUP, WILDCARD
+
+    # Pattern should be RE -> GROUP -> WILDCARD
+    if ast.type != RE or ast.get_children_len() != 1:
+        return False
+
+    var group = ast.get_child(0)
+    if group.type != GROUP or group.get_children_len() != 1:
+        return False
+
+    var wildcard = group.get_child(0)
+    if wildcard.type != WILDCARD:
+        return False
+
+    # Check for quantifiers: *, +, ? or single (min=1, max=1)
+    return (
+        (wildcard.min == 0 and wildcard.max == -1)
+        or (wildcard.min == 1 and wildcard.max == -1)  # *
+        or (wildcard.min == 0 and wildcard.max == 1)  # +
+        or (wildcard.min == 1 and wildcard.max == 1)  # ?  # single dot
+    )
