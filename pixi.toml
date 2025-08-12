@@ -13,13 +13,13 @@ version = "0.4.0"
 
 [package]
 name = "mojo-regex"
-version = "0.2.1"
+version = "0.4.0"
 
 [package.build]
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-mojo = ">=25.6.0.dev2025073007,<26"
+mojo = "=25.5.0"
 
 [tasks]
 test = "mojo test -I ./src tests/"
