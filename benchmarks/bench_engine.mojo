@@ -22,6 +22,32 @@ fn make_test_string(length: Int) -> String:
     return result
 
 
+fn make_phone_test_data(num_phones: Int) -> String:
+    """Generate test data containing US phone numbers in various formats."""
+    var result = String()
+    var phone_patterns = List[String](
+        "555-123-4567",
+        "(555) 123-4567",
+        "555.123.4567",
+        "5551234567",
+        "+1-555-123-4567",
+        "1-555-123-4568",
+        "(555)123-4569",
+        "555 123 4570",
+    )
+    var filler_text = " Contact us at "
+    var extra_text = " or email support@company.com for assistance. "
+
+    for i in range(num_phones):
+        result += filler_text
+        # Cycle through different phone patterns
+        var pattern_idx = i % len(phone_patterns)
+        result += phone_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
 # ===-----------------------------------------------------------------------===#
 # Manual Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
@@ -315,6 +341,45 @@ fn main() raises:
     detect_and_report_engine("[0-9]+\\.[0-9]+", "complex_number")
     benchmark_findall(
         "complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500
+    )
+
+    # ===== US Phone Number Benchmarks =====
+    print("# US Phone Number Parsing")
+    var phone_text = make_phone_test_data(1000)
+
+    detect_and_report_engine("\\d{3}-\\d{3}-\\d{4}", "simple_phone")
+    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
+
+    detect_and_report_engine(
+        "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}", "flexible_phone"
+    )
+    benchmark_findall(
+        "flexible_phone",
+        "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
+        phone_text,
+        100,
+    )
+
+    detect_and_report_engine(
+        "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
+        "multi_format_phone",
+    )
+    benchmark_findall(
+        "multi_format_phone",
+        "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
+        phone_text,
+        50,
+    )
+
+    detect_and_report_engine(
+        "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
+        "phone_validation",
+    )
+    benchmark_match_first(
+        "phone_validation",
+        "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
+        "234-567-8901",
+        500,
     )
 
     print()
