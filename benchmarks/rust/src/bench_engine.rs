@@ -147,6 +147,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "alternation_common_prefix", &patterns.alt_common_prefix, &medium_text, 1, BenchType::FindAll);
 
     // ===-----------------------------------------------------------------------===
+    // US Phone Number Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== US Phone Number Benchmarks ===");
+
+    let phone_text = make_phone_test_data(1000);
+
+    run_benchmark(&timer, &mut all_results, "simple_phone", &patterns.simple_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "flexible_phone", &patterns.flexible_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "multi_format_phone", &patterns.multi_format_phone, &phone_text, 50, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "phone_validation", &patterns.phone_validation, "555-123-4567", 500, BenchType::IsMatch);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -190,6 +202,35 @@ struct CompiledPatterns {
     literal_prefix_medium: Regex,
     literal_prefix_long: Regex,
     required_literal: Regex,
+    simple_phone: Regex,
+    flexible_phone: Regex,
+    multi_format_phone: Regex,
+    phone_validation: Regex,
+}
+
+fn make_phone_test_data(num_phones: usize) -> String {
+    let phone_patterns = [
+        "555-123-4567",
+        "(555) 123-4567",
+        "555.123.4567",
+        "5551234567",
+        "+1-555-123-4567",
+        "1-555-123-4568",
+        "(555)123-4569",
+        "555 123 4570"
+    ];
+    let filler_text = " Contact us at ";
+    let extra_text = " or email support@company.com for assistance. ";
+
+    let mut result = String::new();
+    for i in 0..num_phones {
+        result.push_str(filler_text);
+        let pattern_idx = i % phone_patterns.len();
+        result.push_str(phone_patterns[pattern_idx]);
+        result.push_str(extra_text);
+    }
+
+    result
 }
 
 fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>> {
@@ -218,6 +259,10 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         literal_prefix_medium: Regex::new("hello.*")?,
         literal_prefix_long: Regex::new("hello.*")?,
         required_literal: Regex::new(r".*@example\.com")?,
+        simple_phone: Regex::new(r"\d{3}-\d{3}-\d{4}")?,
+        flexible_phone: Regex::new(r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")?,
+        multi_format_phone: Regex::new(r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}")?,
+        phone_validation: Regex::new(r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$")?,
     })
 }
 

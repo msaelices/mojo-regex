@@ -68,6 +68,10 @@ class Benchmark:
             "required_literal_": 1,
             "no_literal_baseline": 1,
             "alternation_common_prefix": 1,
+            "simple_phone": 100,
+            "flexible_phone": 100,
+            "multi_format_phone": 50,
+            "phone_validation": 500,
         }
 
         internal_iterations = 1
@@ -146,6 +150,32 @@ def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -
     remainder = length % pattern_len
 
     result = pattern * full_repeats + pattern[:remainder]
+    return result
+
+
+def make_phone_test_data(num_phones: int) -> str:
+    """Generate test data containing US phone numbers in various formats."""
+    phone_patterns = [
+        "555-123-4567",
+        "(555) 123-4567",
+        "555.123.4567",
+        "5551234567",
+        "+1-555-123-4567",
+        "1-555-123-4568",
+        "(555)123-4569",
+        "555 123 4570"
+    ]
+    filler_text = " Contact us at "
+    extra_text = " or email support@company.com for assistance. "
+
+    result = ""
+    for i in range(num_phones):
+        result += filler_text
+        # Cycle through different phone patterns
+        pattern_idx = i % len(phone_patterns)
+        result += phone_patterns[pattern_idx]
+        result += extra_text
+
     return result
 
 
@@ -353,6 +383,28 @@ def bench_literal_optimization(
     return benchmark_fn
 
 
+def bench_phone_findall(test_text: str, pattern: str, iterations: int) -> Callable[[], None]:
+    """Benchmark phone number pattern matching."""
+
+    def benchmark_fn():
+        for _ in range(iterations):
+            results = re.findall(pattern, test_text)
+            len(results)  # Keep result
+
+    return benchmark_fn
+
+
+def bench_phone_match(test_text: str, pattern: str, iterations: int) -> Callable[[], None]:
+    """Benchmark phone number pattern validation."""
+
+    def benchmark_fn():
+        for _ in range(iterations):
+            result = re.match(pattern, test_text)
+            bool(result)  # Keep result
+
+    return benchmark_fn
+
+
 # ===-----------------------------------------------------------------------===#
 # Benchmark Main
 # ===-----------------------------------------------------------------------===#
@@ -481,6 +533,29 @@ def main():
     m.bench_function(
         "alternation_common_prefix",
         bench_literal_optimization(MEDIUM_TEXT, r"(hello|help|helicopter)", 1),
+    )
+
+    # US Phone Number Benchmarks
+    phone_text = make_phone_test_data(1000)
+
+    m.bench_function(
+        "simple_phone",
+        bench_phone_findall(phone_text, r"\d{3}-\d{3}-\d{4}", 100),
+    )
+
+    m.bench_function(
+        "flexible_phone",
+        bench_phone_findall(phone_text, r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}", 100),
+    )
+
+    m.bench_function(
+        "multi_format_phone",
+        bench_phone_findall(phone_text, r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}", 50),
+    )
+
+    m.bench_function(
+        "phone_validation",
+        bench_phone_match("555-123-4567", r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$", 500),
     )
 
     # Results summary
