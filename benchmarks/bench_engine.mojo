@@ -10,7 +10,7 @@ from regex import match_first, findall, search
 fn make_test_string(length: Int) -> String:
     """Generate test string by repeating alphabet."""
     var result = String()
-    var pattern = "abcdefghijklmnopqrstuvwxyz"
+    var pattern = String("abcdefghijklmnopqrstuvwxyz")
     var pattern_len = len(pattern)
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
