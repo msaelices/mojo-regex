@@ -126,11 +126,14 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
     var engine: DFAEngine
     """The underlying DFA engine for pattern matching."""
 
-    fn __init__(out self, owned ast: ASTNode[MutableAnyOrigin]) raises:
+    fn __init__(
+        out self, owned ast: ASTNode[MutableAnyOrigin], pattern: String
+    ) raises:
         """Initialize DFA matcher by compiling the AST.
 
         Args:
             ast: AST representing the regex pattern.
+            pattern: The original regex pattern string.
         """
         self.engine = compile_simple_pattern(ast)
 
@@ -378,10 +381,22 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 if len(literal) > 0:
                     best_literal_opt = literal
                     # Simple heuristic: if we have a required literal and no complex regex constructs
+                    # Must also check that the pattern doesn't contain regex operators
+                    var has_regex_operators = (
+                        "*" in pattern
+                        or "+" in pattern
+                        or "?" in pattern
+                        or "." in pattern
+                        or "|" in pattern
+                        or "(" in pattern
+                        or "[" in pattern
+                        or "{" in pattern
+                    )
                     is_exact = (
                         best_literal_info.value().is_required
                         and has_literal_prefix(ast)
                         and not has_anchors
+                        and not has_regex_operators
                     )
 
             self.literal_info = OptimizedLiteralInfo(
@@ -403,7 +418,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Create DFA matcher if pattern is simple enough
         if self.complexity.value == PatternComplexity.SIMPLE:
             try:
-                self.dfa_matcher = DFAMatcher(ast)
+                self.dfa_matcher = DFAMatcher(ast, pattern)
             except:
                 # DFA compilation failed, fall back to NFA only
                 self.dfa_matcher = None
