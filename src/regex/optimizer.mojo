@@ -360,10 +360,12 @@ struct PatternAnalyzer:
         Returns:
             PatternComplexity of the alternation
         """
-        if depth > 2:
-            # Check if this is a common prefix alternation before giving up
-            # These can be efficiently handled with trie-like DFA structures
-            if self._is_common_prefix_alternation_in_tree(ast):
+        if depth > 4:  # Increased from 2 to 4 for better alternation support
+            # Check if this is a literal-heavy alternation before giving up
+            if self._is_literal_heavy_alternation(ast):
+                # Literal-heavy alternations can be handled efficiently by DFA
+                return PatternComplexity(PatternComplexity.MEDIUM)
+            elif self._is_common_prefix_alternation_in_tree(ast):
                 # Common prefix alternation - can be handled by specialized DFA
                 return PatternComplexity(PatternComplexity.SIMPLE)
             # Otherwise, deep nesting - too complex for simple DFA
@@ -382,16 +384,24 @@ struct PatternAnalyzer:
                 max_complexity = PatternComplexity(PatternComplexity.MEDIUM)
 
         # Simple alternation between simple patterns can often be handled by DFA
-        # But be more conservative - small alternations should not cause NFA fallback
-        if (
-            max_complexity.value == PatternComplexity.SIMPLE
-            and ast.get_children_len()
-            <= 3  # Reduced from 5 to avoid NFA overhead
-        ):
-            return PatternComplexity(PatternComplexity.SIMPLE)
-        else:
-            # Mark as MEDIUM instead of falling back, to avoid slow NFA path
-            return PatternComplexity(PatternComplexity.MEDIUM)
+        # Improved logic for alternation complexity assessment
+        if max_complexity.value == PatternComplexity.SIMPLE:
+            # For simple branches, allow more alternations if they're DFA-compatible
+            if ast.get_children_len() <= 8:  # Increased from 3 to 8
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            elif self._is_literal_heavy_alternation(ast):
+                # Even large alternations can be MEDIUM if literal-heavy
+                return PatternComplexity(PatternComplexity.MEDIUM)
+        elif max_complexity.value == PatternComplexity.MEDIUM:
+            # For medium branches, still prefer MEDIUM over COMPLEX when possible
+            if (
+                ast.get_children_len() <= 12
+                and self._is_dfa_friendly_alternation(ast)
+            ):
+                return PatternComplexity(PatternComplexity.MEDIUM)
+
+        # Default to MEDIUM instead of COMPLEX to avoid slow NFA path
+        return PatternComplexity(PatternComplexity.MEDIUM)
 
     fn _analyze_group(self, ast: ASTNode, depth: Int) -> PatternComplexity:
         """Analyze group complexity.
@@ -403,7 +413,12 @@ struct PatternAnalyzer:
         Returns:
             PatternComplexity of the group
         """
-        if depth > 3:
+        if (
+            depth > 4
+        ):  # Increased from 3 to 4 for better non-capturing group support
+            # Check if this is a literal-heavy group before giving up
+            if self._is_literal_heavy_group(ast):
+                return PatternComplexity(PatternComplexity.MEDIUM)
             # Deep nesting - too complex
             return PatternComplexity(PatternComplexity.COMPLEX)
 
@@ -424,6 +439,20 @@ struct PatternAnalyzer:
             else:
                 # Complex quantified groups still need NFA
                 return PatternComplexity(PatternComplexity.MEDIUM)
+
+        # For non-capturing groups, analyze content complexity rather than syntax structure
+        if self._is_non_capturing_group(ast):
+            var content_complexity = self._analyze_group_content_structure(
+                ast, depth
+            )
+            # Non-capturing groups with literal-heavy content should be classified more generously
+            if content_complexity.value == PatternComplexity.SIMPLE:
+                return PatternComplexity(PatternComplexity.SIMPLE)
+            elif self._has_literal_structure(ast):
+                # Even if content is MEDIUM, literal structure can often use DFA optimizations
+                return PatternComplexity(PatternComplexity.MEDIUM)
+            else:
+                return content_complexity
 
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
@@ -464,7 +493,9 @@ struct PatternAnalyzer:
                 all_literal and ast.get_children_len() <= 20
             ):  # Allow longer literal strings
                 return PatternComplexity(PatternComplexity.SIMPLE)
-            elif ast.get_children_len() <= 3:
+            elif (
+                ast.get_children_len() <= 5
+            ):  # Increased from 3 to 5 for better group support
                 return PatternComplexity(PatternComplexity.SIMPLE)
             else:
                 return PatternComplexity(PatternComplexity.MEDIUM)
@@ -666,6 +697,117 @@ struct PatternAnalyzer:
         var branches = List[String]()
         return self._extract_literal_branches_from_or(or_node, branches)
 
+    fn _is_literal_heavy_alternation(self, ast: ASTNode) -> Bool:
+        """Check if alternation consists mainly of literal patterns that DFA can handle efficiently.
+
+        Args:
+            ast: OR node to analyze
+
+        Returns:
+            True if 80%+ branches are DFA-compatible literal patterns
+        """
+        if ast.type != OR:
+            return False
+
+        var dfa_compatible_branches = 0
+        var total_branches = ast.get_children_len()
+
+        for i in range(total_branches):
+            if self._is_dfa_compatible_branch(ast.get_child(i)):
+                dfa_compatible_branches += 1
+
+        # If 80%+ branches are DFA-compatible, classify as literal-heavy
+        return (dfa_compatible_branches * 5) >= (
+            total_branches * 4
+        )  # 80% threshold
+
+    fn _is_dfa_compatible_branch(self, ast: ASTNode) -> Bool:
+        """Check if a single alternation branch is DFA-compatible.
+
+        Args:
+            ast: Branch node to analyze
+
+        Returns:
+            True if branch can be efficiently handled by DFA
+        """
+        if ast.type == ELEMENT:
+            # Simple literal characters are always DFA-compatible
+            return True
+        elif ast.type in (RANGE, DIGIT, SPACE):
+            # Character classes are DFA-compatible
+            return True
+        elif ast.type == GROUP:
+            # Simple groups containing literals/character classes are DFA-compatible
+            if ast.get_children_len() <= 4:  # Reasonable group size
+                for i in range(ast.get_children_len()):
+                    ref child = ast.get_child(i)
+                    if not self._is_simple_dfa_node(child):
+                        return False
+                return True
+        elif ast.type == OR:
+            # Nested alternations are DFA-compatible if they're simple
+            if ast.get_children_len() <= 4:  # Small nested alternations
+                for i in range(ast.get_children_len()):
+                    if not self._is_dfa_compatible_branch(ast.get_child(i)):
+                        return False
+                return True
+
+        return False
+
+    fn _is_simple_dfa_node(self, ast: ASTNode) -> Bool:
+        """Check if a node is simple enough for DFA processing.
+
+        Args:
+            ast: Node to check
+
+        Returns:
+            True if node is DFA-friendly
+        """
+        if ast.type in (ELEMENT, RANGE, DIGIT, SPACE, WILDCARD):
+            # Basic literal and character class nodes
+            return (
+                ast.max <= 10 or ast.max == -1
+            )  # Reasonable quantifier bounds
+        elif ast.type in (START, END):
+            # Anchors are DFA-friendly
+            return True
+
+        return False
+
+    fn _is_dfa_friendly_alternation(self, ast: ASTNode) -> Bool:
+        """Check if an alternation pattern is generally DFA-friendly.
+
+        Args:
+            ast: OR node to analyze
+
+        Returns:
+            True if alternation has DFA-friendly structure
+        """
+        if ast.type != OR:
+            return False
+
+        # Check for patterns that benefit from DFA processing
+        var literal_count = 0
+        var char_class_count = 0
+        var simple_group_count = 0
+
+        for i in range(ast.get_children_len()):
+            ref branch = ast.get_child(i)
+            if branch.type == ELEMENT:
+                literal_count += 1
+            elif branch.type in (RANGE, DIGIT, SPACE):
+                char_class_count += 1
+            elif branch.type == GROUP and branch.get_children_len() <= 3:
+                simple_group_count += 1
+
+        var total_branches = ast.get_children_len()
+        var friendly_branches = (
+            literal_count + char_class_count + simple_group_count
+        )
+
+        # If 60%+ branches are DFA-friendly, consider the alternation friendly
+        return (friendly_branches * 5) >= (total_branches * 3)  # 60% threshold
+
     fn _extract_literal_branches_from_or(
         self, node: ASTNode, mut branches: List[String]
     ) -> Bool:
@@ -692,6 +834,126 @@ struct PatternAnalyzer:
             return True
         else:
             return False  # Unexpected node type
+
+    fn _is_non_capturing_group(self, ast: ASTNode) -> Bool:
+        """Check if this group is a non-capturing group (?:...).
+
+        Args:
+            ast: GROUP node to check
+
+        Returns:
+            True if this is a non-capturing group
+        """
+        # In our AST representation, non-capturing groups are typically
+        # parsed as regular groups with specific flags or markers
+        # For now, assume all groups could potentially be non-capturing
+        # TODO: Add proper non-capturing group detection based on AST structure
+        return True  # Conservative assumption for now
+
+    fn _analyze_group_content_structure(
+        self, ast: ASTNode, depth: Int
+    ) -> PatternComplexity:
+        """Analyze the structural complexity of group content, focusing on DFA-compatibility.
+
+        Args:
+            ast: GROUP node to analyze
+            depth: Current nesting depth
+
+        Returns:
+            PatternComplexity based on content structure
+        """
+        var max_complexity = PatternComplexity(PatternComplexity.SIMPLE)
+        var literal_count = 0
+        var char_class_count = 0
+        var simple_alternation_count = 0
+
+        for i in range(ast.get_children_len()):
+            ref child = ast.get_child(i)
+            var child_complexity = self._analyze_node(child, depth + 1)
+
+            # Track types of content for DFA compatibility assessment
+            if child.type == ELEMENT:
+                literal_count += 1
+            elif child.type in (RANGE, DIGIT, SPACE):
+                char_class_count += 1
+            elif child.type == OR and child.get_children_len() <= 4:
+                simple_alternation_count += 1
+
+            if child_complexity.value == PatternComplexity.COMPLEX:
+                return PatternComplexity(PatternComplexity.COMPLEX)
+            elif child_complexity.value == PatternComplexity.MEDIUM:
+                max_complexity = PatternComplexity(PatternComplexity.MEDIUM)
+
+        # Groups with mostly literals and character classes are DFA-friendly
+        var total_children = ast.get_children_len()
+        var dfa_friendly_children = (
+            literal_count + char_class_count + simple_alternation_count
+        )
+
+        if total_children > 0 and (dfa_friendly_children * 4) >= (
+            total_children * 3
+        ):  # 75% threshold
+            # Even if some children are MEDIUM, the overall structure is DFA-friendly
+            return PatternComplexity(
+                PatternComplexity.SIMPLE
+            ) if max_complexity.value == PatternComplexity.SIMPLE else PatternComplexity(
+                PatternComplexity.MEDIUM
+            )
+
+        return max_complexity
+
+    fn _has_literal_structure(self, ast: ASTNode) -> Bool:
+        """Check if group has a literal-heavy structure suitable for DFA optimization.
+
+        Args:
+            ast: GROUP node to analyze
+
+        Returns:
+            True if group structure is literal-heavy
+        """
+        var literal_elements = 0
+        var total_elements = ast.get_children_len()
+
+        for i in range(total_elements):
+            ref child = ast.get_child(i)
+            if child.type == ELEMENT or child.type in (RANGE, DIGIT, SPACE):
+                literal_elements += 1
+            elif child.type == OR:
+                # Check if alternation is literal-heavy
+                if self._is_literal_heavy_alternation(child):
+                    literal_elements += 1
+
+        # If 60%+ of elements are literal-like, consider it literal structure
+        return total_elements > 0 and (literal_elements * 5) >= (
+            total_elements * 3
+        )  # 60% threshold
+
+    fn _is_literal_heavy_group(self, ast: ASTNode) -> Bool:
+        """Check if group consists mainly of literal patterns and simple constructs.
+
+        Args:
+            ast: GROUP node to analyze
+
+        Returns:
+            True if group is literal-heavy and can be optimized
+        """
+        var simple_count = 0
+        var total_count = ast.get_children_len()
+
+        for i in range(total_count):
+            ref child = ast.get_child(i)
+            if child.type in (ELEMENT, RANGE, DIGIT, SPACE, START, END):
+                simple_count += 1
+            elif child.type == OR and self._is_literal_heavy_alternation(child):
+                simple_count += 1
+            elif child.type == GROUP and child.get_children_len() <= 3:
+                # Small groups are generally simple
+                simple_count += 1
+
+        # If 80%+ of children are simple, consider the group literal-heavy
+        return total_count > 0 and (simple_count * 5) >= (
+            total_count * 4
+        )  # 80% threshold
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
