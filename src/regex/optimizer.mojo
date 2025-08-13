@@ -158,21 +158,32 @@ struct PatternAnalyzer:
         # Check for SIMD optimization opportunities - be more selective
         info.benefits_from_simd = self._check_simd_benefits(ast)
 
-        # Determine suggested engine
+        # Determine suggested engine with Phase 2 optimizations
         var complexity = self.classify(ast)
         if complexity.value == PatternComplexity.SIMPLE:
+            # Check for One-Pass DFA suitability first
+            if self._is_one_pass_candidate(ast):
+                info.suggested_engine = "One-Pass DFA"
             # For SIMPLE patterns, prefer pure DFA without SIMD overhead
-            if info.has_literal_prefix and info.literal_prefix_length > 3:
+            elif info.has_literal_prefix and info.literal_prefix_length > 3:
                 info.suggested_engine = "DFA with literal prefilter"
             else:
                 info.suggested_engine = "DFA"
         elif complexity.value == PatternComplexity.MEDIUM:
-            if info.has_required_literal and info.required_literal_length > 2:
-                info.suggested_engine = "NFA with literal prefilter"
+            # Check for advanced DFA strategies for medium complexity patterns
+            if self._is_one_pass_candidate(ast):
+                info.suggested_engine = "One-Pass DFA"
+            elif self._is_lazy_dfa_candidate(ast):
+                info.suggested_engine = "Lazy DFA"
+            elif info.has_required_literal and info.required_literal_length > 2:
+                info.suggested_engine = "Hybrid with literal prefilter"
             else:
                 info.suggested_engine = "Hybrid"
         else:
-            if info.has_required_literal:
+            # For complex patterns, consider lazy approaches before falling back to NFA
+            if self._is_lazy_dfa_candidate(ast):
+                info.suggested_engine = "Lazy DFA"
+            elif info.has_required_literal:
                 info.suggested_engine = "NFA with literal prefilter"
             else:
                 info.suggested_engine = "NFA"
@@ -954,6 +965,260 @@ struct PatternAnalyzer:
         return total_count > 0 and (simple_count * 5) >= (
             total_count * 4
         )  # 80% threshold
+
+    fn _is_one_pass_candidate(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+        """Check if pattern is suitable for One-Pass DFA compilation.
+
+        One-Pass DFAs work best for patterns where each input position has
+        at most one execution path through the NFA. This includes many
+        alternation patterns and simple capturing group scenarios.
+
+        Args:
+            ast: Root AST node to analyze
+
+        Returns:
+            True if pattern is suitable for One-Pass DFA
+        """
+        # Check basic One-Pass suitability criteria
+        if not self._has_deterministic_structure(ast):
+            return False
+
+        # One-Pass DFA is particularly good for:
+        # 1. Alternation patterns with non-overlapping prefixes
+        # 2. Sequential patterns with simple quantifiers
+        # 3. Patterns with capturing groups that don't create ambiguity
+
+        var alternation_count = self._count_alternations_in_pattern(ast)
+        var group_count = self._count_groups_in_pattern(ast)
+        var complexity_score = self._compute_one_pass_complexity(ast)
+
+        # Criteria for One-Pass suitability:
+        # - Moderate alternation count (not too many branches)
+        # - Simple group structures
+        # - Overall complexity within bounds
+        return (
+            alternation_count <= 8
+            and group_count <= 4
+            and complexity_score <= 20
+        )
+
+    fn _is_lazy_dfa_candidate(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+        """Check if pattern would benefit from Lazy DFA construction.
+
+        Lazy DFA is beneficial for patterns that would create very large
+        state machines if fully constructed, but where most states are
+        never actually visited during typical matching.
+
+        Args:
+            ast: Root AST node to analyze
+
+        Returns:
+            True if Lazy DFA is recommended
+        """
+        # Analyze pattern characteristics that benefit from lazy construction
+        var alternation_count = self._count_alternations_in_pattern(ast)
+        var nesting_depth = self._compute_max_nesting_depth(ast)
+        var estimated_states = self._estimate_dfa_state_count(ast)
+
+        # Lazy DFA is beneficial when:
+        # 1. Many alternations (exponential state growth)
+        # 2. Deep nesting (complex state dependencies)
+        # 3. Estimated large state space
+        # 4. Complex but not necessarily One-Pass
+
+        return (
+            alternation_count > 4 or nesting_depth > 3 or estimated_states > 100
+        )
+
+    fn _has_deterministic_structure(self, ast: ASTNode) -> Bool:
+        """Check if pattern has deterministic execution paths.
+
+        Args:
+            ast: AST node to check
+
+        Returns:
+            True if structure is deterministic
+        """
+        # Simplified determinism check - look for ambiguous constructs
+        # Real implementation would be more sophisticated
+        return not self._has_ambiguous_quantifiers(
+            ast
+        ) and not self._has_overlapping_alternations(ast)
+
+    fn _has_ambiguous_quantifiers(self, ast: ASTNode) -> Bool:
+        """Check for quantifiers that create ambiguous matching.
+
+        Args:
+            ast: AST node to check
+
+        Returns:
+            True if ambiguous quantifiers found
+        """
+        # Look for patterns like (a*)(a*) that create ambiguity
+        if ast.type == GROUP and (ast.min != 1 or ast.max != 1):
+            # Check if group content could match empty string
+            if self._can_match_empty(ast):
+                return True
+
+        for i in range(ast.get_children_len()):
+            if self._has_ambiguous_quantifiers(ast.get_child(i)):
+                return True
+
+        return False
+
+    fn _has_overlapping_alternations(self, ast: ASTNode) -> Bool:
+        """Check for alternations with overlapping match possibilities.
+
+        Args:
+            ast: AST node to check
+
+        Returns:
+            True if overlapping alternations found
+        """
+        if ast.type == OR:
+            # Simplified check - look for branches that could match same prefix
+            # Real implementation would do proper first-set analysis
+            return ast.get_children_len() > 8  # Conservative limit
+
+        for i in range(ast.get_children_len()):
+            if self._has_overlapping_alternations(ast.get_child(i)):
+                return True
+
+        return False
+
+    fn _can_match_empty(self, ast: ASTNode) -> Bool:
+        """Check if a pattern can match empty string.
+
+        Args:
+            ast: AST node to check
+
+        Returns:
+            True if pattern can match empty string
+        """
+        if ast.type in (ELEMENT, RANGE, DIGIT, SPACE, WILDCARD):
+            return ast.min == 0  # Only if quantifier allows zero matches
+        elif ast.type == GROUP:
+            if ast.min == 0:
+                return True  # Group itself is optional
+            # Check if all children can match empty
+            for i in range(ast.get_children_len()):
+                if not self._can_match_empty(ast.get_child(i)):
+                    return False
+            return True
+        elif ast.type == OR:
+            # If any branch can match empty, alternation can match empty
+            for i in range(ast.get_children_len()):
+                if self._can_match_empty(ast.get_child(i)):
+                    return True
+            return False
+        else:
+            return False  # START, END, etc.
+
+    fn _count_alternations_in_pattern(self, ast: ASTNode) -> Int:
+        """Count total alternation nodes in pattern.
+
+        Args:
+            ast: AST to analyze
+
+        Returns:
+            Number of OR nodes
+        """
+        var count = 0
+        if ast.type == OR:
+            count = 1
+
+        for i in range(ast.get_children_len()):
+            count += self._count_alternations_in_pattern(ast.get_child(i))
+
+        return count
+
+    fn _count_groups_in_pattern(self, ast: ASTNode) -> Int:
+        """Count total group nodes in pattern.
+
+        Args:
+            ast: AST to analyze
+
+        Returns:
+            Number of GROUP nodes
+        """
+        var count = 0
+        if ast.type == GROUP:
+            count = 1
+
+        for i in range(ast.get_children_len()):
+            count += self._count_groups_in_pattern(ast.get_child(i))
+
+        return count
+
+    fn _compute_one_pass_complexity(self, ast: ASTNode) -> Int:
+        """Compute complexity score for One-Pass DFA suitability.
+
+        Args:
+            ast: AST to analyze
+
+        Returns:
+            Complexity score (lower is better for One-Pass)
+        """
+        var score = 0
+
+        if ast.type == OR:
+            score += ast.get_children_len()  # Each branch adds complexity
+        elif ast.type == GROUP:
+            score += 2  # Groups add moderate complexity
+            if ast.min != 1 or ast.max != 1:
+                score += 3  # Quantified groups are more complex
+        else:
+            score += 1  # Basic elements
+
+        for i in range(ast.get_children_len()):
+            score += self._compute_one_pass_complexity(ast.get_child(i))
+
+        return score
+
+    fn _compute_max_nesting_depth(self, ast: ASTNode) -> Int:
+        """Compute maximum nesting depth of groups and alternations.
+
+        Args:
+            ast: AST to analyze
+
+        Returns:
+            Maximum nesting depth
+        """
+        var max_depth = 0
+
+        for i in range(ast.get_children_len()):
+            var child_depth = self._compute_max_nesting_depth(ast.get_child(i))
+            if child_depth > max_depth:
+                max_depth = child_depth
+
+        # Add 1 for this level if it's a nesting construct
+        if ast.type in (GROUP, OR):
+            max_depth += 1
+
+        return max_depth
+
+    fn _estimate_dfa_state_count(self, ast: ASTNode) -> Int:
+        """Estimate the number of states a full DFA would require.
+
+        Args:
+            ast: AST to analyze
+
+        Returns:
+            Estimated state count
+        """
+        # Simplified estimation based on alternation exponential growth
+        var alternation_count = self._count_alternations_in_pattern(ast)
+        var group_count = self._count_groups_in_pattern(ast)
+
+        # Exponential growth from alternations, linear from groups
+        var base_states = 10  # Base overhead
+        var alternation_states = 1
+
+        # Each alternation potentially multiplies states
+        for i in range(alternation_count):
+            alternation_states *= 3  # Assume average 3 branches per alternation
+
+        return base_states + alternation_states + (group_count * 5)
 
 
 fn is_literal_pattern(ast: ASTNode) -> Bool:
