@@ -19,6 +19,14 @@ from regex.prefilter import (
     MemchrPrefilter,
     PrefilterMatcher,
 )
+
+# Phase 2 engines commented out due to compilation complexity
+# from regex.phase2_matchers import (
+#     OnePassMatcher,
+#     LazyDFAMatcher,
+#     can_use_one_pass_matcher,
+#     should_use_lazy_dfa_matcher,
+# )
 from regex.literal_optimizer import (
     extract_literals,
     LiteralSet,
@@ -323,6 +331,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """True if pattern is exactly .* (matches any string)."""
     var use_pure_dfa: Bool
     """True if pattern should use pure DFA without SIMD integration."""
+    # Phase 2 engines - framework prepared for future implementation
+    # var onepass_matcher: Optional[OnePassMatcher]
+    # """Optional One-Pass DFA matcher for patterns with capturing groups."""
+    # var lazy_dfa_matcher: Optional[LazyDFAMatcher]
+    # """Optional Lazy DFA matcher for complex alternation patterns."""
+    var suggested_engine: String
+    """Recommended engine type from optimization analysis."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -347,6 +362,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 "a"
             )  # Simple dummy pattern for required initialization
             self.nfa_matcher = NFAMatcher(dummy_ast, "a")
+            self.suggested_engine = "Wildcard"  # Initialize required field
             return
 
         var ast = parse(pattern)
@@ -354,6 +370,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Analyze pattern complexity early
         var analyzer = PatternAnalyzer()
         self.complexity = analyzer.classify(ast)
+
+        # Get optimization recommendations
+        var opt_info = analyzer.analyze_optimizations(ast)
+        self.suggested_engine = opt_info.suggested_engine
 
         # Check if pattern should use pure DFA
         self.use_pure_dfa = analyzer.should_use_pure_dfa(ast)
@@ -425,6 +445,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             self.dfa_matcher = None
 
+        # Phase 2: Advanced DFA engines framework prepared
+        # Future implementation will add One-Pass DFA and Lazy DFA engines here
+        # when compilation issues are resolved
+
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.dfa_matcher = other.dfa_matcher
@@ -435,6 +459,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
+        # Phase 2 engines would be copied here in future implementation
+        self.suggested_engine = other.suggested_engine
 
     fn __moveinit__(out self, owned other: Self):
         """Move constructor."""
@@ -446,6 +472,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
+        # Phase 2 engines would be moved here in future implementation
+        self.suggested_engine = other.suggested_engine^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
@@ -457,7 +485,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             else:
                 return None
 
-        # Prioritize DFA for SIMPLE patterns, especially pure DFA patterns
+        # Use optimized DFA for SIMPLE patterns (Phase 1 improvements active)
         if (
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
@@ -465,7 +493,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Use high-performance DFA for simple patterns
             return self.dfa_matcher.value().match_first(text, start)
         else:
-            # Fall back to NFA for complex patterns
+            # Fall back to NFA for complex patterns (now with improved classification from Phase 1)
             return self.nfa_matcher.match_first(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
@@ -502,6 +530,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 return None  # No candidates found
 
             var search_start = candidate_pos.value()
+            # Use appropriate engine for the filtered position
             # Use appropriate engine for the filtered position
             if (
                 self.dfa_matcher

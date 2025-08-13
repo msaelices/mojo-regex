@@ -48,6 +48,34 @@ fn make_phone_test_data(num_phones: Int) -> String:
     return result
 
 
+fn make_complex_pattern_test_data(num_entries: Int) -> String:
+    """Generate test data for US national phone number validation."""
+    var result = String()
+    var complex_patterns = List[String](
+        "96906001234",  # Matches first alternation
+        "969060012",  # Matches first alternation
+        "969000012345",  # Matches second alternation
+        "973001234",  # Matches second alternation
+        "81234567890",  # Matches third alternation
+        "91234567890",  # Matches third alternation
+        "8356123456789",  # Matches third alternation
+        "9268012345678",  # Matches third alternation
+        "1234567890",  # Should NOT match
+        "96906",  # Should NOT match (too short)
+    )
+    var filler_text = " ID: "
+    var extra_text = " Status: ACTIVE "
+
+    for i in range(num_entries):
+        result += filler_text
+        # Cycle through different patterns (including non-matches)
+        var pattern_idx = i % len(complex_patterns)
+        result += complex_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
 # ===-----------------------------------------------------------------------===#
 # Manual Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
@@ -380,6 +408,72 @@ fn main() raises:
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",
         500,
+    )
+
+    # ===== DFA-Optimized Phone Number Benchmarks =====
+    print("# DFA-Optimized Phone Number Parsing")
+
+    detect_and_report_engine("[0-9]{3}-[0-9]{3}-[0-9]{4}", "dfa_simple_phone")
+    benchmark_findall(
+        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine(
+        "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", "dfa_paren_phone"
+    )
+    benchmark_findall(
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", "dfa_dot_phone")
+    benchmark_findall(
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{10}", "dfa_digits_only")
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
+
+    # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
+    print("# Pure DFA Phone Number Parsing (Literals)")
+
+    # Generate literal test data
+    var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
+
+    detect_and_report_engine("555-123-4567", "pure_dfa_dash")
+    benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
+
+    detect_and_report_engine("\\(555\\) 123-4567", "pure_dfa_paren")
+    benchmark_findall(
+        "pure_dfa_paren", "\\(555\\) 123-4567", literal_phone_text, 1000
+    )
+
+    detect_and_report_engine("555\\.123\\.4567", "pure_dfa_dot")
+    benchmark_findall(
+        "pure_dfa_dot", "555\\.123\\.4567", literal_phone_text, 1000
+    )
+
+    # ===== Smart Multi-Pattern Phone Matcher =====
+    print("# Smart Multi-Pattern Phone Parsing")
+
+    # Test smart matching approach - try DFA patterns first, fallback to comprehensive
+    detect_and_report_engine(
+        "[0-9]{3}-[0-9]{3}-[0-9]{4}", "smart_phone_primary"
+    )
+    benchmark_findall(
+        "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    # National Phone Number Validation (Complex Pattern)
+    detect_and_report_engine(
+        "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}",
+        "national_phone_validation",
+    )
+    var national_phone_text = make_complex_pattern_test_data(500)
+    benchmark_findall(
+        "national_phone_validation",
+        "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}",
+        national_phone_text,
+        10,
     )
 
     print()
