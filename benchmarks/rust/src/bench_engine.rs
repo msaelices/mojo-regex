@@ -159,6 +159,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "phone_validation", &patterns.phone_validation, "555-123-4567", 500, BenchType::IsMatch);
 
     // ===-----------------------------------------------------------------------===
+    // DFA-Optimized Phone Number Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== DFA-Optimized Phone Number Benchmarks ===");
+
+    run_benchmark(&timer, &mut all_results, "dfa_simple_phone", &patterns.dfa_simple_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_paren_phone", &patterns.dfa_paren_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_dot_phone", &patterns.dfa_dot_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_digits_only", &patterns.dfa_digits_only, &phone_text, 100, BenchType::FindAll);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -206,6 +216,10 @@ struct CompiledPatterns {
     flexible_phone: Regex,
     multi_format_phone: Regex,
     phone_validation: Regex,
+    dfa_simple_phone: Regex,
+    dfa_paren_phone: Regex,
+    dfa_dot_phone: Regex,
+    dfa_digits_only: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -263,6 +277,10 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         flexible_phone: Regex::new(r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")?,
         multi_format_phone: Regex::new(r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}")?,
         phone_validation: Regex::new(r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$")?,
+        dfa_simple_phone: Regex::new(r"[0-9]{3}-[0-9]{3}-[0-9]{4}")?,
+        dfa_paren_phone: Regex::new(r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}")?,
+        dfa_dot_phone: Regex::new(r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}")?,
+        dfa_digits_only: Regex::new(r"[0-9]{10}")?,
     })
 }
 

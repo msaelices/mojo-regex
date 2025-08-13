@@ -72,6 +72,10 @@ class Benchmark:
             "flexible_phone": 100,
             "multi_format_phone": 50,
             "phone_validation": 500,
+            "dfa_simple_phone": 100,
+            "dfa_paren_phone": 100,
+            "dfa_dot_phone": 100,
+            "dfa_digits_only": 100,
         }
 
         internal_iterations = 1
@@ -556,6 +560,27 @@ def main():
     m.bench_function(
         "phone_validation",
         bench_phone_match("555-123-4567", r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$", 500),
+    )
+
+    # DFA-Optimized Phone Number Benchmarks
+    m.bench_function(
+        "dfa_simple_phone",
+        bench_phone_findall(phone_text, r"[0-9]{3}-[0-9]{3}-[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_paren_phone",
+        bench_phone_findall(phone_text, r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_dot_phone",
+        bench_phone_findall(phone_text, r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_digits_only",
+        bench_phone_findall(phone_text, r"[0-9]{10}", 100),
     )
 
     # Results summary

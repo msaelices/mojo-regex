@@ -382,6 +382,59 @@ fn main() raises:
         500,
     )
 
+    # ===== DFA-Optimized Phone Number Benchmarks =====
+    print("# DFA-Optimized Phone Number Parsing")
+
+    detect_and_report_engine("[0-9]{3}-[0-9]{3}-[0-9]{4}", "dfa_simple_phone")
+    benchmark_findall(
+        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine(
+        "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", "dfa_paren_phone"
+    )
+    benchmark_findall(
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", "dfa_dot_phone")
+    benchmark_findall(
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{10}", "dfa_digits_only")
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
+
+    # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
+    print("# Pure DFA Phone Number Parsing (Literals)")
+
+    # Generate literal test data
+    var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
+
+    detect_and_report_engine("555-123-4567", "pure_dfa_dash")
+    benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
+
+    detect_and_report_engine("\\(555\\) 123-4567", "pure_dfa_paren")
+    benchmark_findall(
+        "pure_dfa_paren", "\\(555\\) 123-4567", literal_phone_text, 1000
+    )
+
+    detect_and_report_engine("555\\.123\\.4567", "pure_dfa_dot")
+    benchmark_findall(
+        "pure_dfa_dot", "555\\.123\\.4567", literal_phone_text, 1000
+    )
+
+    # ===== Smart Multi-Pattern Phone Matcher =====
+    print("# Smart Multi-Pattern Phone Parsing")
+
+    # Test smart matching approach - try DFA patterns first, fallback to comprehensive
+    detect_and_report_engine(
+        "[0-9]{3}-[0-9]{3}-[0-9]{4}", "smart_phone_primary"
+    )
+    benchmark_findall(
+        "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
     print()
     print("=== Manual Timing Benchmark Complete ===")
     print("Results are directly comparable with Python benchmarks")
