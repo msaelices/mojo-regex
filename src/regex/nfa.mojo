@@ -12,7 +12,6 @@ from regex.engine import Engine
 from regex.matching import Match
 from regex.parser import parse
 from regex.simd_ops import (
-    TwoWaySearcher,
     CharacterClassSIMD,
     get_simd_matcher,
     apply_quantifier_simd_generic,
@@ -25,7 +24,13 @@ from regex.simd_matchers import (
     get_alnum_matcher,
     RangeBasedMatcher,
 )
-from regex.literal_optimizer import extract_literals, extract_literal_prefix
+from regex.literal_ops import (
+    extract_literals,
+    extract_literal_prefix,
+    TwoWaySearcher,
+    BoyerMoore,
+    LiteralSearcher,
+)
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
@@ -56,8 +61,8 @@ struct NFAEngine(Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
-    """SIMD searcher for literal prefix."""
+    var literal_searcher: Optional[LiteralSearcher]
+    """Optimal searcher for literal prefix (Boyer-Moore or Two-Way)."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -97,7 +102,7 @@ struct NFAEngine(Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
+                            self.literal_searcher = LiteralSearcher(
                                 self.literal_prefix
                             )
                         elif (
@@ -109,7 +114,7 @@ struct NFAEngine(Engine):
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
+                            self.literal_searcher = LiteralSearcher(
                                 self.literal_prefix
                             )
         except:
