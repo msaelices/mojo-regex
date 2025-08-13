@@ -48,6 +48,34 @@ fn make_phone_test_data(num_phones: Int) -> String:
     return result
 
 
+fn make_complex_pattern_test_data(num_entries: Int) -> String:
+    """Generate test data for US national phone number validation."""
+    var result = String()
+    var complex_patterns = List[String](
+        "96906001234",  # Matches first alternation
+        "969060012",  # Matches first alternation
+        "969000012345",  # Matches second alternation
+        "973001234",  # Matches second alternation
+        "81234567890",  # Matches third alternation
+        "91234567890",  # Matches third alternation
+        "8356123456789",  # Matches third alternation
+        "9268012345678",  # Matches third alternation
+        "1234567890",  # Should NOT match
+        "96906",  # Should NOT match (too short)
+    )
+    var filler_text = " ID: "
+    var extra_text = " Status: ACTIVE "
+
+    for i in range(num_entries):
+        result += filler_text
+        # Cycle through different patterns (including non-matches)
+        var pattern_idx = i % len(complex_patterns)
+        result += complex_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
 # ===-----------------------------------------------------------------------===#
 # Manual Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
@@ -180,7 +208,7 @@ fn benchmark_findall(
         for _ in range(internal_iterations):
             var results = findall(pattern, text)
             # Touch the result to ensure it's not optimized away
-            if len(results) < 0:  # Always false, but compiler doesn't know
+            if results.__len__() < 0:  # Always false, but compiler doesn't know
                 print("ERROR: Unexpected result")
 
         var end_time = perf_counter_ns()
@@ -433,6 +461,19 @@ fn main() raises:
     )
     benchmark_findall(
         "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    # National Phone Number Validation (Complex Pattern)
+    detect_and_report_engine(
+        "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}",
+        "national_phone_validation",
+    )
+    var national_phone_text = make_complex_pattern_test_data(500)
+    benchmark_findall(
+        "national_phone_validation",
+        "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}",
+        national_phone_text,
+        10,
     )
 
     print()

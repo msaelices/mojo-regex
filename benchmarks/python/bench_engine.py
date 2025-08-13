@@ -76,6 +76,7 @@ class Benchmark:
             "dfa_paren_phone": 100,
             "dfa_dot_phone": 100,
             "dfa_digits_only": 100,
+            "national_phone_validation": 10,
         }
 
         internal_iterations = 1
@@ -178,6 +179,34 @@ def make_phone_test_data(num_phones: int) -> str:
         # Cycle through different phone patterns
         pattern_idx = i % len(phone_patterns)
         result += phone_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
+def make_complex_pattern_test_data(num_entries: int) -> str:
+    """Generate test data for US national phone number validation."""
+    complex_patterns = [
+        "96906001234",      # Matches first alternation
+        "969060012",        # Matches first alternation
+        "969000012345",     # Matches second alternation
+        "973001234",        # Matches second alternation
+        "81234567890",      # Matches third alternation
+        "91234567890",      # Matches third alternation
+        "8356123456789",    # Matches third alternation
+        "9268012345678",    # Matches third alternation
+        "1234567890",       # Should NOT match
+        "96906",            # Should NOT match (too short)
+    ]
+    filler_text = " ID: "
+    extra_text = " Status: ACTIVE "
+
+    result = ""
+    for i in range(num_entries):
+        result += filler_text
+        # Cycle through different patterns (including non-matches)
+        pattern_idx = i % len(complex_patterns)
+        result += complex_patterns[pattern_idx]
         result += extra_text
 
     return result
@@ -581,6 +610,15 @@ def main():
     m.bench_function(
         "dfa_digits_only",
         bench_phone_findall(phone_text, r"[0-9]{10}", 100),
+    )
+
+    # National Phone Number Validation (Complex Pattern)
+    national_phone_text = make_complex_pattern_test_data(500)
+    national_phone_pattern = r"96906(?:0[0-8]|1[1-9]|[2-9]\d)\d\d|9(?:69(?:0[0-57-9]|[1-9]\d)|73(?:[0-8]\d|9[1-9]))\d{4}|(?:8(?:[1356]\d|[28][0-8]|[47][1-9])|9(?:[135]\d|[268][0-8]|4[1-9]|7[124-9]))\d{6}"
+
+    m.bench_function(
+        "national_phone_validation",
+        bench_phone_findall(national_phone_text, national_phone_pattern, 10),
     )
 
     # Results summary

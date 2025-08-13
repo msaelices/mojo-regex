@@ -168,6 +168,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "dfa_dot_phone", &patterns.dfa_dot_phone, &phone_text, 100, BenchType::FindAll);
     run_benchmark(&timer, &mut all_results, "dfa_digits_only", &patterns.dfa_digits_only, &phone_text, 100, BenchType::FindAll);
 
+    // National Phone Number Validation (Complex Pattern)
+    let national_phone_text = make_complex_pattern_test_data(500);
+    run_benchmark(&timer, &mut all_results, "national_phone_validation", &patterns.national_phone_validation, &national_phone_text, 10, BenchType::FindAll);
+
     // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
@@ -220,6 +224,7 @@ struct CompiledPatterns {
     dfa_paren_phone: Regex,
     dfa_dot_phone: Regex,
     dfa_digits_only: Regex,
+    national_phone_validation: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -241,6 +246,34 @@ fn make_phone_test_data(num_phones: usize) -> String {
         result.push_str(filler_text);
         let pattern_idx = i % phone_patterns.len();
         result.push_str(phone_patterns[pattern_idx]);
+        result.push_str(extra_text);
+    }
+
+    result
+}
+
+fn make_complex_pattern_test_data(num_entries: usize) -> String {
+    // Generate test data for US national phone number validation
+    let complex_patterns = [
+        "96906001234",      // Matches first alternation
+        "969060012",        // Matches first alternation
+        "969000012345",     // Matches second alternation
+        "973001234",        // Matches second alternation
+        "81234567890",      // Matches third alternation
+        "91234567890",      // Matches third alternation
+        "8356123456789",    // Matches third alternation
+        "9268012345678",    // Matches third alternation
+        "1234567890",       // Should NOT match
+        "96906",            // Should NOT match (too short)
+    ];
+    let filler_text = " ID: ";
+    let extra_text = " Status: ACTIVE ";
+
+    let mut result = String::new();
+    for i in 0..num_entries {
+        result.push_str(filler_text);
+        let pattern_idx = i % complex_patterns.len();
+        result.push_str(complex_patterns[pattern_idx]);
         result.push_str(extra_text);
     }
 
@@ -281,6 +314,7 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         dfa_paren_phone: Regex::new(r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}")?,
         dfa_dot_phone: Regex::new(r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}")?,
         dfa_digits_only: Regex::new(r"[0-9]{10}")?,
+        national_phone_validation: Regex::new(r"96906(?:0[0-8]|1[1-9]|[2-9]\d)\d\d|9(?:69(?:0[0-57-9]|[1-9]\d)|73(?:[0-8]\d|9[1-9]))\d{4}|(?:8(?:[1356]\d|[28][0-8]|[47][1-9])|9(?:[135]\d|[268][0-8]|4[1-9]|7[124-9]))\d{6}")?,
     })
 }
 
