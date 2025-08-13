@@ -1007,25 +1007,52 @@ struct DFAEngine(Engine):
         var quantifier_min = 1
         var quantifier_max = 1
 
-        # Process each element to build pattern and detect quantifier
+        # Check if this is a mixed pattern (some elements quantified, some not)
+        var has_mixed_quantifiers = False
+        var quantified_elements = 0
+        var non_quantified_elements = 0
+        var uniform_quantifier_type = ""
+
+        # First pass: analyze quantifier distribution
         for i in range(group.get_children_len()):
             ref element = group.get_child(i)
             ref char_text = String(element.get_value().value())
-
-            if element.min == 0 and element.max == -1:  # *
-                quantifier_type = "*"
-                quantifier_min = 0
-                quantifier_max = -1
-            elif element.min == 1 and element.max == -1:  # +
-                quantifier_type = "+"
-                quantifier_min = 1
-                quantifier_max = -1
-            elif element.min == 0 and element.max == 1:  # ?
-                quantifier_type = "?"
-                quantifier_min = 0
-                quantifier_max = 1
-
             pattern_parts.append(char_text)
+
+            var element_quantifier = ""
+            if element.min == 0 and element.max == -1:  # *
+                element_quantifier = "*"
+                quantified_elements += 1
+            elif element.min == 1 and element.max == -1:  # +
+                element_quantifier = "+"
+                quantified_elements += 1
+            elif element.min == 0 and element.max == 1:  # ?
+                element_quantifier = "?"
+                quantified_elements += 1
+            elif element.min == 1 and element.max == 1:  # no quantifier
+                element_quantifier = ""
+                non_quantified_elements += 1
+
+            if element_quantifier != "":
+                if uniform_quantifier_type == "":
+                    uniform_quantifier_type = element_quantifier
+                    quantifier_type = element_quantifier
+                    if element_quantifier == "*":
+                        quantifier_min = 0
+                        quantifier_max = -1
+                    elif element_quantifier == "+":
+                        quantifier_min = 1
+                        quantifier_max = -1
+                    elif element_quantifier == "?":
+                        quantifier_min = 0
+                        quantifier_max = 1
+                elif uniform_quantifier_type != element_quantifier:
+                    has_mixed_quantifiers = True
+                    break
+
+        # Mixed pattern = some quantified elements AND some non-quantified elements
+        if quantified_elements > 0 and non_quantified_elements > 0:
+            has_mixed_quantifiers = True
 
         # Build the pattern string
         var pattern_text = String("")
@@ -1035,23 +1062,136 @@ struct DFAEngine(Engine):
         if len(pattern_text) == 0:
             raise Error("Empty quantifier pattern")
 
-        # Create accepting state
-        var accepting_state = DFAState(is_accepting=True, match_length=0)
-        self.states.append(accepting_state)
-        var accepting_index = len(self.states) - 1
-
-        # Handle different quantifier types
-        if quantifier_min == 0 and quantifier_max == 1:
-            # Optional: pattern?
-            self._compile_simple_optional(pattern_text, accepting_index)
-        elif quantifier_min == 0 and quantifier_max == -1:
-            # Zero or more: pattern*
-            self._compile_simple_zero_or_more(pattern_text, accepting_index)
-        elif quantifier_min == 1 and quantifier_max == -1:
-            # One or more: pattern+
-            self._compile_simple_one_or_more(pattern_text, accepting_index)
+        # Handle mixed quantifier patterns differently
+        if has_mixed_quantifiers:
+            # Compile element by element for mixed patterns like "https?://"
+            self._compile_mixed_quantifier_pattern(group)
         else:
-            raise Error("Unsupported quantifier type for simple quantifier")
+            # Handle uniform quantifier patterns (original logic)
+            # Create accepting state
+            var accepting_state = DFAState(
+                is_accepting=True, match_length=len(pattern_text)
+            )
+            self.states.append(accepting_state)
+            var accepting_index = len(self.states) - 1
+
+            # Handle different quantifier types
+            if quantifier_min == 0 and quantifier_max == 1:
+                # Optional: pattern?
+                self._compile_simple_optional(pattern_text, accepting_index)
+            elif quantifier_min == 0 and quantifier_max == -1:
+                # Zero or more: pattern*
+                self._compile_simple_zero_or_more(pattern_text, accepting_index)
+            elif quantifier_min == 1 and quantifier_max == -1:
+                # One or more: pattern+
+                self._compile_simple_one_or_more(pattern_text, accepting_index)
+            else:
+                raise Error("Unsupported quantifier type for simple quantifier")
+
+    fn _compile_mixed_quantifier_pattern(
+        mut self, group: ASTNode[MutableAnyOrigin]
+    ) raises:
+        """Compile a mixed quantifier pattern where individual elements have different quantifiers.
+
+        For "https?://" this creates two paths:
+        Path 1: h->t->t->p->:->/->/  (matching "http://")
+        Path 2: h->t->t->p->s->:->/->/  (matching "https://")
+        """
+        # Calculate the full pattern length for proper match_length
+        var full_pattern_length = group.get_children_len()
+
+        # Find optional elements and create state machine with branching paths
+        var optional_elements = List[Int]()  # Track which elements are optional
+        for i in range(group.get_children_len()):
+            if group.get_child(i).min == 0 and group.get_child(i).max == 1:
+                optional_elements.append(i)
+
+        if len(optional_elements) != 1:
+            raise Error(
+                "Mixed quantifier compilation currently supports exactly one"
+                " optional element"
+            )
+
+        var optional_index = optional_elements[0]
+
+        # Create accepting state with correct length accounting for optional elements
+        var accepting_state_short = DFAState(
+            is_accepting=True, match_length=full_pattern_length - 1
+        )  # Skip optional
+        var accepting_state_long = DFAState(
+            is_accepting=True, match_length=full_pattern_length
+        )  # Include optional
+        self.states.append(accepting_state_short)
+        self.states.append(accepting_state_long)
+        var accepting_short_index = len(self.states) - 2
+        var accepting_long_index = len(self.states) - 1
+
+        # Build two parallel paths through the pattern
+        var current_state_short = 0  # Path without optional element
+        var current_state_long = 0  # Path with optional element
+
+        for i in range(group.get_children_len()):
+            ref element = group.get_child(i)
+            var char_code = ord(element.get_value().value())
+            var is_last_element = i == group.get_children_len() - 1
+            var is_optional_element = i == optional_index
+
+            if is_optional_element:
+                # This is the optional element - only add to long path
+                if is_last_element:
+                    self.states[current_state_long].add_transition(
+                        char_code, accepting_long_index
+                    )
+                else:
+                    var next_state = DFAState()
+                    self.states.append(next_state)
+                    var next_state_index = len(self.states) - 1
+                    self.states[current_state_long].add_transition(
+                        char_code, next_state_index
+                    )
+                    current_state_long = next_state_index
+
+                # Short path continues from previous state (skips this element)
+                # No state change needed for short path
+            else:
+                # Required element - add to both paths
+                if is_last_element:
+                    # Last element of each path goes to respective accepting state
+                    self.states[current_state_short].add_transition(
+                        char_code, accepting_short_index
+                    )
+                    self.states[current_state_long].add_transition(
+                        char_code, accepting_long_index
+                    )
+                else:
+                    # Create states for continuing paths
+                    if i < optional_index:
+                        # Before optional element - both paths use same state
+                        var next_state = DFAState()
+                        self.states.append(next_state)
+                        var next_state_index = len(self.states) - 1
+                        self.states[current_state_short].add_transition(
+                            char_code, next_state_index
+                        )
+                        current_state_short = next_state_index
+                        current_state_long = next_state_index
+                    else:
+                        # After optional element - paths diverge
+                        var next_state_short = DFAState()
+                        var next_state_long = DFAState()
+                        self.states.append(next_state_short)
+                        self.states.append(next_state_long)
+                        var next_short_index = len(self.states) - 2
+                        var next_long_index = len(self.states) - 1
+
+                        self.states[current_state_short].add_transition(
+                            char_code, next_short_index
+                        )
+                        self.states[current_state_long].add_transition(
+                            char_code, next_long_index
+                        )
+                        current_state_short = next_short_index
+                        current_state_long = next_long_index
 
     fn _compile_simple_optional(
         mut self, pattern_text: String, accepting_index: Int
