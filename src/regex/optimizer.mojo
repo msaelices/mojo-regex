@@ -435,10 +435,13 @@ struct PatternAnalyzer:
             # Deep nesting - too complex
             return PatternComplexity(PatternComplexity.COMPLEX)
 
-        # Analyze group quantifier
-        var quantifier_complexity = self._classify_quantifier(ast)
-        if quantifier_complexity.value == PatternComplexity.COMPLEX:
-            return PatternComplexity(PatternComplexity.COMPLEX)
+        # Analyze quantifiers of group's children
+        for i in range(ast.get_children_len()):
+            var child_quantifier_complexity = self._classify_quantifier(
+                ast.get_child(i)
+            )
+            if child_quantifier_complexity.value == PatternComplexity.COMPLEX:
+                return PatternComplexity(PatternComplexity.COMPLEX)
 
         # Check if group has quantifier and whether it's a simple quantified group that DFA can handle
         if ast.min != 1 or ast.max != 1:
@@ -480,10 +483,20 @@ struct PatternAnalyzer:
                     PatternComplexity.MEDIUM
                 )
 
+        # Check if all children have simple quantifiers
+        var all_simple_quantifiers = True
+        for i in range(ast.get_children_len()):
+            var child_quantifier_complexity = self._classify_quantifier(
+                ast.get_child(i)
+            )
+            if child_quantifier_complexity.value != PatternComplexity.SIMPLE:
+                all_simple_quantifiers = False
+                break
+
         # Simple groups with simple contents can often be handled efficiently
         if (
             max_child_complexity.value == PatternComplexity.SIMPLE
-            and quantifier_complexity.value == PatternComplexity.SIMPLE
+            and all_simple_quantifiers
         ):
             # For literal groups (like "hello" parsed as group of chars), be more generous
             # Check if all children are literal elements or anchors

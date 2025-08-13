@@ -50,24 +50,31 @@ from regex.ast import (
 @always_inline
 fn check_for_quantifiers[
     regex_origin: ImmutableOrigin
-](mut i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]) raises:
-    """Check for quantifiers after an element and set min/max accordingly."""
+](
+    i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]
+) raises -> Int:
+    """Check for quantifiers after an element and set min/max accordingly.
+
+    Returns:
+        The new index position after skipping quantifier tokens.
+    """
     ref next_token = tokens[i + 1]
+    var new_i = i
     if next_token.type == Token.ASTERISK:
         elem.min = 0
         elem.max = -1  # -1 means unlimited
-        i += 1  # Skip quantifier
+        new_i += 1  # Skip quantifier
     elif next_token.type == Token.PLUS:
         elem.min = 1
         elem.max = -1
-        i += 1  # Skip quantifier
+        new_i += 1  # Skip quantifier
     elif next_token.type == Token.QUESTIONMARK:
         elem.min = 0
         elem.max = 1
-        i += 1  # Skip quantifier
+        new_i += 1  # Skip quantifier
     elif next_token.type == Token.LEFTCURLYBRACE:
         # Parse curly brace quantifiers
-        i += 2  # Skip element and {
+        new_i += 2  # Skip element and {
         var min_val = String(
             capacity=String.INLINE_CAPACITY
         )  # Pre-allocate for min value
@@ -76,29 +83,31 @@ fn check_for_quantifiers[
         )  # Pre-allocate for max value
 
         # Parse min value
-        while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-            min_val += String(chr(tokens[i].char))
-            i += 1
+        while new_i < len(tokens) and tokens[new_i].type == Token.ELEMENT:
+            min_val += String(chr(tokens[new_i].char))
+            new_i += 1
 
         elem.min = atol(min_val) if min_val != "" else 0
 
         # Check for comma (range) or closing brace (exact)
-        if i < len(tokens) and tokens[i].type == Token.COMMA:
-            i += 1  # Skip comma
+        if new_i < len(tokens) and tokens[new_i].type == Token.COMMA:
+            new_i += 1  # Skip comma
             # Parse max value
-            while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                max_val += String(chr(tokens[i].char))
-                i += 1
+            while new_i < len(tokens) and tokens[new_i].type == Token.ELEMENT:
+                max_val += String(chr(tokens[new_i].char))
+                new_i += 1
             elem.max = atol(max_val) if max_val != "" else -1
         else:
             # Exact quantifier {n}
             elem.max = elem.min
 
         # Skip closing brace
-        if i < len(tokens) and tokens[i].type == Token.RIGHTCURLYBRACE:
-            i += 1
-        # Don't increment i again - continue processing next token
-        i -= 1  # Compensate for the i += 1 at the end of the loop
+        if new_i < len(tokens) and tokens[new_i].type == Token.RIGHTCURLYBRACE:
+            new_i += 1
+        # Return the index of the last processed token (will be incremented by caller)
+        new_i -= 1  # Compensate for the i += 1 at the end of the loop
+
+    return new_i
 
 
 fn get_range_str(start: String, end: String) -> String:
@@ -236,7 +245,7 @@ fn parse_token_list[
             )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+                i = check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement[ImmutableAnyOrigin](
@@ -246,7 +255,7 @@ fn parse_token_list[
             )
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+                i = check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.SPACE:
             var elem = SpaceElement[ImmutableAnyOrigin](
@@ -257,7 +266,7 @@ fn parse_token_list[
             )
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+                i = check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.DIGIT:
             var elem = DigitElement[ImmutableAnyOrigin](
@@ -268,7 +277,7 @@ fn parse_token_list[
             )
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+                i = check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.START:
             var start_elem = StartElement[ImmutableAnyOrigin](
@@ -324,7 +333,9 @@ fn parse_token_list[
             )
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutableAnyOrigin](i, range_elem, tokens)
+                i = check_for_quantifiers[ImmutableAnyOrigin](
+                    i, range_elem, tokens
+                )
             elements.append(range_elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
@@ -393,7 +404,7 @@ fn parse_token_list[
                 group = rebind[ASTNode[MutableAnyOrigin]](group_node)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
-                check_for_quantifiers[MutableAnyOrigin](i, group, tokens)
+                i = check_for_quantifiers[MutableAnyOrigin](i, group, tokens)
             elements.append(group)
 
         i += 1
