@@ -208,7 +208,7 @@ fn benchmark_findall(
         for _ in range(internal_iterations):
             var results = findall(pattern, text)
             # Touch the result to ensure it's not optimized away
-            if results.__len__() < 0:  # Always false, but compiler doesn't know
+            if len(results) < 0:  # Always false, but compiler doesn't know
                 print("ERROR: Unexpected result")
 
         var end_time = perf_counter_ns()
