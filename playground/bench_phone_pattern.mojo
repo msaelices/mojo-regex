@@ -14,7 +14,7 @@ fn benchmark_pattern(
     var start_time: Int
     var end_time: Int
 
-    for i in range(iterations):
+    for _ in range(iterations):
         start_time = perf_counter_ns()
         _ = regex.test(text)
         end_time = perf_counter_ns()
@@ -36,13 +36,25 @@ fn main() raises:
     ]
 
     # Test texts
-    var valid_phone = "96906123456789"  # Should match
-    var invalid_phone = "12345678901234"  # Should not match
-    var mixed_text = "Contact us at 96906123456 or 8123456789 for more info."
+    var valid_phones = [
+        "3052001234",  # US fixed/mobile line
+        "8002345678",  # US toll-free
+    ]  # Should match
+    var invalid_phones = [
+        "12345678901234",
+        "12345678901234",
+    ]  # Should not match
+    var mixed_text = "Contact us at 3052001234 or 8002345678 for more info."
 
     var iterations = 10000  # More focused iterations
 
-    for phone_pattern in phone_patterns:
+    var valid_phone: String
+    var invalid_phone: String
+
+    for i in range(len(phone_patterns)):
+        phone_pattern = phone_patterns[i]
+        valid_phone = valid_phones[i]
+        invalid_phone = invalid_phones[i]
         print("Pattern:", phone_pattern[:50] + "...")
         print("Iterations per test:", iterations)
         print()
@@ -54,29 +66,29 @@ fn main() raises:
         var time1 = benchmark_pattern(phone_pattern, valid_phone, iterations)
         var test_regex = compile_regex(phone_pattern)
         print(
-            "| Valid phone (match)    | "
-            + String(time1)
-            + "       | "
-            + ("✓" if test_regex.test(valid_phone) else "✗")
-            + "     |"
+            "| Valid phone (match)    | ",
+            time1,
+            "       | ",
+            ("✓" if test_regex.test(valid_phone) else "✗"),
+            "     |",
         )
 
         var time2 = benchmark_pattern(phone_pattern, invalid_phone, iterations)
         print(
-            "| Invalid phone (no match)| "
-            + String(time2)
-            + "       | "
-            + ("✓" if not test_regex.test(invalid_phone) else "✗")
-            + "     |"
+            "| Invalid phone (no match)| ",
+            time2,
+            "       | ",
+            ("✓" if not test_regex.test(invalid_phone) else "✗"),
+            "     |",
         )
 
         var time3 = benchmark_pattern(phone_pattern, mixed_text, iterations)
         print(
-            "| Mixed text (search)    | "
-            + String(time3)
-            + "       | "
-            + ("✓" if test_regex.test(mixed_text) else "✗")
-            + "     |"
+            "| Mixed text (search)    | ",
+            time3,
+            "       | ",
+            ("✓" if test_regex.test(mixed_text) else "✗"),
+            "     |",
         )
 
         print()
