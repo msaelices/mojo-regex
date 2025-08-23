@@ -101,6 +101,27 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "group_alternation", &patterns.group_alternation, &text_group_10000, 1000, BenchType::Search);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
+    // NEW: Optimization Showcase Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== Optimization Showcase Benchmarks ===");
+
+    // Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
+    let fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey";
+    run_benchmark(&timer, &mut all_results, "large_alternation_8_branches", &patterns.large_alternation, fruit_text, 1000, BenchType::Search);
+
+    // Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
+    let nested_text = "Testing deep nested patterns with abcdefgh characters";
+    run_benchmark(&timer, &mut all_results, "deep_nested_groups_depth4", &patterns.deep_nested, nested_text, 1000, BenchType::Search);
+
+    // Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
+    let user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success";
+    run_benchmark(&timer, &mut all_results, "literal_heavy_alternation", &patterns.literal_heavy, user_text, 1000, BenchType::Search);
+
+    // Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
+    let mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data";
+    run_benchmark(&timer, &mut all_results, "complex_group_5_children", &patterns.complex_group, mixed_text, 1000, BenchType::Search);
+
+    // ===-----------------------------------------------------------------------===
     // Global Matching Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Global Matching Benchmarks ===");
@@ -206,6 +227,10 @@ struct CompiledPatterns {
     flexible_phone: Regex,
     multi_format_phone: Regex,
     phone_validation: Regex,
+    large_alternation: Regex,
+    deep_nested: Regex,
+    literal_heavy: Regex,
+    complex_group: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -263,6 +288,10 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         flexible_phone: Regex::new(r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")?,
         multi_format_phone: Regex::new(r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}")?,
         phone_validation: Regex::new(r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$")?,
+        large_alternation: Regex::new(r"(apple|banana|cherry|date|elderberry|fig|grape|honey)")?,
+        deep_nested: Regex::new(r"(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))")?,
+        literal_heavy: Regex::new(r"(user123|admin456|guest789|root000|test111|demo222|sample333|client444)")?,
+        complex_group: Regex::new(r"(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}")?,
     })
 }
 
