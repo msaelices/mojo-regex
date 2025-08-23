@@ -326,7 +326,7 @@ fn main() raises:
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     var literal_heavy = "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)"
-    var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success"
+    var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
     detect_and_report_engine(literal_heavy, "literal_heavy_alternation")
     benchmark_search(
         "literal_heavy_alternation", literal_heavy, user_text, 1000

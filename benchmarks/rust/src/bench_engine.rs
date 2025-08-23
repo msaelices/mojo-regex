@@ -114,7 +114,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "deep_nested_groups_depth4", &patterns.deep_nested, nested_text, 1000, BenchType::Search);
 
     // Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
-    let user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success";
+    let user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked";
     run_benchmark(&timer, &mut all_results, "literal_heavy_alternation", &patterns.literal_heavy, user_text, 1000, BenchType::Search);
 
     // Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)

@@ -495,7 +495,7 @@ def main():
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
-    user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success"
+    user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
     m.bench_function(
         "literal_heavy_alternation",
         bench_alternation_match(user_text, "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)")
