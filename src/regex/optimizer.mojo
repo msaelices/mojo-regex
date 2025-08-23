@@ -210,7 +210,6 @@ struct PatternAnalyzer:
 
     fn _is_single_quantified_char_class(self, ast: ASTNode) -> Bool:
         """Check if pattern is a single quantified character class."""
-        from regex.ast import RE, RANGE, DIGIT, SPACE
 
         if ast.type != RE:
             return False
