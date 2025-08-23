@@ -72,6 +72,11 @@ class Benchmark:
             "flexible_phone": 100,
             "multi_format_phone": 50,
             "phone_validation": 500,
+            "dfa_simple_phone": 100,
+            "dfa_paren_phone": 100,
+            "dfa_dot_phone": 100,
+            "dfa_digits_only": 100,
+            "national_phone_validation": 10,
         }
 
         internal_iterations = 1
@@ -174,6 +179,34 @@ def make_phone_test_data(num_phones: int) -> str:
         # Cycle through different phone patterns
         pattern_idx = i % len(phone_patterns)
         result += phone_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
+def make_complex_pattern_test_data(num_entries: int) -> str:
+    """Generate test data for US national phone number validation."""
+    complex_patterns = [
+        "305200123456",     # Matches first alternation
+        "505601234567",     # Matches first alternation
+        "274212345678",     # Matches second alternation
+        "305912345678",     # Matches second alternation
+        "212345672890",     # Matches third alternation
+        "312345672890",     # Matches third alternation
+        "412345672890",     # Matches third alternation
+        "512345672890",     # Matches third alternation
+        "1234567890",       # Should NOT match
+        "30520",            # Should NOT match (too short)
+    ]
+    filler_text = " ID: "
+    extra_text = " Status: ACTIVE "
+
+    result = ""
+    for i in range(num_entries):
+        result += filler_text
+        # Cycle through different patterns (including non-matches)
+        pattern_idx = i % len(complex_patterns)
+        result += complex_patterns[pattern_idx]
         result += extra_text
 
     return result
@@ -587,6 +620,36 @@ def main():
     m.bench_function(
         "phone_validation",
         bench_phone_match("555-123-4567", r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$", 500),
+    )
+
+    # DFA-Optimized Phone Number Benchmarks
+    m.bench_function(
+        "dfa_simple_phone",
+        bench_phone_findall(phone_text, r"[0-9]{3}-[0-9]{3}-[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_paren_phone",
+        bench_phone_findall(phone_text, r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_dot_phone",
+        bench_phone_findall(phone_text, r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}", 100),
+    )
+
+    m.bench_function(
+        "dfa_digits_only",
+        bench_phone_findall(phone_text, r"[0-9]{10}", 100),
+    )
+
+    # National Phone Number Validation (Complex Pattern)
+    national_phone_text = make_complex_pattern_test_data(500)
+    national_phone_pattern = r"(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}"
+
+    m.bench_function(
+        "national_phone_validation",
+        bench_phone_findall(national_phone_text, national_phone_pattern, 10),
     )
 
     # Results summary

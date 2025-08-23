@@ -48,6 +48,34 @@ fn make_phone_test_data(num_phones: Int) -> String:
     return result
 
 
+fn make_complex_pattern_test_data(num_entries: Int) -> String:
+    """Generate test data for US national phone number validation."""
+    var result = String()
+    var complex_patterns = List[String](
+        "305200123456",  # Matches first alternation
+        "505601234567",  # Matches first alternation
+        "274212345678",  # Matches second alternation
+        "305912345678",  # Matches second alternation
+        "212345672890",  # Matches third alternation
+        "312345672890",  # Matches third alternation
+        "412345672890",  # Matches third alternation
+        "512345672890",  # Matches third alternation
+        "1234567890",  # Should NOT match
+        "30520",  # Should NOT match (too short)
+    )
+    var filler_text = " ID: "
+    var extra_text = " Status: ACTIVE "
+
+    for i in range(num_entries):
+        result += filler_text
+        # Cycle through different patterns (including non-matches)
+        var pattern_idx = i % len(complex_patterns)
+        result += complex_patterns[pattern_idx]
+        result += extra_text
+
+    return result
+
+
 # ===-----------------------------------------------------------------------===#
 # Manual Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
@@ -417,6 +445,72 @@ fn main() raises:
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",
         500,
+    )
+
+    # ===== DFA-Optimized Phone Number Benchmarks =====
+    print("# DFA-Optimized Phone Number Parsing")
+
+    detect_and_report_engine("[0-9]{3}-[0-9]{3}-[0-9]{4}", "dfa_simple_phone")
+    benchmark_findall(
+        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine(
+        "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", "dfa_paren_phone"
+    )
+    benchmark_findall(
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", "dfa_dot_phone")
+    benchmark_findall(
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+    )
+
+    detect_and_report_engine("[0-9]{10}", "dfa_digits_only")
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
+
+    # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
+    print("# Pure DFA Phone Number Parsing (Literals)")
+
+    # Generate literal test data
+    var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
+
+    detect_and_report_engine("555-123-4567", "pure_dfa_dash")
+    benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
+
+    detect_and_report_engine("\\(555\\) 123-4567", "pure_dfa_paren")
+    benchmark_findall(
+        "pure_dfa_paren", "\\(555\\) 123-4567", literal_phone_text, 1000
+    )
+
+    detect_and_report_engine("555\\.123\\.4567", "pure_dfa_dot")
+    benchmark_findall(
+        "pure_dfa_dot", "555\\.123\\.4567", literal_phone_text, 1000
+    )
+
+    # ===== Smart Multi-Pattern Phone Matcher =====
+    print("# Smart Multi-Pattern Phone Parsing")
+
+    # Test smart matching approach - try DFA patterns first, fallback to comprehensive
+    detect_and_report_engine(
+        "[0-9]{3}-[0-9]{3}-[0-9]{4}", "smart_phone_primary"
+    )
+    benchmark_findall(
+        "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+
+    # National Phone Number Validation (Complex Pattern)
+    detect_and_report_engine(
+        "(?:3052(?:0[0-8]|[1-9]\\d)|5056(?:[0-35-9]\\d|4[0-68]))\\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\\d{6}",
+        "national_phone_validation",
+    )
+    var national_phone_text = make_complex_pattern_test_data(500)
+    benchmark_findall(
+        "national_phone_validation",
+        "(?:3052(?:0[0-8]|[1-9]\\d)|5056(?:[0-35-9]\\d|4[0-68]))\\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\\d{6}",
+        national_phone_text,
+        10,
     )
 
     print()
