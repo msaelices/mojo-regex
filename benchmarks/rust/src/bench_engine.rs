@@ -180,6 +180,20 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "phone_validation", &patterns.phone_validation, "555-123-4567", 500, BenchType::IsMatch);
 
     // ===-----------------------------------------------------------------------===
+    // DFA-Optimized Phone Number Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== DFA-Optimized Phone Number Benchmarks ===");
+
+    run_benchmark(&timer, &mut all_results, "dfa_simple_phone", &patterns.dfa_simple_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_paren_phone", &patterns.dfa_paren_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_dot_phone", &patterns.dfa_dot_phone, &phone_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "dfa_digits_only", &patterns.dfa_digits_only, &phone_text, 100, BenchType::FindAll);
+
+    // National Phone Number Validation (Complex Pattern)
+    let national_phone_text = make_complex_pattern_test_data(500);
+    run_benchmark(&timer, &mut all_results, "national_phone_validation", &patterns.national_phone_validation, &national_phone_text, 10, BenchType::FindAll);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -231,6 +245,11 @@ struct CompiledPatterns {
     deep_nested: Regex,
     literal_heavy: Regex,
     complex_group: Regex,
+    dfa_simple_phone: Regex,
+    dfa_paren_phone: Regex,
+    dfa_dot_phone: Regex,
+    dfa_digits_only: Regex,
+    national_phone_validation: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -252,6 +271,34 @@ fn make_phone_test_data(num_phones: usize) -> String {
         result.push_str(filler_text);
         let pattern_idx = i % phone_patterns.len();
         result.push_str(phone_patterns[pattern_idx]);
+        result.push_str(extra_text);
+    }
+
+    result
+}
+
+fn make_complex_pattern_test_data(num_entries: usize) -> String {
+    // Generate test data for US national phone number validation
+    let complex_patterns = [
+        "305200123456",     // Matches first alternation
+        "505601234567",     // Matches first alternation
+        "274212345678",     // Matches second alternation
+        "305912345678",     // Matches second alternation
+        "212345672890",     // Matches third alternation
+        "312345672890",     // Matches third alternation
+        "412345672890",     // Matches third alternation
+        "512345672890",     // Matches third alternation
+        "1234567890",       // Should NOT match
+        "30520",            // Should NOT match (too short)
+    ];
+    let filler_text = " ID: ";
+    let extra_text = " Status: ACTIVE ";
+
+    let mut result = String::new();
+    for i in 0..num_entries {
+        result.push_str(filler_text);
+        let pattern_idx = i % complex_patterns.len();
+        result.push_str(complex_patterns[pattern_idx]);
         result.push_str(extra_text);
     }
 
@@ -292,6 +339,11 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         deep_nested: Regex::new(r"(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))")?,
         literal_heavy: Regex::new(r"(user123|admin456|guest789|root000|test111|demo222|sample333|client444)")?,
         complex_group: Regex::new(r"(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}")?,
+        dfa_simple_phone: Regex::new(r"[0-9]{3}-[0-9]{3}-[0-9]{4}")?,
+        dfa_paren_phone: Regex::new(r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}")?,
+        dfa_dot_phone: Regex::new(r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}")?,
+        dfa_digits_only: Regex::new(r"[0-9]{10}")?,
+        national_phone_validation: Regex::new(r"(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}")?,
     })
 }
 
