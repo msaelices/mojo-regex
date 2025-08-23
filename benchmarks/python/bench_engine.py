@@ -477,6 +477,37 @@ def main():
     m.bench_function("group_quantified", bench_group_match(text_group_10000, "(abc)+"))
     m.bench_function("group_alternation", bench_group_match(text_group_10000, "(a|b)*"))
 
+    # ===== NEW: Optimization Showcase Benchmarks =====
+    print("# Optimization Showcase (part1 branch improvements)")
+
+    # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
+    fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
+    m.bench_function(
+        "large_alternation_8_branches",
+        bench_alternation_match(fruit_text, "(apple|banana|cherry|date|elderberry|fig|grape|honey)")
+    )
+
+    # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
+    nested_text = "Testing deep nested patterns with abcdefgh characters"
+    m.bench_function(
+        "deep_nested_groups_depth4",
+        bench_alternation_match(nested_text, "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))")
+    )
+
+    # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
+    user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success"
+    m.bench_function(
+        "literal_heavy_alternation",
+        bench_alternation_match(user_text, "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)")
+    )
+
+    # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
+    mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    m.bench_function(
+        "complex_group_5_children",
+        bench_alternation_match(mixed_text, "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}")
+    )
+
     # Global matching (unique to our implementation)
     m.bench_function("match_all_simple", bench_match_all(text_10000, "a"))
     m.bench_function("match_all_pattern", bench_match_all(text_10000, "[a-z]+"))

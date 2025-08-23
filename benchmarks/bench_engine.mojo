@@ -303,6 +303,43 @@ fn main() raises:
     detect_and_report_engine("(a|b)", "group_alternation")
     benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
 
+    # ===== NEW: Optimization Showcase Benchmarks =====
+    print("# Optimization Showcase (part1 branch improvements)")
+
+    # Test case 1: Large alternation (5+ branches) - benefits from increased branch limit (3→8)
+    var large_alternation = (
+        "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
+    )
+    var fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
+    detect_and_report_engine(large_alternation, "large_alternation_8_branches")
+    benchmark_search(
+        "large_alternation_8_branches", large_alternation, fruit_text, 1000
+    )
+
+    # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
+    var deep_nested = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
+    var nested_text = "Testing deep nested patterns with abcdefgh characters"
+    detect_and_report_engine(deep_nested, "deep_nested_groups_depth4")
+    benchmark_search(
+        "deep_nested_groups_depth4", deep_nested, nested_text, 1000
+    )
+
+    # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
+    var literal_heavy = "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)"
+    var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success"
+    detect_and_report_engine(literal_heavy, "literal_heavy_alternation")
+    benchmark_search(
+        "literal_heavy_alternation", literal_heavy, user_text, 1000
+    )
+
+    # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
+    var complex_group = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
+    var mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    detect_and_report_engine(complex_group, "complex_group_5_children")
+    benchmark_search(
+        "complex_group_5_children", complex_group, mixed_text, 1000
+    )
+
     # ===== Global Matching (findall) =====
     print("# Global Matching")
     benchmark_findall("match_all_simple", "hello", medium_text, 200)
