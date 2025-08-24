@@ -77,13 +77,13 @@ struct MatchList(Copyable, Movable, Sized):
 
     fn append(
         mut self,
-        `match`: Match,
+        m: Match,
     ):
         """Add a match to the container, reserving capacity on first use."""
         if not self._allocated:
             self._list.reserve(Self.DEFAULT_RESERVE_SIZE)
             self._allocated = True
-        self._list.append(`match`)
+        self._list.append(m)
 
     fn __len__(self) -> Int:
         """Return the number of matches."""
