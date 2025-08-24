@@ -526,13 +526,18 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
-            var matches = List[Match, hint_trivial_type=True]()
+            var matches = List[Match, hint_trivial_type=True](capacity=1)
             if len(text) >= 0:  # .* matches even empty strings
                 matches.append(Match(0, 0, len(text), text))
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var matches = List[Match, hint_trivial_type=True]()
+            var estimated_capacity = min(
+                len(text) // 20, 100
+            )  # Conservative estimate
+            var matches = List[Match, hint_trivial_type=True](
+                capacity=estimated_capacity
+            )
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
@@ -793,7 +798,7 @@ fn findall(
     Returns:
         List of all matches found.
     """
-    var compiled = compile_regex(pattern)
+    ref compiled = compile_regex(pattern)
     return compiled.match_all(text)
 
 

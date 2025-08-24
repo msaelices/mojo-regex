@@ -1862,7 +1862,13 @@ struct DFAEngine(Engine):
         Returns:
             List of all matches found.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        # Smart capacity allocation - avoid over-allocation for sparse matches
+        var estimated_capacity = min(
+            len(text) // 20, 100
+        )  # Conservative estimate
+        var matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_capacity
+        )
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:

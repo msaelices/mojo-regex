@@ -153,10 +153,17 @@ struct NFAEngine(Engine):
             except:
                 return []
 
-        var matches = List[Match, hint_trivial_type=True](capacity=len(text))
+        # Smart capacity allocation - avoid massive over-allocation for sparse matches
+        var estimated_capacity = min(
+            len(text) // 10, 200
+        )  # Much more reasonable
+        var matches = List[Match, hint_trivial_type=True](
+            capacity=estimated_capacity
+        )
         var current_pos = 0
 
-        var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
+        # Smaller temp capacity since we clear frequently
+        var temp_matches = List[Match, hint_trivial_type=True](capacity=3)
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
@@ -176,13 +183,22 @@ struct NFAEngine(Engine):
 
                 # Try to match the full pattern starting from before the literal
                 var try_pos = literal_pos
+                var search_window = (
+                    10  # Reduced from 100 to 10 for better performance
+                )
                 if self.literal_prefix and not self._is_prefix_literal():
-                    try_pos = max(current_pos, literal_pos - 100)
+                    try_pos = max(current_pos, literal_pos - search_window)
 
-                # Search for matches around the literal
+                # Search for matches around the literal with limited iterations
                 var found_match = False
+                var max_search_positions = min(5, literal_pos - try_pos + 1)
+                var search_count = 0
 
-                while try_pos <= literal_pos and try_pos <= len(text):
+                while (
+                    try_pos <= literal_pos
+                    and try_pos <= len(text)
+                    and search_count < max_search_positions
+                ):
                     temp_matches.clear()
                     var result = self._match_node(
                         ast,
@@ -208,6 +224,7 @@ struct NFAEngine(Engine):
                             found_match = True
                             break
                     try_pos += 1
+                    search_count += 1
 
                 if not found_match:
                     # No match found around this literal, move past it
