@@ -276,13 +276,11 @@ fn main() raises:
     print("|---------------------------|-----------------------|--------|")
 
     # ===== Literal Matching Benchmarks =====
-    print("# Literal Matching")
     benchmark_search("literal_match_short", "hello", text_1000, 2000)
 
     benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
     # ===== Wildcard and Quantifier Benchmarks =====
-    print("# Wildcard and Quantifiers")
     benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
 
     benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
@@ -292,7 +290,6 @@ fn main() raises:
     benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
 
     # ===== Character Range Benchmarks =====
-    print("# Character Ranges")
     benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
 
     benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
@@ -302,19 +299,16 @@ fn main() raises:
     )
 
     # ===== Anchor Benchmarks =====
-    print("# Anchors")
     benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
 
     benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
 
     # ===== Alternation Benchmarks =====
-    print("# Alternations")
     benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
 
     benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
-    print("# Optimization Showcase (part1 branch improvements)")
 
     # Test case 1: Large alternation (5+ branches) - benefits from increased branch limit (3→8)
     var large_alternation = (
@@ -347,12 +341,10 @@ fn main() raises:
     )
 
     # ===== Global Matching (findall) =====
-    print("# Global Matching")
     benchmark_findall("match_all_simple", "hello", medium_text, 200)
     benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 200)
 
     # ===== Literal Optimization Benchmarks =====
-    print("# Literal Optimizations")
     benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
     benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
     benchmark_findall(
@@ -364,7 +356,6 @@ fn main() raises:
     )
 
     # ===== Complex Pattern Benchmarks =====
-    print("# Complex Patterns")
     var complex_email_text = (
         "Contact: john@example.com, support@test.org, admin@company.net" * 20
     )
@@ -383,7 +374,6 @@ fn main() raises:
     )
 
     # ===== US Phone Number Benchmarks =====
-    print("# US Phone Number Parsing")
     var phone_text = make_phone_test_data(1000)
 
     benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
@@ -410,7 +400,6 @@ fn main() raises:
     )
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
-    print("# DFA-Optimized Phone Number Parsing")
 
     benchmark_findall(
         "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
@@ -427,7 +416,6 @@ fn main() raises:
     benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
 
     # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
-    print("# Pure DFA Phone Number Parsing (Literals)")
 
     # Generate literal test data
     var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
@@ -443,8 +431,6 @@ fn main() raises:
     )
 
     # ===== Smart Multi-Pattern Phone Matcher =====
-    print("# Smart Multi-Pattern Phone Parsing")
-
     # Test smart matching approach - try DFA patterns first, fallback to comprehensive
     benchmark_findall(
         "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
@@ -457,4 +443,22 @@ fn main() raises:
         "(?:3052(?:0[0-8]|[1-9]\\d)|5056(?:[0-35-9]\\d|4[0-68]))\\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\\d{6}",
         national_phone_text,
         10,
+    )
+
+    # ===== US Toll-Free Numbers Benchmarks =====
+
+    # Generate toll-free test data
+    var toll_free_text = (
+        "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or"
+        " 8006667777."
+        * 100
+    )
+
+    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
+
+    benchmark_findall(
+        "toll_free_complex",
+        "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
+        toll_free_text,
+        100,
     )

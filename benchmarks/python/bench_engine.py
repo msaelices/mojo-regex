@@ -652,6 +652,22 @@ def main():
         bench_phone_findall(national_phone_text, national_phone_pattern, 10),
     )
 
+    # ===== US Toll-Free Numbers Benchmarks =====
+    print("# US Toll-Free Numbers")
+
+    # Generate toll-free test data
+    toll_free_text = "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or 8006667777." * 100
+
+    m.bench_function(
+        "toll_free_simple",
+        bench_phone_findall(toll_free_text, r"[89]00\d{6}", 100),
+    )
+
+    m.bench_function(
+        "toll_free_complex",
+        bench_phone_findall(toll_free_text, r"8(?:00|33|44|55|66|77|88)[2-9]\d{6}", 100),
+    )
+
     # Results summary
     m.dump_report()
 
