@@ -55,6 +55,7 @@ This software is in an early stage of development. Even though it is functional,
 - ✅ **Match Position Tracking** - Precise start_idx, end_idx reporting
 - ✅ **Simple API**: `match_first(pattern, text) -> Optional[Match]`
 
+
 ## Installation
 
 1. **Install [pixi](https://pixi.sh/latest/)**
@@ -120,6 +121,43 @@ if result:
 var emails = findall("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "Contact john@example.com or mary@test.org")
 for i in range(len(emails)):
     print("Email found:", emails[i].get_match_text())
+
+# === OPTIMIZATION SHOWCASE EXAMPLES ===
+# These patterns now benefit from DFA optimization!
+
+# Large alternation (8 branches) - DFA-optimized
+var fruit_pattern = "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
+var fruit_text = "I love eating apple and banana for breakfast"
+var fruits = findall(fruit_pattern, fruit_text)
+for i in range(len(fruits)):
+    print("Fruit found:", fruits[i].get_match_text())
+
+# Deep nested alternation (depth 4) - DFA-optimized
+var nested_pattern = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
+var nested_result = match_first(nested_pattern, "Testing with character a")
+if nested_result:
+    print("Deep nested match:", nested_result.value().get_match_text())
+
+# Literal-heavy alternation (80% threshold) - DFA-optimized
+var user_pattern = "(user123|admin456|guest789|root000|test111|demo222)"
+var login_text = "Login attempts: user123 failed, admin456 success"
+var users = findall(user_pattern, login_text)
+for i in range(len(users)):
+    print("User found:", users[i].get_match_text())
+
+# Complex phone patterns - DFA-optimized
+var phone_pattern = "[0-9]{3}-[0-9]{3}-[0-9]{4}"  # DFA-optimized
+var phone_text = "Call us at 555-123-4567 or 800-555-9999"
+var phones = findall(phone_pattern, phone_text)
+for i in range(len(phones)):
+    print("Phone found:", phones[i].get_match_text())
+
+# Complex group (5 children) - DFA-optimized
+var complex_pattern = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
+var complex_text = "Found: hello123ab, world456cd, test789ef in data"
+var complex_matches = findall(complex_pattern, complex_text)
+for i in range(len(complex_matches)):
+    print("Complex match:", complex_matches[i].get_match_text())
 ```
 
 ## Performance
@@ -136,7 +174,11 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 | **Simple quantifiers** | DFA + SIMD | O(n/w) | Vectorized counting | `"a*"`, `"[0-9]{3}"` |
 | **Anchors** | DFA | O(1) | Position validation | `"^start"`, `"end$"` |
 | **Basic groups** | DFA/NFA + SIMD | O(n) to O(nm) | Partial vectorization | `"(abc)+"`, `"([a-z]+)"` |
-| **Alternation** | DFA/NFA | O(n) to O(nm) | Engine-dependent | `"cat\|dog"` |
+| **Small alternation** | DFA + SIMD | O(n/w) | DFA state optimization | `"cat\|dog"`, `"(a\|b\|c)"` |
+| **Large alternation** | DFA + SIMD | O(n/w) | **Extended to 8 branches** | `"(apple\|banana\|...\|honey)"` |
+| **Literal-heavy alternation** | DFA + SIMD | O(n/w) | **80% threshold detection** | `"(user123\|admin456\|...)"` |
+| **Deep nested groups** | DFA/NFA + SIMD | O(n) to O(nm) | **Depth 4 support** | `"(?:(?:(?:a\|b)\|(?:c\|d))\|...)"` |
+| **Complex phone patterns** | DFA + SIMD | O(n/w) | **Now DFA-optimized** | US national phone validation |
 | **Complex patterns** | NFA + SIMD | O(nm) to O(2^n) | Character-level SIMD | Backreferences, lookahead |
 
 *Where w = SIMD width (typically 16-32 characters processed per instruction)*
@@ -205,11 +247,51 @@ mojo test -I src/ tests/test_simd_integration.mojo
 - [x] Pattern complexity analysis for optimal routing
 - [x] SIMD capability detection for intelligent engine selection
 - [x] Vectorized operations for quantifiers and repetition counting
-- [ ] Additional DFA pattern support (more complex quantifiers and groups)
+- [x] **Extended DFA pattern support** - Large alternations (up to 8 branches)
+- [x] **Deep nesting support** - Groups up to depth 4
+- [x] **Literal-heavy alternation detection** - 80% threshold optimization
+- [x] **Selective optimization** - High-value, low-overhead improvements only
+- [x] **Analysis overhead reduction** - Early termination and selective analysis
+- [x] **Cross-language performance validation** - Benchmarking vs Python/Rust
 - [ ] Compile-time pattern specialization for string literals
 - [ ] Aho-Corasick multi-pattern matching for alternations
 - [ ] Advanced NFA optimizations (lazy quantifiers, cut operators)
 - [ ] Parallel matching for multiple patterns
+- [ ] One-Pass DFA for advanced capturing groups
+- [ ] Lazy DFA construction for very large pattern sets
+
+## Optimization Strategy
+
+The regex engine uses a **selective optimization approach** to extend DFA coverage while avoiding performance regressions:
+
+### Pattern Classification System
+
+Patterns are automatically classified into three categories:
+
+- **SIMPLE**: DFA-optimized with O(n) performance - literals, basic quantifiers, character classes, optimized alternations
+- **MEDIUM**: Hybrid DFA/NFA approach - complex groups, medium alternations, some phone patterns
+- **COMPLEX**: NFA with backtracking - backreferences, lookahead, very complex nesting
+
+### Selective Optimization Criteria
+
+Optimizations are applied only when they provide clear benefits:
+
+1. **Extended Alternation Support**: Increased from 3→8 branches for DFA optimization
+2. **Deep Nesting Tolerance**: Groups now supported up to depth 4 (vs. 3 previously)
+3. **Literal-Heavy Detection**: 80% threshold for alternations with mostly literal branches
+4. **Complex Group Support**: Up to 5 children in groups (vs. 3 previously)
+5. **Early Termination**: Analysis functions use selective branching to reduce overhead
+
+### Performance Validation
+
+All optimizations undergo rigorous validation:
+
+- **Cross-language benchmarking** against Python and Rust implementations
+- **Regression testing** to ensure no performance degradation on existing patterns
+- **Analysis overhead measurement** to validate optimization efficiency
+- **Real-world pattern testing** with complex phone validation and email patterns
+
+This approach ensures that optimizations extend engine capabilities without compromising the performance characteristics that make the main implementation effective.
 
 ## Contributing
 
