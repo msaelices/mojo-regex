@@ -61,6 +61,9 @@ def benchmark_search(name: str, pattern: str, text: str, internal_iterations: in
     padded_name = name + " " * (25 - len(name))
     print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
 
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
 
 def benchmark_match_first(name: str, pattern: str, text: str, internal_iterations: int):
     """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first)."""
@@ -101,6 +104,9 @@ def benchmark_match_first(name: str, pattern: str, text: str, internal_iteration
     padded_name = name + " " * (25 - len(name))
     print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
 
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
 
 def benchmark_findall(name: str, pattern: str, text: str, internal_iterations: int):
     """Benchmark findall with manual timing (mirrors Mojo benchmark_findall)."""
@@ -136,6 +142,48 @@ def benchmark_findall(name: str, pattern: str, text: str, internal_iterations: i
 
     padded_name = name + " " * (25 - len(name))
     print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
+
+# ===-----------------------------------------------------------------------===#
+# Result Collection for JSON Export
+# ===-----------------------------------------------------------------------===#
+
+# Global storage for benchmark results (needed for JSON export)
+_benchmark_results = {}
+_benchmark_iterations = {}
+
+def _store_benchmark_result(name: str, time_ms: float, total_iterations: int):
+    """Store benchmark result for JSON export."""
+    _benchmark_results[name] = time_ms * 1_000_000  # Convert to nanoseconds
+    _benchmark_iterations[name] = total_iterations
+
+def export_json_results(filename: str = "benchmarks/results/python_results.json"):
+    """Export collected benchmark results to JSON file."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+    # Convert results to JSON-serializable format
+    json_results = {
+        "engine": "python",
+        "timestamp": datetime.now().isoformat(),
+        "results": {}
+    }
+
+    for name in _benchmark_results:
+        json_results["results"][name] = {
+            "time_ns": _benchmark_results[name],
+            "time_ms": _benchmark_results[name] / 1_000_000,
+            "iterations": _benchmark_iterations[name]
+        }
+
+    # Write to file
+    with open(filename, "w") as f:
+        json.dump(json_results, f, indent=2)
+
+    print(f"\\nResults exported to {filename}")
 
 
 class Benchmark:
@@ -410,7 +458,26 @@ def main():
         10,
     )
 
+    # ===== US Toll-Free Numbers Benchmarks =====
+
+    # Generate toll-free test data
+    toll_free_text = (
+        "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or 8006667777."
+        * 100
+    )
+
+    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
+    benchmark_findall(
+        "toll_free_complex",
+        "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
+        toll_free_text,
+        100,
+    )
+
     print()  # End of benchmarks
+
+    # Export results to JSON for comparison script
+    export_json_results()
 
 
 
