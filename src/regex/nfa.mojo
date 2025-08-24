@@ -9,7 +9,7 @@ from regex.aliases import (
     SIMD_MATCHER_WHITESPACE,
 )
 from regex.engine import Engine
-from regex.matching import Match
+from regex.matching import Match, MatchList
 from regex.parser import parse
 from regex.simd_ops import (
     TwoWaySearcher,
@@ -118,7 +118,7 @@ struct NFAEngine(Engine):
     fn match_all(
         self,
         text: String,
-    ) -> List[Match, hint_trivial_type=True]:
+    ) -> MatchList:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -151,15 +151,10 @@ struct NFAEngine(Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return []
+                return MatchList()
 
-        # Smart capacity allocation - avoid massive over-allocation for sparse matches
-        var estimated_capacity = min(
-            len(text) // 10, 10
-        )  # Much more reasonable
-        var matches = List[Match, hint_trivial_type=True](
-            capacity=estimated_capacity
-        )
+        # Use smart MatchList container with lazy allocation
+        var matches = MatchList()
         var current_pos = 0
 
         # Smaller temp capacity since we clear frequently
@@ -1424,9 +1419,7 @@ struct NFAEngine(Engine):
             return ch in range_pattern
 
 
-fn findall(
-    pattern: String, text: String
-) raises -> List[Match, hint_trivial_type=True]:
+fn findall(pattern: String, text: String) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1434,7 +1427,7 @@ fn findall(
         text: Text to search in.
 
     Returns:
-        List of all matches found.
+        MatchList container with all matches found.
     """
     var engine = NFAEngine(pattern)
     return engine.match_all(text)

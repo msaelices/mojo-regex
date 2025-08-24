@@ -8,7 +8,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 from regex.ast import ASTNode
 from regex.aliases import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
-from regex.matching import Match
+from regex.matching import Match, MatchList
 from regex.optimizer import (
     PatternComplexity,
     is_literal_pattern,
@@ -1853,22 +1853,17 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) -> MatchList:
         """Find all non-overlapping matches using DFA.
 
         Args:
             text: Input text to search.
 
         Returns:
-            List of all matches found.
+            Matches container with all matches found.
         """
-        # Smart capacity allocation - avoid over-allocation for sparse matches
-        var estimated_capacity = min(
-            len(text) // 20, 10
-        )  # Conservative estimate
-        var matches = List[Match, hint_trivial_type=True](
-            capacity=estimated_capacity
-        )
+        # Use smart Matches container with lazy allocation
+        var matches = MatchList()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:

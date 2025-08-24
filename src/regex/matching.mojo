@@ -29,3 +29,68 @@ struct Match(Copyable, Movable):
     fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
         """Returns the text that was matched."""
         return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
+
+
+struct MatchList(Copyable, Movable, Sized):
+    """Smart container for regex matches with lazy allocation and optimal reservation.
+
+    This struct provides zero allocation until the first match is added, then
+    reserves a small amount of capacity to avoid malloc churn for common cases.
+    Provides List-compatible interface for easy integration with existing code.
+    """
+
+    alias DEFAULT_RESERVE_SIZE = 8
+    """Default number of matches to reserve on first allocation."""
+
+    var _list: List[Match, hint_trivial_type=True]
+    """Internal list storing the matches."""
+    var _allocated: Bool
+    """Track whether we've done the initial smart allocation."""
+
+    fn __init__(
+        out self,
+    ):
+        """Initialize empty Matches container."""
+        self._list = List[Match, hint_trivial_type=True]()
+        self._allocated = False
+
+    fn __copyinit__(
+        out self,
+        other: Self,
+    ):
+        """Copy constructor."""
+        self._list = other._list
+        self._allocated = other._allocated
+
+    fn __moveinit__(
+        out self,
+        owned other: Self,
+    ):
+        """Move constructor."""
+        self._list = other._list^
+        self._allocated = other._allocated
+
+    fn append(
+        mut self,
+        `match`: Match,
+    ):
+        """Add a match to the container, reserving capacity on first use."""
+        if not self._allocated:
+            self._list.reserve(Self.DEFAULT_RESERVE_SIZE)
+            self._allocated = True
+        self._list.append(`match`)
+
+    fn __len__(self) -> Int:
+        """Return the number of matches."""
+        return len(self._list)
+
+    fn __getitem__(self, idx: Int) -> Match:
+        """Get match at index."""
+        return self._list[idx]
+
+    fn clear(
+        mut self,
+    ):
+        """Remove all matches but keep allocated capacity."""
+        self._list.clear()
+        # Keep _allocated = True to maintain reserved capacity
