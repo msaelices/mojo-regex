@@ -45,7 +45,7 @@ class Benchmark:
             fn()
             end_time = time.perf_counter_ns()
             fn_time = end_time - start_time
-            # print(f"Function {name} took {fn_time} ns")
+            print(f"Function {name} took {fn_time} ns")
             total_time += fn_time
             actual_iterations += 1
 
@@ -56,15 +56,15 @@ class Benchmark:
         iterations_map = {
             "literal_match": 2000,  # Increased from 100 to 2000
             "wildcard_match": 1000,  # Increased from 50 to 1000
-            "range_": 1000,          # Increased from 50 to 1000
-            "anchor_": 2000,         # Increased from 100 to 2000
-            "alternation_": 1000,    # Increased from 50 to 1000
-            "group_": 1000,          # Increased from 50 to 1000
-            "match_all_": 200,       # Increased from 10 to 200
-            "complex_email": 40,     # Increased from 2 to 40
-            "complex_number": 500,   # Increased from 25 to 500
-            "simd_": 200,            # Increased from 10 to 200
-            "literal_prefix_": 1,    # Already optimized in Python's re
+            "range_": 1000,  # Increased from 50 to 1000
+            "anchor_": 2000,  # Increased from 100 to 2000
+            "alternation_": 1000,  # Increased from 50 to 1000
+            "group_": 1000,  # Increased from 50 to 1000
+            "match_all_": 200,  # Increased from 10 to 200
+            "complex_email": 40,  # Increased from 2 to 40
+            "complex_number": 500,  # Increased from 25 to 500
+            "simd_": 200,  # Increased from 10 to 200
+            "literal_prefix_": 1,  # Already optimized in Python's re
             "required_literal_": 1,
             "no_literal_baseline": 1,
             "alternation_common_prefix": 1,
@@ -116,14 +116,14 @@ class Benchmark:
         json_results = {
             "engine": "python",
             "timestamp": datetime.now().isoformat(),
-            "results": {}
+            "results": {},
         }
 
         for name in self.results:
             json_results["results"][name] = {
                 "time_ns": self.results[name],
                 "time_ms": self.results[name] / 1_000_000,
-                "iterations": self.iterations[name]
+                "iterations": self.iterations[name],
             }
 
         # Write to file
@@ -140,9 +140,9 @@ class Benchmark:
 # Literal optimization test texts - scaled up to match Mojo benchmarks
 SHORT_TEXT = "hello world this is a test with hello again and hello there"
 MEDIUM_TEXT = SHORT_TEXT * 100  # Increased from 10 to 100
-LONG_TEXT = SHORT_TEXT * 1000   # Increased from 100 to 1000
+LONG_TEXT = SHORT_TEXT * 1000  # Increased from 100 to 1000
 EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-EMAIL_LONG = EMAIL_TEXT * 50    # Increased from 5 to 50
+EMAIL_LONG = EMAIL_TEXT * 50  # Increased from 5 to 50
 
 
 def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -> str:
@@ -168,7 +168,7 @@ def make_phone_test_data(num_phones: int) -> str:
         "+1-555-123-4567",
         "1-555-123-4568",
         "(555)123-4569",
-        "555 123 4570"
+        "555 123 4570",
     ]
     filler_text = " Contact us at "
     extra_text = " or email support@company.com for assistance. "
@@ -187,16 +187,16 @@ def make_phone_test_data(num_phones: int) -> str:
 def make_complex_pattern_test_data(num_entries: int) -> str:
     """Generate test data for US national phone number validation."""
     complex_patterns = [
-        "305200123456",     # Matches first alternation
-        "505601234567",     # Matches first alternation
-        "274212345678",     # Matches second alternation
-        "305912345678",     # Matches second alternation
-        "212345672890",     # Matches third alternation
-        "312345672890",     # Matches third alternation
-        "412345672890",     # Matches third alternation
-        "512345672890",     # Matches third alternation
-        "1234567890",       # Should NOT match
-        "30520",            # Should NOT match (too short)
+        "305200123456",  # Matches first alternation
+        "505601234567",  # Matches first alternation
+        "274212345678",  # Matches second alternation
+        "305912345678",  # Matches second alternation
+        "212345672890",  # Matches third alternation
+        "312345672890",  # Matches third alternation
+        "412345672890",  # Matches third alternation
+        "512345672890",  # Matches third alternation
+        "1234567890",  # Should NOT match
+        "30520",  # Should NOT match (too short)
     ]
     filler_text = " ID: "
     extra_text = " Status: ACTIVE "
@@ -416,7 +416,9 @@ def bench_literal_optimization(
     return benchmark_fn
 
 
-def bench_phone_findall(test_text: str, pattern: str, iterations: int) -> Callable[[], None]:
+def bench_phone_findall(
+    test_text: str, pattern: str, iterations: int
+) -> Callable[[], None]:
     """Benchmark phone number pattern matching."""
 
     def benchmark_fn():
@@ -427,7 +429,9 @@ def bench_phone_findall(test_text: str, pattern: str, iterations: int) -> Callab
     return benchmark_fn
 
 
-def bench_phone_match(test_text: str, pattern: str, iterations: int) -> Callable[[], None]:
+def bench_phone_match(
+    test_text: str, pattern: str, iterations: int
+) -> Callable[[], None]:
     """Benchmark phone number pattern validation."""
 
     def benchmark_fn():
@@ -448,8 +452,8 @@ def main():
     m = Benchmark(num_repetitions=5)
 
     # Pre-create test strings to avoid measurement overhead - scaled up to match Mojo
-    text_10000 = make_test_string(10000)     # Increased from 1000 to 10000
-    text_100000 = make_test_string(100000)   # Increased from 10000 to 100000
+    text_10000 = make_test_string(10000)  # Increased from 1000 to 10000
+    text_100000 = make_test_string(100000)  # Increased from 10000 to 100000
     text_range_10000 = make_test_string(10000, "abc123XYZ")
     text_alternation_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz")
     text_group_10000 = make_test_string(10000, "abcabcabc")
@@ -459,7 +463,9 @@ def main():
     emails = " user@example.com more text john@test.org "
     email_text = f"{base_text} {emails} {base_text} {emails} {base_text}"
 
-    base_number_text = make_test_string(20000, "abc def ghi ")  # Increased from 500 to 20000
+    base_number_text = make_test_string(
+        20000, "abc def ghi "
+    )  # Increased from 500 to 20000
     number_text = (
         f"{base_number_text} 123 price $456.78 quantity 789 {base_number_text}"
     )
@@ -517,28 +523,39 @@ def main():
     fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
     m.bench_function(
         "large_alternation_8_branches",
-        bench_alternation_match(fruit_text, "(apple|banana|cherry|date|elderberry|fig|grape|honey)")
+        bench_alternation_match(
+            fruit_text, "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
+        ),
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
     nested_text = "Testing deep nested patterns with abcdefgh characters"
     m.bench_function(
         "deep_nested_groups_depth4",
-        bench_alternation_match(nested_text, "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))")
+        bench_alternation_match(
+            nested_text, "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
+        ),
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
     m.bench_function(
         "literal_heavy_alternation",
-        bench_alternation_match(user_text, "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)")
+        bench_alternation_match(
+            user_text,
+            "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
+        ),
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
-    mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    mixed_text = (
+        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    )
     m.bench_function(
         "complex_group_5_children",
-        bench_alternation_match(mixed_text, "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}")
+        bench_alternation_match(
+            mixed_text, "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
+        ),
     )
 
     # Global matching (unique to our implementation)
@@ -553,7 +570,9 @@ def main():
 
     # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit in Mojo comparison)
     large_mixed_text = make_mixed_content_text(100000)  # Increased from 10000 to 100000
-    xlarge_mixed_text = make_mixed_content_text(500000)  # Increased from 50000 to 500000
+    xlarge_mixed_text = make_mixed_content_text(
+        500000
+    )  # Increased from 50000 to 500000
 
     m.bench_function(
         "simd_alphanumeric_large",
@@ -614,12 +633,20 @@ def main():
 
     m.bench_function(
         "multi_format_phone",
-        bench_phone_findall(phone_text, r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}", 50),
+        bench_phone_findall(
+            phone_text,
+            r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}",
+            50,
+        ),
     )
 
     m.bench_function(
         "phone_validation",
-        bench_phone_match("555-123-4567", r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$", 500),
+        bench_phone_match(
+            "555-123-4567",
+            r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$",
+            500,
+        ),
     )
 
     # DFA-Optimized Phone Number Benchmarks
@@ -653,10 +680,12 @@ def main():
     )
 
     # ===== US Toll-Free Numbers Benchmarks =====
-    print("# US Toll-Free Numbers")
 
     # Generate toll-free test data
-    toll_free_text = "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or 8006667777." * 100
+    toll_free_text = (
+        "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or 8006667777."
+        * 100
+    )
 
     m.bench_function(
         "toll_free_simple",
@@ -665,7 +694,9 @@ def main():
 
     m.bench_function(
         "toll_free_complex",
-        bench_phone_findall(toll_free_text, r"8(?:00|33|44|55|66|77|88)[2-9]\d{6}", 100),
+        bench_phone_findall(
+            toll_free_text, r"8(?:00|33|44|55|66|77|88)[2-9]\d{6}", 100
+        ),
     )
 
     # Results summary
