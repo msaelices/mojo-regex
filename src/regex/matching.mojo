@@ -84,8 +84,18 @@ struct MatchList(Copyable, Movable, Sized):
         """Return the number of matches."""
         return len(self._list)
 
-    fn __getitem__(self, idx: Int) -> Match:
-        """Get match at index."""
+    fn __getitem__[I: Indexer](ref self, idx: I) -> ref [self._list] Match:
+        """Gets the list element at the given index.
+
+        Args:
+            idx: The index of the element.
+
+        Parameters:
+            I: A type that can be used as an index.
+
+        Returns:
+            A reference to the match at the given index.
+        """
         return self._list[idx]
 
     fn clear(
