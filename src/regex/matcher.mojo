@@ -10,7 +10,7 @@ from time import monotonic
 from sys.ffi import _Global
 
 from regex.ast import ASTNode
-from regex.matching import Match
+from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_simple_pattern
 from regex.optimizer import PatternAnalyzer, PatternComplexity
@@ -106,16 +106,14 @@ trait RegexMatcher:
         """
         ...
 
-    fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all non-overlapping matches in text.
 
         Args:
             text: Input text to search.
 
         Returns:
-            List of all matches found.
+            MatchList container with all matches found.
         """
         ...
 
@@ -153,9 +151,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using DFA execution."""
         return self.engine.match_all(text)
 
@@ -196,9 +192,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
@@ -520,24 +514,17 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_next(text, start)
 
-    fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
-            var matches = List[Match, hint_trivial_type=True](capacity=1)
+            var matches = MatchList()
             if len(text) >= 0:  # .* matches even empty strings
                 matches.append(Match(0, 0, len(text), text))
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var estimated_capacity = min(
-                len(text) // 20, 100
-            )  # Conservative estimate
-            var matches = List[Match, hint_trivial_type=True](
-                capacity=estimated_capacity
-            )
+            var matches = MatchList()
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
@@ -664,16 +651,14 @@ struct CompiledRegex(Copyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    fn match_all(
-        self, text: String
-    ) raises -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches in text.
 
         Args:
             text: Input text to search.
 
         Returns:
-            List of all matches found.
+            MatchList container with all matches found.
         """
         return self.matcher.match_all(text)
 
@@ -786,9 +771,7 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     return compiled.match_next(text)
 
 
-fn findall(
-    pattern: String, text: String
-) raises -> List[Match, hint_trivial_type=True]:
+fn findall(pattern: String, text: String) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -796,7 +779,7 @@ fn findall(
         text: Text to search in.
 
     Returns:
-        List of all matches found.
+        Matches container with all matches found.
     """
     ref compiled = compile_regex(pattern)
     return compiled.match_all(text)

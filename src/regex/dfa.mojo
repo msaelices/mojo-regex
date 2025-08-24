@@ -8,7 +8,7 @@ compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 from regex.ast import ASTNode
 from regex.aliases import ALL_EXCEPT_NEWLINE
 from regex.engine import Engine
-from regex.matching import Match
+from regex.matching import Match, MatchList
 from regex.optimizer import (
     PatternComplexity,
     is_literal_pattern,
@@ -1853,22 +1853,17 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
+    fn match_all(self, text: String) -> MatchList:
         """Find all non-overlapping matches using DFA.
 
         Args:
             text: Input text to search.
 
         Returns:
-            List of all matches found.
+            Matches container with all matches found.
         """
-        # Smart capacity allocation - avoid over-allocation for sparse matches
-        var estimated_capacity = min(
-            len(text) // 20, 100
-        )  # Conservative estimate
-        var matches = List[Match, hint_trivial_type=True](
-            capacity=estimated_capacity
-        )
+        # Use smart Matches container with lazy allocation
+        var matches = MatchList()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
@@ -1876,7 +1871,7 @@ struct DFAEngine(Engine):
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
-            return matches
+            return matches^
 
         # Skip SIMD path - removed for performance
 
@@ -1899,7 +1894,7 @@ struct DFAEngine(Engine):
                 # No match at this position, try next
                 pos += 1
 
-        return matches
+        return matches^
 
     fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
         """SIMD-optimized matching for character class patterns with quantifier support.

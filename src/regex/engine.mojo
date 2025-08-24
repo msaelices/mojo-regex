@@ -1,4 +1,4 @@
-from regex.matching import Match
+from regex.matching import Match, MatchList
 
 
 trait Engine(Copyable, Movable):
@@ -15,13 +15,13 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_all(self, text: String) -> List[Match, hint_trivial_type=True]:
-        """Find all non-overlapping matches using DFA.
+    fn match_all(self, text: String) -> MatchList:
+        """Find all non-overlapping matches using Engine.
 
         Args:
             text: Input text to search.
 
         Returns:
-            List of all matches found.
+            MatchList container with all matches found.
         """
         ...
