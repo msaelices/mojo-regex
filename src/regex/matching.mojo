@@ -1,4 +1,5 @@
 from memory import UnsafePointer
+from builtin._location import __call_location
 
 
 @register_passable("trivial")
@@ -54,6 +55,7 @@ struct MatchList(Copyable, Movable, Sized):
         self._list = List[Match, hint_trivial_type=True]()
         self._allocated = False
 
+    @always_inline
     fn __copyinit__(
         out self,
         other: Self,
@@ -61,6 +63,9 @@ struct MatchList(Copyable, Movable, Sized):
         """Copy constructor."""
         self._list = other._list
         self._allocated = other._allocated
+        # Comment when debug is done
+        var call_location = __call_location()
+        print("Copying MatchList", call_location)
 
     fn __moveinit__(
         out self,
