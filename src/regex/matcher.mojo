@@ -533,7 +533,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
             var estimated_capacity = min(
-                len(text) // 20, 100
+                len(text) // 20, 10
             )  # Conservative estimate
             var matches = List[Match, hint_trivial_type=True](
                 capacity=estimated_capacity

@@ -155,7 +155,7 @@ struct NFAEngine(Engine):
 
         # Smart capacity allocation - avoid massive over-allocation for sparse matches
         var estimated_capacity = min(
-            len(text) // 10, 200
+            len(text) // 10, 10
         )  # Much more reasonable
         var matches = List[Match, hint_trivial_type=True](
             capacity=estimated_capacity

@@ -1864,7 +1864,7 @@ struct DFAEngine(Engine):
         """
         # Smart capacity allocation - avoid over-allocation for sparse matches
         var estimated_capacity = min(
-            len(text) // 20, 100
+            len(text) // 20, 10
         )  # Conservative estimate
         var matches = List[Match, hint_trivial_type=True](
             capacity=estimated_capacity
