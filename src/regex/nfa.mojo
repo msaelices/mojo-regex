@@ -142,6 +142,7 @@ struct NFAEngine(Engine):
             matched.
         """
         # Parse the regex if it's different from the cached one
+        var matches = MatchList()
         var ast: ASTNode[MutableAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
@@ -151,10 +152,9 @@ struct NFAEngine(Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return MatchList()
+                return matches
 
         # Use smart MatchList container with lazy allocation
-        var matches = MatchList()
         var current_pos = 0
 
         # Smaller temp capacity since we clear frequently
@@ -253,7 +253,7 @@ struct NFAEngine(Engine):
                 else:
                     current_pos += 1
 
-        return matches
+        return matches^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.

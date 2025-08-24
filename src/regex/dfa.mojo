@@ -1871,7 +1871,7 @@ struct DFAEngine(Engine):
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
-            return matches
+            return matches^
 
         # Skip SIMD path - removed for performance
 
@@ -1894,7 +1894,7 @@ struct DFAEngine(Engine):
                 # No match at this position, try next
                 pos += 1
 
-        return matches
+        return matches^
 
     fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
         """SIMD-optimized matching for character class patterns with quantifier support.

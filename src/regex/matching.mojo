@@ -63,9 +63,9 @@ struct MatchList(Copyable, Movable, Sized):
         """Copy constructor."""
         self._list = other._list
         self._allocated = other._allocated
-        # Comment when debug is done
-        var call_location = __call_location()
-        print("Copying MatchList", call_location)
+        # # Comment when debug is done
+        # var call_location = __call_location()
+        # print("Copying MatchList", call_location)
 
     fn __moveinit__(
         out self,
