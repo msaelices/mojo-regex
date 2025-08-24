@@ -793,7 +793,7 @@ fn findall(
     Returns:
         List of all matches found.
     """
-    var compiled = compile_regex(pattern)
+    ref compiled = compile_regex(pattern)
     return compiled.match_all(text)
 
 
