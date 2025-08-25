@@ -118,7 +118,7 @@ fn parse_token_list[
     regex_origin: Origin[mut=True]
 ](
     ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
-    owned tokens: List[Token],
+    var tokens: List[Token],
 ) raises -> ASTNode[MutableAnyOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """

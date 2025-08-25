@@ -45,7 +45,7 @@ struct LiteralInfo(Copyable, Movable):
         self.is_exact_match = other.is_exact_match
         self.has_anchors = other.has_anchors
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.required_literals = other.required_literals^
         self.literal_prefixes = other.literal_prefixes^
@@ -392,7 +392,7 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         self.literal = other.literal
         self.is_prefix = other.is_prefix
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.literal = other.literal^
         self.is_prefix = other.is_prefix

@@ -60,7 +60,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
 
     fn __init__(
         out self,
-        owned literal: String,
+        var literal: String,
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -123,7 +123,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
         self.literals = List[LiteralInfo[node_origin]]()
         self.best_literal_idx = None
 
-    fn add(mut self, owned literal: LiteralInfo[node_origin]):
+    fn add(mut self, var literal: LiteralInfo[node_origin]):
         """Add a literal to the set."""
         self.literals.append(literal^)
 

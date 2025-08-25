@@ -62,7 +62,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
 
-    fn __init__(out self, owned char_class: String):
+    fn __init__(out self, var char_class: String):
         """Initialize SIMD character class matcher.
 
         Args:
@@ -205,7 +205,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             if size == 16 or size == 32:
                 # Fast path: use _dynamic_shuffle for optimal sizes
                 var result = self.lookup_table._dynamic_shuffle(chunk)
-                return result != 0
+                return result.ne(0)
             else:
                 # Fallback for other sizes
                 var matches = SIMD[DType.bool, size](False)
@@ -231,7 +231,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
                 return matches
         else:
             # Simple lookup for small character classes
-            var matches = SIMD[DType.bool, size](False)
+            var matches = SIMD[DType.bool, size](fill=False)
 
             @parameter
             for i in range(size):
@@ -291,7 +291,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
                 # The lookup table acts as our shuffle table
                 # Hardware support: SSE3/SSSE3 for 16-byte, AVX2 for 32-byte
                 var result = self.lookup_table._dynamic_shuffle(chunk)
-                return result != 0
+                return result.ne(0)
             else:
                 # Fallback for other sizes - still avoid the loop by using vectorized operations
                 var matches = SIMD[DType.bool, SIMD_WIDTH](False)
@@ -317,7 +317,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
                 return matches
         else:
             # Simple lookup for small character classes - often faster for simple patterns
-            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+            var matches = SIMD[DType.bool, SIMD_WIDTH](fill=False)
 
             # Unroll for better performance
             @parameter
@@ -474,7 +474,7 @@ struct SIMDStringSearch(Copyable, Movable):
             var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
             # Compare with first character of pattern
-            var matches = chunk == self.first_char_simd
+            var matches = chunk.eq(self.first_char_simd)
 
             if matches.reduce_or():
                 # Found potential match, check each position
@@ -597,7 +597,7 @@ fn simd_memcmp(
         var chunk1 = s1.unsafe_ptr().load[width=SIMD_WIDTH](s1_offset + pos)
         var chunk2 = s2.unsafe_ptr().load[width=SIMD_WIDTH](s2_offset + pos)
 
-        if (chunk1 != chunk2).reduce_or():
+        if chunk1 != chunk2:
             return False
 
         pos += SIMD_WIDTH
@@ -633,7 +633,7 @@ fn simd_count_char(text: String, target_char: String) -> Int:
     # Process chunks using SIMD
     while pos + SIMD_WIDTH <= text_len:
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
-        var matches = chunk == target_simd
+        var matches = chunk.eq(target_simd)
         count += Int(matches.cast[DType.uint8]().reduce_add())
         pos += SIMD_WIDTH
 
@@ -1034,7 +1034,7 @@ struct TwoWaySearcher(Copyable & Movable):
                 text_pos + i
             )
 
-            var matches = pattern_chunk == text_chunk
+            var matches = pattern_chunk.eq(text_chunk)
             if not matches.reduce_and():
                 # Find first mismatch
                 for j in range(SIMD_WIDTH):
@@ -1137,10 +1137,10 @@ struct MultiLiteralSearcher(Copyable, Movable):
             var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
             # Check if any first bytes match
-            var any_match = SIMD[DType.bool, SIMD_WIDTH](False)
+            var any_match = SIMD[DType.bool, SIMD_WIDTH](fill=False)
             for i in range(self.literal_count):
-                var matches = chunk == SIMD[DType.uint8, SIMD_WIDTH](
-                    self.first_bytes[i]
+                var matches = chunk.eq(
+                    SIMD[DType.uint8, SIMD_WIDTH](self.first_bytes[i])
                 )
                 any_match = any_match | matches
 
