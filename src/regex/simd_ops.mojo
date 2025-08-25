@@ -707,6 +707,17 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         return matcher
 
 
+fn clear_simd_matchers_cache():
+    """Clear the global SIMD matchers cache to prevent state corruption.
+
+    This function clears all cached CharacterClassSIMD instances, forcing
+    fresh instances to be created for subsequent operations. This is necessary
+    to prevent corruption when SIMD matchers accumulate corrupted internal state.
+    """
+    var matchers_ptr = _get_simd_matchers()
+    matchers_ptr[].clear()
+
+
 fn create_optimal_simd_matcher(
     pattern: String, pattern_type: String = ""
 ) -> CharacterClassSIMD:

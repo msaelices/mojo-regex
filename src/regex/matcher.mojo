@@ -19,6 +19,12 @@ from regex.prefilter import (
     MemchrPrefilter,
     PrefilterMatcher,
 )
+from regex.simd_ops import clear_simd_matchers_cache
+from regex.simd_matchers import (
+    clear_range_matchers_cache,
+    clear_nibble_matchers_cache,
+)
+
 from regex.literal_optimizer import (
     extract_literals,
     LiteralSet,
@@ -449,11 +455,16 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn reset(mut self):
         """Reset mutable search state in underlying matchers to prevent corruption.
 
-        This is a lightweight operation that clears any search state that accumulates
-        between operations. Used for future optimizations.
+        This clears all accumulated search state including global SIMD matcher caches
+        that can become corrupted and affect subsequent regex operations.
         """
         # Reset NFA matcher search state (contains TwoWaySearcher)
         self.nfa_matcher.reset_search_state()
+
+        # Reset global SIMD matcher caches that can accumulate corrupted state
+        clear_simd_matchers_cache()
+        clear_range_matchers_cache()
+        clear_nibble_matchers_cache()
 
     fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.

@@ -497,3 +497,23 @@ fn get_whitespace_matcher() -> NibbleBasedMatcher:
         var matcher = create_whitespace_matcher()
         matchers[SIMD_MATCHER_WHITESPACE] = matcher
         return matcher
+
+
+fn clear_range_matchers_cache():
+    """Clear the global range matchers cache to prevent state corruption.
+
+    This function clears all cached RangeBasedMatcher instances, forcing
+    fresh instances to be created for subsequent operations.
+    """
+    var matchers_ptr = _get_range_matchers()
+    matchers_ptr[].clear()
+
+
+fn clear_nibble_matchers_cache():
+    """Clear the global nibble matchers cache to prevent state corruption.
+
+    This function clears all cached NibbleBasedMatcher instances, forcing
+    fresh instances to be created for subsequent operations.
+    """
+    var matchers_ptr = _get_nibble_matchers()
+    matchers_ptr[].clear()
