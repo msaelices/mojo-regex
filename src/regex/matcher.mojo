@@ -19,11 +19,6 @@ from regex.prefilter import (
     MemchrPrefilter,
     PrefilterMatcher,
 )
-from regex.simd_ops import clear_simd_matchers_cache
-from regex.simd_matchers import (
-    clear_range_matchers_cache,
-    clear_nibble_matchers_cache,
-)
 
 from regex.literal_optimizer import (
     extract_literals,
@@ -455,22 +450,16 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn reset(mut self):
         """Reset mutable search state in underlying matchers to prevent corruption.
 
-        This clears all accumulated search state including global SIMD matcher caches
-        that can become corrupted and affect subsequent regex operations.
+        NOTE: Testing shows current reset implementations do not actually fix
+        the corruption issue. The root cause is deeper in the regex engine and
+        needs further investigation.
         """
-        # Reset NFA matcher search state (contains TwoWaySearcher)
+        # This does not fix the corruption, but kept for potential future use
         self.nfa_matcher.reset_search_state()
-
-        # Reset global SIMD matcher caches that can accumulate corrupted state
-        clear_simd_matchers_cache()
-        clear_range_matchers_cache()
-        clear_nibble_matchers_cache()
 
     fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
-        # Reset mutable state to prevent corruption
-        self.reset()
 
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
@@ -493,8 +482,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
-        # Reset mutable state to prevent corruption
-        self.reset()
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
             if start <= len(text):
@@ -546,8 +533,6 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     fn match_all(mut self, text: String) raises -> MatchList:
         """Find all matches using optimal engine."""
-        # Reset mutable state to prevent corruption
-        self.reset()
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
             var matches = MatchList()
@@ -634,7 +619,15 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
 
 struct CompiledRegex(Copyable, Movable):
-    """High-level compiled regex object with caching and optimization."""
+    """High-level compiled regex object with caching and optimization.
+
+    Uses cached HybridMatcher instances for optimal performance. The caching approach
+    avoids expensive matcher recreation on each operation while maintaining correctness
+    for normal regex operations.
+
+    Note: There is a known corruption issue that affects complex pattern sequences,
+    but this occurs at a deeper level in the regex engine beyond the caching layer.
+    """
 
     var matcher: HybridMatcher
     """The hybrid matcher instance for this compiled regex."""
@@ -669,7 +662,6 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             Optional Match if found.
         """
-        # Create fresh HybridMatcher to prevent mutable state corruption
         return self.matcher.match_first(text, start)
 
     fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
@@ -756,7 +748,7 @@ fn _get_regex_cache() -> UnsafePointer[RegexCache]:
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
-    """Compile a regex pattern with stateless caching for repeated use.
+    """Compile a regex pattern with caching for repeated use.
 
     Args:
         pattern: Regex pattern string.
@@ -764,22 +756,21 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    # Stateless caching approach: Cache CompiledRegex objects safely
-    # The key insight: CompiledRegex methods now create fresh HybridMatcher
-    # instances for each operation, preventing mutable state corruption
+    # Caching approach: Cache CompiledRegex objects with HybridMatcher instances
+    # This provides optimal performance for repeated pattern usage
 
     var regex_cache_ptr = _get_regex_cache()
     var compiled: CompiledRegex
 
     if pattern in regex_cache_ptr[]:
-        # Return cached compiled regex - now safe due to stateless operations
+        # Return cached compiled regex for optimal performance
         compiled = regex_cache_ptr[][pattern]
         return compiled
     else:
         # Not in cache, compile new regex
         compiled = CompiledRegex(pattern)
 
-    # Add to cache - safe now that operations create fresh matchers
+    # Add to cache for future reuse
     regex_cache_ptr[][pattern] = compiled
     return compiled
 
