@@ -1214,3 +1214,110 @@ def test_toll_free_vs_regular_phone_patterns():
     assert_true(
         digits_stats.find("SIMPLE") != -1 or digits_stats.find("DFA") != -1
     )
+
+
+def test_regex_corruption_issue_39():
+    """Test for regex corruption bug reported in GitHub issue #39.
+
+    This test reproduces a critical bug where executing a specific sequence
+    of regex patterns corrupts the global regex engine state, causing subsequent
+    patterns to fail matching even when they should succeed.
+
+    Bug details:
+    - Sequence: DFA('hello') → NFA('.*') → DFA('a*') → DFA('[0-9]+')
+    - Result: All subsequent 'hello' patterns fail to match "hello world"
+    - Impact: 1000x performance degradation due to engine corruption
+    - Root cause: Global state corruption affecting all regex instances
+
+    This test should FAIL until the corruption bug is fixed.
+    See: https://github.com/msaelices/mojo-regex/issues/39
+    """
+
+    def _make_test_string(length: Int) -> String:
+        """Generate a test string of specified length."""
+        var result = String()
+        var pattern = String("abcdefghijklmnopqrstuvwxyz")
+        var pattern_len = len(pattern)
+        var full_repeats = length // pattern_len
+        var remainder = length % pattern_len
+        for _ in range(full_repeats):
+            result += pattern
+        for i in range(remainder):
+            result += pattern[i]
+        return result
+
+    # Clear any existing cache to start fresh
+    clear_regex_cache()
+
+    # Step 1: Verify that 'hello' pattern works initially
+    var initial_test = compile_regex("hello")
+    var initial_match = initial_test.match_first("hello world")
+    assert_true(initial_match.__bool__(), "Initial 'hello' pattern should work")
+
+    # Step 2: Set up the large text strings used in the corruption sequence
+    var text_10000 = _make_test_string(10000) + "hello world"
+    var text_range_10000 = _make_test_string(10000) + "0123456789"
+
+    # Step 3: Execute the exact corruption sequence
+    # This is the minimal sequence that triggers global state corruption:
+
+    # 3a. DFA pattern: 'hello'
+    var hello_pattern = compile_regex("hello")
+    _ = hello_pattern.match_first(text_10000)
+
+    # 3b. NFA pattern: '.*' (wildcard)
+    var wildcard_pattern = compile_regex(".*")
+    _ = wildcard_pattern.match_first(text_10000)
+
+    # 3c. DFA pattern: 'a*' (CRITICAL - this step triggers the corruption)
+    var quantifier_pattern = compile_regex("a*")
+    _ = quantifier_pattern.match_first(text_10000)
+
+    # 3d. DFA pattern: '[0-9]+'
+    var range_pattern = compile_regex("[0-9]+")
+    _ = range_pattern.match_next(text_range_10000, 0)
+
+    # Step 4: Test if corruption occurred
+    # After the above sequence, 'hello' patterns should fail to match
+    var corrupted_test = compile_regex("hello")
+    var corrupted_match = corrupted_test.match_first("hello world")
+
+    # Document the current buggy behavior for verification
+    var corruption_detected = not corrupted_match.__bool__()
+
+    # Also test that it affects fresh instances (global corruption, not instance-specific)
+    var fresh_test = compile_regex("hello")
+    var fresh_match = fresh_test.match_first("hello world")
+    var fresh_also_broken = not fresh_match.__bool__()
+
+    # Test that high-level API is also affected
+    var api_results = findall("hello", "hello world")
+    var api_broken = len(api_results) == 0
+
+    # For now, we document the bug by checking that it occurs
+    # Remove these lines once the bug is fixed:
+    if not corruption_detected:
+        print(
+            "WARNING: Expected corruption but 'hello' still works - bug may be"
+            " non-deterministic"
+        )
+    else:
+        print("CONFIRMED: GitHub issue #39 corruption reproduced")
+        print("  - Original instance broken:", corruption_detected)
+        print("  - Fresh instance broken:", fresh_also_broken)
+        print("  - High-level API broken:", api_broken)
+        print("  - This indicates GLOBAL state corruption")
+
+        # Verify it's global corruption affecting all instances
+        assert_true(
+            fresh_also_broken,
+            "Fresh instances should also be broken (global corruption)",
+        )
+        assert_true(
+            api_broken,
+            "High-level API should also be broken (global corruption)",
+        )
+
+    assert_true(
+        corrupted_match.__bool__(), "'hello' pattern should work after sequence"
+    )
