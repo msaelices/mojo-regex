@@ -69,7 +69,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     fn __moveinit__(
         out self,
-        owned other: Self,
+        deinit other: Self,
     ):
         """Move constructor."""
         self._list = other._list^

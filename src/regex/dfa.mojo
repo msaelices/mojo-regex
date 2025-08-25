@@ -148,7 +148,7 @@ struct SequentialPatternElement(Copyable, Movable):
 
     fn __init__(
         out self,
-        owned char_class: String,
+        var char_class: String,
         min_matches: Int,
         max_matches: Int,
         positive_logic: Bool = True,
@@ -254,7 +254,7 @@ struct DFAEngine(Engine):
         self.simd_char_pattern = ""
         self.literal_pattern = ""
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.states = other.states^
         self.start_state = other.start_state
@@ -313,7 +313,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_character_class(
-        mut self, owned char_class: String, min_matches: Int, max_matches: Int
+        mut self, var char_class: String, min_matches: Int, max_matches: Int
     ) raises:
         """Compile a character class pattern like [a-z]+ into a DFA.
 
@@ -328,7 +328,7 @@ struct DFAEngine(Engine):
 
     fn compile_character_class_with_logic(
         mut self,
-        owned char_class: String,
+        var char_class: String,
         min_matches: Int,
         max_matches: Int,
         positive_logic: Bool,
@@ -575,7 +575,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_multi_character_class_sequence(
-        mut self, owned sequence_info: SequentialPatternInfo
+        mut self, var sequence_info: SequentialPatternInfo
     ) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
 
