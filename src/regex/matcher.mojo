@@ -5,6 +5,7 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
+from builtin._location import __call_location
 from memory import UnsafePointer
 from time import monotonic
 from sys.ffi import _Global
@@ -651,6 +652,17 @@ struct CompiledRegex(Copyable, Movable):
         self.matcher = other.matcher^
         self.pattern = other.pattern^
         self.compiled_at = other.compiled_at
+
+    @always_inline
+    fn __del__(owned self):
+        """Destructor to clean up resources."""
+        call_location = __call_location()
+        print(
+            "CompiledRegex for pattern '",
+            self.pattern,
+            "' is being deleted in ",
+            call_location,
+        )
 
     fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
