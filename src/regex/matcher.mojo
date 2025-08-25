@@ -196,6 +196,11 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
+    fn reset_search_state(mut self):
+        """Reset mutable search state in underlying NFAEngine to prevent corruption.
+        """
+        self.engine.reset_search_state()
+
 
 @always_inline
 fn _is_wildcard_match_any(pattern: String) -> Bool:
@@ -441,6 +446,15 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
 
+    fn reset(mut self):
+        """Reset mutable search state in underlying matchers to prevent corruption.
+
+        This is a lightweight operation that clears any search state that accumulates
+        between operations. Used for future optimizations.
+        """
+        # Reset NFA matcher search state (contains TwoWaySearcher)
+        self.nfa_matcher.reset_search_state()
+
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -638,12 +652,7 @@ struct CompiledRegex(Copyable, Movable):
             Optional Match if found.
         """
         # Create fresh HybridMatcher to prevent mutable state corruption
-        try:
-            var fresh_matcher = HybridMatcher(self.pattern)
-            return fresh_matcher.match_first(text, start)
-        except:
-            # Fallback to existing matcher if fresh creation fails
-            return self.matcher.match_first(text, start)
+        return self.matcher.match_first(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
@@ -655,13 +664,7 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             Optional Match if found.
         """
-        # Create fresh HybridMatcher to prevent mutable state corruption
-        try:
-            var fresh_matcher = HybridMatcher(self.pattern)
-            return fresh_matcher.match_next(text, start)
-        except:
-            # Fallback to existing matcher if fresh creation fails
-            return self.matcher.match_next(text, start)
+        return self.matcher.match_next(text, start)
 
     fn match_all(self, text: String) raises -> MatchList:
         """Find all matches in text.
@@ -672,13 +675,7 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             MatchList container with all matches found.
         """
-        # Create fresh HybridMatcher to prevent mutable state corruption
-        try:
-            var fresh_matcher = HybridMatcher(self.pattern)
-            return fresh_matcher.match_all(text)
-        except:
-            # Fallback to existing matcher if fresh creation fails
-            return self.matcher.match_all(text)
+        return self.matcher.match_all(text)
 
     fn test(self, text: String) -> Bool:
         """Test if pattern matches anywhere in text.
@@ -689,14 +686,8 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             True if pattern matches, False otherwise.
         """
-        try:
-            var fresh_matcher = HybridMatcher(self.pattern)
-            var result = fresh_matcher.match_next(text, 0)
-            return result.__bool__()
-        except:
-            # Fallback to existing matcher if fresh creation fails
-            var result = self.matcher.match_next(text, 0)
-            return result.__bool__()
+        var result = self.matcher.match_next(text, 0)
+        return result.__bool__()
 
     fn get_stats(self) -> String:
         """Get performance statistics and engine information.
@@ -808,7 +799,7 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     Returns:
         Matches container with all matches found.
     """
-    ref compiled = compile_regex(pattern)
+    var compiled = compile_regex(pattern)
     return compiled.match_all(text)
 
 

@@ -255,6 +255,15 @@ struct NFAEngine(Engine):
 
         return matches^
 
+    fn reset_search_state(mut self):
+        """Reset mutable search state in literal searcher to prevent corruption.
+
+        This clears any search state that accumulates between operations when
+        the same NFAEngine instance is reused in cached CompiledRegex objects.
+        """
+        if self.literal_searcher:
+            self.literal_searcher.value().reset()
+
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.

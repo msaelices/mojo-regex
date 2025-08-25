@@ -939,6 +939,15 @@ struct TwoWaySearcher(Copyable & Movable):
 
         self.period = period
 
+    fn reset(mut self):
+        """Reset mutable search state to initial values.
+
+        This clears the memory fields that track search state between operations,
+        preventing corruption when the same searcher is reused for different searches.
+        """
+        self.memory = 0
+        self.memory_fwd = -1
+
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using Two-Way algorithm with SIMD.
 
