@@ -695,7 +695,7 @@ struct CompiledRegex(Copyable, Movable):
         """
         return self.matcher.match_all(text)
 
-    fn test(self, text: String) -> Bool:
+    fn test(mut self, text: String) -> Bool:
         """Test if pattern matches anywhere in text.
 
         Args:
