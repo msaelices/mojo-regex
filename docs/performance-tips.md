@@ -82,7 +82,7 @@ Not all patterns benefit equally from SIMD. Use a hybrid approach:
 
 ```mojo
 # From simd_ops.mojo - commit 3e2cf21
-fn __init__(out self, owned char_class: String):
+fn __init__(out self, var char_class: String):
     self.use_shuffle_optimization = len(char_class) > 3
 
     if self.use_shuffle_optimization:

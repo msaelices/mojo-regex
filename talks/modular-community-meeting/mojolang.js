@@ -9,7 +9,7 @@
                 keyword:
                     'struct fn var let def trait alias for while if else return continue break ' +
                     'and or not in as is self Self trait ' +
-                    'owned in borrowed mut ' +
+                    'var in borrowed mut ' +
                     'raises ' +
                     'constrained ' +
                     'from import with try except finally pass ',

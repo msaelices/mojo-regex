@@ -84,7 +84,7 @@ struct Regex[origin: Origin](
     #     print("Copying Regex:", self, "in ", call_location)
 
     # @always_inline
-    # fn __del__(owned self):
+    # fn __del__(var self):
     #     """Destroy all the children and free its memory."""
     #     var call_location = __call_location()
     #     print("Deleting Regex:", self, "in ", call_location)
@@ -121,7 +121,7 @@ struct Regex[origin: Origin](
         return self.children_len
 
     @always_inline
-    fn append_child(mut self, owned child: ASTNode[ImmutableAnyOrigin]):
+    fn append_child(mut self, var child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
         # print(
         #     "Appending child to Regex at ",
@@ -246,7 +246,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.children_len = len(children_indexes)
 
     # @always_inline
-    # fn __del__(owned self):
+    # fn __del__(var self):
     #     """Destroy all the children and free its memory."""
     #     var call_location = __call_location()
     #     print("Deleting ASTNode:", self, "in ", call_location)
@@ -285,7 +285,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             and self.max == other.max
             and self.positive_logic == other.positive_logic
             and self.children_len == other.children_len
-            and (self.children_indexes == other.children_indexes).reduce_and()
+            and self.children_indexes == other.children_indexes
         )
 
     fn __ne__(self, other: ASTNode[regex_origin]) -> Bool:
@@ -332,7 +332,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     @always_inline
     fn is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if (LEAF_ELEMS == self.type).reduce_or():
+        if LEAF_ELEMS.eq(self.type).reduce_or():
             return True
         else:
             return False
@@ -344,7 +344,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         Only use SIMD for patterns that will truly benefit, avoiding overhead
         for simple cases that can be handled more efficiently by regular matching.
         """
-        if not (SIMD_QUANTIFIERS == self.type).reduce_or():
+        if not SIMD_QUANTIFIERS.eq(self.type).reduce_or():
             return False
 
         if min_matches == 1 and max_matches == 1:
