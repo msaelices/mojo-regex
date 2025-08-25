@@ -10,7 +10,7 @@ struct CharacterClassSIMD(Copyable, Movable):
 
     var lookup_table: SIMD[DType.uint8, 256]
 
-    fn __init__(out self, owned char_class: String):
+    fn __init__(out self, var char_class: String):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         for i in range(len(char_class)):
             var char_code = ord(char_class[i])

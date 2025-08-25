@@ -63,7 +63,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
 
-    fn __init__(out self, owned char_class: String):
+    fn __init__(out self, var char_class: String):
         """Initialize SIMD character class matcher.
 
         Args:

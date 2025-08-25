@@ -84,7 +84,7 @@ struct Regex[origin: Origin](
     #     print("Copying Regex:", self, "in ", call_location)
 
     # @always_inline
-    # fn __del__(owned self):
+    # fn __del__(var self):
     #     """Destroy all the children and free its memory."""
     #     var call_location = __call_location()
     #     print("Deleting Regex:", self, "in ", call_location)
@@ -121,7 +121,7 @@ struct Regex[origin: Origin](
         return self.children_len
 
     @always_inline
-    fn append_child(mut self, owned child: ASTNode[ImmutableAnyOrigin]):
+    fn append_child(mut self, var child: ASTNode[ImmutableAnyOrigin]):
         """Append a child ASTNode to the Regex."""
         # print(
         #     "Appending child to Regex at ",
@@ -246,7 +246,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         self.children_len = len(children_indexes)
 
     # @always_inline
-    # fn __del__(owned self):
+    # fn __del__(var self):
     #     """Destroy all the children and free its memory."""
     #     var call_location = __call_location()
     #     print("Deleting ASTNode:", self, "in ", call_location)

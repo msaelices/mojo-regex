@@ -55,7 +55,7 @@ struct OptimizedLiteralInfo(Copyable, Movable):
         self.has_anchors = other.has_anchors
         self.is_exact_match = other.is_exact_match
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.best_literal = other.best_literal^
         self.has_anchors = other.has_anchors
@@ -125,7 +125,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """The underlying DFA engine for pattern matching."""
 
     fn __init__(
-        out self, owned ast: ASTNode[MutableAnyOrigin], pattern: String
+        out self, var ast: ASTNode[MutableAnyOrigin], pattern: String
     ) raises:
         """Initialize DFA matcher by compiling the AST.
 
@@ -139,7 +139,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Copy constructor."""
         self.engine = other.engine
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.engine = other.engine^
 
@@ -179,7 +179,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = other.engine
         self.ast = other.ast
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.engine = other.engine^
         self.ast = other.ast^
@@ -430,7 +430,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.dfa_matcher = other.dfa_matcher^
         self.nfa_matcher = other.nfa_matcher^
@@ -621,7 +621,7 @@ struct CompiledRegex(Copyable, Movable):
         self.matcher = HybridMatcher(pattern)
         self.compiled_at = monotonic()
 
-    fn __moveinit__(out self, owned other: Self):
+    fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
         self.matcher = other.matcher^
         self.pattern = other.pattern^
