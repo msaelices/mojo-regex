@@ -96,7 +96,7 @@ fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 trait RegexMatcher:
     """Interface for different regex matching engines."""
 
-    fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find the first match in text starting from the given position.
 
         Args:
@@ -151,7 +151,7 @@ struct DFAMatcher(Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
-    fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
@@ -192,7 +192,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = other.engine^
         self.ast = other.ast^
 
-    fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
 
@@ -203,11 +203,6 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     fn match_all(mut self, text: String) raises -> MatchList:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
-
-    fn reset_search_state(mut self):
-        """Reset mutable search state in underlying NFAEngine to prevent corruption.
-        """
-        self.engine.reset_search_state()
 
 
 @always_inline
@@ -454,17 +449,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
 
-    fn reset(mut self):
-        """Reset mutable search state in underlying matchers to prevent corruption.
-
-        NOTE: Testing shows current reset implementations do not actually fix
-        the corruption issue. The root cause is deeper in the regex engine and
-        needs further investigation.
-        """
-        # This does not fix the corruption, but kept for potential future use
-        self.nfa_matcher.reset_search_state()
-
-    fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
 
@@ -670,7 +655,7 @@ struct CompiledRegex(Copyable, Movable):
     #         call_location,
     #     )
 
-    fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
