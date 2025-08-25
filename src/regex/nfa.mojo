@@ -41,7 +41,7 @@ alias MIN_PREFIX_LITERAL_LENGTH = 3
 alias MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
-struct NFAEngine(Engine):
+struct NFAEngine(Copyable, Engine):
     """A regex engine that can match regex patterns against text."""
 
     var pattern: String

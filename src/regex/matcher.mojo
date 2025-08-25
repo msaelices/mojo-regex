@@ -120,11 +120,15 @@ trait RegexMatcher:
         ...
 
 
-struct DFAMatcher(Copyable, Movable, RegexMatcher):
+struct DFAMatcher(Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine: DFAEngine
+    var engine_ptr: UnsafePointer[DFAEngine]
     """The underlying DFA engine for pattern matching."""
+
+    fn __init__(out self):
+        """Default constructor for empty DFA matcher."""
+        self.engine_ptr = UnsafePointer[DFAEngine]()
 
     fn __init__(
         out self, var ast: ASTNode[MutableAnyOrigin], pattern: String
@@ -135,27 +139,28 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
             ast: AST representing the regex pattern.
             pattern: The original regex pattern string.
         """
-        self.engine = compile_simple_pattern(ast)
+        engine = compile_simple_pattern(ast)
+        self.engine_ptr = UnsafePointer(to=engine)
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.engine = other.engine
+        self.engine_ptr = other.engine_ptr
 
-    fn __moveinit__(out self, deinit other: Self):
-        """Move constructor."""
-        self.engine = other.engine^
+    fn __bool__(self) -> Bool:
+        """Check if DFA matcher is valid (compiled)."""
+        return Bool(self.engine_ptr)
 
     fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.engine.match_first(text, start)
+        return self.engine_ptr[].match_first(text, start)
 
     fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.engine.match_next(text, start)
+        return self.engine_ptr[].match_next(text, start)
 
     fn match_all(mut self, text: String) raises -> MatchList:
         """Find all matches using DFA execution."""
-        return self.engine.match_all(text)
+        return self.engine_ptr[].match_all(text)
 
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
@@ -308,8 +313,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """Intelligent matcher that routes to optimal engine based on pattern complexity.
     """
 
-    var dfa_matcher: Optional[DFAMatcher]
-    """Optional DFA matcher for simple patterns."""
+    var dfa_matcher: DFAMatcher
+    """DFA matcher for simple patterns."""
     var nfa_matcher: NFAMatcher
     """NFA matcher as fallback for complex patterns."""
     var complexity: PatternComplexity
@@ -341,7 +346,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.is_exact_literal = False
             self.prefilter = None
             self.complexity = PatternComplexity(PatternComplexity.SIMPLE)
-            self.dfa_matcher = None
+            self.dfa_matcher = DFAMatcher()
             self.use_pure_dfa = False  # Special wildcard handling
             # Create minimal NFA matcher (required field, but won't be used)
             var dummy_ast = parse(
@@ -422,9 +427,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 self.dfa_matcher = DFAMatcher(ast, pattern)
             except:
                 # DFA compilation failed, fall back to NFA only
-                self.dfa_matcher = None
+                self.dfa_matcher = DFAMatcher()
         else:
-            self.dfa_matcher = None
+            self.dfa_matcher = DFAMatcher()
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
@@ -475,7 +480,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
             # Use high-performance DFA for simple patterns
-            return self.dfa_matcher.value().match_first(text, start)
+            return self.dfa_matcher.match_first(text, start)
         else:
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
@@ -519,7 +524,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 self.dfa_matcher
                 and self.complexity.value == PatternComplexity.SIMPLE
             ):
-                return self.dfa_matcher.value().match_next(text, search_start)
+                return self.dfa_matcher.match_next(text, search_start)
             else:
                 return self.nfa_matcher.match_next(text, search_start)
 
@@ -528,7 +533,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
-            return self.dfa_matcher.value().match_next(text, start)
+            return self.dfa_matcher.match_next(text, start)
         else:
             return self.nfa_matcher.match_next(text, start)
 
@@ -583,7 +588,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.dfa_matcher
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
-            return self.dfa_matcher.value().match_all(text)
+            return self.dfa_matcher.match_all(text)
         else:
             return self.nfa_matcher.match_all(text)
 

@@ -1,7 +1,7 @@
 from regex.matching import Match, MatchList
 
 
-trait Engine(Copyable, Movable):
+trait Engine(Movable):
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
         """Get the regex pattern ptr used by this Engine.
 
