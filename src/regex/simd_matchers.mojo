@@ -119,7 +119,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
                     var high_match = self.high_nibble_lut._dynamic_shuffle(
                         sub_high
                     )
-                    var sub_result = (low_match & high_match) != 0
+                    var sub_result = (low_match & high_match).ne(0)
                     for i in range(16):
                         result[offset + i] = sub_result[i]
                 else:
