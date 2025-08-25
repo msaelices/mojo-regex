@@ -654,7 +654,7 @@ struct CompiledRegex(Copyable, Movable):
         self.compiled_at = other.compiled_at
 
     @always_inline
-    fn __del__(owned self):
+    fn __del__(deinit self):
         """Destructor to clean up resources."""
         call_location = __call_location()
         print(
