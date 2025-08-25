@@ -52,7 +52,6 @@ alias SHUFFLE_MIN_SIZE = 4
 alias SHUFFLE_MAX_SIZE = 32
 
 
-@register_passable("trivial")
 struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
     """SIMD-optimized character class matcher."""
 
@@ -423,12 +422,11 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-@register_passable("trivial")
-struct SIMDStringSearch:
+struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern_ptr: UnsafePointer[Byte]
-    """Pointer to the pattern string."""
+    var pattern: String
+    """Stored copy of the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
@@ -440,7 +438,7 @@ struct SIMDStringSearch:
         Args:
             pattern: Literal string pattern to search for.
         """
-        self.pattern_ptr = pattern.unsafe_ptr()
+        self.pattern = pattern
         self.pattern_length = len(pattern)
 
         # Create SIMD vector with first character of pattern
@@ -510,19 +508,20 @@ struct SIMDStringSearch:
 
         if self.pattern_length == 1:
             # Single character - simple scan
-            var target_char = self.pattern_ptr[][0]
+            var target_char = ord(self.pattern[0])
             for i in range(start, text_len):
-                if ord(text[i]) == Int(target_char):
+                if ord(text[i]) == target_char:
                     return i
         elif self.pattern_length == 2:
             # Two characters - check pairs
             if text_len - start < 2:
                 return -1
-            var first_char = self.pattern_ptr[][0]
-            var second_char = self.pattern_ptr[][1]
+            var first_char = ord(self.pattern[0])
+            var second_char = ord(self.pattern[1])
             for i in range(start, text_len - 1):
-                if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
-                    second_char
+                if (
+                    ord(text[i]) == first_char
+                    and ord(text[i + 1]) == second_char
                 ):
                     return i
 
@@ -542,8 +541,7 @@ struct SIMDStringSearch:
             return False
 
         for i in range(self.pattern_length):
-            var ptr = self.pattern_ptr + i
-            if ord(text[pos + i]) != Int(ptr[]):
+            if ord(text[pos + i]) != ord(self.pattern[i]):
                 return False
 
         return True
