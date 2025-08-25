@@ -637,7 +637,13 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             Optional Match if found.
         """
-        return self.matcher.match_first(text, start)
+        # Create fresh HybridMatcher to prevent mutable state corruption
+        try:
+            var fresh_matcher = HybridMatcher(self.pattern)
+            return fresh_matcher.match_first(text, start)
+        except:
+            # Fallback to existing matcher if fresh creation fails
+            return self.matcher.match_first(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
@@ -649,7 +655,13 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             Optional Match if found.
         """
-        return self.matcher.match_next(text, start)
+        # Create fresh HybridMatcher to prevent mutable state corruption
+        try:
+            var fresh_matcher = HybridMatcher(self.pattern)
+            return fresh_matcher.match_next(text, start)
+        except:
+            # Fallback to existing matcher if fresh creation fails
+            return self.matcher.match_next(text, start)
 
     fn match_all(self, text: String) raises -> MatchList:
         """Find all matches in text.
@@ -660,7 +672,13 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             MatchList container with all matches found.
         """
-        return self.matcher.match_all(text)
+        # Create fresh HybridMatcher to prevent mutable state corruption
+        try:
+            var fresh_matcher = HybridMatcher(self.pattern)
+            return fresh_matcher.match_all(text)
+        except:
+            # Fallback to existing matcher if fresh creation fails
+            return self.matcher.match_all(text)
 
     fn test(self, text: String) -> Bool:
         """Test if pattern matches anywhere in text.
@@ -671,8 +689,14 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             True if pattern matches, False otherwise.
         """
-        var result = self.match_next(text)
-        return result.__bool__()
+        try:
+            var fresh_matcher = HybridMatcher(self.pattern)
+            var result = fresh_matcher.match_next(text, 0)
+            return result.__bool__()
+        except:
+            # Fallback to existing matcher if fresh creation fails
+            var result = self.matcher.match_next(text, 0)
+            return result.__bool__()
 
     fn get_stats(self) -> String:
         """Get performance statistics and engine information.
@@ -723,7 +747,7 @@ fn _get_regex_cache() -> UnsafePointer[RegexCache]:
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:
-    """Compile a regex pattern with caching for repeated use.
+    """Compile a regex pattern with stateless caching for repeated use.
 
     Args:
         pattern: Regex pattern string.
@@ -731,26 +755,24 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    # FIXME: Disable caching temporarily due to mutable state corruption bug
-    # CompiledRegex objects contain mutable internal state that gets corrupted
-    # when the same cached object is reused for different operations.
-    # This was causing massive performance degradation (1000x slower) in benchmarks.
-    return CompiledRegex(pattern)
-    # regex_cache_ptr = _get_regex_cache()
-    # var compiled: CompiledRegex
-    #
-    # if pattern in regex_cache_ptr[]:
-    #     # Return cached compiled regex if available
-    #     compiled = regex_cache_ptr[][pattern]
-    #     return compiled
-    # else:
-    #     # Not in cache, compile new regex
-    #     compiled = CompiledRegex(pattern)
-    #
-    # # Add to cache (TODO: implement LRU eviction)
-    # regex_cache_ptr[][pattern] = compiled
-    #
-    # return compiled
+    # Stateless caching approach: Cache CompiledRegex objects safely
+    # The key insight: CompiledRegex methods now create fresh HybridMatcher
+    # instances for each operation, preventing mutable state corruption
+
+    var regex_cache_ptr = _get_regex_cache()
+    var compiled: CompiledRegex
+
+    if pattern in regex_cache_ptr[]:
+        # Return cached compiled regex - now safe due to stateless operations
+        compiled = regex_cache_ptr[][pattern]
+        return compiled
+    else:
+        # Not in cache, compile new regex
+        compiled = CompiledRegex(pattern)
+
+    # Add to cache - safe now that operations create fresh matchers
+    regex_cache_ptr[][pattern] = compiled
+    return compiled
 
 
 fn clear_regex_cache():
