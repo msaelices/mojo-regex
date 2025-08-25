@@ -231,7 +231,7 @@ struct DFAEngine(Engine):
     """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
-    var simd_string_search: Optional[SIMDStringSearch]
+    var simd_string_search: Optional[SIMDStringSearch[Self]]
     """SIMD-optimized string search for pure literal patterns."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
@@ -295,7 +295,7 @@ struct DFAEngine(Engine):
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
             self.literal_pattern = pattern  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch(self.literal_pattern)
+            self.simd_string_search = SIMDStringSearch[Self](self)
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
@@ -1704,6 +1704,22 @@ struct DFAEngine(Engine):
             for char_code in range(DEFAULT_DFA_TRANSITIONS):
                 if char_bitmap[char_code] == 0:
                     state.add_transition(char_code, to_state)
+
+    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
+        """Get the regex pattern used by this Engine.
+
+        Returns:
+            The regex pattern as a string.
+        """
+        return self.literal_pattern.unsafe_ptr()
+
+    fn get_pattern_len(self) -> Int:
+        """Get the length of the regex pattern used by this Engine.
+
+        Returns:
+            Length of the regex pattern string.
+        """
+        return len(self.literal_pattern)
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,

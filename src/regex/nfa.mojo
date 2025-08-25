@@ -56,7 +56,7 @@ struct NFAEngine(Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
+    var literal_searcher: Optional[TwoWaySearcher[NFAEngine]]
     """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
@@ -97,8 +97,8 @@ struct NFAEngine(Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
+                            self.literal_searcher = TwoWaySearcher[NFAEngine](
+                                self
                             )
                         elif (
                             best.is_required
@@ -109,11 +109,17 @@ struct NFAEngine(Engine):
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
-                            )
+                            self.literal_searcher = TwoWaySearcher(self)
         except:
             self.regex = None
+
+    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
+        """Get a pointer to the pattern string."""
+        return self.literal_prefix.unsafe_ptr()
+
+    fn get_pattern_len(self) -> Int:
+        """Get the length of the pattern string."""
+        return len(self.literal_prefix)
 
     fn match_all(
         self,
