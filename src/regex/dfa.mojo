@@ -231,7 +231,7 @@ struct DFAEngine(Engine):
     """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
-    var simd_string_search: Optional[SIMDStringSearch[Self]]
+    var simd_string_search: Optional[SIMDStringSearch]
     """SIMD-optimized string search for pure literal patterns."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
@@ -295,7 +295,7 @@ struct DFAEngine(Engine):
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
             self.literal_pattern = pattern  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch[Self](self)
+            self.simd_string_search = SIMDStringSearch(self)
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
@@ -1790,7 +1790,7 @@ struct DFAEngine(Engine):
             ref searcher = self.simd_string_search.value()
             if require_exact_position:
                 # For match_first, must match at exact position
-                if searcher._verify_match(text, start_pos):
+                if searcher.verify_match(text, start_pos):
                     var match_len = searcher.pattern_length
                     return Match(0, start_pos, start_pos + match_len, text)
                 return None

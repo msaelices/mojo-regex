@@ -56,7 +56,7 @@ struct NFAEngine(Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher[NFAEngine]]
+    var literal_searcher: Optional[TwoWaySearcher]
     """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
@@ -97,9 +97,7 @@ struct NFAEngine(Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher[NFAEngine](
-                                self
-                            )
+                            self.literal_searcher = TwoWaySearcher(self)
                         elif (
                             best.is_required
                             and best.get_literal_len()
