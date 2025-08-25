@@ -179,7 +179,7 @@ struct SequentialPatternInfo(Copyable, Movable):
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
-    var transitions: SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS]
+    var transitions: SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS]
     """Transition table for this state, indexed by character code (0-255)."""
     var is_accepting: Bool
     """A state is accepting if it can end a match following this path."""
@@ -188,7 +188,7 @@ struct DFAState(Copyable, Movable):
 
     fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
-        self.transitions = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](
+        self.transitions = SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS](
             -1
         )  # -1 means no transition
         self.is_accepting = is_accepting
@@ -1162,7 +1162,7 @@ struct DFAEngine(Engine):
         var existing_target = Int(
             self.states[from_state].transitions[char_code]
         )
-        if existing_target != 255:  # 255 is -1 in uint8
+        if existing_target != -1:  # -1 means no transition
             # Transition already exists, reuse the target state
             return existing_target
         else:
