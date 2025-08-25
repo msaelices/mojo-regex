@@ -731,21 +731,26 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     Returns:
         Compiled regex object ready for matching.
     """
-    regex_cache_ptr = _get_regex_cache()
-    var compiled: CompiledRegex
-
-    if pattern in regex_cache_ptr[]:
-        # Return cached compiled regex if available
-        compiled = regex_cache_ptr[][pattern]
-        return compiled
-    else:
-        # Not in cache, compile new regex
-        compiled = CompiledRegex(pattern)
-
-    # Add to cache (TODO: implement LRU eviction)
-    regex_cache_ptr[][pattern] = compiled
-
-    return compiled
+    # FIXME: Disable caching temporarily due to mutable state corruption bug
+    # CompiledRegex objects contain mutable internal state that gets corrupted
+    # when the same cached object is reused for different operations.
+    # This was causing massive performance degradation (1000x slower) in benchmarks.
+    return CompiledRegex(pattern)
+    # regex_cache_ptr = _get_regex_cache()
+    # var compiled: CompiledRegex
+    #
+    # if pattern in regex_cache_ptr[]:
+    #     # Return cached compiled regex if available
+    #     compiled = regex_cache_ptr[][pattern]
+    #     return compiled
+    # else:
+    #     # Not in cache, compile new regex
+    #     compiled = CompiledRegex(pattern)
+    #
+    # # Add to cache (TODO: implement LRU eviction)
+    # regex_cache_ptr[][pattern] = compiled
+    #
+    # return compiled
 
 
 fn clear_regex_cache():
