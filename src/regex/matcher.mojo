@@ -140,7 +140,8 @@ struct DFAMatcher(Movable, RegexMatcher):
             pattern: The original regex pattern string.
         """
         engine = compile_simple_pattern(ast)
-        self.engine_ptr = UnsafePointer(to=engine)
+        self.engine_ptr = UnsafePointer[DFAEngine].alloc(1)
+        self.engine_ptr.init_pointee_move(engine^)
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
