@@ -658,16 +658,16 @@ struct CompiledRegex(Copyable, Movable):
         self.pattern = other.pattern^
         self.compiled_at = other.compiled_at
 
-    @always_inline
-    fn __del__(deinit self):
-        """Destructor to clean up resources."""
-        call_location = __call_location()
-        print(
-            "CompiledRegex for pattern '",
-            self.pattern,
-            "' is being deleted in ",
-            call_location,
-        )
+    # @always_inline
+    # fn __del__(deinit self):
+    #     """Destructor to clean up resources."""
+    #     call_location = __call_location()
+    #     print(
+    #         "CompiledRegex for pattern '",
+    #         self.pattern,
+    #         "' is being deleted in ",
+    #         call_location,
+    #     )
 
     fn match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
