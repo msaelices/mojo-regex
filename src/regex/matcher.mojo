@@ -108,7 +108,7 @@ trait RegexMatcher:
         """
         ...
 
-    fn match_all(mut self, text: String) raises -> MatchList:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -155,11 +155,11 @@ struct DFAMatcher(Movable, RegexMatcher):
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
-    fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_next(text, start)
 
-    fn match_all(mut self, text: String) raises -> MatchList:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using DFA execution."""
         return self.engine_ptr[].match_all(text)
 
@@ -196,11 +196,11 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
 
-    fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(mut self, text: String) raises -> MatchList:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
@@ -471,7 +471,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
 
-    fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
@@ -523,7 +523,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_next(text, start)
 
-    fn match_all(mut self, text: String) raises -> MatchList:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
@@ -667,7 +667,7 @@ struct CompiledRegex(Copyable, Movable):
         """
         return self.matcher.match_first(text, start)
 
-    fn match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
 
         Args:
@@ -679,7 +679,7 @@ struct CompiledRegex(Copyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    fn match_all(mut self, text: String) raises -> MatchList:
+    fn match_all(self, text: String) raises -> MatchList:
         """Find all matches in text.
 
         Args:
