@@ -1001,7 +1001,7 @@ struct TwoWaySearcher(Copyable & Movable):
     """Memory for the forward search phase."""
 
     fn __init__(out self, engine: NFAEngine):
-        """Initialize the Two-Way searcher with a pattern.
+        """Initialize the Two-Way searcher with an engine.
 
         Args:
             engine: The engine with the pattern to search for.
@@ -1011,8 +1011,7 @@ struct TwoWaySearcher(Copyable & Movable):
         self.memory = 0
         self.memory_fwd = -1
 
-        # Compute critical factorization
-        var n = self.engine_ptr[].get_pattern_len()
+        var n = self.pattern_len
         if n == 0:
             self.critical_pos = 0
             self.period = 1
@@ -1032,10 +1031,8 @@ struct TwoWaySearcher(Copyable & Movable):
         var k = 1
         while k < n:
             var i = 0
-            while (
-                i < n - k
-                and self.get_pattern_ptr()[i] == self.get_pattern_ptr()[i + k]
-            ):
+            var pattern_ptr = self.get_pattern_ptr()
+            while i < n - k and pattern_ptr[i] == pattern_ptr[i + k]:
                 i += 1
             if i == n - k:
                 period = k
@@ -1045,7 +1042,7 @@ struct TwoWaySearcher(Copyable & Movable):
         self.period = period
 
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
-        """Get character at index from the pattern."""
+        """Get a pointer to the pattern bytes."""
         return self.engine_ptr[].get_pattern_ptr()
 
     fn reset(mut self):
