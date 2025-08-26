@@ -556,11 +556,10 @@ fn _simd_search(
     return -1
 
 
-@register_passable("trivial")
-struct SIMDStringSearch:
+struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
-    var engine_ptr: UnsafePointer[DFAEngine, mut=False]
+    var engine_ptr: UnsafePointer[DFAEngine, mut=True]
     """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
@@ -573,7 +572,8 @@ struct SIMDStringSearch:
         Args:
             engine: DFA engine used.
         """
-        self.engine_ptr = UnsafePointer[DFAEngine, mut=False](to=engine)
+        self.engine_ptr = UnsafePointer[DFAEngine, mut=True].alloc(1)
+        self.engine_ptr.init_pointee_copy(engine)
         self.pattern_length = engine.get_pattern_len()
 
         # Create SIMD vector with first character of pattern
@@ -582,6 +582,11 @@ struct SIMDStringSearch:
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](first_char)
         else:
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](0)
+
+    fn __del__(deinit self):
+        """Clean up allocated resources."""
+        if self.engine_ptr:
+            self.engine_ptr.free()
 
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using SIMD acceleration.
