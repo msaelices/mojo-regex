@@ -557,7 +557,7 @@ fn _simd_search(
 
 
 @register_passable("trivial")
-struct SIMDStringSearch(Copyable, Movable):
+struct SIMDStringSearch:
     """SIMD-optimized string search for literal patterns."""
 
     var engine_ptr: UnsafePointer[DFAEngine, mut=False]
