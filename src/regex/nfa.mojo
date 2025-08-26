@@ -41,7 +41,7 @@ alias MIN_PREFIX_LITERAL_LENGTH = 3
 alias MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
-struct NFAEngine(Engine):
+struct NFAEngine(Copyable, Engine):
     """A regex engine that can match regex patterns against text."""
 
     var pattern: String
@@ -97,9 +97,7 @@ struct NFAEngine(Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
-                            )
+                            self.literal_searcher = TwoWaySearcher(self)
                         elif (
                             best.is_required
                             and best.get_literal_len()
@@ -109,11 +107,19 @@ struct NFAEngine(Engine):
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
-                            )
+                            self.literal_searcher = TwoWaySearcher(self)
         except:
             self.regex = None
+
+    @always_inline
+    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
+        """Get a pointer to the pattern string."""
+        return self.literal_prefix.unsafe_ptr()
+
+    @always_inline
+    fn get_pattern_len(self) -> Int:
+        """Get the length of the pattern string."""
+        return len(self.literal_prefix)
 
     fn match_all(
         self,

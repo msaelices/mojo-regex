@@ -237,16 +237,11 @@ def test_performance_simple_vs_complex():
     # TODO: This is not working because of some stale state
     # Compare with the below code which is working because
     # of I changed the order in which patterns are compiled
-    # var simple_pattern = CompiledRegex("hello")
-    # var complex_pattern = CompiledRegex("a*")  # Might use NFA
-    # # Both should work correctly
-    # assert_true(complex_pattern.test("aaaa"))
-    # assert_true(simple_pattern.test("hello world"))
-
     var simple_pattern = CompiledRegex("hello")
-    assert_true(simple_pattern.test("hello world"))
     var complex_pattern = CompiledRegex("a*")  # Might use NFA
+    # Both should work correctly
     assert_true(complex_pattern.test("aaaa"))
+    assert_true(simple_pattern.test("hello world"))
 
     # Simple pattern should use DFA
     var _ = simple_pattern.get_stats()
