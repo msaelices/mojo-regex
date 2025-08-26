@@ -111,10 +111,12 @@ struct NFAEngine(Copyable, Engine):
         except:
             self.regex = None
 
+    @always_inline
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
         """Get a pointer to the pattern string."""
         return self.literal_prefix.unsafe_ptr()
 
+    @always_inline
     fn get_pattern_len(self) -> Int:
         """Get the length of the pattern string."""
         return len(self.literal_prefix)

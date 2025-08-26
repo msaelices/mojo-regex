@@ -1705,6 +1705,7 @@ struct DFAEngine(Engine):
                 if char_bitmap[char_code] == 0:
                     state.add_transition(char_code, to_state)
 
+    @always_inline
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
         """Get the regex pattern used by this Engine.
 
@@ -1713,6 +1714,7 @@ struct DFAEngine(Engine):
         """
         return self.literal_pattern.unsafe_ptr()
 
+    @always_inline
     fn get_pattern_len(self) -> Int:
         """Get the length of the regex pattern used by this Engine.
 
