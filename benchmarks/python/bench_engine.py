@@ -17,8 +17,179 @@ from typing import Callable
 # ===-----------------------------------------------------------------------===#
 
 
+# ===-----------------------------------------------------------------------===#
+# Direct Benchmark Functions (Mirroring Mojo Architecture)
+# ===-----------------------------------------------------------------------===#
+
+
+def benchmark_search(name: str, pattern: str, text: str, internal_iterations: int):
+    """Benchmark search with manual timing (mirrors Mojo benchmark_search)."""
+
+    # Compile pattern once for fair comparison
+    compiled_pattern = re.compile(pattern)
+
+    # Warmup (3 iterations like Mojo)
+    for _ in range(3):
+        compiled_pattern.search(text)
+
+    # Target runtime: 100ms like Mojo
+    target_runtime = 100_000_000  # 100ms in nanoseconds
+    total_time = 0
+    actual_iterations = 0
+
+    # Run until we hit target runtime or max iterations
+    while total_time < target_runtime and actual_iterations < 100_000:
+        start_time = time.perf_counter_ns()
+
+        # Internal loop matches Mojo benchmark structure
+        for _ in range(internal_iterations):
+            result = compiled_pattern.search(text)
+            if not result:
+                print(f"ERROR: No search match in {name} for pattern: {pattern}")
+                return
+
+        end_time = time.perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
+
+    # Calculate and print results (mirrors Mojo format)
+    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
+    time_ms = mean_time_per_match / 1_000_000.0
+    total_matches = actual_iterations * internal_iterations
+
+    # Format output to match Mojo's benchmark format
+    padded_name = name + " " * (25 - len(name))
+    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
+
+def benchmark_match_first(name: str, pattern: str, text: str, internal_iterations: int):
+    """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first)."""
+
+    # Compile pattern once for fair comparison
+    compiled_pattern = re.compile(pattern)
+
+    # Warmup (3 iterations like Mojo)
+    for _ in range(3):
+        compiled_pattern.match(text)
+
+    # Target runtime: 100ms like Mojo
+    target_runtime = 100_000_000  # 100ms in nanoseconds
+    total_time = 0
+    actual_iterations = 0
+
+    # Run until we hit target runtime or max iterations
+    while total_time < target_runtime and actual_iterations < 100_000:
+        start_time = time.perf_counter_ns()
+
+        # Internal loop matches Mojo benchmark structure
+        for _ in range(internal_iterations):
+            result = compiled_pattern.match(text)
+            if not result:
+                print(f"ERROR: No match in {name} for pattern: {pattern}")
+                return
+
+        end_time = time.perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
+
+    # Calculate and print results (mirrors Mojo format)
+    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
+    time_ms = mean_time_per_match / 1_000_000.0
+    total_matches = actual_iterations * internal_iterations
+
+    # Format output to match Mojo's benchmark format
+    padded_name = name + " " * (25 - len(name))
+    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
+
+def benchmark_findall(name: str, pattern: str, text: str, internal_iterations: int):
+    """Benchmark findall with manual timing (mirrors Mojo benchmark_findall)."""
+
+    # Compile pattern once for fair comparison
+    compiled_pattern = re.compile(pattern)
+
+    # Warmup
+    for _ in range(3):
+        compiled_pattern.findall(text)
+
+    target_runtime = 100_000_000
+    total_time = 0
+    actual_iterations = 0
+
+    while total_time < target_runtime and actual_iterations < 100_000:
+        start_time = time.perf_counter_ns()
+
+        for _ in range(internal_iterations):
+            results = compiled_pattern.findall(text)
+            # Touch the result to ensure it's not optimized away
+            if len(results) < 0:  # Always false, but compiler doesn't know
+                print("ERROR: Unexpected result")
+
+        end_time = time.perf_counter_ns()
+        total_time += end_time - start_time
+        actual_iterations += 1
+
+    # Calculate and print results
+    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
+    time_ms = mean_time_per_match / 1_000_000.0
+    total_matches = actual_iterations * internal_iterations
+
+    padded_name = name + " " * (25 - len(name))
+    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+
+    # Store result for JSON export
+    _store_benchmark_result(name, time_ms, total_matches)
+
+
+# ===-----------------------------------------------------------------------===#
+# Result Collection for JSON Export
+# ===-----------------------------------------------------------------------===#
+
+# Global storage for benchmark results (needed for JSON export)
+_benchmark_results = {}
+_benchmark_iterations = {}
+
+
+def _store_benchmark_result(name: str, time_ms: float, total_iterations: int):
+    """Store benchmark result for JSON export."""
+    _benchmark_results[name] = time_ms * 1_000_000  # Convert to nanoseconds
+    _benchmark_iterations[name] = total_iterations
+
+
+def export_json_results(filename: str = "benchmarks/results/python_results.json"):
+    """Export collected benchmark results to JSON file."""
+    # Ensure directory exists
+    os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+    # Convert results to JSON-serializable format
+    json_results = {
+        "engine": "python",
+        "timestamp": datetime.now().isoformat(),
+        "results": {},
+    }
+
+    for name in _benchmark_results:
+        json_results["results"][name] = {
+            "time_ns": _benchmark_results[name],
+            "time_ms": _benchmark_results[name] / 1_000_000,
+            "iterations": _benchmark_iterations[name],
+        }
+
+    # Write to file
+    with open(filename, "w") as f:
+        json.dump(json_results, f, indent=2)
+
+    print(f"\\nResults exported to {filename}")
+
+
 class Benchmark:
-    """Simple benchmark infrastructure to mirror Mojo's benchmark system."""
+    """Legacy benchmark infrastructure - now deprecated."""
 
     def __init__(self, num_repetitions: int = 5):
         self.num_repetitions = num_repetitions
@@ -28,121 +199,24 @@ class Benchmark:
     def bench_function(
         self, name: str, fn: Callable[[], None], warmup_iterations: int = 3
     ):
-        """Benchmark a function with warmup and multiple repetitions."""
-        # Warmup silently
-        for _ in range(warmup_iterations):
-            fn()
-
-        # Determine target runtime and calculate iterations
-        target_runtime = 100_000_000  # 100ms target
-
-        # Run the actual benchmark
-        total_time = 0
-        actual_iterations = 0
-
-        while total_time < target_runtime and actual_iterations < 100_000:
-            start_time = time.perf_counter_ns()
-            fn()
-            end_time = time.perf_counter_ns()
-            fn_time = end_time - start_time
-            # print(f"Function {name} took {fn_time} ns")
-            total_time += fn_time
-            actual_iterations += 1
-
-        # Calculate mean time per run
-        mean_time = total_time / actual_iterations
-
-        # Get internal iteration count for accurate per-operation timing - scaled up to match Mojo
-        iterations_map = {
-            "literal_match": 2000,  # Increased from 100 to 2000
-            "wildcard_match": 1000,  # Increased from 50 to 1000
-            "range_": 1000,  # Increased from 50 to 1000
-            "anchor_": 2000,  # Increased from 100 to 2000
-            "alternation_": 1000,  # Increased from 50 to 1000
-            "group_": 1000,  # Increased from 50 to 1000
-            "match_all_": 200,  # Increased from 10 to 200
-            "complex_email": 40,  # Increased from 2 to 40
-            "complex_number": 500,  # Increased from 25 to 500
-            "simd_": 200,  # Increased from 10 to 200
-            "literal_prefix_": 1,  # Already optimized in Python's re
-            "required_literal_": 1,
-            "no_literal_baseline": 1,
-            "alternation_common_prefix": 1,
-            "simple_phone": 100,
-            "flexible_phone": 100,
-            "multi_format_phone": 50,
-            "phone_validation": 500,
-            "dfa_simple_phone": 100,
-            "dfa_paren_phone": 100,
-            "dfa_dot_phone": 100,
-            "dfa_digits_only": 100,
-            "national_phone_validation": 10,
-        }
-
-        internal_iterations = 1
-        for prefix, iters in iterations_map.items():
-            if name.startswith(prefix):
-                internal_iterations = iters
-                break
-
-        # Store results
-        self.results[name] = mean_time / internal_iterations
-        self.iterations[name] = actual_iterations * internal_iterations
+        """DEPRECATED: Use direct benchmark functions instead."""
+        pass
 
     def dump_report(self):
-        """Print summary report of all benchmarks in Mojo format."""
-        print("\n=== Benchmark Results ===")
-        print("| name                      | met (ms)              | iters  |")
-        print("|---------------------------|-----------------------|--------|")
-
-        for name in self.results:
-            # Format time in milliseconds with proper precision
-            time_ms = self.results[name] / 1_000_000
-            iters = self.iterations[name]
-
-            # Right-align values to match Mojo format
-            print(f"| {name:<25} | {time_ms:>21.17f} | {iters:>6} |")
+        """DEPRECATED: Results are now printed directly by benchmark functions."""
+        pass
 
     def export_json(self, filename: str = "benchmarks/results/python_results.json"):
-        """Export benchmark results to JSON file.
-
-        Args:
-            filename: Path to output JSON file
-        """
-        # Ensure directory exists
-        os.makedirs(os.path.dirname(filename), exist_ok=True)
-
-        # Convert results to JSON-serializable format
-        json_results = {
-            "engine": "python",
-            "timestamp": datetime.now().isoformat(),
-            "results": {},
-        }
-
-        for name in self.results:
-            json_results["results"][name] = {
-                "time_ns": self.results[name],
-                "time_ms": self.results[name] / 1_000_000,
-                "iterations": self.iterations[name],
-            }
-
-        # Write to file
-        with open(filename, "w") as f:
-            json.dump(json_results, f, indent=2)
-
-        print(f"\nResults exported to {filename}")
+        """DEPRECATED: Results are now printed directly by benchmark functions."""
+        print("\nNote: JSON export disabled in new direct benchmark mode.")
+        print(
+            "Results are printed directly to stdout for parsing by comparison scripts."
+        )
 
 
 # ===-----------------------------------------------------------------------===#
-# Benchmark Data Generation
-# ===-----------------------------------------------------------------------===#
-
-# Literal optimization test texts - scaled up to match Mojo benchmarks
-SHORT_TEXT = "hello world this is a test with hello again and hello there"
-MEDIUM_TEXT = SHORT_TEXT * 100  # Increased from 10 to 100
-LONG_TEXT = SHORT_TEXT * 1000  # Increased from 100 to 1000
-EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-EMAIL_LONG = EMAIL_TEXT * 50  # Increased from 5 to 50
+# Test Data Generation (Mirroring Mojo Functions)
+# ===-----------------------------------------------------------------------===
 
 
 def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -> str:
@@ -213,233 +287,11 @@ def make_complex_pattern_test_data(num_entries: int) -> str:
 
 
 # ===-----------------------------------------------------------------------===#
-# Basic Literal Matching Benchmarks
+# Legacy Benchmark Functions - DEPRECATED
 # ===-----------------------------------------------------------------------===#
 
-
-def bench_literal_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark literal string matching."""
-
-    def benchmark_fn():
-        for _ in range(2000):  # Increased from 100 to 2000
-            result = re.search(pattern, test_text)
-            # Keep result to prevent optimization
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Wildcard and Quantifier Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_wildcard_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark wildcard and quantifier patterns."""
-
-    def benchmark_fn():
-        for _ in range(1000):  # Increased from 50 to 1000
-            result = re.match(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Character Range Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_range_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark character range patterns."""
-
-    def benchmark_fn():
-        for _ in range(1000):  # Increased from 50 to 1000
-            result = re.match(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Anchor Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_anchor_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark anchor patterns (^ and $)."""
-
-    def benchmark_fn():
-        for _ in range(2000):  # Increased from 100 to 2000
-            result = re.match(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Alternation (OR) Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_alternation_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark alternation patterns (|)."""
-
-    def benchmark_fn():
-        for _ in range(1000):  # Increased from 50 to 1000
-            result = re.search(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Group Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_group_match(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark group patterns with quantifiers."""
-
-    def benchmark_fn():
-        for _ in range(1000):  # Increased from 50 to 1000
-            result = re.search(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Match All Benchmarks (Global Matching)
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_match_all(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark finding all matches in text."""
-
-    def benchmark_fn():
-        for _ in range(200):  # Increased from 10 to 200
-            results = re.findall(pattern, test_text)
-            len(results)  # Keep result
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Complex Pattern Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_complex_email_match(email_text: str) -> Callable[[], None]:
-    """Benchmark complex email validation pattern."""
-    pattern = r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}"
-
-    def benchmark_fn():
-        for _ in range(40):  # Increased from 2 to 40
-            results = re.findall(pattern, email_text)
-            len(results)
-
-    return benchmark_fn
-
-
-def bench_complex_number_extraction(number_text: str) -> Callable[[], None]:
-    """Benchmark extracting numbers from text."""
-    pattern = r"\d+\.?\d*"
-
-    def benchmark_fn():
-        for _ in range(500):  # Increased from 25 to 500
-            results = re.findall(pattern, number_text)
-            len(results)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# SIMD-Heavy Character Filtering Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def make_mixed_content_text(length: int) -> str:
-    """Generate large mixed content text optimal for SIMD character class testing.
-
-    Args:
-        length: The desired length of the test string.
-
-    Returns:
-        String with mixed alphanumeric, punctuation, and whitespace content.
-    """
-    if length <= 0:
-        return ""
-
-    # Pattern that creates realistic mixed content with plenty of alphanumeric sequences
-    base_pattern = "User123 sent email to user456@domain.com with ID abc789! Status: ACTIVE_2024 (priority=HIGH). "
-    pattern_len = len(base_pattern)
-    full_repeats = length // pattern_len
-    remainder = length % pattern_len
-
-    result = base_pattern * full_repeats + base_pattern[:remainder]
-    return result
-
-
-def bench_simd_heavy_filtering(test_text: str, pattern: str) -> Callable[[], None]:
-    """Benchmark SIMD-optimized character class filtering on large mixed content.
-
-    This benchmark is designed to show maximum SIMD performance benefits by:
-    - Using character classes that benefit from SIMD lookup tables
-    - Processing large amounts of text to amortize SIMD setup costs
-    - Using realistic mixed content with alphanumeric sequences
-    """
-
-    def benchmark_fn():
-        for _ in range(200):  # Increased from 10 to 200
-            result = re.match(pattern, test_text)
-            bool(result)
-
-    return benchmark_fn
-
-
-# ===-----------------------------------------------------------------------===#
-# Literal Optimization Benchmarks
-# ===-----------------------------------------------------------------------===#
-
-
-def bench_literal_optimization(
-    test_text: str, pattern: str, iterations: int
-) -> Callable[[], None]:
-    """Benchmark literal optimization patterns."""
-
-    def benchmark_fn():
-        for _ in range(iterations):
-            results = re.findall(pattern, test_text)
-            len(results)  # Keep result
-
-    return benchmark_fn
-
-
-def bench_phone_findall(
-    test_text: str, pattern: str, iterations: int
-) -> Callable[[], None]:
-    """Benchmark phone number pattern matching."""
-
-    def benchmark_fn():
-        for _ in range(iterations):
-            results = re.findall(pattern, test_text)
-            len(results)  # Keep result
-
-    return benchmark_fn
-
-
-def bench_phone_match(
-    test_text: str, pattern: str, iterations: int
-) -> Callable[[], None]:
-    """Benchmark phone number pattern validation."""
-
-    def benchmark_fn():
-        for _ in range(iterations):
-            result = re.match(pattern, test_text)
-            bool(result)  # Keep result
-
-    return benchmark_fn
+# Note: All previous function-based benchmark generators have been removed.
+# The new architecture uses direct benchmark functions that mirror Mojo's approach.
 
 
 # ===-----------------------------------------------------------------------===#
@@ -448,235 +300,178 @@ def bench_phone_match(
 
 
 def main():
-    """Run all benchmarks and display results."""
-    m = Benchmark(num_repetitions=5)
+    """Run all regex benchmarks with manual timing (mirrors Mojo structure)."""
+    print("=== REGEX ENGINE BENCHMARKS (Manual Timing) ===")
+    print("Using Python-compatible time.perf_counter_ns() for fair comparison")
+    print()
 
-    # Pre-create test strings to avoid measurement overhead - scaled up to match Mojo
-    text_10000 = make_test_string(10000)  # Increased from 1000 to 10000
-    text_100000 = make_test_string(100000)  # Increased from 10000 to 100000
-    text_range_10000 = make_test_string(10000, "abc123XYZ")
-    text_alternation_10000 = make_test_string(10000, "abcdefghijklmnopqrstuvwxyz")
-    text_group_10000 = make_test_string(10000, "abcabcabc")
+    # Prepare test data - same as Mojo benchmarks
+    text_1000 = make_test_string(1000)
+    text_5000 = make_test_string(5000)
+    text_10000 = make_test_string(10000)
+    text_range_10000 = make_test_string(10000) + "0123456789"
 
-    # Create complex text patterns - scaled up to match Mojo
-    base_text = make_test_string(2000)  # Increased from 100 to 2000
-    emails = " user@example.com more text john@test.org "
-    email_text = f"{base_text} {emails} {base_text} {emails} {base_text}"
+    # Add hello to texts to ensure literal matches
+    text_1000 += "hello world"
+    text_5000 += "hello world"
+    text_10000 += "hello world"
 
-    base_number_text = make_test_string(
-        20000, "abc def ghi "
-    )  # Increased from 500 to 20000
-    number_text = (
-        f"{base_number_text} 123 price $456.78 quantity 789 {base_number_text}"
+    # Test data for optimization benchmarks
+    short_text = "hello world this is a test with hello again and hello there"
+    medium_text = short_text * 100
+    long_text = short_text * 1000
+    email_text = (
+        "test@example.com user@test.org admin@example.com support@example.com"
+        " no-reply@example.com" * 50
     )
 
-    # Basic literal matching
-    m.bench_function(
-        "literal_match_short",
-        bench_literal_match(
-            text_10000 + " hello world" + text_10000,  # Ensure "hello" is present
-            "hello",
-        ),
-    )
-    m.bench_function(
-        "literal_match_long",
-        bench_literal_match(
-            text_100000 + " hello world" + text_10000,  # Ensure "hello" is present
-            "hello",
-        ),
-    )
+    print("| name                      | met (ms)              | iters  |")
+    print("|---------------------------|-----------------------|--------|")
 
-    # Wildcard and quantifiers
-    m.bench_function("wildcard_match_any", bench_wildcard_match(text_10000, ".*"))
-    m.bench_function("quantifier_zero_or_more", bench_wildcard_match(text_10000, "a*"))
-    m.bench_function("quantifier_one_or_more", bench_wildcard_match(text_10000, "a+"))
-    m.bench_function("quantifier_zero_or_one", bench_wildcard_match(text_10000, "a?"))
+    # ===== Literal Matching Benchmarks =====
+    benchmark_search("literal_match_short", "hello", text_1000, 2000)
+    benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
-    # Character ranges
-    m.bench_function("range_lowercase", bench_range_match(text_range_10000, "[a-z]+"))
-    m.bench_function("range_digits", bench_range_match(text_range_10000, "[0-9]+"))
-    m.bench_function(
-        "range_alphanumeric", bench_range_match(text_range_10000, "[a-zA-Z0-9]+")
-    )
+    # ===== Wildcard and Quantifier Benchmarks =====
+    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
+    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
+    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
+    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
 
-    # Anchors
-    m.bench_function("anchor_start", bench_anchor_match(text_10000, "^abc"))
-    m.bench_function("anchor_end", bench_anchor_match(text_10000, "xyz$"))
+    # ===== Character Range Benchmarks =====
+    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
+    benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
 
-    # Alternation
-    m.bench_function(
-        "alternation_simple", bench_alternation_match(text_alternation_10000, "a|b|c")
-    )
-    m.bench_function(
-        "alternation_words",
-        bench_alternation_match(text_alternation_10000, "abc|def|ghi"),
-    )
+    # ===== Anchor Benchmarks =====
+    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
+    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
 
-    # Groups
-    m.bench_function("group_quantified", bench_group_match(text_group_10000, "(abc)+"))
-    m.bench_function("group_alternation", bench_group_match(text_group_10000, "(a|b)*"))
+    # ===== Alternation Benchmarks =====
+    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
+    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
-    print("# Optimization Showcase (part1 branch improvements)")
 
     # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
     fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
-    m.bench_function(
+    benchmark_search(
         "large_8_alternations",
-        bench_alternation_match(
-            fruit_text, "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
-        ),
+        "(apple|banana|cherry|date|elderberry|fig|grape|honey)",
+        fruit_text,
+        1000,
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
     nested_text = "Testing deep nested patterns with abcdefgh characters"
-    m.bench_function(
+    benchmark_search(
         "deep_nested_groups_depth4",
-        bench_alternation_match(
-            nested_text, "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
-        ),
+        "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))",
+        nested_text,
+        1000,
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
-    m.bench_function(
+    benchmark_search(
         "literal_heavy_alternation",
-        bench_alternation_match(
-            user_text,
-            "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
-        ),
+        "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
+        user_text,
+        1000,
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
     mixed_text = (
         "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
     )
-    m.bench_function(
+    benchmark_search(
         "complex_group_5_children",
-        bench_alternation_match(
-            mixed_text, "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
-        ),
+        "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}",
+        mixed_text,
+        1000,
     )
 
-    # Global matching (unique to our implementation)
-    m.bench_function("match_all_simple", bench_match_all(text_10000, "a"))
-    m.bench_function("match_all_pattern", bench_match_all(text_10000, "[a-z]+"))
+    # ===== Global Matching (findall) =====
+    benchmark_findall("match_all_simple", "hello", medium_text, 200)
+    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 200)
 
-    # Complex real-world patterns
-    m.bench_function("complex_email_extraction", bench_complex_email_match(email_text))
-    m.bench_function(
-        "complex_number_extraction", bench_complex_number_extraction(number_text)
-    )
-
-    # SIMD-Heavy Character Filtering (designed to show maximum SIMD benefit in Mojo comparison)
-    large_mixed_text = make_mixed_content_text(100000)  # Increased from 10000 to 100000
-    xlarge_mixed_text = make_mixed_content_text(
-        500000
-    )  # Increased from 50000 to 500000
-
-    m.bench_function(
-        "simd_alphanumeric_large",
-        bench_simd_heavy_filtering(large_mixed_text, r"[a-zA-Z0-9]+"),
-    )
-    m.bench_function(
-        "simd_alphanumeric_xlarge",
-        bench_simd_heavy_filtering(xlarge_mixed_text, r"[a-zA-Z0-9]+"),
-    )
-    m.bench_function(
-        "simd_negated_alphanumeric",
-        bench_simd_heavy_filtering(large_mixed_text, r"[^a-zA-Z0-9]+"),
-    )
-    m.bench_function(
-        "simd_multi_char_class",
-        bench_simd_heavy_filtering(large_mixed_text, r"[a-z]+[0-9]+"),
+    # ===== Literal Optimization Benchmarks =====
+    benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
+    benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
+    benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 1)
+    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_match_first(
+        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
     )
 
-    # Literal Optimization Benchmarks
-    m.bench_function(
-        "literal_prefix_short",
-        bench_literal_optimization(SHORT_TEXT, r"hello.*world", 1),
+    # ===== Complex Pattern Benchmarks =====
+    complex_email_text = (
+        "Contact: john@example.com, support@test.org, admin@company.net" * 20
     )
-    m.bench_function(
-        "literal_prefix_medium", bench_literal_optimization(MEDIUM_TEXT, r"hello.*", 1)
-    )
-    m.bench_function(
-        "literal_prefix_long", bench_literal_optimization(LONG_TEXT, r"hello.*", 1)
-    )
-    m.bench_function(
-        "required_literal_short",
-        bench_literal_optimization(EMAIL_TEXT, r".*@example\.com", 1),
-    )
-    m.bench_function(
-        "required_literal_long",
-        bench_literal_optimization(EMAIL_LONG, r".*@example\.com", 1),
-    )
-    m.bench_function(
-        "no_literal_baseline", bench_literal_optimization(MEDIUM_TEXT, r"[a-z]+", 1)
-    )
-    m.bench_function(
-        "alternation_common_prefix",
-        bench_literal_optimization(MEDIUM_TEXT, r"(hello|help|helicopter)", 1),
+    benchmark_findall(
+        "complex_email",
+        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+        complex_email_text,
+        40,
     )
 
-    # US Phone Number Benchmarks
+    complex_number_text = (
+        "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
+    )
+    benchmark_findall("complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500)
+
+    # ===== US Phone Number Benchmarks =====
     phone_text = make_phone_test_data(1000)
 
-    m.bench_function(
-        "simple_phone",
-        bench_phone_findall(phone_text, r"\d{3}-\d{3}-\d{4}", 100),
-    )
-
-    m.bench_function(
+    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
+    benchmark_findall(
         "flexible_phone",
-        bench_phone_findall(phone_text, r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}", 100),
+        "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
+        phone_text,
+        100,
     )
-
-    m.bench_function(
+    benchmark_findall(
         "multi_format_phone",
-        bench_phone_findall(
-            phone_text,
-            r"\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}",
-            50,
-        ),
+        "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
+        phone_text,
+        50,
     )
-
-    m.bench_function(
+    benchmark_match_first(
         "phone_validation",
-        bench_phone_match(
-            "555-123-4567",
-            r"^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$",
-            500,
-        ),
+        "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
+        "234-567-8901",
+        500,
     )
 
-    # DFA-Optimized Phone Number Benchmarks
-    m.bench_function(
-        "dfa_simple_phone",
-        bench_phone_findall(phone_text, r"[0-9]{3}-[0-9]{3}-[0-9]{4}", 100),
+    # ===== DFA-Optimized Phone Number Benchmarks =====
+    benchmark_findall("dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100)
+    benchmark_findall(
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
     )
-
-    m.bench_function(
-        "dfa_paren_phone",
-        bench_phone_findall(phone_text, r"\([0-9]{3}\) [0-9]{3}-[0-9]{4}", 100),
+    benchmark_findall(
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
     )
-
-    m.bench_function(
-        "dfa_dot_phone",
-        bench_phone_findall(phone_text, r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}", 100),
-    )
-
-    m.bench_function(
-        "dfa_digits_only",
-        bench_phone_findall(phone_text, r"[0-9]{10}", 100),
-    )
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
 
     # National Phone Number Validation (Complex Pattern)
     national_phone_text = make_complex_pattern_test_data(500)
-    national_phone_pattern = r"(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}"
-
-    m.bench_function(
+    national_phone_pattern = (
+        r"(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|"
+        r"(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|"
+        r"(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|"
+        r"3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|"
+        r"4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|"
+        r"5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|"
+        r"6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|"
+        r"7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|"
+        r"8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|"
+        r"9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}"
+    )
+    benchmark_findall(
         "national_phone_validation",
-        bench_phone_findall(national_phone_text, national_phone_pattern, 10),
+        national_phone_pattern,
+        national_phone_text,
+        10,
     )
 
     # ===== US Toll-Free Numbers Benchmarks =====
@@ -687,23 +482,18 @@ def main():
         * 100
     )
 
-    m.bench_function(
-        "toll_free_simple",
-        bench_phone_findall(toll_free_text, r"[89]00\d{6}", 100),
-    )
-
-    m.bench_function(
+    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
+    benchmark_findall(
         "toll_free_complex",
-        bench_phone_findall(
-            toll_free_text, r"8(?:00|33|44|55|66|77|88)[2-9]\d{6}", 100
-        ),
+        "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
+        toll_free_text,
+        100,
     )
 
-    # Results summary
-    m.dump_report()
+    print()  # End of benchmarks
 
-    # Export to JSON
-    m.export_json()
+    # Export results to JSON for comparison script
+    export_json_results()
 
 
 if __name__ == "__main__":
