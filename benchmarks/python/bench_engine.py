@@ -522,7 +522,7 @@ def main():
     # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
     fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
     m.bench_function(
-        "large_alternation_8_branches",
+        "large_8_alternations",
         bench_alternation_match(
             fruit_text, "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
         ),

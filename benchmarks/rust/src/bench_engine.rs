@@ -107,7 +107,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
     let fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey";
-    run_benchmark(&timer, &mut all_results, "large_alternation_8_branches", &patterns.large_alternation, fruit_text, 1000, BenchType::Search);
+    run_benchmark(&timer, &mut all_results, "large_8_alternations", &patterns.large_alternation, fruit_text, 1000, BenchType::Search);
 
     // Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
     let nested_text = "Testing deep nested patterns with abcdefgh characters";

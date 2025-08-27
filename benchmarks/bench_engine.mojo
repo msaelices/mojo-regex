@@ -316,7 +316,7 @@ fn main() raises:
     )
     var fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
     benchmark_search(
-        "large_alternation_8_branches", large_alternation, fruit_text, 1000
+        "large_8_alternations", large_alternation, fruit_text, 1000
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
