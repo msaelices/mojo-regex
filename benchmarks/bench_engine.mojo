@@ -378,26 +378,26 @@ fn main() raises:
 
     benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
 
-    # benchmark_findall(
-    #     "flexible_phone",
-    #     "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
-    #     phone_text,
-    #     100,
-    # )
+    benchmark_findall(
+        "flexible_phone",
+        "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
+        phone_text,
+        100,
+    )
 
-    # benchmark_findall(
-    #     "multi_format_phone",
-    #     "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
-    #     phone_text,
-    #     50,
-    # )
-    #
-    # benchmark_match_first(
-    #     "phone_validation",
-    #     "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
-    #     "234-567-8901",
-    #     500,
-    # )
+    benchmark_findall(
+        "multi_format_phone",
+        "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
+        phone_text,
+        50,
+    )
+
+    benchmark_match_first(
+        "phone_validation",
+        "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
+        "234-567-8901",
+        500,
+    )
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
 
@@ -456,9 +456,9 @@ fn main() raises:
 
     benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
 
-    # benchmark_findall(
-    #     "toll_free_complex",
-    #     "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
-    #     toll_free_text,
-    #     100,
-    # )
+    benchmark_findall(
+        "toll_free_complex",
+        "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
+        toll_free_text,
+        100,
+    )
