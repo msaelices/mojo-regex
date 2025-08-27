@@ -114,12 +114,18 @@ struct NFAEngine(Copyable, Engine):
     @always_inline
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
         """Get a pointer to the pattern string."""
-        return self.literal_prefix.unsafe_ptr()
+        if self.has_literal_optimization:
+            return self.literal_prefix.unsafe_ptr()
+        else:
+            return self.pattern.unsafe_ptr()
 
     @always_inline
     fn get_pattern_len(self) -> Int:
         """Get the length of the pattern string."""
-        return len(self.literal_prefix)
+        if self.has_literal_optimization:
+            return len(self.literal_prefix)
+        else:
+            return len(self.pattern)
 
     fn match_all(
         self,
