@@ -11,6 +11,7 @@ from regex.simd_ops import (
     simd_memcmp,
     simd_count_char,
 )
+from regex.dfa import DFAEngine
 
 
 def test_character_class_simd_basic():
@@ -150,7 +151,9 @@ def test_whitespace():
 
 def test_simd_string_search():
     """Test SIMD-accelerated string search."""
-    var search = SIMDStringSearch("hello")
+    var engine = DFAEngine()
+    engine.compile_pattern("hello", False, False)
+    var search = SIMDStringSearch(engine)
 
     # Test basic search
     assert_equal(search.search("hello world"), 0)
@@ -163,7 +166,9 @@ def test_simd_string_search():
 
 def test_simd_string_search_all():
     """Test finding all occurrences with SIMD string search."""
-    var search = SIMDStringSearch("ll")
+    var engine = DFAEngine()
+    engine.compile_pattern("ll", False, False)
+    var search = SIMDStringSearch(engine)
 
     var positions = search.search_all("hello world, all well")
     assert_equal(len(positions), 3)
@@ -174,7 +179,9 @@ def test_simd_string_search_all():
 
 def test_simd_string_search_empty():
     """Test SIMD string search with empty pattern."""
-    var search = SIMDStringSearch("")
+    var engine = DFAEngine()
+    engine.compile_pattern("", False, False)
+    var search = SIMDStringSearch(engine)
 
     # Empty pattern should match at any position
     assert_equal(search.search("hello"), 0)
@@ -183,7 +190,9 @@ def test_simd_string_search_empty():
 
 def test_simd_string_search_single_char():
     """Test SIMD string search with single character."""
-    var search = SIMDStringSearch("a")
+    var engine = DFAEngine()
+    engine.compile_pattern("a", False, False)
+    var search = SIMDStringSearch(engine)
 
     assert_equal(search.search("banana"), 1)
     assert_equal(search.search("hello"), -1)

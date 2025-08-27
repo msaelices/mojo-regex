@@ -179,7 +179,7 @@ struct SequentialPatternInfo(Copyable, Movable):
 struct DFAState(Copyable, Movable):
     """A single state in the DFA state machine."""
 
-    var transitions: SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS]
+    var transitions: SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS]
     """Transition table for this state, indexed by character code (0-255)."""
     var is_accepting: Bool
     """A state is accepting if it can end a match following this path."""
@@ -188,7 +188,7 @@ struct DFAState(Copyable, Movable):
 
     fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
-        self.transitions = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](
+        self.transitions = SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS](
             -1
         )  # -1 means no transition
         self.is_accepting = is_accepting
@@ -295,7 +295,7 @@ struct DFAEngine(Engine):
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
             self.literal_pattern = pattern  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch(self.literal_pattern)
+            self.simd_string_search = SIMDStringSearch(self)
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
@@ -1162,7 +1162,7 @@ struct DFAEngine(Engine):
         var existing_target = Int(
             self.states[from_state].transitions[char_code]
         )
-        if existing_target != 255:  # 255 is -1 in uint8
+        if existing_target != -1:  # -1 means no transition
             # Transition already exists, reuse the target state
             return existing_target
         else:
@@ -1705,6 +1705,24 @@ struct DFAEngine(Engine):
                 if char_bitmap[char_code] == 0:
                     state.add_transition(char_code, to_state)
 
+    @always_inline
+    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
+        """Get the regex pattern used by this Engine.
+
+        Returns:
+            The regex pattern as a string.
+        """
+        return self.literal_pattern.unsafe_ptr()
+
+    @always_inline
+    fn get_pattern_len(self) -> Int:
+        """Get the length of the regex pattern used by this Engine.
+
+        Returns:
+            Length of the regex pattern string.
+        """
+        return len(self.literal_pattern)
+
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
@@ -1774,7 +1792,7 @@ struct DFAEngine(Engine):
             ref searcher = self.simd_string_search.value()
             if require_exact_position:
                 # For match_first, must match at exact position
-                if searcher._verify_match(text, start_pos):
+                if searcher.verify_match(text, start_pos):
                     var match_len = searcher.pattern_length
                     return Match(0, start_pos, start_pos + match_len, text)
                 return None

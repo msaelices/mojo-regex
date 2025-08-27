@@ -18,16 +18,8 @@ The module automatically adapts to the available SIMD width:
 from algorithm import vectorize
 from builtin._location import __call_location
 from sys import ffi
-from regex.simd_matchers import (
-    SIMDMatcher,
-    NibbleBasedMatcher,
-    RangeBasedMatcher,
-    create_digit_matcher,
-    create_whitespace_matcher,
-    create_alpha_matcher,
-    create_alnum_matcher,
-)
 from sys.info import simdwidthof
+
 from regex.aliases import (
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_WHITESPACE,
@@ -39,6 +31,30 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM_LOWER,
     SIMD_MATCHER_ALNUM_UPPER,
     SIMD_MATCHER_CUSTOM,
+)
+from regex.aliases import (
+    SIMD_MATCHER_NONE,
+    SIMD_MATCHER_WHITESPACE,
+    SIMD_MATCHER_DIGITS,
+    SIMD_MATCHER_ALPHA_LOWER,
+    SIMD_MATCHER_ALPHA_UPPER,
+    SIMD_MATCHER_ALPHA,
+    SIMD_MATCHER_ALNUM,
+    SIMD_MATCHER_ALNUM_LOWER,
+    SIMD_MATCHER_ALNUM_UPPER,
+    SIMD_MATCHER_CUSTOM,
+)
+from regex.engine import Engine
+from regex.dfa import DFAEngine
+from regex.nfa import NFAEngine
+from regex.simd_matchers import (
+    SIMDMatcher,
+    NibbleBasedMatcher,
+    RangeBasedMatcher,
+    create_digit_matcher,
+    create_whitespace_matcher,
+    create_alpha_matcher,
+    create_alnum_matcher,
 )
 
 # SIMD width for character operations (uint8)
@@ -423,32 +439,154 @@ fn create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-@register_passable("trivial")
-struct SIMDStringSearch:
+fn _search_short_pattern(
+    pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, start: Int
+) -> Int:
+    """Optimized search for very short patterns (1-2 characters).
+
+    Args:
+        pattern_ptr: Pointer to the pattern string.
+        pattern_len: Length of the pattern string.
+        text: Text to search in.
+        start: Starting position.
+
+    Returns:
+        Position of first match, or -1 if not found.
+    """
+    var text_len = len(text)
+
+    if pattern_len == 1:
+        # Single character - simple scan
+        var target_char = pattern_ptr[0]
+        for i in range(start, text_len):
+            if ord(text[i]) == Int(target_char):
+                return i
+    elif pattern_len == 2:
+        # Two characters - check pairs
+        if text_len - start < 2:
+            return -1
+        var first_char = pattern_ptr[0]
+        var second_char = pattern_ptr[1]
+        for i in range(start, text_len - 1):
+            if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
+                second_char
+            ):
+                return i
+    return -1
+
+
+fn _verify_match(
+    pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, pos: Int
+) -> Bool:
+    """Verify that pattern matches at given position.
+
+    Args:
+        text: Text to check.
+        pos: Position to check.
+
+    Returns:
+        True if pattern matches at this position.
+    """
+    if pos + pattern_len > len(text):
+        return False
+
+    for i in range(pattern_len):
+        var ptr = pattern_ptr + i
+        if ord(text[pos + i]) != Int(ptr[]):
+            return False
+
+    return True
+
+
+fn _simd_search(
+    pattern_ptr: UnsafePointer[Byte],
+    pattern_len: Int,
+    text: String,
+    start: Int = 0,
+) -> Int:
+    """Search for pattern in text using SIMD acceleration.
+
+    Args:
+        pattern_ptr: Pointer to the pattern string.
+        pattern_len: Length of the pattern string.
+        text: Text to search in.
+        start: Starting position.
+
+    Returns:
+        Position of first match, or -1 if not found.
+    """
+    if pattern_len == 0:
+        return start  # Empty pattern matches at any position
+
+    var text_len = len(text)
+    var pos = start
+
+    # For very short patterns (1-2 chars), use simpler approach
+    if pattern_len <= 2:
+        return _search_short_pattern(pattern_ptr, pattern_len, text, start)
+
+    # Use SIMD to quickly find potential matches by first character
+    while pos + SIMD_WIDTH <= text_len:
+        # Load chunk of text
+        var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
+
+        # Compare with first character of pattern
+        var first_char = pattern_ptr[0]
+        var first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](first_char)
+        var matches = chunk.eq(first_char_simd)
+
+        if matches.reduce_or():
+            # Found potential match, check each position
+            for i in range(SIMD_WIDTH):
+                if matches[i]:
+                    var candidate_pos = pos + i
+                    if _verify_match(
+                        pattern_ptr, pattern_len, text, candidate_pos
+                    ):
+                        return candidate_pos
+
+        pos += SIMD_WIDTH
+
+    # Handle remaining characters
+    while pos <= text_len - pattern_len:
+        if _verify_match(pattern_ptr, pattern_len, text, pos):
+            return pos
+        pos += 1
+
+    return -1
+
+
+struct SIMDStringSearch(Copyable, Movable):
     """SIMD-optimized string search for literal patterns."""
 
-    var pattern_ptr: UnsafePointer[Byte]
+    var engine_ptr: UnsafePointer[DFAEngine, mut=True]
     """Pointer to the pattern string."""
     var pattern_length: Int
     """Length of the pattern string."""
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
     """SIMD vector filled with the first character of the pattern for fast comparison."""
 
-    fn __init__(out self, pattern: String):
+    fn __init__(out self, engine: DFAEngine):
         """Initialize SIMD string search.
 
         Args:
-            pattern: Literal string pattern to search for.
+            engine: DFA engine used.
         """
-        self.pattern_ptr = pattern.unsafe_ptr()
-        self.pattern_length = len(pattern)
+        self.engine_ptr = UnsafePointer[DFAEngine, mut=True].alloc(1)
+        self.engine_ptr.init_pointee_copy(engine)
+        self.pattern_length = engine.get_pattern_len()
 
         # Create SIMD vector with first character of pattern
-        if len(pattern) > 0:
-            var first_char = ord(pattern[0])
+        if self.pattern_length > 0:
+            var first_char = engine.get_pattern_ptr()[0]
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](first_char)
         else:
             self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](0)
+
+    fn __del__(deinit self):
+        """Clean up allocated resources."""
+        if self.engine_ptr:
+            self.engine_ptr.free()
 
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using SIMD acceleration.
@@ -460,41 +598,26 @@ struct SIMDStringSearch:
         Returns:
             Position of first match, or -1 if not found.
         """
-        if self.pattern_length == 0:
-            return start  # Empty pattern matches at any position
+        return _simd_search(
+            self.engine_ptr[].get_pattern_ptr(),
+            self.pattern_length,
+            text,
+            start,
+        )
 
-        var text_len = len(text)
-        var pos = start
+    fn verify_match(self, text: String, pos: Int) -> Bool:
+        """Verify that pattern matches at given position.
 
-        # For very short patterns (1-2 chars), use simpler approach
-        if self.pattern_length <= 2:
-            return self._search_short_pattern(text, start)
+        Args:
+            text: Text to check.
+            pos: Position to check.
 
-        # Use SIMD to quickly find potential matches by first character
-        while pos + SIMD_WIDTH <= text_len:
-            # Load chunk of text
-            var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
-
-            # Compare with first character of pattern
-            var matches = chunk.eq(self.first_char_simd)
-
-            if matches.reduce_or():
-                # Found potential match, check each position
-                for i in range(SIMD_WIDTH):
-                    if matches[i]:
-                        var candidate_pos = pos + i
-                        if self._verify_match(text, candidate_pos):
-                            return candidate_pos
-
-            pos += SIMD_WIDTH
-
-        # Handle remaining characters
-        while pos <= text_len - self.pattern_length:
-            if self._verify_match(text, pos):
-                return pos
-            pos += 1
-
-        return -1
+        Returns:
+            True if pattern matches at this position.
+        """
+        return _verify_match(
+            self.engine_ptr[].get_pattern_ptr(), self.pattern_length, text, pos
+        )
 
     fn _search_short_pattern(self, text: String, start: Int) -> Int:
         """Optimized search for very short patterns (1-2 characters).
@@ -510,7 +633,7 @@ struct SIMDStringSearch:
 
         if self.pattern_length == 1:
             # Single character - simple scan
-            var target_char = self.pattern_ptr[][0]
+            var target_char = self.engine_ptr[].get_pattern_ptr()[0]
             for i in range(start, text_len):
                 if ord(text[i]) == Int(target_char):
                     return i
@@ -518,8 +641,8 @@ struct SIMDStringSearch:
             # Two characters - check pairs
             if text_len - start < 2:
                 return -1
-            var first_char = self.pattern_ptr[][0]
-            var second_char = self.pattern_ptr[][1]
+            var first_char = self.engine_ptr[].get_pattern_ptr()[0]
+            var second_char = self.engine_ptr[].get_pattern_ptr()[1]
             for i in range(start, text_len - 1):
                 if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
                     second_char
@@ -527,26 +650,6 @@ struct SIMDStringSearch:
                     return i
 
         return -1
-
-    fn _verify_match(self, text: String, pos: Int) -> Bool:
-        """Verify that pattern matches at given position.
-
-        Args:
-            text: Text to check.
-            pos: Position to check.
-
-        Returns:
-            True if pattern matches at this position.
-        """
-        if pos + self.pattern_length > len(text):
-            return False
-
-        for i in range(self.pattern_length):
-            var ptr = self.pattern_ptr + i
-            if ord(text[pos + i]) != Int(ptr[]):
-                return False
-
-        return True
 
     fn search_all(self, text: String) -> List[Int]:
         """Find all non-overlapping occurrences of pattern in text.
@@ -889,8 +992,10 @@ struct TwoWaySearcher(Copyable & Movable):
     This implementation enhances it with SIMD for the search phase.
     """
 
-    var pattern: String
-    """The pattern to search for."""
+    var engine_ptr: UnsafePointer[NFAEngine, mut=False]
+    """The engine with the pattern to search for."""
+    var pattern_len: Int
+    """Length of the pattern."""
     var period: Int
     """The period of the pattern's critical factorization."""
     var critical_pos: Int
@@ -900,18 +1005,18 @@ struct TwoWaySearcher(Copyable & Movable):
     var memory_fwd: Int
     """Memory for the forward search phase."""
 
-    fn __init__(out self, pattern: String):
-        """Initialize the Two-Way searcher with a pattern.
+    fn __init__(out self, engine: NFAEngine):
+        """Initialize the Two-Way searcher with an engine.
 
         Args:
-            pattern: The pattern to search for.
+            engine: The engine with the pattern to search for.
         """
-        self.pattern = pattern
+        self.engine_ptr = UnsafePointer[NFAEngine, mut=False](to=engine)
+        self.pattern_len = engine.get_pattern_len()
         self.memory = 0
         self.memory_fwd = -1
 
-        # Compute critical factorization
-        var n = len(self.pattern)
+        var n = self.pattern_len
         if n == 0:
             self.critical_pos = 0
             self.period = 1
@@ -927,10 +1032,12 @@ struct TwoWaySearcher(Copyable & Movable):
 
         # Compute the actual period of the pattern
         var period = 1
+        self.period = period
         var k = 1
         while k < n:
             var i = 0
-            while i < n - k and self.pattern[i] == self.pattern[i + k]:
+            var pattern_ptr = self.get_pattern_ptr()
+            while i < n - k and pattern_ptr[i] == pattern_ptr[i + k]:
                 i += 1
             if i == n - k:
                 period = k
@@ -938,6 +1045,19 @@ struct TwoWaySearcher(Copyable & Movable):
             k += 1
 
         self.period = period
+
+    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
+        """Get a pointer to the pattern bytes."""
+        return self.engine_ptr[].get_pattern_ptr()
+
+    fn reset(mut self):
+        """Reset mutable search state to initial values.
+
+        This clears the memory fields that track search state between operations,
+        preventing corruption when the same searcher is reused for different searches.
+        """
+        self.memory = 0
+        self.memory_fwd = -1
 
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using Two-Way algorithm with SIMD.
@@ -949,7 +1069,7 @@ struct TwoWaySearcher(Copyable & Movable):
         Returns:
             Position of first match, or -1 if not found.
         """
-        var n = len(self.pattern)
+        var n = self.pattern_len
         var m = len(text)
 
         if n == 0:
@@ -964,8 +1084,9 @@ struct TwoWaySearcher(Copyable & Movable):
         # For patterns where Two-Way's complexity isn't needed, use SIMD search
         # This ensures correctness while maintaining good performance
         if n <= 32:
-            var search = SIMDStringSearch(self.pattern)
-            return search.search(text, start)
+            return _simd_search(
+                self.engine_ptr[].get_pattern_ptr(), n, text, start
+            )
 
         # For longer patterns, use the Two-Way algorithm
         var pos = start
@@ -982,7 +1103,9 @@ struct TwoWaySearcher(Copyable & Movable):
                 # Right part matches, check left part
                 i = self.critical_pos - 1
 
-                while i >= 0 and text[pos + i] == self.pattern[i]:
+                while i >= 0 and ord(text[pos + i]) == Int(
+                    self.get_pattern_ptr()[i]
+                ):
                     i -= 1
 
                 if i < 0:
@@ -1012,7 +1135,7 @@ struct TwoWaySearcher(Copyable & Movable):
         Returns:
             Position of first mismatch, or pattern length if full match.
         """
-        var n = len(self.pattern)
+        var n = self.pattern_len
         var i = start_offset
 
         # SIMD comparison for chunks
@@ -1020,9 +1143,7 @@ struct TwoWaySearcher(Copyable & Movable):
             if text_pos + i + SIMD_WIDTH > len(text):
                 break
 
-            var pattern_chunk = self.pattern.unsafe_ptr().load[
-                width=SIMD_WIDTH
-            ](i)
+            var pattern_chunk = self.get_pattern_ptr().load[width=SIMD_WIDTH](i)
             var text_chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](
                 text_pos + i
             )
@@ -1038,7 +1159,7 @@ struct TwoWaySearcher(Copyable & Movable):
 
         # Handle remaining characters
         while i < n and text_pos + i < len(text):
-            if self.pattern[i] != text[text_pos + i]:
+            if self.get_pattern_ptr()[i] != ord(text[text_pos + i]):
                 return i
             i += 1
 
@@ -1049,20 +1170,21 @@ struct TwoWaySearcher(Copyable & Movable):
 
         Uses SIMD to search for pattern as a small integer.
         """
-        var n = len(self.pattern)
+        var n = self.pattern_len
         var m = len(text)
 
         if n == 1:
             # Single character search
-            var search = SIMDStringSearch(self.pattern)
-            return search.search(text, start)
+            return _simd_search(
+                self.engine_ptr[].get_pattern_ptr(), n, text, start
+            )
 
         # For 2-4 byte patterns, use rolling comparison
         var pos = start
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if text[pos + i] != self.pattern[i]:
+                if ord(text[pos + i]) != Int(self.get_pattern_ptr()[i]):
                     matched = False
                     break
             if matched:

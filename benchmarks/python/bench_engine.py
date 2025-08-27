@@ -155,10 +155,12 @@ def benchmark_findall(name: str, pattern: str, text: str, internal_iterations: i
 _benchmark_results = {}
 _benchmark_iterations = {}
 
+
 def _store_benchmark_result(name: str, time_ms: float, total_iterations: int):
     """Store benchmark result for JSON export."""
     _benchmark_results[name] = time_ms * 1_000_000  # Convert to nanoseconds
     _benchmark_iterations[name] = total_iterations
+
 
 def export_json_results(filename: str = "benchmarks/results/python_results.json"):
     """Export collected benchmark results to JSON file."""
@@ -169,14 +171,14 @@ def export_json_results(filename: str = "benchmarks/results/python_results.json"
     json_results = {
         "engine": "python",
         "timestamp": datetime.now().isoformat(),
-        "results": {}
+        "results": {},
     }
 
     for name in _benchmark_results:
         json_results["results"][name] = {
             "time_ns": _benchmark_results[name],
             "time_ms": _benchmark_results[name] / 1_000_000,
-            "iterations": _benchmark_iterations[name]
+            "iterations": _benchmark_iterations[name],
         }
 
     # Write to file
@@ -207,7 +209,9 @@ class Benchmark:
     def export_json(self, filename: str = "benchmarks/results/python_results.json"):
         """DEPRECATED: Results are now printed directly by benchmark functions."""
         print("\nNote: JSON export disabled in new direct benchmark mode.")
-        print("Results are printed directly to stdout for parsing by comparison scripts.")
+        print(
+            "Results are printed directly to stdout for parsing by comparison scripts."
+        )
 
 
 # ===-----------------------------------------------------------------------===#
@@ -352,10 +356,10 @@ def main():
     # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
     fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
     benchmark_search(
-        "large_alternation_8_branches",
+        "large_8_alternations",
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)",
         fruit_text,
-        1000
+        1000,
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
@@ -364,7 +368,7 @@ def main():
         "deep_nested_groups_depth4",
         "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))",
         nested_text,
-        1000
+        1000,
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
@@ -373,16 +377,18 @@ def main():
         "literal_heavy_alternation",
         "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
         user_text,
-        1000
+        1000,
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
-    mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    mixed_text = (
+        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    )
     benchmark_search(
         "complex_group_5_children",
         "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}",
         mixed_text,
-        1000
+        1000,
     )
 
     # ===== Global Matching (findall) =====
@@ -394,10 +400,14 @@ def main():
     benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
     benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 1)
     benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
-    benchmark_match_first("alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1)
+    benchmark_match_first(
+        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
+    )
 
     # ===== Complex Pattern Benchmarks =====
-    complex_email_text = "Contact: john@example.com, support@test.org, admin@company.net" * 20
+    complex_email_text = (
+        "Contact: john@example.com, support@test.org, admin@company.net" * 20
+    )
     benchmark_findall(
         "complex_email",
         "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
@@ -405,7 +415,9 @@ def main():
         40,
     )
 
-    complex_number_text = "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
+    complex_number_text = (
+        "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
+    )
     benchmark_findall("complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500)
 
     # ===== US Phone Number Benchmarks =====
@@ -433,8 +445,12 @@ def main():
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
     benchmark_findall("dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100)
-    benchmark_findall("dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100)
-    benchmark_findall("dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100)
+    benchmark_findall(
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+    )
+    benchmark_findall(
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+    )
     benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
 
     # National Phone Number Validation (Complex Pattern)
@@ -478,10 +494,6 @@ def main():
 
     # Export results to JSON for comparison script
     export_json_results()
-
-
-
-
 
 
 if __name__ == "__main__":
