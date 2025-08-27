@@ -369,7 +369,7 @@ struct DFAEngine(Engine):
             elif char_class == " \t\n\r\f\v":
                 pattern_str = "\\s"
                 # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_whitespace_matcher() with wrapper
+                # In future: could use _create_whitespace_matcher() with wrapper
                 self.simd_char_matcher = CharacterClassSIMD(char_class)
             else:
                 # For other patterns, use standard CharacterClassSIMD

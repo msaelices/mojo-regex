@@ -2,11 +2,11 @@ from testing import assert_equal, assert_true, assert_false
 
 from regex.simd_ops import (
     CharacterClassSIMD,
-    create_ascii_lowercase,
-    create_ascii_uppercase,
-    create_ascii_digits,
-    create_ascii_alphanumeric,
-    create_whitespace,
+    _create_ascii_lowercase,
+    _create_ascii_uppercase,
+    _create_ascii_digits,
+    _create_ascii_alphanumeric,
+    _create_whitespace,
     SIMDStringSearch,
     simd_memcmp,
     simd_count_char,
@@ -81,7 +81,7 @@ def test_character_class_count():
 
 def test_ascii_lowercase():
     """Test predefined ASCII lowercase character class."""
-    var lowercase = create_ascii_lowercase()
+    var lowercase = _create_ascii_lowercase()
 
     assert_true(lowercase.contains(ord("a")))
     assert_true(lowercase.contains(ord("z")))
@@ -94,7 +94,7 @@ def test_ascii_lowercase():
 
 def test_ascii_uppercase():
     """Test predefined ASCII uppercase character class."""
-    var uppercase = create_ascii_uppercase()
+    var uppercase = _create_ascii_uppercase()
 
     assert_true(uppercase.contains(ord("A")))
     assert_true(uppercase.contains(ord("Z")))
@@ -107,7 +107,7 @@ def test_ascii_uppercase():
 
 def test_ascii_digits():
     """Test predefined ASCII digits character class."""
-    var digits = create_ascii_digits()
+    var digits = _create_ascii_digits()
 
     assert_true(digits.contains(ord("0")))
     assert_true(digits.contains(ord("9")))
@@ -120,7 +120,7 @@ def test_ascii_digits():
 
 def test_ascii_alphanumeric():
     """Test predefined ASCII alphanumeric character class."""
-    var alnum = create_ascii_alphanumeric()
+    var alnum = _create_ascii_alphanumeric()
 
     # Test letters
     assert_true(alnum.contains(ord("a")))
@@ -138,7 +138,7 @@ def test_ascii_alphanumeric():
 
 def test_whitespace():
     """Test predefined whitespace character class."""
-    var whitespace = create_whitespace()
+    var whitespace = _create_whitespace()
 
     assert_true(whitespace.contains(ord(" ")))
     assert_true(whitespace.contains(ord("\t")))

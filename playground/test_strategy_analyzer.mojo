@@ -1,7 +1,7 @@
 from regex.simd_matchers import (
     analyze_character_class_pattern,
     create_hex_digit_matcher,
-    create_whitespace_matcher,
+    _create_whitespace_matcher,
 )
 
 
@@ -85,7 +85,7 @@ fn test_specialized_matchers() raises:
 
     # Test whitespace matcher
     print("\nWhitespace matcher:")
-    var ws_matcher = create_whitespace_matcher()
+    var ws_matcher = _create_whitespace_matcher()
 
     var ws_test = "Hello \tWorld\n\rTest\f\vEnd"
     var ws_chunk = SIMD[DType.uint8, 32](0)

@@ -52,7 +52,7 @@ from regex.simd_matchers import (
     NibbleBasedMatcher,
     RangeBasedMatcher,
     create_digit_matcher,
-    create_whitespace_matcher,
+    _create_whitespace_matcher,
     create_alpha_matcher,
     create_alnum_matcher,
 )
@@ -347,25 +347,25 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
 
 
 @always_inline
-fn create_ascii_lowercase() -> CharacterClassSIMD:
+fn _create_ascii_lowercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII lowercase letters [a-z]."""
     return CharacterClassSIMD("a", "z")
 
 
 @always_inline
-fn create_ascii_uppercase() -> CharacterClassSIMD:
+fn _create_ascii_uppercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII uppercase letters [A-Z]."""
     return CharacterClassSIMD("A", "Z")
 
 
 @always_inline
-fn create_ascii_digits() -> CharacterClassSIMD:
+fn _create_ascii_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII digits [0-9]."""
     return CharacterClassSIMD("0", "9")
 
 
 @always_inline
-fn create_ascii_alphanumeric() -> CharacterClassSIMD:
+fn _create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -385,14 +385,14 @@ fn create_ascii_alphanumeric() -> CharacterClassSIMD:
 
 
 @always_inline
-fn create_whitespace() -> CharacterClassSIMD:
+fn _create_whitespace() -> CharacterClassSIMD:
     """Create SIMD matcher for whitespace characters [ \\t\\n\\r\\f\\v]."""
     var whitespace_chars = " \t\n\r\f\v"
     return CharacterClassSIMD(whitespace_chars)
 
 
 @always_inline
-fn create_ascii_alpha() -> CharacterClassSIMD:
+fn _create_ascii_alpha() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII letters [a-zA-Z]."""
     var result = CharacterClassSIMD("")
 
@@ -408,7 +408,7 @@ fn create_ascii_alpha() -> CharacterClassSIMD:
 
 
 @always_inline
-fn create_ascii_alnum_lower() -> CharacterClassSIMD:
+fn _create_ascii_alnum_lower() -> CharacterClassSIMD:
     """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -424,7 +424,7 @@ fn create_ascii_alnum_lower() -> CharacterClassSIMD:
 
 
 @always_inline
-fn create_ascii_alnum_upper() -> CharacterClassSIMD:
+fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
     """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -788,21 +788,21 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
     except:
         var matcher: CharacterClassSIMD
         if matcher_type == SIMD_MATCHER_WHITESPACE:
-            matcher = create_whitespace()
+            matcher = _create_whitespace()
         elif matcher_type == SIMD_MATCHER_DIGITS:
-            matcher = create_ascii_digits()
+            matcher = _create_ascii_digits()
         elif matcher_type == SIMD_MATCHER_ALPHA_LOWER:
-            matcher = create_ascii_lowercase()
+            matcher = _create_ascii_lowercase()
         elif matcher_type == SIMD_MATCHER_ALPHA_UPPER:
-            matcher = create_ascii_uppercase()
+            matcher = _create_ascii_uppercase()
         elif matcher_type == SIMD_MATCHER_ALPHA:
-            matcher = create_ascii_alpha()
+            matcher = _create_ascii_alpha()
         elif matcher_type == SIMD_MATCHER_ALNUM:
-            matcher = create_ascii_alphanumeric()
+            matcher = _create_ascii_alphanumeric()
         elif matcher_type == SIMD_MATCHER_ALNUM_LOWER:
-            matcher = create_ascii_alnum_lower()
+            matcher = _create_ascii_alnum_lower()
         elif matcher_type == SIMD_MATCHER_ALNUM_UPPER:
-            matcher = create_ascii_alnum_upper()
+            matcher = _create_ascii_alnum_upper()
         else:
             # Custom matcher, create empty one
             matcher = CharacterClassSIMD("")
