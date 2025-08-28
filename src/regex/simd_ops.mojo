@@ -475,7 +475,7 @@ fn _search_short_pattern(
     return -1
 
 
-fn _verify_match(
+fn verify_match(
     pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, pos: Int
 ) -> Bool:
     """Verify that pattern matches at given position.
@@ -500,7 +500,7 @@ fn _verify_match(
     return True
 
 
-fn _simd_search(
+fn simd_search(
     pattern_ptr: UnsafePointer[Byte],
     pattern_len: Int,
     text: String,
@@ -542,7 +542,7 @@ fn _simd_search(
             for i in range(SIMD_WIDTH):
                 if matches[i]:
                     var candidate_pos = pos + i
-                    if _verify_match(
+                    if verify_match(
                         pattern_ptr, pattern_len, text, candidate_pos
                     ):
                         return candidate_pos
@@ -551,7 +551,7 @@ fn _simd_search(
 
     # Handle remaining characters
     while pos <= text_len - pattern_len:
-        if _verify_match(pattern_ptr, pattern_len, text, pos):
+        if verify_match(pattern_ptr, pattern_len, text, pos):
             return pos
         pos += 1
 
@@ -610,7 +610,7 @@ struct SIMDStringSearch(Copyable, Movable):
         Returns:
             Position of first match, or -1 if not found.
         """
-        return _simd_search(
+        return simd_search(
             self.engine_ptr[].get_pattern_ptr(),
             self.pattern_length,
             text,
@@ -627,7 +627,7 @@ struct SIMDStringSearch(Copyable, Movable):
         Returns:
             True if pattern matches at this position.
         """
-        return _verify_match(
+        return verify_match(
             self.engine_ptr[].get_pattern_ptr(), self.pattern_length, text, pos
         )
 
@@ -1109,7 +1109,7 @@ struct TwoWaySearcher(Copyable, Movable):
         # For patterns where Two-Way's complexity isn't needed, use SIMD search
         # This ensures correctness while maintaining good performance
         if n <= 32:
-            return _simd_search(
+            return simd_search(
                 self.engine_ptr[].get_pattern_ptr(), n, text, start
             )
 
@@ -1200,7 +1200,7 @@ struct TwoWaySearcher(Copyable, Movable):
 
         if n == 1:
             # Single character search
-            return _simd_search(
+            return simd_search(
                 self.engine_ptr[].get_pattern_ptr(), n, text, start
             )
 
@@ -1219,7 +1219,7 @@ struct TwoWaySearcher(Copyable, Movable):
         return -1
 
 
-fn _twoway_search(
+fn twoway_search(
     pattern_ptr: UnsafePointer[Byte],
     pattern_len: Int,
     text: String,
@@ -1251,7 +1251,7 @@ fn _twoway_search(
     if n <= 4:
         if n == 1:
             # Single character search
-            return _simd_search(pattern_ptr, n, text, start)
+            return simd_search(pattern_ptr, n, text, start)
 
         # For 2-4 byte patterns, use rolling comparison
         var pos = start
@@ -1269,7 +1269,7 @@ fn _twoway_search(
     # For patterns where Two-Way's complexity isn't needed, use SIMD search
     # This ensures correctness while maintaining good performance
     if n <= 32:
-        return _simd_search(pattern_ptr, n, text, start)
+        return simd_search(pattern_ptr, n, text, start)
 
     # For longer patterns, use simplified Two-Way algorithm
     # Use conservative approach to ensure correctness

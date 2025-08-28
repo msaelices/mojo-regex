@@ -12,7 +12,7 @@ from regex.engine import Engine
 from regex.matching import Match, MatchList
 from regex.parser import parse
 from regex.simd_ops import (
-    _twoway_search,
+    twoway_search,
     CharacterClassSIMD,
     get_simd_matcher,
     apply_quantifier_simd_generic,
@@ -171,7 +171,7 @@ struct NFAEngine(Copyable, Engine):
         if self.has_literal_optimization:
             while current_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = _twoway_search(
+                var literal_pos = twoway_search(
                     self.literal_prefix.unsafe_ptr(),
                     len(self.literal_prefix),
                     text,
@@ -337,7 +337,7 @@ struct NFAEngine(Copyable, Engine):
         if self.has_literal_optimization:
             while search_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = _twoway_search(
+                var literal_pos = twoway_search(
                     self.literal_prefix.unsafe_ptr(),
                     len(self.literal_prefix),
                     text,

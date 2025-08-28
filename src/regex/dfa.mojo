@@ -29,8 +29,8 @@ from regex.simd_ops import (
     CharacterClassSIMD,
     apply_quantifier_simd_generic,
     find_in_text_simd,
-    _simd_search,
-    _verify_match,
+    simd_search,
+    verify_match,
 )
 from regex.simd_matchers import (
     analyze_character_class_pattern,
@@ -1789,7 +1789,7 @@ struct DFAEngine(Engine):
             var pattern_len = self.get_pattern_len()
             if require_exact_position:
                 # For match_first, must match at exact position
-                if _verify_match(
+                if verify_match(
                     self.get_pattern_ptr(),
                     pattern_len,
                     text,
@@ -1799,7 +1799,7 @@ struct DFAEngine(Engine):
                 return None
             else:
                 # For match_next, can search from position
-                var pos = _simd_search(
+                var pos = simd_search(
                     self.get_pattern_ptr(),
                     pattern_len,
                     text,
