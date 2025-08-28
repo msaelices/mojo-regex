@@ -65,11 +65,13 @@ struct MatchList(Copyable, Movable, Sized):
         other: Self,
     ):
         """Copy constructor."""
-        self = Self(capacity=other._capacity)
-        for i in range(len(other)):
-            self.append(other[i])
-        self._len = other._len
-        self._capacity = other._capacity
+        self._data = UnsafePointer[Match]()
+        self._len = 0
+        self._capacity = 0
+        if other._len > 0:
+            self._realloc(other._capacity)
+            memcpy(self._data, other._data, other._len)
+            self._len = other._len
         # # Comment when debug is done
         # var call_location = __call_location()
         # print("Copying MatchList", call_location)
@@ -114,8 +116,11 @@ struct MatchList(Copyable, Movable, Sized):
         m: Match,
     ):
         """Add a match to the container, reserving capacity on first use."""
-        if not self._data:
-            self._realloc(self._capacity + self.DEFAULT_RESERVE_SIZE)
+        if not self._data or self._len >= self._capacity:
+            var new_capacity = max(
+                self._capacity * 2, self.DEFAULT_RESERVE_SIZE
+            )
+            self._realloc(new_capacity)
         self._data[self._len] = m
         self._len += 1
 
@@ -123,5 +128,4 @@ struct MatchList(Copyable, Movable, Sized):
         mut self,
     ):
         """Remove all matches but keep allocated capacity."""
-        if self._data:
-            self._data.free()
+        self._len = 0
