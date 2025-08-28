@@ -481,6 +481,8 @@ fn _verify_match(
     """Verify that pattern matches at given position.
 
     Args:
+        pattern_ptr: Pointer to the pattern string.
+        pattern_len: Length of the pattern string.
         text: Text to check.
         pos: Position to check.
 
