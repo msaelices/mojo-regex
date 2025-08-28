@@ -568,6 +568,12 @@ struct SIMDStringSearch(Copyable, Movable):
     var first_char_simd: SIMD[DType.uint8, SIMD_WIDTH]
     """SIMD vector filled with the first character of the pattern for fast comparison."""
 
+    fn __init__(out self):
+        """Default constructor for uninitialized SIMDStringSearch."""
+        self.engine_ptr = UnsafePointer[DFAEngine, mut=True]()
+        self.pattern_length = 0
+        self.first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](0)
+
     fn __init__(out self, engine: DFAEngine):
         """Initialize SIMD string search.
 
@@ -589,6 +595,10 @@ struct SIMDStringSearch(Copyable, Movable):
         """Clean up allocated resources."""
         if self.engine_ptr:
             self.engine_ptr.free()
+
+    fn __bool__(self) -> Bool:
+        """Check if SIMDStringSearch is initialized with an engine."""
+        return Bool(self.engine_ptr)
 
     fn search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using SIMD acceleration.
@@ -987,7 +997,7 @@ fn find_in_text_simd[
     return -1
 
 
-struct TwoWaySearcher(Copyable & Movable):
+struct TwoWaySearcher(Copyable, Movable):
     """SIMD-optimized Two-Way string search algorithm.
 
     The Two-Way algorithm provides O(n) worst-case time complexity with O(1) space.
@@ -1006,6 +1016,15 @@ struct TwoWaySearcher(Copyable & Movable):
     """Memory for the backward search phase."""
     var memory_fwd: Int
     """Memory for the forward search phase."""
+
+    fn __init__(out self):
+        """Default constructor for uninitialized TwoWaySearcher."""
+        self.engine_ptr = UnsafePointer[NFAEngine, mut=False]()
+        self.pattern_len = 0
+        self.period = 0
+        self.critical_pos = 0
+        self.memory = 0
+        self.memory_fwd = -1
 
     fn __init__(out self, engine: NFAEngine):
         """Initialize the Two-Way searcher with an engine.
@@ -1047,6 +1066,10 @@ struct TwoWaySearcher(Copyable & Movable):
             k += 1
 
         self.period = period
+
+    fn __bool__(self) -> Bool:
+        """Check if TwoWaySearcher is initialized with an engine."""
+        return Bool(self.engine_ptr)
 
     fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
         """Get a pointer to the pattern bytes."""

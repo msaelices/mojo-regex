@@ -56,7 +56,7 @@ struct NFAEngine(Copyable, Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
+    var literal_searcher: TwoWaySearcher
     """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
@@ -66,7 +66,7 @@ struct NFAEngine(Copyable, Engine):
         self.pattern = pattern
         self.literal_prefix = ""
         self.has_literal_optimization = False
-        self.literal_searcher = None
+        self.literal_searcher = TwoWaySearcher()
 
         try:
             self.regex = parse(pattern)
@@ -174,7 +174,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher
 
             while current_pos <= len(text):
                 # Find next occurrence of literal
@@ -337,7 +337,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Use literal prefiltering if available
         if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
+            ref searcher = self.literal_searcher
 
             while search_pos <= len(text):
                 # Find next occurrence of literal
