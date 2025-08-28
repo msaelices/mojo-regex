@@ -1,4 +1,4 @@
-from memory import UnsafePointer
+from memory import UnsafePointer, memcpy
 from builtin._location import __call_location
 
 
@@ -43,17 +43,21 @@ struct MatchList(Copyable, Movable, Sized):
     alias DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _list: List[Match, hint_trivial_type=True]
+    var _data: UnsafePointer[Match]
     """Internal list storing the matches."""
-    var _allocated: Bool
-    """Track whether we've done the initial smart allocation."""
+    var _len: Int
+    var _capacity: Int
 
     fn __init__(
         out self,
+        capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._list = List[Match, hint_trivial_type=True]()
-        self._allocated = False
+        self._data = UnsafePointer[Match]()
+        self._capacity = capacity
+        self._len = 0
+        if capacity > 0:
+            self._realloc(capacity)
 
     @always_inline
     fn __copyinit__(
@@ -61,35 +65,26 @@ struct MatchList(Copyable, Movable, Sized):
         other: Self,
     ):
         """Copy constructor."""
-        self._list = other._list
-        self._allocated = other._allocated
+        self = Self(capacity=other._capacity)
+        for i in range(len(other)):
+            self.append(other[i])
+        self._len = other._len
+        self._capacity = other._capacity
         # # Comment when debug is done
         # var call_location = __call_location()
         # print("Copying MatchList", call_location)
 
-    fn __moveinit__(
-        out self,
-        deinit other: Self,
-    ):
-        """Move constructor."""
-        self._list = other._list^
-        self._allocated = other._allocated
+    fn __del__(deinit self):
+        """Destructor to free allocated memory."""
+        if self._data:
+            self._data.free()
 
-    fn append(
-        mut self,
-        m: Match,
-    ):
-        """Add a match to the container, reserving capacity on first use."""
-        if not self._allocated:
-            self._list.reserve(Self.DEFAULT_RESERVE_SIZE)
-            self._allocated = True
-        self._list.append(m)
-
+    @always_inline
     fn __len__(self) -> Int:
         """Return the number of matches."""
-        return len(self._list)
+        return self._len
 
-    fn __getitem__[I: Indexer](ref self, idx: I) -> ref [self._list] Match:
+    fn __getitem__[I: Indexer](ref self, idx: I) -> ref [self] Match:
         """Gets the list element at the given index.
 
         Args:
@@ -101,11 +96,32 @@ struct MatchList(Copyable, Movable, Sized):
         Returns:
             A reference to the match at the given index.
         """
-        return self._list[idx]
+        return self._data[idx]
+
+    @no_inline
+    fn _realloc(mut self, new_capacity: Int):
+        var new_data = UnsafePointer[Match].alloc(new_capacity)
+
+        memcpy(new_data, self._data, len(self))
+
+        if self._data:
+            self._data.free()
+        self._data = new_data
+        self._capacity = new_capacity
+
+    fn append(
+        mut self,
+        m: Match,
+    ):
+        """Add a match to the container, reserving capacity on first use."""
+        if not self._data:
+            self._realloc(self._capacity + self.DEFAULT_RESERVE_SIZE)
+        self._data[self._len] = m
+        self._len += 1
 
     fn clear(
         mut self,
     ):
         """Remove all matches but keep allocated capacity."""
-        self._list.clear()
-        # Keep _allocated = True to maintain reserved capacity
+        if self._data:
+            self._data.free()
