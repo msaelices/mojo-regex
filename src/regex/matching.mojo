@@ -79,6 +79,24 @@ struct MatchList(Copyable, Movable, Sized):
         if self._data:
             self._data.free()
 
+    fn __moveinit__(
+        out self,
+        deinit other: Self,
+    ):
+        """Move constructor."""
+        self._list = other._list^
+        self._allocated = other._allocated
+
+    fn append(
+        mut self,
+        m: Match,
+    ):
+        """Add a match to the container, reserving capacity on first use."""
+        if not self._allocated:
+            self._list.reserve(Self.DEFAULT_RESERVE_SIZE)
+            self._allocated = True
+        self._list.append(m)
+
     @always_inline
     fn __len__(self) -> Int:
         """Return the number of matches."""

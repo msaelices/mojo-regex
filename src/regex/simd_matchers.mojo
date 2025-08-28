@@ -119,7 +119,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
                     var high_match = self.high_nibble_lut._dynamic_shuffle(
                         sub_high
                     )
-                    var sub_result = (low_match & high_match) != 0
+                    var sub_result = (low_match & high_match).ne(0)
                     for i in range(16):
                         result[offset + i] = sub_result[i]
                 else:
@@ -283,7 +283,7 @@ fn create_alnum_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-fn create_whitespace_matcher() -> NibbleBasedMatcher:
+fn _create_whitespace_matcher() -> NibbleBasedMatcher:
     """Create a nibble-based matcher for whitespace characters.
 
     Matches: space (0x20), tab (0x09), newline (0x0A), carriage return (0x0D),
@@ -494,6 +494,6 @@ fn get_whitespace_matcher() -> NibbleBasedMatcher:
         return matchers[SIMD_MATCHER_WHITESPACE]
     except:
         # Create and cache the matcher
-        var matcher = create_whitespace_matcher()
+        var matcher = _create_whitespace_matcher()
         matchers[SIMD_MATCHER_WHITESPACE] = matcher
         return matcher

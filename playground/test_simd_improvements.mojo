@@ -2,8 +2,8 @@
 
 from src.regex.simd_ops import (
     CharacterClassSIMD,
-    create_ascii_digits,
-    create_whitespace,
+    _create_ascii_digits,
+    _create_whitespace,
 )
 from src.regex.simd_matchers import create_hex_digit_matcher, RangeBasedMatcher
 
@@ -15,7 +15,7 @@ fn test_simd_operations():
 
     # Test digit matcher
     print("\n1. Testing digit matcher:")
-    var digit_matcher = create_ascii_digits()
+    var digit_matcher = _create_ascii_digits()
     var test_digits = "0123456789"
     var test_non_digits = "abcdefgh"
 
@@ -33,7 +33,7 @@ fn test_simd_operations():
 
     # Test whitespace matcher
     print("\n2. Testing whitespace matcher:")
-    var ws_matcher = create_whitespace()
+    var ws_matcher = _create_whitespace()
     var test_ws = " \t\n\r"
     var test_non_ws = "abcd"
 
