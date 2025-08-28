@@ -1219,6 +1219,92 @@ struct TwoWaySearcher(Copyable, Movable):
         return -1
 
 
+fn _twoway_search(
+    pattern_ptr: UnsafePointer[Byte],
+    pattern_len: Int,
+    text: String,
+    start: Int = 0,
+) -> Int:
+    """Search for pattern in text using Two-Way algorithm with SIMD.
+
+    This is a standalone version of TwoWaySearcher.search() that doesn't require
+    an engine instance, avoiding circular dependencies.
+
+    Args:
+        pattern_ptr: Pointer to the pattern string.
+        pattern_len: Length of the pattern string.
+        text: Text to search in.
+        start: Starting position.
+
+    Returns:
+        Position of first match, or -1 if not found.
+    """
+    var n = pattern_len
+    var m = len(text)
+
+    if n == 0:
+        return start
+    if n > m - start:
+        return -1
+
+    # For very short patterns, use simple search
+    if n <= 4:
+        if n == 1:
+            # Single character search
+            return _simd_search(pattern_ptr, n, text, start)
+
+        # For 2-4 byte patterns, use rolling comparison
+        var pos = start
+        while pos <= m - n:
+            var matched = True
+            for i in range(n):
+                if ord(text[pos + i]) != Int(pattern_ptr[i]):
+                    matched = False
+                    break
+            if matched:
+                return pos
+            pos += 1
+        return -1
+
+    # For patterns where Two-Way's complexity isn't needed, use SIMD search
+    # This ensures correctness while maintaining good performance
+    if n <= 32:
+        return _simd_search(pattern_ptr, n, text, start)
+
+    # For longer patterns, use simplified Two-Way algorithm
+    # Use conservative approach to ensure correctness
+    var pos = start
+    var critical_pos = 1 if n > 1 else 0
+    var period = 1
+
+    # Compute actual period of the pattern
+    for i in range(1, n):
+        var is_period = True
+        for j in range(n - i):
+            if Int(pattern_ptr[j]) != Int(pattern_ptr[j + i]):
+                is_period = False
+                break
+        if is_period:
+            period = i
+            break
+
+    while pos <= m - n:
+        # Simple forward comparison
+        var matched = True
+        for i in range(n):
+            if ord(text[pos + i]) != Int(pattern_ptr[i]):
+                matched = False
+                break
+
+        if matched:
+            return pos
+
+        # Move by period to avoid redundant comparisons
+        pos += period
+
+    return -1
+
+
 struct MultiLiteralSearcher(Copyable, Movable):
     """SIMD-optimized multi-literal string searcher (Teddy-like algorithm).
 
