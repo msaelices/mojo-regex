@@ -1,4 +1,4 @@
-from regex.aliases import CHAR_COLON
+from regex.aliases import CHAR_COLON, CHAR_ZERO, CHAR_NINE
 from regex.lexer import scan
 from regex.tokens import (
     Token,
@@ -76,8 +76,8 @@ fn check_for_quantifiers[
         # Parse min value directly as integer
         while i < len(tokens) and tokens[i].type == Token.ELEMENT:
             var digit_char = tokens[i].char
-            if digit_char >= ord("0") and digit_char <= ord("9"):
-                min_val = min_val * 10 + (digit_char - ord("0"))
+            if digit_char >= CHAR_ZERO and digit_char <= CHAR_NINE:
+                min_val = min_val * 10 + (digit_char - CHAR_ZERO)
                 has_min = True
             else:
                 raise Error("Invalid digit in quantifier")
