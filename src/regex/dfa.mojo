@@ -25,12 +25,12 @@ from regex.tokens import (
     DIGITS,
 )
 from regex.simd_ops import (
-    SIMDStringSearch,
     CharacterClassSIMD,
     apply_quantifier_simd_generic,
     find_in_text_simd,
     simd_search,
     verify_match,
+    twoway_search,
 )
 from regex.simd_matchers import (
     analyze_character_class_pattern,
