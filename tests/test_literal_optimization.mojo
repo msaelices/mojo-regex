@@ -119,29 +119,31 @@ fn test_two_way_searcher() raises:
 
     # Test simple pattern
     var pattern1 = "fox"
-    var pos1 = twoway_search(pattern1.unsafe_ptr(), len(pattern1), text)
+    var pattern1_span = Span[Byte](pattern1.unsafe_ptr(), len(pattern1))
+    var pos1 = twoway_search(pattern1_span, text)
     assert_equal(pos1, 16, "Should find 'fox' at position 16")
 
     # Test search from offset
-    var pos2 = twoway_search(
-        pattern1.unsafe_ptr(), len(pattern1), text, pos1 + 1
-    )
+    var pos2 = twoway_search(pattern1_span, text, pos1 + 1)
     assert_equal(pos2, 49, "Should find second 'fox' at position 49")
 
     # Test pattern not found
     var pattern2 = "cat"
-    var pos3 = twoway_search(pattern2.unsafe_ptr(), len(pattern2), text)
+    var pattern2_span = Span[Byte](pattern2.unsafe_ptr(), len(pattern2))
+    var pos3 = twoway_search(pattern2_span, text)
     assert_equal(pos3, -1, "Should return -1 when pattern not found")
 
     # Test longer pattern
     var pattern3 = "quick brown"
-    var pos4 = twoway_search(pattern3.unsafe_ptr(), len(pattern3), text)
+    var pattern3_span = Span[Byte](pattern3.unsafe_ptr(), len(pattern3))
+    var pos4 = twoway_search(pattern3_span, text)
     assert_equal(pos4, 4, "Should find 'quick brown' at position 4")
 
     # Test pattern at end - use "quick" instead of "quick." to avoid regex metachar
     var pattern4 = "quick"
+    var pattern4_span = Span[Byte](pattern4.unsafe_ptr(), len(pattern4))
     var pos5 = twoway_search(
-        pattern4.unsafe_ptr(), len(pattern4), text, 50
+        pattern4_span, text, 50
     )  # Search from position 50 to find the second "quick"
     assert_equal(pos5, 56, "Should find second 'quick' at position 56")
 
