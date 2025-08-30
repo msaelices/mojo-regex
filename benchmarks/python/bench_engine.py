@@ -343,6 +343,10 @@ def main():
     benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
     benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
 
+    # ===== Predefined Character Class Benchmarks =====
+    benchmark_search("predefined_digits", r"\d+", text_range_10000, 1000)
+    benchmark_match_first("predefined_word", r"\w+", text_range_10000, 1000)
+
     # ===== Anchor Benchmarks =====
     benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
     benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
