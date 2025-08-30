@@ -18,7 +18,7 @@ The module automatically adapts to the available SIMD width:
 from algorithm import vectorize
 from builtin._location import __call_location
 from sys import ffi
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 
 from regex.aliases import (
     SIMD_MATCHER_NONE,
@@ -58,7 +58,7 @@ from regex.simd_matchers import (
 )
 
 # SIMD width for character operations (uint8)
-alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
 # Shuffle optimization thresholds

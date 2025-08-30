@@ -4,7 +4,7 @@ SIMD-optimized matchers for character classes using advanced byte lookup techniq
 Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html
 """
 
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 from sys import ffi
 from memory import UnsafePointer
 from regex.aliases import (
@@ -16,7 +16,7 @@ from regex.aliases import (
     SIMD_MATCHER_HEX_DIGITS,
 )
 
-alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 trait SIMDMatcher:

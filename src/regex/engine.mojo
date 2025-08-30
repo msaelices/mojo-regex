@@ -5,7 +5,7 @@ trait Engine(Copyable, Movable):
     # Commented out because Mojo currently is not compiling, throwing error:
     # cannot return 'self's origin, because it might expand to a @register_passable type
     # fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
-    #     """Returns a contiguous slice of the pattern bytes
+    #     """Returns a contiguous slice of the pattern bytes.
     #
     #     Returns:
     #         A contiguous slice pointing to the bytes owned by the pattern.
