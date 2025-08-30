@@ -886,7 +886,6 @@ fn twoway_search(
     """
     var n = len(pattern)
     var m = len(text)
-    var pattern_ptr = pattern.unsafe_ptr()
 
     if n == 0:
         return start
@@ -904,7 +903,7 @@ fn twoway_search(
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if ord(text[pos + i]) != Int(pattern_ptr[i]):
+                if ord(text[pos + i]) != Int(pattern[i]):
                     matched = False
                     break
             if matched:
@@ -926,7 +925,7 @@ fn twoway_search(
     for i in range(1, n):
         var is_period = True
         for j in range(n - i):
-            if Int(pattern_ptr[j]) != Int(pattern_ptr[j + i]):
+            if Int(pattern[j]) != Int(pattern[j + i]):
                 is_period = False
                 break
         if is_period:
@@ -937,7 +936,7 @@ fn twoway_search(
         # Simple forward comparison
         var matched = True
         for i in range(n):
-            if ord(text[pos + i]) != Int(pattern_ptr[i]):
+            if ord(text[pos + i]) != Int(pattern[i]):
                 matched = False
                 break
 
