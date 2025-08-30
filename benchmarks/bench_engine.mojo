@@ -462,3 +462,141 @@ fn main() raises:
         toll_free_text,
         100,
     )
+
+    # ===== Quantifier Parser Optimization Benchmarks =====
+    # These benchmarks test patterns with multiple {n,m} quantifiers
+
+    # Generate test data for quantifier-intensive patterns
+    var serial_number_text = (
+        "Serial: ABC1234-DEF5678-GHI9012 Model: XYZ123-ABC456-DEF789 "
+        "Part: MNO345-PQR678-STU901 Code: VWX234-YZA567-BCD890 "
+        * 50
+    )
+
+    var datetime_text = (
+        "2024-01-15 14:30:25.123 2024-02-28 09:45:30.456 "
+        "2024-03-10 16:20:15.789 2024-04-05 11:35:40.012 "
+        * 100
+    )
+
+    var structured_data_text = (
+        "Record: USER12345-DEPT678-LOC901-ID234 Status:"
+        " ACTIVE567-FLAG890-CODE123 Transaction: TXN9876-AMT543-FEE210-TAX087"
+        " Reference: REF1357-NUM246-CHK802 "
+        * 75
+    )
+
+    # Single quantifier patterns (baseline)
+    benchmark_findall(
+        "single_quantifier_digits", "[0-9]{4}", serial_number_text, 200
+    )
+    benchmark_findall(
+        "single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200
+    )
+
+    # Multiple quantifier patterns - these benefit most from the optimization
+    benchmark_findall(
+        "dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150
+    )
+    benchmark_findall(
+        "triple_quantifiers",
+        "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}",
+        serial_number_text,
+        100,
+    )
+    benchmark_findall(
+        "quad_quantifiers",
+        "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{3}[0-9]{3}",
+        serial_number_text,
+        100,
+    )
+
+    # Complex quantifier ranges {min,max} - stress test the parser optimization
+    benchmark_findall(
+        "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 100
+    )
+    benchmark_findall(
+        "mixed_range_quantifiers",
+        "[A-Z]{1,3}-[0-9]{2,4}-[A-Z]{2,3}[0-9]{3,4}",
+        serial_number_text,
+        75,
+    )
+
+    # DateTime patterns with many quantifiers
+    benchmark_findall(
+        "datetime_quantifiers",
+        "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}",
+        datetime_text,
+        100,
+    )
+    benchmark_findall(
+        "flexible_datetime",
+        "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}",
+        datetime_text,
+        100,
+    )
+
+    # High quantifier density patterns - maximum parser stress
+    benchmark_findall(
+        "dense_quantifiers",
+        "[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}",
+        structured_data_text,
+        50,
+    )
+    benchmark_findall(
+        "ultra_dense_quantifiers",
+        "[A-Z]{1,2}[0-9]{3,5}-[A-Z]{2,4}[0-9]{2,4}-[A-Z]{1,3}[0-9]{2,4}-[A-Z]{2,3}[0-9]{2,3}",
+        structured_data_text,
+        25,
+    )
+
+    # Nested quantifiers within groups
+    benchmark_findall(
+        "grouped_quantifiers",
+        "([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})",
+        serial_number_text,
+        100,
+    )
+    benchmark_findall(
+        "alternation_quantifiers",
+        "([A-Z]{2,3}[0-9]{3,4})|([0-9]{4}-[A-Z]{3})",
+        structured_data_text,
+        75,
+    )
+
+    # Optimization test data for quantifier stress testing
+    var optimization_test_text = (
+        "Transaction: TXN12345-DEPT678-LOC90123-ID4567 Status:"
+        " ACTIVE12-FLAG890-CODE1234 Reference: REF13579-NUM24680-CHK80246"
+        " Product: PROD123-CAT456-TYPE789-SUB012 "
+        * 100
+    )
+
+    # Most significant optimization cases from analysis
+    benchmark_findall(
+        "optimize_range_quantifier", "a{2,4}", "aaaabbbbccccdddd" * 500, 1000
+    )
+    benchmark_findall(
+        "optimize_multiple_quantifiers",
+        "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{2}",
+        optimization_test_text,
+        200,
+    )
+    benchmark_findall(
+        "optimize_phone_quantifiers",
+        "[0-9]{3}-[0-9]{3}-[0-9]{4}",
+        "Call 555-123-4567 or 800-555-1234 or 900-876-5432 for help. " * 200,
+        300,
+    )
+    benchmark_findall(
+        "optimize_large_quantifiers",
+        "[A-Z]{10,20}[0-9]{15,25}",
+        "PREFIX" + "A" * 15 + "1" * 20 + "SUFFIX " * 50,
+        100,
+    )
+    benchmark_findall(
+        "optimize_extreme_quantifiers",
+        "a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}",
+        "abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR" * 20,
+        500,
+    )
