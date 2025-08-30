@@ -439,25 +439,23 @@ fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-fn _search_short_pattern(
-    pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, start: Int
-) -> Int:
+fn _search_short_pattern(pattern: Span[Byte], text: String, start: Int) -> Int:
     """Optimized search for very short patterns (1-2 characters).
 
     Args:
-        pattern_ptr: Pointer to the pattern string.
-        pattern_len: Length of the pattern string.
+        pattern: Pattern span of bytes.
         text: Text to search in.
         start: Starting position.
 
     Returns:
         Position of first match, or -1 if not found.
     """
+    var pattern_len = len(pattern)
     var text_len = len(text)
 
     if pattern_len == 1:
         # Single character - simple scan
-        var target_char = pattern_ptr[0]
+        var target_char = pattern[0]
         for i in range(start, text_len):
             if ord(text[i]) == Int(target_char):
                 return i
@@ -465,8 +463,8 @@ fn _search_short_pattern(
         # Two characters - check pairs
         if text_len - start < 2:
             return -1
-        var first_char = pattern_ptr[0]
-        var second_char = pattern_ptr[1]
+        var first_char = pattern[0]
+        var second_char = pattern[1]
         for i in range(start, text_len - 1):
             if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
                 second_char
@@ -475,48 +473,45 @@ fn _search_short_pattern(
     return -1
 
 
-fn verify_match(
-    pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, pos: Int
-) -> Bool:
+fn verify_match(pattern: Span[Byte], text: String, pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
     Args:
-        pattern_ptr: Pointer to the pattern string.
-        pattern_len: Length of the pattern string.
+        pattern: Pattern to verify.
         text: Text to check.
         pos: Position to check.
 
     Returns:
         True if pattern matches at this position.
     """
+    var pattern_len = len(pattern)
     if pos + pattern_len > len(text):
         return False
 
     for i in range(pattern_len):
-        var ptr = pattern_ptr + i
-        if ord(text[pos + i]) != Int(ptr[]):
+        var c = pattern[i]
+        if ord(text[pos + i]) != Int(c):
             return False
 
     return True
 
 
 fn simd_search(
-    pattern_ptr: UnsafePointer[Byte],
-    pattern_len: Int,
+    pattern: Span[Byte],
     text: String,
     start: Int = 0,
 ) -> Int:
     """Search for pattern in text using SIMD acceleration.
 
     Args:
-        pattern_ptr: Pointer to the pattern string.
-        pattern_len: Length of the pattern string.
+        pattern: Pattern slice of bytes.
         text: Text to search in.
         start: Starting position.
 
     Returns:
         Position of first match, or -1 if not found.
     """
+    var pattern_len = len(pattern)
     if pattern_len == 0:
         return start  # Empty pattern matches at any position
 
@@ -525,7 +520,7 @@ fn simd_search(
 
     # For very short patterns (1-2 chars), use simpler approach
     if pattern_len <= 2:
-        return _search_short_pattern(pattern_ptr, pattern_len, text, start)
+        return _search_short_pattern(pattern, text, start)
 
     # Use SIMD to quickly find potential matches by first character
     while pos + SIMD_WIDTH <= text_len:
@@ -533,7 +528,7 @@ fn simd_search(
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
         # Compare with first character of pattern
-        var first_char = pattern_ptr[0]
+        var first_char = pattern[0]
         var first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](first_char)
         var matches = chunk.eq(first_char_simd)
 
@@ -542,16 +537,14 @@ fn simd_search(
             for i in range(SIMD_WIDTH):
                 if matches[i]:
                     var candidate_pos = pos + i
-                    if verify_match(
-                        pattern_ptr, pattern_len, text, candidate_pos
-                    ):
+                    if verify_match(pattern, text, candidate_pos):
                         return candidate_pos
 
         pos += SIMD_WIDTH
 
     # Handle remaining characters
     while pos <= text_len - pattern_len:
-        if verify_match(pattern_ptr, pattern_len, text, pos):
+        if verify_match(pattern, text, pos):
             return pos
         pos += 1
 
@@ -870,8 +863,7 @@ fn find_in_text_simd[
 
 
 fn twoway_search(
-    pattern_ptr: UnsafePointer[Byte],
-    pattern_len: Int,
+    pattern: Span[Byte],
     text: String,
     start: Int = 0,
 ) -> Int:
@@ -881,15 +873,14 @@ fn twoway_search(
     an engine instance, avoiding circular dependencies.
 
     Args:
-        pattern_ptr: Pointer to the pattern string.
-        pattern_len: Length of the pattern string.
+        pattern: Pattern span of bytes.
         text: Text to search in.
         start: Starting position.
 
     Returns:
         Position of first match, or -1 if not found.
     """
-    var n = pattern_len
+    var n = len(pattern)
     var m = len(text)
 
     if n == 0:
@@ -901,14 +892,14 @@ fn twoway_search(
     if n <= 4:
         if n == 1:
             # Single character search
-            return simd_search(pattern_ptr, n, text, start)
+            return simd_search(pattern, text, start)
 
         # For 2-4 byte patterns, use rolling comparison
         var pos = start
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if ord(text[pos + i]) != Int(pattern_ptr[i]):
+                if ord(text[pos + i]) != Int(pattern[i]):
                     matched = False
                     break
             if matched:
@@ -919,19 +910,18 @@ fn twoway_search(
     # For patterns where Two-Way's complexity isn't needed, use SIMD search
     # This ensures correctness while maintaining good performance
     if n <= 32:
-        return simd_search(pattern_ptr, n, text, start)
+        return simd_search(pattern, text, start)
 
     # For longer patterns, use simplified Two-Way algorithm
     # Use conservative approach to ensure correctness
     var pos = start
-    var critical_pos = 1 if n > 1 else 0
     var period = 1
 
     # Compute actual period of the pattern
     for i in range(1, n):
         var is_period = True
         for j in range(n - i):
-            if Int(pattern_ptr[j]) != Int(pattern_ptr[j + i]):
+            if Int(pattern[j]) != Int(pattern[j + i]):
                 is_period = False
                 break
         if is_period:
@@ -942,7 +932,7 @@ fn twoway_search(
         # Simple forward comparison
         var matched = True
         for i in range(n):
-            if ord(text[pos + i]) != Int(pattern_ptr[i]):
+            if ord(text[pos + i]) != Int(pattern[i]):
                 matched = False
                 break
 

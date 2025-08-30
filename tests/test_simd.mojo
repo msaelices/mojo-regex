@@ -153,25 +153,21 @@ def test_whitespace():
 def test_simd_string_search():
     """Test SIMD-accelerated string search."""
     var pattern = "hello"
-    var pattern_ptr = pattern.unsafe_ptr()
-    var pattern_len = len(pattern)
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
     # Test basic search
-    assert_equal(simd_search(pattern_ptr, pattern_len, "hello world"), 0)
-    assert_equal(simd_search(pattern_ptr, pattern_len, "say hello there"), 4)
-    assert_equal(simd_search(pattern_ptr, pattern_len, "goodbye"), -1)
+    assert_equal(simd_search(pattern_span, "hello world"), 0)
+    assert_equal(simd_search(pattern_span, "say hello there"), 4)
+    assert_equal(simd_search(pattern_span, "goodbye"), -1)
 
     # Test with start position
-    assert_equal(
-        simd_search(pattern_ptr, pattern_len, "hello hello hello", 1), 6
-    )
+    assert_equal(simd_search(pattern_span, "hello hello hello", 1), 6)
 
 
 def test_simd_string_search_all():
     """Test finding all occurrences with SIMD string search."""
     var pattern = "ll"
-    var pattern_ptr = pattern.unsafe_ptr()
-    var pattern_len = len(pattern)
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
     var text = "hello world, all well"
 
     # Find all non-overlapping occurrences manually using simd_search
@@ -179,12 +175,12 @@ def test_simd_string_search_all():
     var start = 0
 
     while True:
-        var pos = simd_search(pattern_ptr, pattern_len, text, start)
+        var pos = simd_search(pattern_span, text, start)
         if pos == -1:
             break
         positions.append(pos)
         # Move past this match to avoid overlapping matches
-        start = pos + pattern_len
+        start = pos + len(pattern)
 
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 2)  # "hello"
@@ -195,22 +191,20 @@ def test_simd_string_search_all():
 def test_simd_string_search_empty():
     """Test SIMD string search with empty pattern."""
     var pattern = ""
-    var pattern_ptr = pattern.unsafe_ptr()
-    var pattern_len = len(pattern)
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
     # Empty pattern should match at any position
-    assert_equal(simd_search(pattern_ptr, pattern_len, "hello"), 0)
-    assert_equal(simd_search(pattern_ptr, pattern_len, "hello", 2), 2)
+    assert_equal(simd_search(pattern_span, "hello"), 0)
+    assert_equal(simd_search(pattern_span, "hello", 2), 2)
 
 
 def test_simd_string_search_single_char():
     """Test SIMD string search with single character."""
     var pattern = "a"
-    var pattern_ptr = pattern.unsafe_ptr()
-    var pattern_len = len(pattern)
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
-    assert_equal(simd_search(pattern_ptr, pattern_len, "banana"), 1)
-    assert_equal(simd_search(pattern_ptr, pattern_len, "hello"), -1)
+    assert_equal(simd_search(pattern_span, "banana"), 1)
+    assert_equal(simd_search(pattern_span, "hello"), -1)
 
     # Find all occurrences manually using simd_search
     var positions = List[Int]()
@@ -218,12 +212,12 @@ def test_simd_string_search_single_char():
     var start = 0
 
     while True:
-        var pos = simd_search(pattern_ptr, pattern_len, text, start)
+        var pos = simd_search(pattern_span, text, start)
         if pos == -1:
             break
         positions.append(pos)
         # Move past this match to avoid overlapping matches
-        start = pos + pattern_len
+        start = pos + len(pattern)
 
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 1)
