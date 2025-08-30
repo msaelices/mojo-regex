@@ -107,7 +107,7 @@ struct NFAEngine(Copyable, Engine):
             self.regex = None
 
     @always_inline
-    fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
+    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
         """Returns a contiguous slice of the pattern bytes.
 
         Returns:

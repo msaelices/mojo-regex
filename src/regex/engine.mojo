@@ -2,15 +2,13 @@ from regex.matching import Match, MatchList
 
 
 trait Engine(Copyable, Movable):
-    # Commented out because Mojo currently is not compiling, throwing error:
-    # cannot return 'self's origin, because it might expand to a @register_passable type
-    # fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
-    #     """Returns a contiguous slice of the pattern bytes.
-    #
-    #     Returns:
-    #         A contiguous slice pointing to the bytes owned by the pattern.
-    #     """
-    #     ...
+    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
+        """Returns a contiguous slice of the pattern bytes.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by the pattern.
+        """
+        ...
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
