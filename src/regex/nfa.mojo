@@ -653,7 +653,15 @@ struct NFAEngine(Copyable, Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
         if str_i >= len(str):
-            return (False, str_i)
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
         # Use specialized SIMD digit matcher for better performance
         var digit_matcher = get_digit_matcher()
@@ -663,7 +671,15 @@ struct NFAEngine(Copyable, Engine):
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
-            return (False, str_i)
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
     @always_inline
     fn _match_word(
@@ -676,7 +692,15 @@ struct NFAEngine(Copyable, Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match word character (\\w)."""
         if str_i >= len(str):
-            return (False, str_i)
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
         # Use specialized SIMD word matcher for better performance
         var word_matcher = get_word_matcher()
@@ -686,7 +710,15 @@ struct NFAEngine(Copyable, Engine):
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
-            return (False, str_i)
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
     @always_inline
     fn _match_range(
