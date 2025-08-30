@@ -1,7 +1,7 @@
 from time import perf_counter_ns as now
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 
-alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 @register_passable("trivial")

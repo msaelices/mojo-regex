@@ -12,7 +12,7 @@ from regex.engine import Engine
 from regex.matching import Match, MatchList
 from regex.parser import parse
 from regex.simd_ops import (
-    TwoWaySearcher,
+    twoway_search,
     CharacterClassSIMD,
     get_simd_matcher,
     apply_quantifier_simd_generic,
@@ -56,8 +56,6 @@ struct NFAEngine(Copyable, Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
-    """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -66,7 +64,6 @@ struct NFAEngine(Copyable, Engine):
         self.pattern = pattern
         self.literal_prefix = ""
         self.has_literal_optimization = False
-        self.literal_searcher = None
 
         try:
             self.regex = parse(pattern)
@@ -97,7 +94,6 @@ struct NFAEngine(Copyable, Engine):
                             # Use prefix literal for optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(self)
                         elif (
                             best.is_required
                             and best.get_literal_len()
@@ -107,25 +103,25 @@ struct NFAEngine(Copyable, Engine):
                             # Require even longer literals for non-prefix optimization
                             self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(self)
         except:
             self.regex = None
 
     @always_inline
-    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
-        """Get a pointer to the pattern string."""
-        if self.has_literal_optimization:
-            return self.literal_prefix.unsafe_ptr()
-        else:
-            return self.pattern.unsafe_ptr()
+    fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the pattern bytes.
 
-    @always_inline
-    fn get_pattern_len(self) -> Int:
-        """Get the length of the pattern string."""
+        Returns:
+            A contiguous slice pointing to the bytes owned by the pattern.
+        """
         if self.has_literal_optimization:
-            return len(self.literal_prefix)
-        else:
-            return len(self.pattern)
+            return Span[Byte, __origin_of(self)](
+                ptr=self.literal_prefix.unsafe_ptr(),
+                length=self.literal_prefix.byte_length(),
+            )
+        return Span[Byte, __origin_of(self)](
+            ptr=self.pattern.unsafe_ptr(),
+            length=self.pattern.byte_length(),
+        )
 
     fn match_all(
         self,
@@ -173,12 +169,14 @@ struct NFAEngine(Copyable, Engine):
         var temp_matches = List[Match, hint_trivial_type=True](capacity=3)
 
         # Use literal prefiltering if available
-        if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
-
+        if self.has_literal_optimization:
             while current_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = searcher.search(text, current_pos)
+                var literal_pos = twoway_search(
+                    self.get_pattern(),
+                    text,
+                    current_pos,
+                )
                 if literal_pos == -1:
                     # No more occurrences of required literal
                     break
@@ -336,12 +334,14 @@ struct NFAEngine(Copyable, Engine):
         var search_pos = start
 
         # Use literal prefiltering if available
-        if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
-
+        if self.has_literal_optimization:
             while search_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = searcher.search(text, search_pos)
+                var literal_pos = twoway_search(
+                    self.get_pattern(),
+                    text,
+                    search_pos,
+                )
                 if literal_pos == -1:
                     # No more occurrences of required literal
                     return None

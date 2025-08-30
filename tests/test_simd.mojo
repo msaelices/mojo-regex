@@ -7,7 +7,8 @@ from regex.simd_ops import (
     _create_ascii_digits,
     _create_ascii_alphanumeric,
     _create_whitespace,
-    SIMDStringSearch,
+    simd_search,
+    verify_match,
     simd_memcmp,
     simd_count_char,
 )
@@ -151,26 +152,36 @@ def test_whitespace():
 
 def test_simd_string_search():
     """Test SIMD-accelerated string search."""
-    var engine = DFAEngine()
-    engine.compile_pattern("hello", False, False)
-    var search = SIMDStringSearch(engine)
+    var pattern = "hello"
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
     # Test basic search
-    assert_equal(search.search("hello world"), 0)
-    assert_equal(search.search("say hello there"), 4)
-    assert_equal(search.search("goodbye"), -1)
+    assert_equal(simd_search(pattern_span, "hello world"), 0)
+    assert_equal(simd_search(pattern_span, "say hello there"), 4)
+    assert_equal(simd_search(pattern_span, "goodbye"), -1)
 
     # Test with start position
-    assert_equal(search.search("hello hello hello", 1), 6)
+    assert_equal(simd_search(pattern_span, "hello hello hello", 1), 6)
 
 
 def test_simd_string_search_all():
     """Test finding all occurrences with SIMD string search."""
-    var engine = DFAEngine()
-    engine.compile_pattern("ll", False, False)
-    var search = SIMDStringSearch(engine)
+    var pattern = "ll"
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
+    var text = "hello world, all well"
 
-    var positions = search.search_all("hello world, all well")
+    # Find all non-overlapping occurrences manually using simd_search
+    var positions = List[Int]()
+    var start = 0
+
+    while True:
+        var pos = simd_search(pattern_span, text, start)
+        if pos == -1:
+            break
+        positions.append(pos)
+        # Move past this match to avoid overlapping matches
+        start = pos + len(pattern)
+
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 2)  # "hello"
     assert_equal(positions[1], 14)  # "all"
@@ -179,25 +190,35 @@ def test_simd_string_search_all():
 
 def test_simd_string_search_empty():
     """Test SIMD string search with empty pattern."""
-    var engine = DFAEngine()
-    engine.compile_pattern("", False, False)
-    var search = SIMDStringSearch(engine)
+    var pattern = ""
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
     # Empty pattern should match at any position
-    assert_equal(search.search("hello"), 0)
-    assert_equal(search.search("hello", 2), 2)
+    assert_equal(simd_search(pattern_span, "hello"), 0)
+    assert_equal(simd_search(pattern_span, "hello", 2), 2)
 
 
 def test_simd_string_search_single_char():
     """Test SIMD string search with single character."""
-    var engine = DFAEngine()
-    engine.compile_pattern("a", False, False)
-    var search = SIMDStringSearch(engine)
+    var pattern = "a"
+    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
 
-    assert_equal(search.search("banana"), 1)
-    assert_equal(search.search("hello"), -1)
+    assert_equal(simd_search(pattern_span, "banana"), 1)
+    assert_equal(simd_search(pattern_span, "hello"), -1)
 
-    var positions = search.search_all("banana")
+    # Find all occurrences manually using simd_search
+    var positions = List[Int]()
+    var text = "banana"
+    var start = 0
+
+    while True:
+        var pos = simd_search(pattern_span, text, start)
+        if pos == -1:
+            break
+        positions.append(pos)
+        # Move past this match to avoid overlapping matches
+        start = pos + len(pattern)
+
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 1)
     assert_equal(positions[1], 3)
