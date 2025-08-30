@@ -194,6 +194,56 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "national_phone_validation", &patterns.national_phone_validation, &national_phone_text, 10, BenchType::FindAll);
 
     // ===-----------------------------------------------------------------------===
+    // Quantifier Parser Optimization Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== Quantifier Parser Optimization Benchmarks ===");
+
+    // Generate test data for quantifier-intensive patterns
+    let serial_number_text = "Serial: ABC1234-DEF5678-GHI9012 Model: XYZ123-ABC456-DEF789 Part: MNO345-PQR678-STU901 Code: VWX234-YZA567-BCD890 ".repeat(50);
+    let datetime_text = "2024-01-15 14:30:25.123 2024-02-28 09:45:30.456 2024-03-10 16:20:15.789 2024-04-05 11:35:40.012 ".repeat(100);
+    let structured_data_text = "Record: USER12345-DEPT678-LOC901-ID234 Status: ACTIVE567-FLAG890-CODE123 Transaction: TXN9876-AMT543-FEE210-TAX087 Reference: REF1357-NUM246-CHK802 ".repeat(75);
+
+    // Single quantifier patterns (baseline)
+    run_benchmark(&timer, &mut all_results, "single_quantifier_digits", &patterns.single_quantifier_digits, &serial_number_text, 200, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "single_quantifier_alpha", &patterns.single_quantifier_alpha, &serial_number_text, 200, BenchType::FindAll);
+
+    // Multiple quantifier patterns - these benefit most from the optimization
+    run_benchmark(&timer, &mut all_results, "dual_quantifiers", &patterns.dual_quantifiers, &serial_number_text, 150, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "triple_quantifiers", &patterns.triple_quantifiers, &serial_number_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "quad_quantifiers", &patterns.quad_quantifiers, &serial_number_text, 100, BenchType::FindAll);
+
+    // Complex quantifier ranges {min,max} - stress test the parser optimization
+    run_benchmark(&timer, &mut all_results, "range_quantifiers", &patterns.range_quantifiers, &serial_number_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "mixed_range_quantifiers", &patterns.mixed_range_quantifiers, &serial_number_text, 75, BenchType::FindAll);
+
+    // DateTime patterns with many quantifiers
+    run_benchmark(&timer, &mut all_results, "datetime_quantifiers", &patterns.datetime_quantifiers, &datetime_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "flexible_datetime", &patterns.flexible_datetime, &datetime_text, 100, BenchType::FindAll);
+
+    // High quantifier density patterns - maximum parser stress
+    run_benchmark(&timer, &mut all_results, "dense_quantifiers", &patterns.dense_quantifiers, &structured_data_text, 50, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "ultra_dense_quantifiers", &patterns.ultra_dense_quantifiers, &structured_data_text, 25, BenchType::FindAll);
+
+    // Nested quantifiers within groups
+    run_benchmark(&timer, &mut all_results, "grouped_quantifiers", &patterns.grouped_quantifiers, &serial_number_text, 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "alternation_quantifiers", &patterns.alternation_quantifiers, &structured_data_text, 75, BenchType::FindAll);
+
+    // ===-----------------------------------------------------------------------===
+    // OPTIMIZATION SHOWCASE: Quantifier Parser Improvements
+    // ===-----------------------------------------------------------------------===
+    println!("=== Quantifier Optimization Showcase Benchmarks ===");
+
+    // Optimization test data for quantifier stress testing
+    let optimization_test_text = "Transaction: TXN12345-DEPT678-LOC90123-ID4567 Status: ACTIVE12-FLAG890-CODE1234 Reference: REF13579-NUM24680-CHK80246 Product: PROD123-CAT456-TYPE789-SUB012 ".repeat(100);
+
+    // Most significant optimization cases from analysis
+    run_benchmark(&timer, &mut all_results, "optimize_range_quantifier", &patterns.optimize_range_quantifier, &("aaaabbbbccccdddd".repeat(500)), 1000, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "optimize_multiple_quantifiers", &patterns.optimize_multiple_quantifiers, &optimization_test_text, 200, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "optimize_phone_quantifiers", &patterns.optimize_phone_quantifiers, &("Call 555-123-4567 or 800-555-1234 or 900-876-5432 for help. ".repeat(200)), 300, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "optimize_large_quantifiers", &patterns.optimize_large_quantifiers, &(format!("PREFIX{}{}SUFFIX ", "A".repeat(15), "1".repeat(20)).repeat(50)), 100, BenchType::FindAll);
+    run_benchmark(&timer, &mut all_results, "optimize_extreme_quantifiers", &patterns.optimize_extreme_quantifiers, &("abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR".repeat(20)), 500, BenchType::FindAll);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -250,6 +300,26 @@ struct CompiledPatterns {
     dfa_dot_phone: Regex,
     dfa_digits_only: Regex,
     national_phone_validation: Regex,
+    // Quantifier parser optimization patterns
+    single_quantifier_digits: Regex,
+    single_quantifier_alpha: Regex,
+    dual_quantifiers: Regex,
+    triple_quantifiers: Regex,
+    quad_quantifiers: Regex,
+    range_quantifiers: Regex,
+    mixed_range_quantifiers: Regex,
+    datetime_quantifiers: Regex,
+    flexible_datetime: Regex,
+    dense_quantifiers: Regex,
+    ultra_dense_quantifiers: Regex,
+    grouped_quantifiers: Regex,
+    alternation_quantifiers: Regex,
+    // Optimization showcase patterns
+    optimize_range_quantifier: Regex,
+    optimize_multiple_quantifiers: Regex,
+    optimize_phone_quantifiers: Regex,
+    optimize_large_quantifiers: Regex,
+    optimize_extreme_quantifiers: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -344,6 +414,26 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         dfa_dot_phone: Regex::new(r"[0-9]{3}\.[0-9]{3}\.[0-9]{4}")?,
         dfa_digits_only: Regex::new(r"[0-9]{10}")?,
         national_phone_validation: Regex::new(r"(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}")?,
+        // Quantifier parser optimization patterns
+        single_quantifier_digits: Regex::new(r"[0-9]{4}")?,
+        single_quantifier_alpha: Regex::new(r"[A-Z]{3}")?,
+        dual_quantifiers: Regex::new(r"[A-Z]{3}[0-9]{4}")?,
+        triple_quantifiers: Regex::new(r"[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}")?,
+        quad_quantifiers: Regex::new(r"[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{3}[0-9]{3}")?,
+        range_quantifiers: Regex::new(r"[A-Z]{2,4}[0-9]{3,5}")?,
+        mixed_range_quantifiers: Regex::new(r"[A-Z]{1,3}-[0-9]{2,4}-[A-Z]{2,3}[0-9]{3,4}")?,
+        datetime_quantifiers: Regex::new(r"[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}")?,
+        flexible_datetime: Regex::new(r"[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}")?,
+        dense_quantifiers: Regex::new(r"[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}")?,
+        ultra_dense_quantifiers: Regex::new(r"[A-Z]{1,2}[0-9]{3,5}-[A-Z]{2,4}[0-9]{2,4}-[A-Z]{1,3}[0-9]{2,4}-[A-Z]{2,3}[0-9]{2,3}")?,
+        grouped_quantifiers: Regex::new(r"([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})")?,
+        alternation_quantifiers: Regex::new(r"([A-Z]{2,3}[0-9]{3,4})|([0-9]{4}-[A-Z]{3})")?,
+        // Optimization showcase patterns
+        optimize_range_quantifier: Regex::new(r"a{2,4}")?,
+        optimize_multiple_quantifiers: Regex::new(r"[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{2}")?,
+        optimize_phone_quantifiers: Regex::new(r"[0-9]{3}-[0-9]{3}-[0-9]{4}")?,
+        optimize_large_quantifiers: Regex::new(r"[A-Z]{10,20}[0-9]{15,25}")?,
+        optimize_extreme_quantifiers: Regex::new(r"a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}")?,
     })
 }
 
