@@ -439,25 +439,23 @@ fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
-fn _search_short_pattern(
-    pattern_ptr: UnsafePointer[Byte], pattern_len: Int, text: String, start: Int
-) -> Int:
+fn _search_short_pattern(pattern: Span[Byte], text: String, start: Int) -> Int:
     """Optimized search for very short patterns (1-2 characters).
 
     Args:
-        pattern_ptr: Pointer to the pattern string.
-        pattern_len: Length of the pattern string.
+        pattern: Pattern span of bytes.
         text: Text to search in.
         start: Starting position.
 
     Returns:
         Position of first match, or -1 if not found.
     """
+    var pattern_len = len(pattern)
     var text_len = len(text)
 
     if pattern_len == 1:
         # Single character - simple scan
-        var target_char = pattern_ptr[0]
+        var target_char = pattern[0]
         for i in range(start, text_len):
             if ord(text[i]) == Int(target_char):
                 return i
@@ -465,8 +463,8 @@ fn _search_short_pattern(
         # Two characters - check pairs
         if text_len - start < 2:
             return -1
-        var first_char = pattern_ptr[0]
-        var second_char = pattern_ptr[1]
+        var first_char = pattern[0]
+        var second_char = pattern[1]
         for i in range(start, text_len - 1):
             if ord(text[i]) == Int(first_char) and ord(text[i + 1]) == Int(
                 second_char
@@ -522,9 +520,7 @@ fn simd_search(
 
     # For very short patterns (1-2 chars), use simpler approach
     if pattern_len <= 2:
-        return _search_short_pattern(
-            pattern.unsafe_ptr(), pattern_len, text, start
-        )
+        return _search_short_pattern(pattern, text, start)
 
     # Use SIMD to quickly find potential matches by first character
     while pos + SIMD_WIDTH <= text_len:
