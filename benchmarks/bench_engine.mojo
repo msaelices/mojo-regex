@@ -1,5 +1,6 @@
 from time import perf_counter_ns
 from regex import match_first, findall, search
+from regex.matcher import compile_regex
 
 
 # ===-----------------------------------------------------------------------===#
@@ -86,6 +87,11 @@ fn benchmark_match_first(
 ) raises:
     """Benchmark match_first with manual timing."""
 
+    # Output engine detection information
+    var compiled_regex = compile_regex(pattern)
+    var stats = compiled_regex.get_stats()
+    print("[ENGINE] " + name + " -> " + stats)
+
     # Warmup (3 iterations like Python)
     for _ in range(3):
         _ = match_first(pattern, text)
@@ -138,6 +144,11 @@ fn benchmark_search(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark search (match_next) with manual timing."""
+
+    # Output engine detection information
+    var compiled_regex = compile_regex(pattern)
+    var stats = compiled_regex.get_stats()
+    print("[ENGINE] " + name + " -> " + stats)
 
     # Warmup (3 iterations like Python)
     for _ in range(3):
@@ -193,6 +204,11 @@ fn benchmark_findall(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark findall with manual timing."""
+
+    # Output engine detection information
+    var compiled_regex = compile_regex(pattern)
+    var stats = compiled_regex.get_stats()
+    print("[ENGINE] " + name + " -> " + stats)
 
     # Warmup
     for _ in range(3):
