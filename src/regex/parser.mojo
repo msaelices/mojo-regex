@@ -1,4 +1,4 @@
-from regex.aliases import CHAR_COLON
+from regex.aliases import CHAR_COLON, CHAR_ZERO, CHAR_NINE
 from regex.lexer import scan
 from regex.tokens import (
     Token,
@@ -68,28 +68,36 @@ fn check_for_quantifiers[
     elif next_token.type == Token.LEFTCURLYBRACE:
         # Parse curly brace quantifiers
         i += 2  # Skip element and {
-        var min_val = String(
-            capacity=String.INLINE_CAPACITY
-        )  # Pre-allocate for min value
-        var max_val = String(
-            capacity=String.INLINE_CAPACITY
-        )  # Pre-allocate for max value
+        var min_val = 0
+        var max_val = 0
+        var has_min = False
+        var has_max = False
 
-        # Parse min value
+        # Parse min value directly as integer
         while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-            min_val += String(chr(tokens[i].char))
+            var digit_char = tokens[i].char
+            if digit_char >= CHAR_ZERO and digit_char <= CHAR_NINE:
+                min_val = min_val * 10 + (digit_char - CHAR_ZERO)
+                has_min = True
+            else:
+                raise Error("Invalid digit in quantifier")
             i += 1
 
-        elem.min = atol(min_val) if min_val != "" else 0
+        elem.min = min_val if has_min else 0
 
         # Check for comma (range) or closing brace (exact)
         if i < len(tokens) and tokens[i].type == Token.COMMA:
             i += 1  # Skip comma
-            # Parse max value
+            # Parse max value directly as integer
             while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                max_val += String(chr(tokens[i].char))
+                var digit_char = tokens[i].char
+                if digit_char >= ord("0") and digit_char <= ord("9"):
+                    max_val = max_val * 10 + (digit_char - ord("0"))
+                    has_max = True
+                else:
+                    raise Error("Invalid digit in quantifier")
                 i += 1
-            elem.max = atol(max_val) if max_val != "" else -1
+            elem.max = max_val if has_max else -1
         else:
             # Exact quantifier {n}
             elem.max = elem.min

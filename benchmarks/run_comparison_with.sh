@@ -60,7 +60,7 @@ run_and_parse_benchmarks() {
     echo "-----------------------------------------"
 
     # Run Mojo benchmarks and parse output
-    mojo run "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "$output_txt" | python3 benchmarks/parse_mojo_output.py "$output_json"
+    mojo run -I src "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "$output_txt" | python3 benchmarks/parse_mojo_output.py "$output_json"
 
     if [ -f "$output_json" ]; then
         echo "✓ Results saved to $output_json"
