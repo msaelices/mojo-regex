@@ -25,10 +25,12 @@ from regex.tokens import (
     DIGITS,
 )
 from regex.simd_ops import (
-    SIMDStringSearch,
     CharacterClassSIMD,
     apply_quantifier_simd_generic,
     find_in_text_simd,
+    simd_search,
+    verify_match,
+    twoway_search,
 )
 from regex.simd_matchers import (
     analyze_character_class_pattern,
@@ -231,8 +233,6 @@ struct DFAEngine(Engine):
     """Whether the pattern starts with ^ anchor."""
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
-    var simd_string_search: Optional[SIMDStringSearch]
-    """SIMD-optimized string search for pure literal patterns."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
     var simd_char_matcher: Optional[CharacterClassSIMD]
@@ -248,7 +248,6 @@ struct DFAEngine(Engine):
         self.start_state = 0
         self.has_start_anchor = False
         self.has_end_anchor = False
-        self.simd_string_search = None
         self.is_pure_literal = False
         self.simd_char_matcher = None
         self.simd_char_pattern = ""
@@ -260,7 +259,6 @@ struct DFAEngine(Engine):
         self.start_state = other.start_state
         self.has_start_anchor = other.has_start_anchor
         self.has_end_anchor = other.has_end_anchor
-        self.simd_string_search = other.simd_string_search^
         self.is_pure_literal = other.is_pure_literal
         self.simd_char_matcher = other.simd_char_matcher^
         self.simd_char_pattern = other.simd_char_pattern^
@@ -295,7 +293,6 @@ struct DFAEngine(Engine):
         if not has_start_anchor and not has_end_anchor and len_pattern > 0:
             self.literal_pattern = pattern  # Store pattern to keep it alive
             self.is_pure_literal = True
-            self.simd_string_search = SIMDStringSearch(self)
             # Still create DFA states as fallback
 
         # Create states: one for each character + one final accepting state
@@ -1788,20 +1785,28 @@ struct DFAEngine(Engine):
             return None
 
         # Fast path for pure literal patterns using SIMD
-        if self.is_pure_literal and self.simd_string_search:
-            ref searcher = self.simd_string_search.value()
+        if self.is_pure_literal:
+            var pattern_len = self.get_pattern_len()
             if require_exact_position:
                 # For match_first, must match at exact position
-                if searcher.verify_match(text, start_pos):
-                    var match_len = searcher.pattern_length
-                    return Match(0, start_pos, start_pos + match_len, text)
+                if verify_match(
+                    self.get_pattern_ptr(),
+                    pattern_len,
+                    text,
+                    start_pos,
+                ):
+                    return Match(0, start_pos, start_pos + pattern_len, text)
                 return None
             else:
                 # For match_next, can search from position
-                var pos = searcher.search(text, start_pos)
+                var pos = simd_search(
+                    self.get_pattern_ptr(),
+                    pattern_len,
+                    text,
+                    start_pos,
+                )
                 if pos != -1:
-                    var match_len = searcher.pattern_length
-                    return Match(0, pos, pos + match_len, text)
+                    return Match(0, pos, pos + pattern_len, text)
                 return None
 
         # Try SIMD matching for simple character class patterns
