@@ -1703,22 +1703,16 @@ struct DFAEngine(Engine):
                     state.add_transition(char_code, to_state)
 
     @always_inline
-    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
-        """Get the regex pattern used by this Engine.
+    fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the pattern bytes.
 
         Returns:
-            The regex pattern as a string.
+            A contiguous slice pointing to the bytes owned by the pattern.
         """
-        return self.literal_pattern.unsafe_ptr()
-
-    @always_inline
-    fn get_pattern_len(self) -> Int:
-        """Get the length of the regex pattern used by this Engine.
-
-        Returns:
-            Length of the regex pattern string.
-        """
-        return len(self.literal_pattern)
+        return Span[Byte, __origin_of(self)](
+            ptr=self.literal_pattern.unsafe_ptr(),
+            length=self.literal_pattern.byte_length(),
+        )
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
@@ -1786,12 +1780,12 @@ struct DFAEngine(Engine):
 
         # Fast path for pure literal patterns using SIMD
         if self.is_pure_literal:
-            var pattern_len = self.get_pattern_len()
+            var pattern = self.get_pattern()
+            var pattern_len = len(pattern)
             if require_exact_position:
                 # For match_first, must match at exact position
                 if verify_match(
-                    self.get_pattern_ptr(),
-                    pattern_len,
+                    pattern,
                     text,
                     start_pos,
                 ):
@@ -1800,8 +1794,7 @@ struct DFAEngine(Engine):
             else:
                 # For match_next, can search from position
                 var pos = simd_search(
-                    self.get_pattern_ptr(),
-                    pattern_len,
+                    self.get_pattern(),
                     text,
                     start_pos,
                 )

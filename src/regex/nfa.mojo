@@ -107,20 +107,21 @@ struct NFAEngine(Copyable, Engine):
             self.regex = None
 
     @always_inline
-    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
-        """Get a pointer to the pattern string."""
-        if self.has_literal_optimization:
-            return self.literal_prefix.unsafe_ptr()
-        else:
-            return self.pattern.unsafe_ptr()
+    fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
+        """Returns a contiguous slice of the pattern bytes.
 
-    @always_inline
-    fn get_pattern_len(self) -> Int:
-        """Get the length of the pattern string."""
+        Returns:
+            A contiguous slice pointing to the bytes owned by the pattern.
+        """
         if self.has_literal_optimization:
-            return len(self.literal_prefix)
-        else:
-            return len(self.pattern)
+            return Span[Byte, __origin_of(self)](
+                ptr=self.literal_prefix.unsafe_ptr(),
+                length=self.literal_prefix.byte_length(),
+            )
+        return Span[Byte, __origin_of(self)](
+            ptr=self.pattern.unsafe_ptr(),
+            length=self.pattern.byte_length(),
+        )
 
     fn match_all(
         self,
@@ -172,8 +173,7 @@ struct NFAEngine(Copyable, Engine):
             while current_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.literal_prefix.unsafe_ptr(),
-                    len(self.literal_prefix),
+                    self.get_pattern(),
                     text,
                     current_pos,
                 )
@@ -338,8 +338,7 @@ struct NFAEngine(Copyable, Engine):
             while search_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.literal_prefix.unsafe_ptr(),
-                    len(self.literal_prefix),
+                    self.get_pattern(),
                     text,
                     search_pos,
                 )

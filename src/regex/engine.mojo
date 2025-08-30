@@ -2,21 +2,15 @@ from regex.matching import Match, MatchList
 
 
 trait Engine(Copyable, Movable):
-    fn get_pattern_ptr(self) -> UnsafePointer[Byte]:
-        """Get the regex pattern ptr used by this Engine.
-
-        Returns:
-            The regex pattern as a string pointer.
-        """
-        ...
-
-    fn get_pattern_len(self) -> Int:
-        """Get the length of the regex pattern used by this Engine.
-
-        Returns:
-            The length of the regex pattern.
-        """
-        ...
+    # Commented out because Mojo currently is not compiling, throwing error:
+    # cannot return 'self's origin, because it might expand to a @register_passable type
+    # fn get_pattern(self) -> Span[Byte, __origin_of(self)]:
+    #     """Returns a contiguous slice of the pattern bytes
+    #
+    #     Returns:
+    #         A contiguous slice pointing to the bytes owned by the pattern.
+    #     """
+    #     ...
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
