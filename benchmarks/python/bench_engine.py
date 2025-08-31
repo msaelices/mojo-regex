@@ -329,31 +329,31 @@ def main():
     print("|---------------------------|-----------------------|--------|")
 
     # ===== Literal Matching Benchmarks =====
-    benchmark_search("literal_match_short", "hello", text_1000, 2000)
-    benchmark_search("literal_match_long", "hello", text_10000, 2000)
+    benchmark_search("literal_match_short", "hello", text_1000, 20000)
+    benchmark_search("literal_match_long", "hello", text_10000, 20000)
 
     # ===== Wildcard and Quantifier Benchmarks =====
-    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
-    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
-    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
-    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
+    benchmark_match_first("wildcard_match_any", ".*", text_10000, 10000)
+    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 10000)
+    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 10000)
+    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 10000)
 
     # ===== Character Range Benchmarks =====
-    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
-    benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
-    benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
+    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 10000)
+    benchmark_search("range_digits", "[0-9]+", text_range_10000, 10000)
+    benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 10000)
 
     # ===== Predefined Character Class Benchmarks =====
-    benchmark_search("predefined_digits", r"\d+", text_range_10000, 1000)
-    benchmark_match_first("predefined_word", r"\w+", text_range_10000, 1000)
+    benchmark_search("predefined_digits", r"\d+", text_range_10000, 10000)
+    benchmark_match_first("predefined_word", r"\w+", text_range_10000, 10000)
 
     # ===== Anchor Benchmarks =====
-    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
-    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
+    benchmark_match_first("anchor_start", "^abc", text_10000, 20000)
+    benchmark_match_first("anchor_end", "xyz$", text_10000, 20000)
 
     # ===== Alternation Benchmarks =====
-    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
-    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
+    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 10000)
+    benchmark_match_first("group_alternation", "(a|b)", text_10000, 10000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
 
@@ -363,7 +363,7 @@ def main():
         "large_8_alternations",
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)",
         fruit_text,
-        1000,
+        10000,
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
@@ -372,7 +372,7 @@ def main():
         "deep_nested_groups_depth4",
         "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))",
         nested_text,
-        1000,
+        10000,
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
@@ -381,7 +381,7 @@ def main():
         "literal_heavy_alternation",
         "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
         user_text,
-        1000,
+        10000,
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
@@ -392,20 +392,20 @@ def main():
         "complex_group_5_children",
         "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}",
         mixed_text,
-        1000,
+        10000,
     )
 
     # ===== Global Matching (findall) =====
-    benchmark_findall("match_all_simple", "hello", medium_text, 200)
-    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 200)
+    benchmark_findall("match_all_simple", "hello", medium_text, 2000)
+    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 2000)
 
     # ===== Literal Optimization Benchmarks =====
-    benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
-    benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
-    benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 1)
-    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_findall("literal_prefix_short", "hello.*", short_text, 10)
+    benchmark_findall("literal_prefix_long", "hello.*", long_text, 10)
+    benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 10)
+    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 10)
     benchmark_match_first(
-        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
+        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 10
     )
 
     # ===== Complex Pattern Benchmarks =====
@@ -416,46 +416,46 @@ def main():
         "complex_email",
         "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
         complex_email_text,
-        40,
+        400,
     )
 
     complex_number_text = (
         "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
     )
-    benchmark_findall("complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500)
+    benchmark_findall("complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 5000)
 
     # ===== US Phone Number Benchmarks =====
     phone_text = make_phone_test_data(1000)
 
-    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
+    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 1000)
     benchmark_findall(
         "flexible_phone",
         "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
         phone_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "multi_format_phone",
         "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
         phone_text,
-        50,
+        500,
     )
     benchmark_match_first(
         "phone_validation",
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",
-        500,
+        5000,
     )
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
-    benchmark_findall("dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100)
+    benchmark_findall("dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 1000)
     benchmark_findall(
-        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 1000
     )
     benchmark_findall(
-        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 1000
     )
-    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 1000)
 
     # National Phone Number Validation (Complex Pattern)
     national_phone_text = make_complex_pattern_test_data(500)
@@ -475,7 +475,7 @@ def main():
         "national_phone_validation",
         national_phone_pattern,
         national_phone_text,
-        10,
+        100,
     )
 
     # ===== US Toll-Free Numbers Benchmarks =====
@@ -486,12 +486,12 @@ def main():
         * 100
     )
 
-    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
+    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 1000)
     benchmark_findall(
         "toll_free_complex",
         "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
         toll_free_text,
-        100,
+        1000,
     )
 
     # ===== Quantifier Parser Optimization Benchmarks =====
@@ -512,33 +512,33 @@ def main():
     ) * 75
 
     # Single quantifier patterns (baseline)
-    benchmark_findall("single_quantifier_digits", "[0-9]{4}", serial_number_text, 200)
-    benchmark_findall("single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200)
+    benchmark_findall("single_quantifier_digits", "[0-9]{4}", serial_number_text, 2000)
+    benchmark_findall("single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 2000)
 
     # Multiple quantifier patterns - these benefit most from the optimization
-    benchmark_findall("dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150)
+    benchmark_findall("dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 1500)
     benchmark_findall(
         "triple_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}",
         serial_number_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "quad_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{3}[0-9]{3}",
         serial_number_text,
-        100,
+        1000,
     )
 
     # Complex quantifier ranges {min,max} - stress test the parser optimization
     benchmark_findall(
-        "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 100
+        "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 1000
     )
     benchmark_findall(
         "mixed_range_quantifiers",
         "[A-Z]{1,3}-[0-9]{2,4}-[A-Z]{2,3}[0-9]{3,4}",
         serial_number_text,
-        75,
+        750,
     )
 
     # DateTime patterns with many quantifiers
@@ -546,13 +546,13 @@ def main():
         "datetime_quantifiers",
         "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}",
         datetime_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "flexible_datetime",
         "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}",
         datetime_text,
-        100,
+        1000,
     )
 
     # High quantifier density patterns - maximum parser stress
@@ -560,13 +560,13 @@ def main():
         "dense_quantifiers",
         "[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}",
         structured_data_text,
-        50,
+        500,
     )
     benchmark_findall(
         "ultra_dense_quantifiers",
         "[A-Z]{1,2}[0-9]{3,5}-[A-Z]{2,4}[0-9]{2,4}-[A-Z]{1,3}[0-9]{2,4}-[A-Z]{2,3}[0-9]{2,3}",
         structured_data_text,
-        25,
+        250,
     )
 
     # Nested quantifiers within groups
@@ -574,13 +574,13 @@ def main():
         "grouped_quantifiers",
         "([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})",
         serial_number_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "alternation_quantifiers",
         "([A-Z]{2,3}[0-9]{3,4})|([0-9]{4}-[A-Z]{3})",
         structured_data_text,
-        75,
+        750,
     )
 
     # Optimization test data for quantifier stress testing
@@ -591,31 +591,31 @@ def main():
 
     # Most significant optimization cases from analysis
     benchmark_findall(
-        "optimize_range_quantifier", r"a{2,4}", "aaaabbbbccccdddd" * 500, 1000
+        "optimize_range_quantifier", r"a{2,4}", "aaaabbbbccccdddd" * 500, 10000
     )
     benchmark_findall(
         "optimize_multiple_quantifiers",
         r"[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{2}",
         optimization_test_text,
-        200,
+        2000,
     )
     benchmark_findall(
         "optimize_phone_quantifiers",
         r"[0-9]{3}-[0-9]{3}-[0-9]{4}",
         "Call 555-123-4567 or 800-555-1234 or 900-876-5432 for help. " * 200,
-        300,
+        3000,
     )
     benchmark_findall(
         "optimize_large_quantifiers",
         r"[A-Z]{10,20}[0-9]{15,25}",
         "PREFIX" + "A" * 15 + "1" * 20 + "SUFFIX " * 50,
-        100,
+        1000,
     )
     benchmark_findall(
         "optimize_extreme_quantifiers",
         r"a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}",
         "abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR" * 20,
-        500,
+        5000,
     )
 
     print()  # End of benchmarks
