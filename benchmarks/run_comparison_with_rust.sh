@@ -79,7 +79,7 @@ echo ""
 echo "Step 2: Running Mojo regex benchmarks..."
 echo "----------------------------------------"
 # Capture Mojo output and parse it
-mojo run "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt" | python3 benchmarks/parse_mojo_output.py "$MOJO_RESULTS"
+mojo run -I src "benchmarks/${BENCHMARK_TYPE}.mojo" | tee "benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt" | python3 benchmarks/parse_mojo_output.py "$MOJO_RESULTS"
 
 # Show engine usage summary if available
 MOJO_OUTPUT="benchmarks/results/${OUTPUT_PREFIX}mojo_output.txt"
