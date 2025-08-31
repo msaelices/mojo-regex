@@ -14,7 +14,6 @@ from regex.parser import parse
 from regex.simd_ops import (
     twoway_search,
     CharacterClassSIMD,
-    get_simd_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
 )

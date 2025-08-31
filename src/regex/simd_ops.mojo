@@ -31,18 +31,8 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM_LOWER,
     SIMD_MATCHER_ALNUM_UPPER,
     SIMD_MATCHER_CUSTOM,
-)
-from regex.aliases import (
-    SIMD_MATCHER_NONE,
-    SIMD_MATCHER_WHITESPACE,
-    SIMD_MATCHER_DIGITS,
-    SIMD_MATCHER_ALPHA_LOWER,
-    SIMD_MATCHER_ALPHA_UPPER,
-    SIMD_MATCHER_ALPHA,
-    SIMD_MATCHER_ALNUM,
-    SIMD_MATCHER_ALNUM_LOWER,
-    SIMD_MATCHER_ALNUM_UPPER,
-    SIMD_MATCHER_CUSTOM,
+    SIMD_MATCHER_WORD_CHARS,
+    WORD_CHARS,
 )
 from regex.engine import Engine
 from regex.dfa import DFAEngine
@@ -439,6 +429,12 @@ fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
     return result
 
 
+@always_inline
+fn _create_word_chars() -> CharacterClassSIMD:
+    """Create SIMD matcher for word characters [a-zA-Z0-9_]."""
+    return CharacterClassSIMD(WORD_CHARS)
+
+
 fn _search_short_pattern(pattern: Span[Byte], text: String, start: Int) -> Int:
     """Optimized search for very short patterns (1-2 characters).
 
@@ -680,6 +676,8 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
             matcher = _create_ascii_alnum_lower()
         elif matcher_type == SIMD_MATCHER_ALNUM_UPPER:
             matcher = _create_ascii_alnum_upper()
+        elif matcher_type == SIMD_MATCHER_WORD_CHARS:
+            matcher = _create_word_chars()
         else:
             # Custom matcher, create empty one
             matcher = CharacterClassSIMD("")

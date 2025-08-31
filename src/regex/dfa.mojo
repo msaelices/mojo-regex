@@ -5,8 +5,8 @@ This module provides O(n) time complexity regex matching for simple patterns tha
 compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
-from regex.ast import ASTNode
-from regex.aliases import ALL_EXCEPT_NEWLINE
+from regex.ast import ASTNode, OR, GROUP, ELEMENT
+from regex.aliases import ALL_EXCEPT_NEWLINE, WORD_CHARS
 from regex.engine import Engine
 from regex.matching import Match, MatchList
 from regex.optimizer import (
@@ -24,7 +24,6 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
-from regex.aliases import WORD_CHARS
 from regex.simd_ops import (
     CharacterClassSIMD,
     apply_quantifier_simd_generic,
@@ -1463,8 +1462,6 @@ struct DFAEngine(Engine):
     ):
         """Extract all string branches from alternation for quantified groups.
         """
-        from regex.ast import OR, GROUP, ELEMENT
-
         if node.type == OR:
             # Get left and right children
             ref left_child = node.get_child(0)
