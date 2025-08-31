@@ -32,6 +32,7 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM_UPPER,
     SIMD_MATCHER_CUSTOM,
     SIMD_MATCHER_WORD_CHARS,
+    DIGITS,
     WORD_CHARS,
 )
 from regex.engine import Engine
@@ -683,6 +684,48 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
             matcher = CharacterClassSIMD("")
         matchers_ptr[][matcher_type] = matcher
         return matcher
+
+
+@always_inline
+fn get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
+    """Get optimal cached matcher for character class string.
+
+    This function detects common character class patterns and returns
+    cached matchers to avoid repeated allocations.
+
+    Args:
+        char_class: Character class string (e.g., "0123456789", "[a-z]").
+
+    Returns:
+        Cached CharacterClassSIMD matcher if pattern is recognized,
+        otherwise creates new matcher instance.
+    """
+    # Most common patterns - use cached SIMD matchers
+    if char_class == DIGITS:
+        return get_simd_matcher(SIMD_MATCHER_DIGITS)
+    elif char_class == WORD_CHARS:
+        return get_simd_matcher(SIMD_MATCHER_WORD_CHARS)
+    elif char_class == " \t\n\r\f":  # Common whitespace pattern
+        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+    elif char_class == " \t\n\r\f\v":  # Extended whitespace with vertical tab
+        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+    elif char_class == "abcdefghijklmnopqrstuvwxyz":  # [a-z]
+        return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
+    elif char_class == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":  # [A-Z]
+        return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
+    elif (
+        char_class == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    ):  # [a-zA-Z]
+        return get_simd_matcher(SIMD_MATCHER_ALPHA)
+    elif (
+        char_class
+        == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    ):  # [a-zA-Z0-9]
+        return get_simd_matcher(SIMD_MATCHER_ALNUM)
+    else:
+        # Custom character class - create new matcher instance
+        # These are not cached as they can be arbitrary patterns
+        return CharacterClassSIMD(char_class)
 
 
 fn process_text_with_matcher[

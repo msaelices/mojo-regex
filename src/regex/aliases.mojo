@@ -58,3 +58,9 @@ alias SIMD_MATCHER_WORD_CHARS = 11
 alias SIMD_MATCHER_NON_WORD_CHARS = 12
 alias SIMD_MATCHER_PUNCT = 13
 alias SIMD_MATCHER_CONTROL = 14
+
+# Additional cache keys for specialized matchers to avoid allocations
+alias SIMD_MATCHER_RANGE_DIGIT = 15
+alias SIMD_MATCHER_RANGE_ALPHA = 16
+alias SIMD_MATCHER_RANGE_ALNUM = 17
+alias SIMD_MATCHER_NIBBLE_WHITESPACE = 18

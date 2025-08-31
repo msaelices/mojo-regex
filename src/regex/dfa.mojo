@@ -37,6 +37,7 @@ from regex.tokens import (
 )
 from regex.simd_ops import (
     CharacterClassSIMD,
+    get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
     simd_search,
@@ -363,7 +364,7 @@ struct DFAEngine(Engine):
         """
         # Try to use SIMD optimization for simple character class patterns
         if min_matches >= 0 and positive_logic:
-            self.simd_char_matcher = CharacterClassSIMD(char_class)
+            self.simd_char_matcher = get_character_class_matcher(char_class)
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -1613,7 +1614,7 @@ struct DFAEngine(Engine):
             and sequence_info.elements[0].min_matches >= 1
             and digit_elements * 2 >= total_elements
         ):
-            self.simd_char_matcher = CharacterClassSIMD(DIGITS)
+            self.simd_char_matcher = get_character_class_matcher(DIGITS)
 
     @always_inline
     fn _add_character_class_transitions(
