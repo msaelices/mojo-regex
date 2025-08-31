@@ -1,6 +1,6 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode
+from regex.ast import ASTNode, DIGIT, WORD, SPACE
 from regex.aliases import (
     CHAR_ZERO,
     CHAR_NINE,
@@ -23,6 +23,7 @@ from regex.simd_matchers import (
     get_whitespace_matcher,
     get_alpha_matcher,
     get_alnum_matcher,
+    get_word_matcher,
     RangeBasedMatcher,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
@@ -507,6 +508,7 @@ struct NFAEngine(Copyable, Engine):
             WILDCARD,
             SPACE,
             DIGIT,
+            WORD,
             RANGE,
             START,
             END,
@@ -531,6 +533,10 @@ struct NFAEngine(Copyable, Engine):
             )
         elif ast.type == DIGIT:
             return self._match_digit(
+                ast, str, str_i, match_first_mode, required_start_pos
+            )
+        elif ast.type == WORD:
+            return self._match_word(
                 ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == RANGE:
@@ -647,7 +653,15 @@ struct NFAEngine(Copyable, Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
         if str_i >= len(str):
-            return (False, str_i)
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
         # Use specialized SIMD digit matcher for better performance
         var digit_matcher = get_digit_matcher()
@@ -657,7 +671,54 @@ struct NFAEngine(Copyable, Engine):
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
-            return (False, str_i)
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
+
+    @always_inline
+    fn _match_word(
+        self,
+        ast: ASTNode,
+        str: String,
+        str_i: Int,
+        match_first_mode: Bool,
+        required_start_pos: Int,
+    ) capturing -> Tuple[Bool, Int]:
+        """Match word character (\\w)."""
+        if str_i >= len(str):
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
+
+        # Use specialized SIMD word matcher for better performance
+        var word_matcher = get_word_matcher()
+        var ch_code = ord(str[str_i])
+        if word_matcher.contains(ch_code):
+            return self._apply_quantifier(
+                ast, str, str_i, 1, match_first_mode, required_start_pos
+            )
+        else:
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
     @always_inline
     fn _match_range(
@@ -1169,7 +1230,7 @@ struct NFAEngine(Copyable, Engine):
         Returns:
             Tuple of (success, final_position).
         """
-        from regex.ast import DIGIT, SPACE, RANGE
+        from regex.ast import DIGIT, SPACE, WORD, RANGE
 
         # Use specialized matchers for better performance
         if ast.type == DIGIT:
@@ -1181,6 +1242,11 @@ struct NFAEngine(Copyable, Engine):
             var whitespace_matcher = get_whitespace_matcher()
             return apply_quantifier_simd_generic(
                 whitespace_matcher, str, str_i, min_matches, max_matches
+            )
+        elif ast.type == WORD:
+            var word_matcher = get_word_matcher()
+            return apply_quantifier_simd_generic(
+                word_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
             ref range_pattern = String(ast.get_value().value())

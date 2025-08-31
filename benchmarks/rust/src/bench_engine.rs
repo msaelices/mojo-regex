@@ -77,6 +77,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "range_alphanumeric", &patterns.range_alnum, &text_range_10000, 1000, BenchType::IsMatch);  // Updated text size and iterations (50->1000)
 
     // ===-----------------------------------------------------------------------===
+    // Predefined Character Class Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== Predefined Character Class Benchmarks ===");
+
+    run_benchmark(&timer, &mut all_results, "predefined_digits", &patterns.predefined_digits, &text_range_10000, 1000, BenchType::Search);
+    run_benchmark(&timer, &mut all_results, "predefined_word", &patterns.predefined_word, &text_range_10000, 1000, BenchType::IsMatch);
+
+    // ===-----------------------------------------------------------------------===
     // Anchor Benchmarks
     // ===-----------------------------------------------------------------------===
     println!("=== Anchor Benchmarks ===");
@@ -320,6 +328,9 @@ struct CompiledPatterns {
     optimize_phone_quantifiers: Regex,
     optimize_large_quantifiers: Regex,
     optimize_extreme_quantifiers: Regex,
+    // Predefined character classes
+    predefined_digits: Regex,
+    predefined_word: Regex,
 }
 
 fn make_phone_test_data(num_phones: usize) -> String {
@@ -434,6 +445,9 @@ fn create_all_patterns() -> Result<CompiledPatterns, Box<dyn std::error::Error>>
         optimize_phone_quantifiers: Regex::new(r"[0-9]{3}-[0-9]{3}-[0-9]{4}")?,
         optimize_large_quantifiers: Regex::new(r"[A-Z]{10,20}[0-9]{15,25}")?,
         optimize_extreme_quantifiers: Regex::new(r"a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}")?,
+        // Predefined character classes
+        predefined_digits: Regex::new(r"\d+")?,
+        predefined_word: Regex::new(r"\w+")?,
     })
 }
 

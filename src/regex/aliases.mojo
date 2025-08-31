@@ -4,10 +4,12 @@ fn _all_except_newline() -> String:
 
 
 alias DIGITS: String = "0123456789"
+alias WORD_CHARS: String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 alias CHAR_LIT_SPACE = ord("s")
 alias CHAR_LIT_TAB = ord("t")
 alias CHAR_TAB = ord("\t")
 alias CHAR_DIGIT = ord("d")
+alias CHAR_WORD = ord("w")
 alias CHAR_COLON = ord(":")
 alias CHAR_DOT = ord(".")
 alias CHAR_SLASH = ord("\\")

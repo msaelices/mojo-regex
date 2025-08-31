@@ -16,6 +16,7 @@ from regex.ast import (
     WILDCARD,
     SPACE,
     DIGIT,
+    WORD,
     RANGE,
     START,
     END,
@@ -218,7 +219,7 @@ struct PatternAnalyzer:
             return False
 
         ref child = ast.get_child(0)
-        if child.type in (RANGE, DIGIT, SPACE):
+        if child.type in (RANGE, DIGIT, WORD, SPACE):
             # Check if it has a quantifier
             return child.min != 1 or child.max != 1
 
@@ -243,7 +244,12 @@ struct PatternAnalyzer:
         """Count nodes that benefit from SIMD optimization."""
         var count = 0
 
-        if ast.type == RANGE or ast.type == DIGIT or ast.type == SPACE:
+        if (
+            ast.type == RANGE
+            or ast.type == DIGIT
+            or ast.type == WORD
+            or ast.type == SPACE
+        ):
             # Character classes benefit from SIMD
             if ast.min > 1 or ast.max == -1:  # Repeated character classes
                 count += 2  # Extra benefit for repetition
@@ -290,8 +296,12 @@ struct PatternAnalyzer:
             return self._classify_quantifier(ast)
 
         elif ast.type == DIGIT:
-            # Digit (\d) - simple with basic quantifiers
-            return self._classify_quantifier(ast)
+            # Digit (\d) - route to NFA for complete implementation
+            return PatternComplexity(PatternComplexity.COMPLEX)
+
+        elif ast.type == WORD:
+            # Word (\w) - route to NFA for complete implementation
+            return PatternComplexity(PatternComplexity.COMPLEX)
 
         elif ast.type == RANGE:
             # Character class [a-z] - simple with basic quantifiers, optimized by DFA+SIMD
@@ -497,6 +507,7 @@ struct PatternAnalyzer:
             if (
                 element.type == RANGE
                 or element.type == DIGIT
+                or element.type == WORD
                 or element.type == SPACE
                 or element.type == WILDCARD
             ):
@@ -730,7 +741,7 @@ struct PatternAnalyzer:
         if ast.type == ELEMENT:
             # Simple literal characters are always DFA-compatible
             return True
-        elif ast.type in (RANGE, DIGIT, SPACE):
+        elif ast.type in (RANGE, DIGIT, WORD, SPACE):
             # Character classes are DFA-compatible
             return True
         elif ast.type == GROUP:
@@ -760,7 +771,7 @@ struct PatternAnalyzer:
         Returns:
             True if node is DFA-friendly
         """
-        if ast.type in (ELEMENT, RANGE, DIGIT, SPACE, WILDCARD):
+        if ast.type in (ELEMENT, RANGE, DIGIT, WORD, SPACE, WILDCARD):
             # Basic literal and character class nodes
             return (
                 ast.max <= 10 or ast.max == -1

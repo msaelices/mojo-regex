@@ -4,6 +4,7 @@ from regex.aliases import (
     CHAR_COMMA,
     CHAR_DASH,
     CHAR_DIGIT,
+    CHAR_WORD,
     CHAR_DOT,
     CHAR_END,
     CHAR_LEFT_BRACKET,
@@ -48,6 +49,7 @@ from regex.tokens import (
     ElementToken,
     SpaceToken,
     DigitToken,
+    WordToken,
 )
 
 
@@ -84,6 +86,10 @@ fn scan(regex: String) raises -> List[Token]:
                 tokens.append(token)
             elif ch_codepoint == CHAR_DIGIT:
                 var token = DigitToken(char=ch_codepoint)
+                token.start_pos = i - 1  # -1 because escape char is at i-1
+                tokens.append(token)
+            elif ch_codepoint == CHAR_WORD:
+                var token = WordToken(char=ch_codepoint)
                 token.start_pos = i - 1  # -1 because escape char is at i-1
                 tokens.append(token)
             else:

@@ -29,6 +29,7 @@ from regex.ast import (
     WildcardElement,
     SpaceElement,
     DigitElement,
+    WordElement,
     RangeElement,
     StartElement,
     EndElement,
@@ -39,6 +40,7 @@ from regex.ast import (
     WILDCARD,
     SPACE,
     DIGIT,
+    WORD,
     RANGE,
     START,
     END,
@@ -275,6 +277,17 @@ fn parse_token_list[
                 + 2,  # Digit tokens like \d are 2 characters
             )
             # Check for quantifiers after the digit
+            if i + 1 < len(tokens):
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
+        elif token.type == Token.WORD:
+            var elem = WordElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Word tokens like \w are 2 characters
+            )
+            # Check for quantifiers after the word
             if i + 1 < len(tokens):
                 check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)

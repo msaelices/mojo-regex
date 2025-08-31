@@ -3,7 +3,7 @@ from builtin._location import __call_location
 from memory import UnsafePointer
 from os import abort
 
-from regex.aliases import CHAR_ZERO, CHAR_NINE
+from regex.aliases import CHAR_ZERO, CHAR_NINE, WORD_CHARS
 
 
 alias RE = 0
@@ -11,28 +11,29 @@ alias ELEMENT = 1
 alias WILDCARD = 2
 alias SPACE = 3
 alias DIGIT = 4
-alias RANGE = 5
-alias START = 6
-alias END = 7
-alias OR = 8
-alias NOT = 9
-alias GROUP = 10
+alias WORD = 5
+alias RANGE = 6
+alias START = 7
+alias END = 8
+alias OR = 9
+alias NOT = 10
+alias GROUP = 11
 
 alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
     ELEMENT,
     WILDCARD,
     SPACE,
     DIGIT,
+    WORD,
     RANGE,
     START,
     END,
-    -1,  # sentinel to pad to 8 elements
 ]
 alias SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
     SPACE,
     DIGIT,
+    WORD,
     RANGE,
-    -1,  # sentinel to pad to 4 elements
 ]
 
 alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
@@ -388,6 +389,10 @@ struct ASTNode[regex_origin: ImmutableOrigin](
                 var ch_code = ord(value)
                 return CHAR_ZERO <= ch_code <= CHAR_NINE
             return False
+        elif self.type == WORD:
+            if len(value) == 1:
+                return value in WORD_CHARS
+            return False
         elif self.type == RANGE:
             # For range elements, use XNOR logic for positive/negative matching
             var ch_found = False
@@ -557,6 +562,28 @@ fn DigitElement[
     ]()
     return ASTNode[regex_origin](
         type=DIGIT,
+        regex_ptr=regex_ptr,
+        start_idx=start_idx,
+        end_idx=end_idx,
+        min=1,
+        max=1,
+    )
+
+
+@always_inline
+fn WordElement[
+    regex_origin: ImmutableOrigin,
+](
+    ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
+    start_idx: Int,
+    end_idx: Int,
+) -> ASTNode[regex_origin]:
+    """Create a WordElement node."""
+    var regex_ptr = UnsafePointer(to=regex).origin_cast[
+        mut=False, origin=ImmutableAnyOrigin
+    ]()
+    return ASTNode[regex_origin](
+        type=WORD,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
         end_idx=end_idx,

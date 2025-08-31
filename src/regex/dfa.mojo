@@ -24,6 +24,7 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
+from regex.aliases import WORD_CHARS
 from regex.simd_ops import (
     CharacterClassSIMD,
     apply_quantifier_simd_generic,
@@ -39,6 +40,7 @@ from regex.simd_matchers import (
     get_alnum_matcher,
     get_whitespace_matcher,
     get_hex_digit_matcher,
+    get_word_matcher,
     RangeBasedMatcher,
     NibbleBasedMatcher,
 )
@@ -79,6 +81,9 @@ fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
     elif range_str == "[a-zA-Z]":
         # Common pattern for letters only
         return ALL_LETTERS
+    elif range_str == "\\w":
+        # Word character pattern
+        return WORD_CHARS
 
     # Extract the inner part: [a-z] -> a-z
     var inner = range_str[1:-1]
@@ -2306,7 +2311,7 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     Returns:
         True if pattern is a simple character class pattern.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP
+    from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
     # First check if it's a multi-character sequence - if so, not simple
     if _is_multi_character_class_sequence(ast):
@@ -2314,13 +2319,15 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
     if ast.type == RE and ast.get_children_len() == 1:
         ref child = ast.get_child(0)
-        if child.type == DIGIT or child.type == RANGE:
+        if child.type == DIGIT or child.type == WORD or child.type == RANGE:
             return True
         elif child.type == GROUP and child.get_children_len() == 1:
             # Check if group contains single digit or range element
             ref inner = child.get_child(0)
-            return inner.type == DIGIT or inner.type == RANGE
-    elif ast.type == DIGIT or ast.type == RANGE:
+            return (
+                inner.type == DIGIT or inner.type == WORD or inner.type == RANGE
+            )
+    elif ast.type == DIGIT or ast.type == WORD or ast.type == RANGE:
         return True
 
     return False
@@ -2339,7 +2346,7 @@ fn _extract_character_class_info(
     Returns:
         Tuple of (char_class_string, min_matches, max_matches, has_start_anchor, has_end_anchor, positive_logic).
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP
+    from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
     var char_class: Optional[StringSlice[ImmutableAnyOrigin]] = None
     var min_matches = 1
@@ -2348,13 +2355,17 @@ fn _extract_character_class_info(
     var has_end = False
     var positive_logic = True
 
-    # Find the character class node (DIGIT or RANGE)
+    # Find the character class node (DIGIT, WORD, or RANGE)
     var class_node: ASTNode[ImmutableAnyOrigin]
-    if ast.type == DIGIT or ast.type == RANGE:
+    if ast.type == DIGIT or ast.type == WORD or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
         ref ast_child = ast.get_child(0)
-        if ast_child.type == DIGIT or ast_child.type == RANGE:
+        if (
+            ast_child.type == DIGIT
+            or ast_child.type == WORD
+            or ast_child.type == RANGE
+        ):
             class_node = ast_child
         elif ast_child.type == GROUP and ast_child.get_children_len() == 1:
             class_node = ast_child.get_child(0)
@@ -2371,6 +2382,12 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
+        char_class = class_node.get_value()
+    elif class_node.type == WORD:
+        min_matches = class_node.min
+        max_matches = class_node.max
+        positive_logic = class_node.positive_logic
+        # Generate word character class string
         char_class = class_node.get_value()
     elif class_node.type == RANGE:
         min_matches = class_node.min
@@ -2427,7 +2444,7 @@ fn _is_sequential_character_class_pattern(
     Returns:
         True if pattern is a sequence like [+]*\\d+[-]*\\d+.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP
+    from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
     if ast.type != RE or ast.get_children_len() != 1:
         return False
@@ -2436,10 +2453,14 @@ fn _is_sequential_character_class_pattern(
     if child.type != GROUP:
         return False
 
-    # Check if all children are character classes (RANGE or DIGIT)
+    # Check if all children are character classes (RANGE, DIGIT, or WORD)
     for i in range(child.get_children_len()):
         ref element = child.get_child(i)
-        if element.type != RANGE and element.type != DIGIT:
+        if (
+            element.type != RANGE
+            and element.type != DIGIT
+            and element.type != WORD
+        ):
             return False
 
     # Must have at least 2 elements to be considered sequential
@@ -2457,7 +2478,7 @@ fn _extract_sequential_pattern_info(
     Returns:
         SequentialPatternInfo with details about each element.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP
+    from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
     var info = SequentialPatternInfo()
 
@@ -2474,6 +2495,8 @@ fn _extract_sequential_pattern_info(
 
                 if element.type == DIGIT:
                     char_class = DIGITS
+                elif element.type == WORD:
+                    char_class = WORD_CHARS
                 elif element.type == RANGE:
                     char_class = expand_character_range(
                         element.get_value().value()
@@ -2500,7 +2523,16 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     Returns:
         True if pattern is a multi-character class sequence.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
+    from regex.ast import (
+        RE,
+        DIGIT,
+        WORD,
+        RANGE,
+        GROUP,
+        SPACE,
+        WILDCARD,
+        ELEMENT,
+    )
 
     if ast.type != RE or ast.get_children_len() != 1:
         return False
@@ -2522,6 +2554,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
         if (
             element.type == RANGE
             or element.type == DIGIT
+            or element.type == WORD
             or element.type == SPACE
         ):
             char_class_count += 1
@@ -2551,7 +2584,16 @@ fn _extract_multi_class_sequence_info(
     Returns:
         SequentialPatternInfo with details about each character class element.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, SPACE, WILDCARD, ELEMENT
+    from regex.ast import (
+        RE,
+        DIGIT,
+        WORD,
+        RANGE,
+        GROUP,
+        SPACE,
+        WILDCARD,
+        ELEMENT,
+    )
 
     var info = SequentialPatternInfo()
 
@@ -2568,6 +2610,8 @@ fn _extract_multi_class_sequence_info(
 
                 if element.type == DIGIT:
                     char_class = "0123456789"
+                elif element.type == WORD:
+                    char_class = WORD_CHARS
                 elif element.type == RANGE:
                     char_class = expand_character_range(
                         element.get_value().value()
@@ -2607,7 +2651,7 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     Returns:
         True if pattern is a mixed sequential pattern.
     """
-    from regex.ast import RE, DIGIT, RANGE, GROUP, ELEMENT
+    from regex.ast import RE, DIGIT, WORD, RANGE, GROUP, ELEMENT
 
     if ast.type != RE or ast.get_children_len() != 1:
         return False
@@ -2626,7 +2670,11 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     for i in range(child.get_children_len()):
         ref element = child.get_child(i)
 
-        if element.type == RANGE or element.type == DIGIT:
+        if (
+            element.type == RANGE
+            or element.type == DIGIT
+            or element.type == WORD
+        ):
             has_char_class = True
         elif element.type == ELEMENT:
             # Check if it's an optional literal (min=0, max=1)

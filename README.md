@@ -16,6 +16,8 @@ This software is in an early stage of development. Even though it is functional,
 - ✅ Literal characters (`a`, `hello`)
 - ✅ Wildcard (`.`) - matches any character except newline
 - ✅ Whitespace (`\s`) - matches space, tab, newline, carriage return, form feed
+- ✅ Digits (`\d`) - matches ASCII digits 0-9
+- ✅ Word characters (`\w`) - matches letters, digits, and underscore [a-zA-Z0-9_]
 - ✅ Escape sequences (`\t` for tab, `\\` for literal backslash)
 
 ### Character Classes
@@ -87,10 +89,15 @@ result = match_first(".*@.*", "user@domain.com")
 if result:
     print("Email found")
 
-# Find all numbers in text
-var numbers = findall("[0-9]+", "Price: $123, Quantity: 456, Total: $579")
+# Find all numbers in text using predefined digit class
+var numbers = findall("\\d+", "Price: $123, Quantity: 456, Total: $579")
 for i in range(len(numbers)):
     print("Number found:", numbers[i].get_match_text())
+
+# Find all word identifiers
+var words = findall("\\w+", "variable_name123 and another_var")
+for i in range(len(words)):
+    print("Word found:", words[i].get_match_text())
 
 # Character ranges
 result = match_first("[a-z]+", "hello123")
@@ -112,15 +119,20 @@ result = match_first("^https?://", "https://example.com")
 if result:
     print("Valid URL")
 
-# Complex patterns
-result = match_first("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$", "user@example.com")
+# Complex patterns using predefined character classes
+result = match_first("^\\w+@\\w+\\.\\w+$", "user@example.com")
 if result:
     print("Valid email format")
 
 # Find all email addresses in text
-var emails = findall("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}", "Contact john@example.com or mary@test.org")
+var emails = findall("\\w+@\\w+\\.\\w+", "Contact john@example.com or mary@test.org")
 for i in range(len(emails)):
     print("Email found:", emails[i].get_match_text())
+
+# Validate identifiers (programming variable names)
+result = match_first("^[a-zA-Z_]\\w*$", "_private_var123")
+if result:
+    print("Valid identifier")
 
 # === OPTIMIZATION SHOWCASE EXAMPLES ===
 # These patterns now benefit from DFA optimization!
@@ -170,7 +182,7 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 |--------------|-------------|-----------------|-------------------|---------|
 | **Literal strings** | DFA + SIMD | O(n/w) | String search vectorization | `"hello"`, `"example.com"` |
 | **Character classes** | DFA + SIMD | O(n/w) | Lookup table vectorization | `"[a-z]+"`, `"[0-9]+"` |
-| **Built-in classes** | DFA/NFA + SIMD | O(n/w) | Pre-built SIMD matchers | `"\d+"`, `"\s+"` |
+| **Built-in classes** | NFA + SIMD | O(n/w) | Pre-built SIMD matchers | `"\d+"`, `"\w+"`, `"\s+"` |
 | **Simple quantifiers** | DFA + SIMD | O(n/w) | Vectorized counting | `"a*"`, `"[0-9]{3}"` |
 | **Anchors** | DFA | O(1) | Position validation | `"^start"`, `"end$"` |
 | **Basic groups** | DFA/NFA + SIMD | O(n) to O(nm) | Partial vectorization | `"(abc)+"`, `"([a-z]+)"` |
@@ -212,9 +224,10 @@ mojo test -I src/ tests/test_simd_integration.mojo
 - [x] SIMD-accelerated literal string search
 - [x] SIMD capability detection and automatic routing
 - [x] Vectorized quantifier processing for character classes
+- [x] Predefined character classes (`\d`, `\w`) - digits and word characters with full quantifier support
+- [ ] Remaining predefined character classes (`\s`, `\S`, `\D`, `\W`) - negated and space variants
 - [ ] Non-capturing groups (`(?:...)`)
 - [ ] Named groups (`(?<name>...)` or `(?P<name>...)`)
-- [ ] Predefined character classes (`\d`, `\w`, `\S`, `\D`, `\W`)
 - [ ] Case insensitive matching options
 - [ ] Match replacement (`sub()`, `gsub()`)
 - [ ] String splitting (`split()`)

@@ -1316,3 +1316,100 @@ def test_regex_corruption_issue_39():
     assert_true(
         corrupted_match.__bool__(), "'hello' pattern should work after sequence"
     )
+
+
+def test_match_digit_basic():
+    """Test basic \\d digit matching."""
+    var result = match_first("\\d", "5")
+    assert_true(result)
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 1)
+    assert_equal(matched.get_match_text(), "5")
+
+
+def test_match_digit_not_match_letter():
+    """Test \\d should not match letters."""
+    var result = match_first("\\d", "a")
+    assert_true(not result)
+
+
+def test_match_digit_quantifier_plus():
+    """Test \\d+ matching multiple digits."""
+    var result = match_first("\\d+", "12345")
+    assert_true(result)
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 5)
+    assert_equal(matched.get_match_text(), "12345")
+
+
+def test_match_digit_quantifier_star():
+    """Test \\d* matching optional digits."""
+    var result1 = match_first("\\d*", "123")
+    assert_true(result1)
+    var matched1 = result1.value()
+    assert_equal(matched1.get_match_text(), "123")
+
+    var result2 = match_first("\\d*", "abc")
+    assert_true(result2)
+    var matched2 = result2.value()
+    assert_equal(matched2.get_match_text(), "")
+
+
+def test_match_word_basic():
+    """Test basic \\w word character matching."""
+    var result1 = match_first("\\w", "a")
+    assert_true(result1)
+    var matched1 = result1.value()
+    assert_equal(matched1.get_match_text(), "a")
+
+    var result2 = match_first("\\w", "Z")
+    assert_true(result2)
+    var matched2 = result2.value()
+    assert_equal(matched2.get_match_text(), "Z")
+
+    var result3 = match_first("\\w", "5")
+    assert_true(result3)
+    var matched3 = result3.value()
+    assert_equal(matched3.get_match_text(), "5")
+
+    var result4 = match_first("\\w", "_")
+    assert_true(result4)
+    var matched4 = result4.value()
+    assert_equal(matched4.get_match_text(), "_")
+
+
+def test_match_word_not_match_special():
+    """Test \\w should not match special characters."""
+    var result1 = match_first("\\w", "@")
+    assert_true(not result1)
+
+    var result2 = match_first("\\w", " ")
+    assert_true(not result2)
+
+    var result3 = match_first("\\w", "-")
+    assert_true(not result3)
+
+
+def test_match_word_quantifier_plus():
+    """Test \\w+ matching multiple word characters."""
+    var result = match_first("\\w+", "hello123_world")
+    assert_true(result)
+    var matched = result.value()
+    assert_equal(matched.start_idx, 0)
+    assert_equal(matched.end_idx, 14)
+    assert_equal(matched.get_match_text(), "hello123_world")
+
+
+def test_match_word_quantifier_star():
+    """Test \\w* matching optional word characters."""
+    var result1 = match_first("\\w*", "abc123")
+    assert_true(result1)
+    var matched1 = result1.value()
+    assert_equal(matched1.get_match_text(), "abc123")
+
+    var result2 = match_first("\\w*", "@#$")
+    assert_true(result2)
+    var matched2 = result2.value()
+    assert_equal(matched2.get_match_text(), "")
