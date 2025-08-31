@@ -241,8 +241,6 @@ struct DFAEngine(Engine):
     """Whether this is a pure literal pattern (no regex operators)."""
     var simd_char_matcher: Optional[CharacterClassSIMD]
     """SIMD-optimized character class matcher for simple patterns."""
-    var simd_char_pattern: String
-    """The character class pattern being matched with SIMD."""
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
@@ -254,7 +252,6 @@ struct DFAEngine(Engine):
         self.has_end_anchor = False
         self.is_pure_literal = False
         self.simd_char_matcher = None
-        self.simd_char_pattern = ""
         self.literal_pattern = ""
 
     fn __moveinit__(out self, deinit other: Self):
@@ -265,7 +262,6 @@ struct DFAEngine(Engine):
         self.has_end_anchor = other.has_end_anchor
         self.is_pure_literal = other.is_pure_literal
         self.simd_char_matcher = other.simd_char_matcher^
-        self.simd_char_pattern = other.simd_char_pattern^
         self.literal_pattern = other.literal_pattern^
 
     fn compile_pattern(
@@ -344,40 +340,7 @@ struct DFAEngine(Engine):
         """
         # Try to use SIMD optimization for simple character class patterns
         if min_matches >= 0 and positive_logic:
-            # Check if this is a pattern we can optimize with SIMD
-            var pattern_str = String()
-            if char_class == DIGITS or char_class == "0123456789":
-                pattern_str = "[0-9]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_digit_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == LOWERCASE_LETTERS:
-                pattern_str = "[a-z]"
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == UPPERCASE_LETTERS:
-                pattern_str = "[A-Z]"
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == ALL_LETTERS:
-                pattern_str = "[a-zA-Z]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_alpha_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == ALPHANUMERIC:
-                pattern_str = "[a-zA-Z0-9]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_alnum_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == " \t\n\r\f\v":
-                pattern_str = "\\s"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use _create_whitespace_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            else:
-                # For other patterns, use standard CharacterClassSIMD
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-
-            if pattern_str:
-                self.simd_char_pattern = pattern_str
+            self.simd_char_matcher = CharacterClassSIMD(char_class)
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -1628,7 +1591,6 @@ struct DFAEngine(Engine):
             and digit_elements * 2 >= total_elements
         ):
             self.simd_char_matcher = CharacterClassSIMD(DIGITS)
-            self.simd_char_pattern = "[0-9]"
 
     @always_inline
     fn _add_character_class_transitions(
