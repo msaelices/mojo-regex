@@ -72,7 +72,7 @@ fn _expand_character_range(
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
     Args:
-        node: AST node for fast type-based optimization.
+        node_type: AST node type for fast type-based optimization.
         range_str: Range string like '[a-z]' or '[0-9]' or 'abcd'.
 
     Returns:
