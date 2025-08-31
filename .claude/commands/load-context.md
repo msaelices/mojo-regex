@@ -3,9 +3,8 @@
 * Read the pixi.toml file.
 * Read the docs/*.md documents.
 * Read the tools/*.sh scripts.
-* Read the benchmarks/*.mojo and benchmarks/python/*.py and benchmarks/rust/*.rs files.
+* Read the benchmarks/bench_engine.mojo and benchmarks/python/bench_engine.py and benchmarks/rust/bench_engine.rs files.
 * Read the src/regex/*.mojo files.
-* Read the tests/test_matcher.mojo file.
-* Read the playground/*.mojo files.
+* List the tests/ tree.
 
 Notes: for testing the implementation, place the files in the playground/ directory
