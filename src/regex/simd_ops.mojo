@@ -131,7 +131,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             return self.lookup_table[char_code] == 1
         return False
 
-    fn find_first_match(self, text: String, start: Int = 0) -> Int:
+    fn find_first_match(self, text: StringSlice, start: Int = 0) -> Int:
         """Find first character in text that matches this class using SIMD.
 
         Args:
@@ -275,7 +275,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         return count
 
     fn _check_chunk_simd(
-        self, text: String, pos: Int
+        self, text: StringSlice, pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations.
 
