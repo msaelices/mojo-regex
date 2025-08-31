@@ -292,42 +292,42 @@ fn main() raises:
     print("|---------------------------|-----------------------|--------|")
 
     # ===== Literal Matching Benchmarks =====
-    benchmark_search("literal_match_short", "hello", text_1000, 2000)
+    benchmark_search("literal_match_short", "hello", text_1000, 20000)
 
-    benchmark_search("literal_match_long", "hello", text_10000, 2000)
+    benchmark_search("literal_match_long", "hello", text_10000, 20000)
 
     # ===== Wildcard and Quantifier Benchmarks =====
-    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
+    benchmark_match_first("wildcard_match_any", ".*", text_10000, 10000)
 
-    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
+    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 10000)
 
-    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
+    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 10000)
 
-    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
+    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 10000)
 
     # ===== Character Range Benchmarks =====
-    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 10000)
 
-    benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
+    benchmark_search("range_digits", "[0-9]+", text_range_10000, 10000)
 
     benchmark_match_first(
-        "range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
+        "range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 10000
     )
 
     # ===== Predefined Character Class Benchmarks =====
-    benchmark_search("predefined_digits", "\\d+", text_range_10000, 1000)
+    benchmark_search("predefined_digits", "\\d+", text_range_10000, 10000)
 
-    benchmark_match_first("predefined_word", "\\w+", text_range_10000, 1000)
+    benchmark_match_first("predefined_word", "\\w+", text_range_10000, 10000)
 
     # ===== Anchor Benchmarks =====
-    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
+    benchmark_match_first("anchor_start", "^abc", text_10000, 20000)
 
-    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
+    benchmark_match_first("anchor_end", "xyz$", text_10000, 20000)
 
     # ===== Alternation Benchmarks =====
-    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
+    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 10000)
 
-    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
+    benchmark_match_first("group_alternation", "(a|b)", text_10000, 10000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
 
@@ -337,43 +337,43 @@ fn main() raises:
     )
     var fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
     benchmark_search(
-        "large_8_alternations", large_alternation, fruit_text, 1000
+        "large_8_alternations", large_alternation, fruit_text, 10000
     )
 
     # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
     var deep_nested = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
     var nested_text = "Testing deep nested patterns with abcdefgh characters"
     benchmark_search(
-        "deep_nested_groups_depth4", deep_nested, nested_text, 1000
+        "deep_nested_groups_depth4", deep_nested, nested_text, 10000
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     var literal_heavy = "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)"
     var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
     benchmark_search(
-        "literal_heavy_alternation", literal_heavy, user_text, 1000
+        "literal_heavy_alternation", literal_heavy, user_text, 10000
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
     var complex_group = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
     var mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
     benchmark_search(
-        "complex_group_5_children", complex_group, mixed_text, 1000
+        "complex_group_5_children", complex_group, mixed_text, 10000
     )
 
     # ===== Global Matching (findall) =====
-    benchmark_findall("match_all_simple", "hello", medium_text, 200)
-    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 200)
+    benchmark_findall("match_all_simple", "hello", medium_text, 2000)
+    benchmark_findall("match_all_digits", "[0-9]+", text_range_10000 * 10, 2000)
 
     # ===== Literal Optimization Benchmarks =====
-    benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
-    benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
+    benchmark_findall("literal_prefix_short", "hello.*", short_text, 10)
+    benchmark_findall("literal_prefix_long", "hello.*", long_text, 10)
     benchmark_findall(
-        "required_literal_short", ".*@example\\.com", email_text, 1
+        "required_literal_short", ".*@example\\.com", email_text, 10
     )
-    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 10)
     benchmark_match_first(
-        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
+        "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 10
     )
 
     # ===== Complex Pattern Benchmarks =====
@@ -384,77 +384,77 @@ fn main() raises:
         "complex_email",
         "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
         complex_email_text,
-        40,
+        400,
     )
 
     var complex_number_text = (
         "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
     )
     benchmark_findall(
-        "complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500
+        "complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 5000
     )
 
     # ===== US Phone Number Benchmarks =====
     var phone_text = make_phone_test_data(1000)
 
-    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 100)
+    benchmark_findall("simple_phone", "\\d{3}-\\d{3}-\\d{4}", phone_text, 1000)
 
     benchmark_findall(
         "flexible_phone",
         "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
         phone_text,
-        100,
+        1000,
     )
 
     benchmark_findall(
         "multi_format_phone",
         "\\(?\\d{3}\\)?[\\s.-]\\d{3}[\\s.-]\\d{4}|\\d{3}-\\d{3}-\\d{4}|\\d{10}",
         phone_text,
-        50,
+        500,
     )
 
     benchmark_match_first(
         "phone_validation",
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",
-        500,
+        5000,
     )
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
 
     benchmark_findall(
-        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 1000
     )
 
     benchmark_findall(
-        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
+        "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 1000
     )
 
     benchmark_findall(
-        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 100
+        "dfa_dot_phone", "[0-9]{3}\\.[0-9]{3}\\.[0-9]{4}", phone_text, 1000
     )
 
-    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 100)
+    benchmark_findall("dfa_digits_only", "[0-9]{10}", phone_text, 1000)
 
     # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
 
     # Generate literal test data
     var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
 
-    benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
+    benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 10000)
 
     benchmark_findall(
-        "pure_dfa_paren", "\\(555\\) 123-4567", literal_phone_text, 1000
+        "pure_dfa_paren", "\\(555\\) 123-4567", literal_phone_text, 10000
     )
 
     benchmark_findall(
-        "pure_dfa_dot", "555\\.123\\.4567", literal_phone_text, 1000
+        "pure_dfa_dot", "555\\.123\\.4567", literal_phone_text, 10000
     )
 
     # ===== Smart Multi-Pattern Phone Matcher =====
     # Test smart matching approach - try DFA patterns first, fallback to comprehensive
     benchmark_findall(
-        "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+        "smart_phone_primary", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 1000
     )
 
     # National Phone Number Validation (Complex Pattern)
@@ -463,7 +463,7 @@ fn main() raises:
         "national_phone_validation",
         "(?:3052(?:0[0-8]|[1-9]\\d)|5056(?:[0-35-9]\\d|4[0-68]))\\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\\d{6}",
         national_phone_text,
-        10,
+        100,
     )
 
     # ===== US Toll-Free Numbers Benchmarks =====
@@ -475,13 +475,13 @@ fn main() raises:
         * 100
     )
 
-    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 100)
+    benchmark_findall("toll_free_simple", "[89]00\\d{6}", toll_free_text, 1000)
 
     benchmark_findall(
         "toll_free_complex",
         "8(?:00|33|44|55|66|77|88)[2-9]\\d{6}",
         toll_free_text,
-        100,
+        1000,
     )
 
     # ===== Quantifier Parser Optimization Benchmarks =====
@@ -509,38 +509,38 @@ fn main() raises:
 
     # Single quantifier patterns (baseline)
     benchmark_findall(
-        "single_quantifier_digits", "[0-9]{4}", serial_number_text, 200
+        "single_quantifier_digits", "[0-9]{4}", serial_number_text, 2000
     )
     benchmark_findall(
-        "single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200
+        "single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 2000
     )
 
     # Multiple quantifier patterns - these benefit most from the optimization
     benchmark_findall(
-        "dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150
+        "dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 1500
     )
     benchmark_findall(
         "triple_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}",
         serial_number_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "quad_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{3}[0-9]{3}",
         serial_number_text,
-        100,
+        1000,
     )
 
     # Complex quantifier ranges {min,max} - stress test the parser optimization
     benchmark_findall(
-        "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 100
+        "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 1000
     )
     benchmark_findall(
         "mixed_range_quantifiers",
         "[A-Z]{1,3}-[0-9]{2,4}-[A-Z]{2,3}[0-9]{3,4}",
         serial_number_text,
-        75,
+        750,
     )
 
     # DateTime patterns with many quantifiers
@@ -548,13 +548,13 @@ fn main() raises:
         "datetime_quantifiers",
         "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}",
         datetime_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "flexible_datetime",
         "[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}",
         datetime_text,
-        100,
+        1000,
     )
 
     # High quantifier density patterns - maximum parser stress
@@ -562,13 +562,13 @@ fn main() raises:
         "dense_quantifiers",
         "[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}",
         structured_data_text,
-        50,
+        500,
     )
     benchmark_findall(
         "ultra_dense_quantifiers",
         "[A-Z]{1,2}[0-9]{3,5}-[A-Z]{2,4}[0-9]{2,4}-[A-Z]{1,3}[0-9]{2,4}-[A-Z]{2,3}[0-9]{2,3}",
         structured_data_text,
-        25,
+        250,
     )
 
     # Nested quantifiers within groups
@@ -576,13 +576,13 @@ fn main() raises:
         "grouped_quantifiers",
         "([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})",
         serial_number_text,
-        100,
+        1000,
     )
     benchmark_findall(
         "alternation_quantifiers",
         "([A-Z]{2,3}[0-9]{3,4})|([0-9]{4}-[A-Z]{3})",
         structured_data_text,
-        75,
+        750,
     )
 
     # Optimization test data for quantifier stress testing
@@ -601,23 +601,23 @@ fn main() raises:
         "optimize_multiple_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{2}",
         optimization_test_text,
-        200,
+        2000,
     )
     benchmark_findall(
         "optimize_phone_quantifiers",
         "[0-9]{3}-[0-9]{3}-[0-9]{4}",
         "Call 555-123-4567 or 800-555-1234 or 900-876-5432 for help. " * 200,
-        300,
+        3000,
     )
     benchmark_findall(
         "optimize_large_quantifiers",
         "[A-Z]{10,20}[0-9]{15,25}",
         "PREFIX" + "A" * 15 + "1" * 20 + "SUFFIX " * 50,
-        100,
+        1000,
     )
     benchmark_findall(
         "optimize_extreme_quantifiers",
         "a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}",
         "abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR" * 20,
-        500,
+        5000,
     )
