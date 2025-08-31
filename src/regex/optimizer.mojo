@@ -296,12 +296,12 @@ struct PatternAnalyzer:
             return self._classify_quantifier(ast)
 
         elif ast.type == DIGIT:
-            # Digit (\d) - route to NFA for complete implementation
-            return PatternComplexity(PatternComplexity.COMPLEX)
+            # Digit (\d) - simple with basic quantifiers, optimized by DFA+SIMD
+            return self._classify_quantifier(ast)
 
         elif ast.type == WORD:
-            # Word (\w) - route to NFA for complete implementation
-            return PatternComplexity(PatternComplexity.COMPLEX)
+            # Word (\w) - simple with basic quantifiers, optimized by DFA+SIMD
+            return self._classify_quantifier(ast)
 
         elif ast.type == RANGE:
             # Character class [a-z] - simple with basic quantifiers, optimized by DFA+SIMD

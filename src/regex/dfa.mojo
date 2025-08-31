@@ -2382,13 +2382,17 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = class_node.get_value()
+        char_class = StringSlice[ImmutableAnyOrigin](
+            ptr=DIGITS.unsafe_ptr(), length=len(DIGITS)
+        )
     elif class_node.type == WORD:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate word character class string
-        char_class = class_node.get_value()
+        char_class = StringSlice[ImmutableAnyOrigin](
+            ptr=WORD_CHARS.unsafe_ptr(), length=len(WORD_CHARS)
+        )
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
