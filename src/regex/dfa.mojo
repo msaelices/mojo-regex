@@ -66,7 +66,7 @@ alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
 fn _expand_character_range(
-    node: ASTNode[ImmutableAnyOrigin],
+    node_type: Int,
     range_str: StringSlice[ImmutableAnyOrigin],
 ) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
@@ -79,11 +79,11 @@ fn _expand_character_range(
         Expanded character set string.
     """
     # Fast path using AST node type (much faster than string comparisons)
-    if node.type == DIGIT:
+    if node_type == DIGIT:
         return DIGITS
-    elif node.type == WORD:
+    elif node_type == WORD:
         return WORD_CHARS
-    elif node.type == SPACE:
+    elif node_type == SPACE:
         return " \t\n\r\f"  # Space characters
 
     # If it's already expanded (doesn't contain '-' in brackets), return as is
@@ -2192,7 +2192,9 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
             ast
         )
         ref char_class_str = char_class.value()
-        var expanded_char_class = _expand_character_range(ast, char_class_str)
+        var expanded_char_class = _expand_character_range(
+            ast.type, char_class_str
+        )
         dfa.compile_character_class_with_logic(
             expanded_char_class,
             min_matches,
@@ -2469,7 +2471,7 @@ fn _extract_sequential_pattern_info(
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
                     char_class = _expand_character_range(
-                        element, element.get_value().value()
+                        element.type, element.get_value().value()
                     )
                 else:
                     continue  # Skip unknown elements
@@ -2573,7 +2575,7 @@ fn _extract_multi_class_sequence_info(
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
                     char_class = _expand_character_range(
-                        element, element.get_value().value()
+                        element.type, element.get_value().value()
                     )
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
