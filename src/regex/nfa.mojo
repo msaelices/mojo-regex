@@ -452,7 +452,7 @@ struct NFAEngine(Copyable, Engine):
                     return None
 
                 # More complex pattern, use helper to expand
-                from regex.dfa import expand_character_range
+                from regex.dfa import _expand_character_range
 
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns

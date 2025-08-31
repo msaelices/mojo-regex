@@ -54,7 +54,9 @@ alias ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
 alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
-fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
+fn _expand_character_range(
+    range_str: StringSlice[ImmutableAnyOrigin],
+) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
     Args:
@@ -2169,7 +2171,7 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
             ast
         )
         ref char_class_str = char_class.value()
-        var expanded_char_class = expand_character_range(char_class_str)
+        var expanded_char_class = _expand_character_range(char_class_str)
         dfa.compile_character_class_with_logic(
             expanded_char_class,
             min_matches,
@@ -2445,7 +2447,7 @@ fn _extract_sequential_pattern_info(
                 elif element.type == WORD:
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
-                    char_class = expand_character_range(
+                    char_class = _expand_character_range(
                         element.get_value().value()
                     )
                 else:
@@ -2560,7 +2562,7 @@ fn _extract_multi_class_sequence_info(
                 elif element.type == WORD:
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
-                    char_class = expand_character_range(
+                    char_class = _expand_character_range(
                         element.get_value().value()
                     )
                 elif element.type == SPACE:
