@@ -451,9 +451,6 @@ struct NFAEngine(Copyable, Engine):
                 ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
-                # More complex pattern, use helper to expand
-                from regex.dfa import _expand_character_range
-
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns
                 char_class = String()

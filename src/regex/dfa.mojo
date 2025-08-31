@@ -5,8 +5,19 @@ This module provides O(n) time complexity regex matching for simple patterns tha
 compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
-from regex.ast import ASTNode, OR, GROUP, ELEMENT
 from regex.aliases import ALL_EXCEPT_NEWLINE, WORD_CHARS
+from regex.ast import (
+    ASTNode,
+    DIGIT,
+    ELEMENT,
+    GROUP,
+    OR,
+    RANGE,
+    RE,
+    SPACE,
+    WILDCARD,
+    WORD,
+)
 from regex.engine import Engine
 from regex.matching import Match, MatchList
 from regex.optimizer import (
@@ -2533,17 +2544,6 @@ fn _extract_multi_class_sequence_info(
     Returns:
         SequentialPatternInfo with details about each character class element.
     """
-    from regex.ast import (
-        RE,
-        DIGIT,
-        WORD,
-        RANGE,
-        GROUP,
-        SPACE,
-        WILDCARD,
-        ELEMENT,
-    )
-
     var info = SequentialPatternInfo()
 
     # Check for anchors at root level
