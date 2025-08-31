@@ -13,7 +13,7 @@ from sys.ffi import _Global
 from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
-from regex.dfa import DFAEngine, compile_simple_pattern
+from regex.dfa import DFAEngine, compile_dfa_pattern
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
 from regex.prefilter import (
@@ -139,7 +139,7 @@ struct DFAMatcher(Movable, RegexMatcher):
             ast: AST representing the regex pattern.
             pattern: The original regex pattern string.
         """
-        engine = compile_simple_pattern(ast)
+        engine = compile_dfa_pattern(ast)
         self.engine_ptr = UnsafePointer[DFAEngine].alloc(1)
         self.engine_ptr.init_pointee_move(engine^)
 

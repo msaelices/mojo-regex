@@ -2178,7 +2178,7 @@ struct BoyerMoore:
         return positions
 
 
-fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -2281,22 +2281,6 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         raise Error("Pattern too complex for current DFA implementation")
 
     return dfa^
-
-
-fn compile_simple_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
-    """Compile a simple pattern AST into a DFA engine.
-
-    Args:
-        ast: AST representing a simple pattern.
-
-    Returns:
-        Compiled DFA engine ready for matching.
-
-    Raises:
-        Error if pattern is too complex for DFA compilation.
-    """
-    # Use the enhanced compilation function
-    return compile_ast_pattern(ast)
 
 
 fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
