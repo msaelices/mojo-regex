@@ -685,50 +685,6 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         return matcher
 
 
-fn create_optimal_simd_matcher(
-    pattern: String, pattern_type: String = ""
-) -> CharacterClassSIMD:
-    """Create the optimal SIMD matcher based on pattern analysis.
-
-    This is a temporary implementation that returns CharacterClassSIMD.
-    TODO: Return SIMDMatcher trait once we have better integration.
-
-    Args:
-        pattern: The character class pattern (e.g., "0123456789" or "[a-z]").
-        pattern_type: Optional hint about pattern type ("digits", "whitespace", etc.).
-
-    Returns:
-        The optimal matcher for the pattern.
-    """
-    # For now, we'll use the existing CharacterClassSIMD
-    # In the next phase, we'll integrate the specialized matchers
-
-    # Check for pre-defined types first
-    if pattern_type == "whitespace" or pattern == " \t\n\r\f\v":
-        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
-    elif pattern_type == "digits" or pattern == "0123456789":
-        return get_simd_matcher(SIMD_MATCHER_DIGITS)
-    elif pattern == "abcdefghijklmnopqrstuvwxyz":
-        return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
-    elif pattern == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
-    elif pattern == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
-        return get_simd_matcher(SIMD_MATCHER_ALPHA)
-    elif (
-        pattern
-        == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    ):
-        return get_simd_matcher(SIMD_MATCHER_ALNUM)
-
-    # TODO: Analyze pattern to determine if it's suitable for:
-    # - NibbleBasedMatcher (≤16 unique values)
-    # - RangeBasedMatcher (contiguous ranges)
-    # - BitmaskMatcher (arbitrary sets)
-
-    # For now, fall back to CharacterClassSIMD
-    return CharacterClassSIMD(pattern)
-
-
 fn process_text_with_matcher[
     T: SIMDMatcher
 ](matcher: T, text: String, start: Int = 0) -> List[Int]:
