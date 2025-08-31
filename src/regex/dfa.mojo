@@ -2056,17 +2056,22 @@ struct DFAEngine(Engine):
 
         while pos + CHUNK_SIZE <= text_len:
             # Load a chunk of characters
-            var chars = SIMD[DType.uint8, CHUNK_SIZE]()
-            for i in range(CHUNK_SIZE):
-                chars[i] = ord(text[pos + i])
-
-            # Use SIMD matcher to check all characters at once
-            var matches = simd_matcher.match_chunk[CHUNK_SIZE](chars)
-
-            # Find first matching position in this chunk
-            for i in range(CHUNK_SIZE):
-                if matches[i]:
-                    return pos + i
+            var match_pos = simd_matcher.find_first_match(
+                text[pos : pos + CHUNK_SIZE]
+            )
+            if match_pos != -1:
+                return pos + match_pos
+            # var chars = SIMD[DType.uint8, CHUNK_SIZE]()
+            # for i in range(CHUNK_SIZE):
+            #     chars[i] = ord(text[pos + i])
+            #
+            # # Use SIMD matcher to check all characters at once
+            # var matches = simd_matcher.match_chunk[CHUNK_SIZE](chars)
+            #
+            # # Find first matching position in this chunk
+            # for i in range(CHUNK_SIZE):
+            #     if matches[i]:
+            #         return pos + i
 
             pos += CHUNK_SIZE
 
