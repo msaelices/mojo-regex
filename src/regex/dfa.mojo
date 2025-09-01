@@ -2064,9 +2064,7 @@ struct DFAEngine(Engine):
                 chars[i] = ord(text[pos + i])
 
             # Use SIMD matcher to find first match in this chunk
-            var match_pos = simd_matcher.find_first_match_simd[CHUNK_SIZE](
-                chars
-            )
+            var match_pos = simd_matcher.find_first_match[CHUNK_SIZE](chars)
             if match_pos != -1:
                 return pos + match_pos
 

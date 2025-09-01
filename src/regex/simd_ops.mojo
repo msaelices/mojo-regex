@@ -142,6 +142,79 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         Returns:
             Position of first match, or -1 if not found.
         """
+        return self.find_first_match_in_text(text, start)
+
+    fn find_first_match[
+        CHUNK_SIZE: Int
+    ](self, chunk: SIMD[DType.uint8, CHUNK_SIZE]) -> Int:
+        """Find first character in SIMD chunk that matches this class.
+
+        This method operates directly on SIMD vectors, avoiding string slicing overhead.
+        Optimized for early return - exits as soon as first match is found.
+
+        Parameters:
+            CHUNK_SIZE: Size of the SIMD chunk to process.
+
+        Args:
+            chunk: SIMD vector of characters to check.
+
+        Returns:
+            Position of first match within chunk, or -1 if not found.
+        """
+        # Use hybrid approach based on pattern characteristics for optimal performance
+        if self.use_shuffle:
+
+            @parameter
+            if CHUNK_SIZE == 16 or CHUNK_SIZE == 32:
+                # Fast path: use _dynamic_shuffle for optimal sizes
+                var result = self.lookup_table._dynamic_shuffle(chunk)
+
+                # Find first matching position immediately without creating boolean vector
+                @parameter
+                for i in range(CHUNK_SIZE):
+                    if result[i] != 0:
+                        return i
+                return -1
+            else:
+                # Fallback for other sizes - process in 16-byte sub-chunks
+                @parameter
+                for offset in range(0, CHUNK_SIZE, 16):
+
+                    @parameter
+                    if offset + 16 <= CHUNK_SIZE:
+                        var sub_chunk = chunk.slice[16, offset=offset]()
+                        var sub_result = self.lookup_table._dynamic_shuffle(
+                            sub_chunk
+                        )
+                        for i in range(16):
+                            if sub_result[i] != 0:
+                                return offset + i
+                    else:
+                        # Handle remaining elements
+                        for i in range(offset, CHUNK_SIZE):
+                            var char_code = Int(chunk[i])
+                            if self.lookup_table[char_code] == 1:
+                                return i
+                return -1
+        else:
+            # Simple lookup for small character classes - early return optimization
+            @parameter
+            for i in range(CHUNK_SIZE):
+                var char_code = Int(chunk[i])
+                if char_code < 256 and self.lookup_table[char_code] == 1:
+                    return i
+            return -1
+
+    fn find_first_match_in_text(self, text: StringSlice, start: Int = 0) -> Int:
+        """Find first character in text that matches this class using SIMD.
+
+        Args:
+            text: Text to search.
+            start: Starting position.
+
+        Returns:
+            Position of first match, or -1 if not found.
+        """
         var pos = start
         var text_len = len(text)
 
@@ -160,32 +233,6 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             if self.contains(ord(text[pos])):
                 return pos
             pos += 1
-
-        return -1
-
-    fn find_first_match_simd[
-        CHUNK_SIZE: Int
-    ](self, chunk: SIMD[DType.uint8, CHUNK_SIZE]) -> Int:
-        """Find first character in SIMD chunk that matches this class.
-
-        This method operates directly on SIMD vectors, avoiding string slicing overhead.
-
-        Parameters:
-            CHUNK_SIZE: Size of the SIMD chunk to process.
-
-        Args:
-            chunk: SIMD vector of characters to check.
-
-        Returns:
-            Position of first match within chunk, or -1 if not found.
-        """
-        var matches = self.match_chunk[CHUNK_SIZE](chunk)
-
-        # Find first matching position in this chunk
-        @parameter
-        for i in range(CHUNK_SIZE):
-            if matches[i]:
-                return i
 
         return -1
 
