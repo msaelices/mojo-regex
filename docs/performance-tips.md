@@ -267,7 +267,7 @@ Optimize character range operations:
 
 ```mojo
 # From dfa.mojo - commit b2d284f
-fn expand_character_range(start: String, end: String) -> String:
+fn _expand_character_range(start: String, end: String) -> String:
     """Expand character range without excessive allocations."""
     var start_code = ord(start[0])
     var end_code = ord(end[0])

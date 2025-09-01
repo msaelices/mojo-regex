@@ -32,11 +32,11 @@ Recent benchmarks on PR #28 revealed performance regressions for certain pattern
 
 ### Previous Issue
 - **Gap Identified**: 22 patterns classified as SIMPLE by PatternAnalyzer, but only 16 successfully use DFA engines
-- **Root Cause**: 6 SIMPLE patterns fail DFA compilation in `compile_ast_pattern()` at `/src/regex/dfa.mojo:1325` and fall back to NFA
+- **Root Cause**: 6 SIMPLE patterns fail DFA compilation in `compile_dfa_pattern()` at `/src/regex/dfa.mojo:1325` and fall back to NFA
 - **Impact**: Mismatch between theoretical complexity assessment and actual implementation coverage leads to suboptimal performance
 
 ### Technical Context
-The issue occurs in the `compile_ast_pattern` function where patterns that don't match any of the implemented DFA handlers throw an error "Pattern too complex for current DFA implementation" and fall back to NFA execution in the HybridMatcher.
+The issue occurs in the `compile_dfa_pattern` function where patterns that don't match any of the implemented DFA handlers throw an error "Pattern too complex for current DFA implementation" and fall back to NFA execution in the HybridMatcher.
 
 ## Rust Architecture Study
 
@@ -69,7 +69,7 @@ Add support for common pattern types causing SIMPLE→NFA fallbacks:
 - **Word boundary patterns**: `\b\w+\b`, `\btest\b`
 - **Optional sequences**: `abc?def`, `test(ing)?`
 
-#### 1.2 Enhance `compile_ast_pattern()` Function
+#### 1.2 Enhance `compile_dfa_pattern()` Function
 **Location**: `/src/regex/dfa.mojo:1267-1327`
 
 **Current Structure**:
@@ -216,7 +216,7 @@ These patterns show regressions that were fixed:
 
 ## Implementation Priority
 
-1. **Phase 1**: Direct fix for current gap - expand `compile_ast_pattern()` handlers
+1. **Phase 1**: Direct fix for current gap - expand `compile_dfa_pattern()` handlers
 2. **Phase 2**: Add Hybrid DFA for intermediate complexity patterns
 3. **Phase 3**: Implement full meta strategy system
 4. **Phase 4**: Advanced optimizations and analysis improvements

@@ -31,18 +31,9 @@ from regex.aliases import (
     SIMD_MATCHER_ALNUM_LOWER,
     SIMD_MATCHER_ALNUM_UPPER,
     SIMD_MATCHER_CUSTOM,
-)
-from regex.aliases import (
-    SIMD_MATCHER_NONE,
-    SIMD_MATCHER_WHITESPACE,
-    SIMD_MATCHER_DIGITS,
-    SIMD_MATCHER_ALPHA_LOWER,
-    SIMD_MATCHER_ALPHA_UPPER,
-    SIMD_MATCHER_ALPHA,
-    SIMD_MATCHER_ALNUM,
-    SIMD_MATCHER_ALNUM_LOWER,
-    SIMD_MATCHER_ALNUM_UPPER,
-    SIMD_MATCHER_CUSTOM,
+    SIMD_MATCHER_WORD_CHARS,
+    DIGITS,
+    WORD_CHARS,
 )
 from regex.engine import Engine
 from regex.dfa import DFAEngine
@@ -141,7 +132,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             return self.lookup_table[char_code] == 1
         return False
 
-    fn find_first_match(self, text: String, start: Int = 0) -> Int:
+    fn find_first_match(self, text: StringSlice, start: Int = 0) -> Int:
         """Find first character in text that matches this class using SIMD.
 
         Args:
@@ -285,7 +276,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         return count
 
     fn _check_chunk_simd(
-        self, text: String, pos: Int
+        self, text: StringSlice, pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations.
 
@@ -437,6 +428,12 @@ fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
         result.lookup_table[i] = 1
 
     return result
+
+
+@always_inline
+fn _create_word_chars() -> CharacterClassSIMD:
+    """Create SIMD matcher for word characters [a-zA-Z0-9_]."""
+    return CharacterClassSIMD(WORD_CHARS)
 
 
 fn _search_short_pattern(pattern: Span[Byte], text: String, start: Int) -> Int:
@@ -680,6 +677,8 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
             matcher = _create_ascii_alnum_lower()
         elif matcher_type == SIMD_MATCHER_ALNUM_UPPER:
             matcher = _create_ascii_alnum_upper()
+        elif matcher_type == SIMD_MATCHER_WORD_CHARS:
+            matcher = _create_word_chars()
         else:
             # Custom matcher, create empty one
             matcher = CharacterClassSIMD("")
@@ -687,48 +686,46 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
         return matcher
 
 
-fn create_optimal_simd_matcher(
-    pattern: String, pattern_type: String = ""
-) -> CharacterClassSIMD:
-    """Create the optimal SIMD matcher based on pattern analysis.
+@always_inline
+fn get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
+    """Get optimal cached matcher for character class string.
 
-    This is a temporary implementation that returns CharacterClassSIMD.
-    TODO: Return SIMDMatcher trait once we have better integration.
+    This function detects common character class patterns and returns
+    cached matchers to avoid repeated allocations.
 
     Args:
-        pattern: The character class pattern (e.g., "0123456789" or "[a-z]").
-        pattern_type: Optional hint about pattern type ("digits", "whitespace", etc.).
+        char_class: Character class string (e.g., "0123456789", "[a-z]").
 
     Returns:
-        The optimal matcher for the pattern.
+        Cached CharacterClassSIMD matcher if pattern is recognized,
+        otherwise creates new matcher instance.
     """
-    # For now, we'll use the existing CharacterClassSIMD
-    # In the next phase, we'll integrate the specialized matchers
-
-    # Check for pre-defined types first
-    if pattern_type == "whitespace" or pattern == " \t\n\r\f\v":
-        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
-    elif pattern_type == "digits" or pattern == "0123456789":
+    # Most common patterns - use cached SIMD matchers
+    if char_class == DIGITS:
         return get_simd_matcher(SIMD_MATCHER_DIGITS)
-    elif pattern == "abcdefghijklmnopqrstuvwxyz":
+    elif char_class == WORD_CHARS:
+        return get_simd_matcher(SIMD_MATCHER_WORD_CHARS)
+    elif char_class == " \t\n\r\f":  # Common whitespace pattern
+        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+    elif char_class == " \t\n\r\f\v":  # Extended whitespace with vertical tab
+        return get_simd_matcher(SIMD_MATCHER_WHITESPACE)
+    elif char_class == "abcdefghijklmnopqrstuvwxyz":  # [a-z]
         return get_simd_matcher(SIMD_MATCHER_ALPHA_LOWER)
-    elif pattern == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+    elif char_class == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":  # [A-Z]
         return get_simd_matcher(SIMD_MATCHER_ALPHA_UPPER)
-    elif pattern == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ":
+    elif (
+        char_class == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    ):  # [a-zA-Z]
         return get_simd_matcher(SIMD_MATCHER_ALPHA)
     elif (
-        pattern
+        char_class
         == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-    ):
+    ):  # [a-zA-Z0-9]
         return get_simd_matcher(SIMD_MATCHER_ALNUM)
-
-    # TODO: Analyze pattern to determine if it's suitable for:
-    # - NibbleBasedMatcher (≤16 unique values)
-    # - RangeBasedMatcher (contiguous ranges)
-    # - BitmaskMatcher (arbitrary sets)
-
-    # For now, fall back to CharacterClassSIMD
-    return CharacterClassSIMD(pattern)
+    else:
+        # Custom character class - create new matcher instance
+        # These are not cached as they can be arbitrary patterns
+        return CharacterClassSIMD(char_class)
 
 
 fn process_text_with_matcher[

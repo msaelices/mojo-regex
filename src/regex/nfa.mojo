@@ -14,7 +14,7 @@ from regex.parser import parse
 from regex.simd_ops import (
     twoway_search,
     CharacterClassSIMD,
-    get_simd_matcher,
+    get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
 )
@@ -452,9 +452,6 @@ struct NFAEngine(Copyable, Engine):
                 ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
-                # More complex pattern, use helper to expand
-                from regex.dfa import expand_character_range
-
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns
                 char_class = String()
@@ -464,7 +461,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Create SIMD matcher
         if char_class:
-            return CharacterClassSIMD(char_class)
+            return get_character_class_matcher(char_class)
 
         return None
 

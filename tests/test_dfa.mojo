@@ -3,8 +3,7 @@ from testing import assert_equal, assert_true, assert_false
 from regex.dfa import (
     DFAEngine,
     BoyerMoore,
-    compile_simple_pattern,
-    compile_ast_pattern,
+    compile_dfa_pattern,
 )
 from regex.parser import parse
 
@@ -111,11 +110,11 @@ def test_boyer_moore_search_all():
     assert_equal(positions[2], 19)  # "well"
 
 
-def test_compile_simple_pattern():
+def test_compile_dfa_pattern():
     """Test high-level simple pattern compilation."""
     # Test literal pattern
     var ast1 = parse("hello")
-    var dfa1 = compile_simple_pattern(ast1)
+    var dfa1 = compile_dfa_pattern(ast1)
 
     var result1 = dfa1.match_first("hello world", 0)
     assert_true(result1.__bool__())
@@ -252,7 +251,7 @@ def test_dfa_pure_anchors():
     """Test DFA with pure anchor patterns."""
     # Test start anchor only (^)
     var ast1 = parse("^")
-    var dfa1 = compile_simple_pattern(ast1)
+    var dfa1 = compile_dfa_pattern(ast1)
 
     var result1 = dfa1.match_first("hello", 0)
     assert_true(result1.__bool__())
@@ -266,7 +265,7 @@ def test_dfa_pure_anchors():
 
     # Test end anchor only ($)
     var ast2 = parse("$")
-    var dfa2 = compile_simple_pattern(ast2)
+    var dfa2 = compile_dfa_pattern(ast2)
 
     var result3 = dfa2.match_first("hello", 0)
     # Like Python, this should return False if not at end
@@ -308,21 +307,21 @@ def test_dfa_anchors_with_high_level_api():
     """Test that anchored patterns now use DFA through high-level API."""
     # Test that these patterns are now classified as SIMPLE and use DFA
     var ast1 = parse("^hello")
-    var dfa1 = compile_simple_pattern(ast1)
+    var dfa1 = compile_dfa_pattern(ast1)
 
     var result1 = dfa1.match_first("hello world", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "hello")
 
     var ast2 = parse("world$")
-    var dfa2 = compile_simple_pattern(ast2)
+    var dfa2 = compile_dfa_pattern(ast2)
 
     var result2 = dfa2.match_first("hello world", 0)
     # Like Python, this should return False if not at start
     assert_false(result2.__bool__())
 
     var ast3 = parse("^hello$")
-    var dfa3 = compile_simple_pattern(ast3)
+    var dfa3 = compile_dfa_pattern(ast3)
 
     var result3 = dfa3.match_first("hello", 0)
     assert_true(result3.__bool__())
@@ -334,7 +333,7 @@ def test_phone_numbers():
     # Complex phone number pattern with sequential character classes
     pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
     var ast = parse(pattern)
-    var dfa = compile_ast_pattern(ast)
+    var dfa = compile_dfa_pattern(ast)
     var result = dfa.match_first("+1-541-236-5432", 0)
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), "+1-541-236-5432")
@@ -345,13 +344,13 @@ def test_phone_numbers():
 #     es_pattern = "[5-9]\\d{8}"
 #     phone = "810123456"
 #     var ast = parse(es_pattern)
-#     var dfa = compile_ast_pattern(ast)
+#     var dfa = compile_dfa_pattern(ast)
 #     var result = dfa.match_first(phone, 0)
 #     assert_true(result.__bool__())
 #     assert_equal(result.value().get_match_text(), phone)
 #     es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
 #     var ast2 = parse(es_fixed_line_pattern)
-#     var dfa2 = compile_ast_pattern(ast2)
+#     var dfa2 = compile_dfa_pattern(ast2)
 #     var result2 = dfa2.match_first(phone)
 #     assert_true(result2.__bool__())
 #     assert_equal(result2.value().get_match_text(), phone)
@@ -365,7 +364,7 @@ def test_dfa_state_construction_logic():
     """
     # Test multi-character sequence that requires proper state chaining
     var ast1 = parse("[a-z]+[0-9]+")
-    var dfa1 = compile_ast_pattern(ast1)
+    var dfa1 = compile_dfa_pattern(ast1)
 
     # Should work correctly
     var result1 = dfa1.match_first("hello123", 0)
@@ -374,7 +373,7 @@ def test_dfa_state_construction_logic():
 
     # Test pattern with different quantifiers to ensure state logic is correct
     var ast2 = parse("[A-Z][a-z]+[0-9]+")
-    var dfa2 = compile_ast_pattern(ast2)
+    var dfa2 = compile_dfa_pattern(ast2)
 
     # Should match capital letter, lowercase letters, then digits
     var result2 = dfa2.match_first("Hello123", 0)
@@ -398,7 +397,7 @@ def test_dfa_optional_element_state_logic():
     """
     # Test optional first element followed by required element
     var ast = parse("[a-z]*[0-9]+")
-    var dfa = compile_ast_pattern(ast)
+    var dfa = compile_dfa_pattern(ast)
 
     # Case 1: No letters, just digits (should work when fixed)
     var result1 = dfa.match_first("123", 0)

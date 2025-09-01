@@ -5,8 +5,19 @@ This module provides O(n) time complexity regex matching for simple patterns tha
 compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
-from regex.ast import ASTNode
-from regex.aliases import ALL_EXCEPT_NEWLINE
+from regex.aliases import ALL_EXCEPT_NEWLINE, WORD_CHARS
+from regex.ast import (
+    ASTNode,
+    DIGIT,
+    ELEMENT,
+    GROUP,
+    OR,
+    RANGE,
+    RE,
+    SPACE,
+    WILDCARD,
+    WORD,
+)
 from regex.engine import Engine
 from regex.matching import Match, MatchList
 from regex.optimizer import (
@@ -24,9 +35,9 @@ from regex.tokens import (
     CHAR_NINE,
     DIGITS,
 )
-from regex.aliases import WORD_CHARS
 from regex.simd_ops import (
     CharacterClassSIMD,
+    get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
     simd_search,
@@ -55,15 +66,27 @@ alias ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
 alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
-fn expand_character_range(range_str: StringSlice[ImmutableAnyOrigin]) -> String:
+fn _expand_character_range(
+    node_type: Int,
+    range_str: StringSlice[ImmutableAnyOrigin],
+) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
     Args:
+        node_type: AST node type for fast type-based optimization.
         range_str: Range string like '[a-z]' or '[0-9]' or 'abcd'.
 
     Returns:
         Expanded character set string.
     """
+    # Fast path using AST node type (much faster than string comparisons)
+    if node_type == DIGIT:
+        return DIGITS
+    elif node_type == WORD:
+        return WORD_CHARS
+    elif node_type == SPACE:
+        return " \t\n\r\f"  # Space characters
+
     # If it's already expanded (doesn't contain '-' in brackets), return as is
     if not range_str.startswith("[") or not range_str.endswith("]"):
         return String(range_str)
@@ -242,8 +265,6 @@ struct DFAEngine(Engine):
     """Whether this is a pure literal pattern (no regex operators)."""
     var simd_char_matcher: Optional[CharacterClassSIMD]
     """SIMD-optimized character class matcher for simple patterns."""
-    var simd_char_pattern: String
-    """The character class pattern being matched with SIMD."""
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
@@ -255,7 +276,6 @@ struct DFAEngine(Engine):
         self.has_end_anchor = False
         self.is_pure_literal = False
         self.simd_char_matcher = None
-        self.simd_char_pattern = ""
         self.literal_pattern = ""
 
     fn __moveinit__(out self, deinit other: Self):
@@ -266,7 +286,6 @@ struct DFAEngine(Engine):
         self.has_end_anchor = other.has_end_anchor
         self.is_pure_literal = other.is_pure_literal
         self.simd_char_matcher = other.simd_char_matcher^
-        self.simd_char_pattern = other.simd_char_pattern^
         self.literal_pattern = other.literal_pattern^
 
     fn compile_pattern(
@@ -345,40 +364,7 @@ struct DFAEngine(Engine):
         """
         # Try to use SIMD optimization for simple character class patterns
         if min_matches >= 0 and positive_logic:
-            # Check if this is a pattern we can optimize with SIMD
-            var pattern_str = String()
-            if char_class == DIGITS or char_class == "0123456789":
-                pattern_str = "[0-9]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_digit_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == LOWERCASE_LETTERS:
-                pattern_str = "[a-z]"
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == UPPERCASE_LETTERS:
-                pattern_str = "[A-Z]"
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == ALL_LETTERS:
-                pattern_str = "[a-zA-Z]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_alpha_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == ALPHANUMERIC:
-                pattern_str = "[a-zA-Z0-9]"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use create_alnum_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            elif char_class == " \t\n\r\f\v":
-                pattern_str = "\\s"
-                # For now, keep using CharacterClassSIMD for compatibility
-                # In future: could use _create_whitespace_matcher() with wrapper
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-            else:
-                # For other patterns, use standard CharacterClassSIMD
-                self.simd_char_matcher = CharacterClassSIMD(char_class)
-
-            if pattern_str:
-                self.simd_char_pattern = pattern_str
+            self.simd_char_matcher = get_character_class_matcher(char_class)
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -1463,8 +1449,6 @@ struct DFAEngine(Engine):
     ):
         """Extract all string branches from alternation for quantified groups.
         """
-        from regex.ast import OR, GROUP, ELEMENT
-
         if node.type == OR:
             # Get left and right children
             ref left_child = node.get_child(0)
@@ -1630,8 +1614,7 @@ struct DFAEngine(Engine):
             and sequence_info.elements[0].min_matches >= 1
             and digit_elements * 2 >= total_elements
         ):
-            self.simd_char_matcher = CharacterClassSIMD(DIGITS)
-            self.simd_char_pattern = "[0-9]"
+            self.simd_char_matcher = get_character_class_matcher(DIGITS)
 
     @always_inline
     fn _add_character_class_transitions(
@@ -2074,17 +2057,11 @@ struct DFAEngine(Engine):
 
         while pos + CHUNK_SIZE <= text_len:
             # Load a chunk of characters
-            var chars = SIMD[DType.uint8, CHUNK_SIZE]()
-            for i in range(CHUNK_SIZE):
-                chars[i] = ord(text[pos + i])
-
-            # Use SIMD matcher to check all characters at once
-            var matches = simd_matcher.match_chunk[CHUNK_SIZE](chars)
-
-            # Find first matching position in this chunk
-            for i in range(CHUNK_SIZE):
-                if matches[i]:
-                    return pos + i
+            var match_pos = simd_matcher.find_first_match(
+                text[pos : pos + CHUNK_SIZE]
+            )
+            if match_pos != -1:
+                return pos + match_pos
 
             pos += CHUNK_SIZE
 
@@ -2181,7 +2158,7 @@ struct BoyerMoore:
         return positions
 
 
-fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -2210,7 +2187,9 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
             ast
         )
         ref char_class_str = char_class.value()
-        var expanded_char_class = expand_character_range(char_class_str)
+        var expanded_char_class = _expand_character_range(
+            ast.type, char_class_str
+        )
         dfa.compile_character_class_with_logic(
             expanded_char_class,
             min_matches,
@@ -2284,22 +2263,6 @@ fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         raise Error("Pattern too complex for current DFA implementation")
 
     return dfa^
-
-
-fn compile_simple_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
-    """Compile a simple pattern AST into a DFA engine.
-
-    Args:
-        ast: AST representing a simple pattern.
-
-    Returns:
-        Compiled DFA engine ready for matching.
-
-    Raises:
-        Error if pattern is too complex for DFA compilation.
-    """
-    # Use the enhanced compilation function
-    return compile_ast_pattern(ast)
 
 
 fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
@@ -2382,13 +2345,17 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = class_node.get_value()
+        char_class = StringSlice[ImmutableAnyOrigin](
+            ptr=DIGITS.unsafe_ptr(), length=len(DIGITS)
+        )
     elif class_node.type == WORD:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate word character class string
-        char_class = class_node.get_value()
+        char_class = StringSlice[ImmutableAnyOrigin](
+            ptr=WORD_CHARS.unsafe_ptr(), length=len(WORD_CHARS)
+        )
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
@@ -2498,8 +2465,8 @@ fn _extract_sequential_pattern_info(
                 elif element.type == WORD:
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
-                    char_class = expand_character_range(
-                        element.get_value().value()
+                    char_class = _expand_character_range(
+                        element.type, element.get_value().value()
                     )
                 else:
                     continue  # Skip unknown elements
@@ -2584,17 +2551,6 @@ fn _extract_multi_class_sequence_info(
     Returns:
         SequentialPatternInfo with details about each character class element.
     """
-    from regex.ast import (
-        RE,
-        DIGIT,
-        WORD,
-        RANGE,
-        GROUP,
-        SPACE,
-        WILDCARD,
-        ELEMENT,
-    )
-
     var info = SequentialPatternInfo()
 
     # Check for anchors at root level
@@ -2613,8 +2569,8 @@ fn _extract_multi_class_sequence_info(
                 elif element.type == WORD:
                     char_class = WORD_CHARS
                 elif element.type == RANGE:
-                    char_class = expand_character_range(
-                        element.get_value().value()
+                    char_class = _expand_character_range(
+                        element.type, element.get_value().value()
                     )
                 elif element.type == SPACE:
                     char_class = " \t\n\r\f"
