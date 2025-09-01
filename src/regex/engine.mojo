@@ -10,7 +10,7 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 

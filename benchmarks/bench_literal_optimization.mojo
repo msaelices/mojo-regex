@@ -8,7 +8,7 @@ on various types of patterns containing literals.
 """
 
 from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
-from regex import match_first, findall
+from regex import match, findall
 
 # Simple test texts
 alias SHORT_TEXT = "hello world this is a test with hello again and hello there"

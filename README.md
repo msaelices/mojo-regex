@@ -55,7 +55,7 @@ This software is in an early stage of development. Even though it is functional,
 - ✅ **SIMD Optimization** - Vectorized character class matching
 - ✅ **Pattern Compilation Caching** - Pre-compiled patterns for reuse
 - ✅ **Match Position Tracking** - Precise start_idx, end_idx reporting
-- ✅ **Simple API**: `match_first(pattern, text) -> Optional[Match]`
+- ✅ **Simple API**: `match(pattern, text) -> Optional[Match]`
 
 
 ## Installation
@@ -71,10 +71,10 @@ This software is in an early stage of development. Even though it is functional,
 ## Example Usage
 
 ```mojo
-from regex import match_first, findall
+from regex import match, findall
 
 # Basic literal matching
-var result = match_first("hello", "hello world")
+var result = match("hello", "hello world")
 if result:
     print("Match found:", result.value().get_match_text())
 
@@ -85,7 +85,7 @@ for i in range(len(matches)):
     print("  Match", i, ":", matches[i].get_match_text(), "at position", matches[i].start_idx)
 
 # Wildcard and quantifiers
-result = match_first(".*@.*", "user@domain.com")
+result = match(".*@.*", "user@domain.com")
 if result:
     print("Email found")
 
@@ -100,12 +100,12 @@ for i in range(len(words)):
     print("Word found:", words[i].get_match_text())
 
 # Character ranges
-result = match_first("[a-z]+", "hello123")
+result = match("[a-z]+", "hello123")
 if result:
     print("Letters:", result.value().get_match_text())
 
 # Groups and alternation
-result = match_first("(com|org|net)", "example.com")
+result = match("(com|org|net)", "example.com")
 if result:
     print("TLD found:", result.value().get_match_text())
 
@@ -115,12 +115,12 @@ for i in range(len(domains)):
     print("Domain found:", domains[i].get_match_text())
 
 # Anchors
-result = match_first("^https?://", "https://example.com")
+result = match("^https?://", "https://example.com")
 if result:
     print("Valid URL")
 
 # Complex patterns using predefined character classes
-result = match_first("^\\w+@\\w+\\.\\w+$", "user@example.com")
+result = match("^\\w+@\\w+\\.\\w+$", "user@example.com")
 if result:
     print("Valid email format")
 
@@ -130,7 +130,7 @@ for i in range(len(emails)):
     print("Email found:", emails[i].get_match_text())
 
 # Validate identifiers (programming variable names)
-result = match_first("^[a-zA-Z_]\\w*$", "_private_var123")
+result = match("^[a-zA-Z_]\\w*$", "_private_var123")
 if result:
     print("Valid identifier")
 
@@ -146,7 +146,7 @@ for i in range(len(fruits)):
 
 # Deep nested alternation (depth 4) - DFA-optimized
 var nested_pattern = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
-var nested_result = match_first(nested_pattern, "Testing with character a")
+var nested_result = match(nested_pattern, "Testing with character a")
 if nested_result:
     print("Deep nested match:", nested_result.value().get_match_text())
 

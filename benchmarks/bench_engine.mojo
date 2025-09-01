@@ -1,5 +1,5 @@
 from time import perf_counter_ns
-from regex import match_first, findall, search
+from regex import match, findall, search
 from regex.matcher import compile_regex
 
 
@@ -82,10 +82,10 @@ fn make_complex_pattern_test_data(num_entries: Int) -> String:
 # ===-----------------------------------------------------------------------===#
 
 
-fn benchmark_match_first(
+fn benchmark_match(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
-    """Benchmark match_first with manual timing."""
+    """Benchmark match with manual timing."""
 
     # Output engine detection information
     var compiled_regex = compile_regex(pattern)
@@ -94,7 +94,7 @@ fn benchmark_match_first(
 
     # Warmup (3 iterations like Python)
     for _ in range(3):
-        _ = match_first(pattern, text)
+        _ = match(pattern, text)
 
     # Target runtime: 100ms like Python
     var target_runtime = 100_000_000  # 100ms in nanoseconds
@@ -107,7 +107,7 @@ fn benchmark_match_first(
 
         # Internal loop matches Python benchmark structure
         for _ in range(internal_iterations):
-            var result = match_first(pattern, text)
+            var result = match(pattern, text)
             if not result:
                 print("ERROR: No match in", name, "for pattern:", pattern)
                 return
@@ -297,37 +297,37 @@ fn main() raises:
     benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
     # ===== Wildcard and Quantifier Benchmarks =====
-    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
+    benchmark_match("wildcard_match_any", ".*", text_10000, 1000)
 
-    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
+    benchmark_match("quantifier_zero_or_more", "a*", text_10000, 1000)
 
-    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
+    benchmark_match("quantifier_one_or_more", "a+", text_10000, 1000)
 
-    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
+    benchmark_match("quantifier_zero_or_one", "a?", text_10000, 1000)
 
     # ===== Character Range Benchmarks =====
-    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_match("range_lowercase", "[a-z]+", text_range_10000, 1000)
 
     benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
 
-    benchmark_match_first(
+    benchmark_match(
         "range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
     )
 
     # ===== Predefined Character Class Benchmarks =====
     benchmark_search("predefined_digits", "\\d+", text_range_10000, 1000)
 
-    benchmark_match_first("predefined_word", "\\w+", text_range_10000, 1000)
+    benchmark_match("predefined_word", "\\w+", text_range_10000, 1000)
 
     # ===== Anchor Benchmarks =====
-    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
+    benchmark_match("anchor_start", "^abc", text_10000, 2000)
 
-    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
+    benchmark_match("anchor_end", "xyz$", text_10000, 2000)
 
     # ===== Alternation Benchmarks =====
-    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
+    benchmark_match("alternation_simple", "a|b|c", text_10000, 1000)
 
-    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
+    benchmark_match("group_alternation", "(a|b)", text_10000, 1000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
 
@@ -371,8 +371,8 @@ fn main() raises:
     benchmark_findall(
         "required_literal_short", ".*@example\\.com", email_text, 1
     )
-    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
-    benchmark_match_first(
+    benchmark_match("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_match(
         "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
     )
 
@@ -413,7 +413,7 @@ fn main() raises:
         50,
     )
 
-    benchmark_match_first(
+    benchmark_match(
         "phone_validation",
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",

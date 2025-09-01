@@ -65,8 +65,8 @@ def benchmark_search(name: str, pattern: str, text: str, internal_iterations: in
     _store_benchmark_result(name, time_ms, total_matches)
 
 
-def benchmark_match_first(name: str, pattern: str, text: str, internal_iterations: int):
-    """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first)."""
+def benchmark_match(name: str, pattern: str, text: str, internal_iterations: int):
+    """Benchmark match with manual timing (mirrors Mojo benchmark_match)."""
 
     # Compile pattern once for fair comparison
     compiled_pattern = re.compile(pattern)
@@ -333,27 +333,27 @@ def main():
     benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
     # ===== Wildcard and Quantifier Benchmarks =====
-    benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
-    benchmark_match_first("quantifier_zero_or_more", "a*", text_10000, 1000)
-    benchmark_match_first("quantifier_one_or_more", "a+", text_10000, 1000)
-    benchmark_match_first("quantifier_zero_or_one", "a?", text_10000, 1000)
+    benchmark_match("wildcard_match_any", ".*", text_10000, 1000)
+    benchmark_match("quantifier_zero_or_more", "a*", text_10000, 1000)
+    benchmark_match("quantifier_one_or_more", "a+", text_10000, 1000)
+    benchmark_match("quantifier_zero_or_one", "a?", text_10000, 1000)
 
     # ===== Character Range Benchmarks =====
-    benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_match("range_lowercase", "[a-z]+", text_range_10000, 1000)
     benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
-    benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
+    benchmark_match("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
 
     # ===== Predefined Character Class Benchmarks =====
     benchmark_search("predefined_digits", r"\d+", text_range_10000, 1000)
-    benchmark_match_first("predefined_word", r"\w+", text_range_10000, 1000)
+    benchmark_match("predefined_word", r"\w+", text_range_10000, 1000)
 
     # ===== Anchor Benchmarks =====
-    benchmark_match_first("anchor_start", "^abc", text_10000, 2000)
-    benchmark_match_first("anchor_end", "xyz$", text_10000, 2000)
+    benchmark_match("anchor_start", "^abc", text_10000, 2000)
+    benchmark_match("anchor_end", "xyz$", text_10000, 2000)
 
     # ===== Alternation Benchmarks =====
-    benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
-    benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
+    benchmark_match("alternation_simple", "a|b|c", text_10000, 1000)
+    benchmark_match("group_alternation", "(a|b)", text_10000, 1000)
 
     # ===== NEW: Optimization Showcase Benchmarks =====
 
@@ -403,8 +403,8 @@ def main():
     benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
     benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
     benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 1)
-    benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
-    benchmark_match_first(
+    benchmark_match("no_literal_baseline", "[a-z]+", medium_text, 1)
+    benchmark_match(
         "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
     )
 
@@ -440,7 +440,7 @@ def main():
         phone_text,
         50,
     )
-    benchmark_match_first(
+    benchmark_match(
         "phone_validation",
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$",
         "234-567-8901",

@@ -1,11 +1,11 @@
 from testing import assert_equal, assert_true, assert_raises
 
-from regex.nfa import match_first, findall
+from regex.nfa import match, findall
 
 
 def test_simplest():
     """Test the simplest case: single character match."""
-    var result = match_first("a", "a")
+    var result = match("a", "a")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -14,7 +14,7 @@ def test_simplest():
 
 def test_simplest_with_wildcard():
     """Test wildcard matching any character."""
-    var result = match_first(".", "a")
+    var result = match(".", "a")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -23,7 +23,7 @@ def test_simplest_with_wildcard():
 
 def test_simplest_but_longer():
     """Test longer pattern matching."""
-    var result = match_first("a.c", "abc")
+    var result = match("a.c", "abc")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -32,7 +32,7 @@ def test_simplest_but_longer():
 
 def test_wildcard():
     """Test wildcard with quantifier."""
-    var result = match_first(".*a", "aa")
+    var result = match(".*a", "aa")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -41,7 +41,7 @@ def test_wildcard():
 
 def test_backtracking():
     """Test backtracking with quantifiers."""
-    var result = match_first("a*a", "aaaa")
+    var result = match("a*a", "aaaa")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -50,7 +50,7 @@ def test_backtracking():
 
 def test_or():
     """Test alternation (OR) matching."""
-    var result = match_first("a.*|b", "b")
+    var result = match("a.*|b", "b")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -59,7 +59,7 @@ def test_or():
 
 def test_anchor_start():
     """Test start anchor (^)."""
-    var result = match_first("^a", "abc")
+    var result = match("^a", "abc")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -69,7 +69,7 @@ def test_anchor_start():
 # TODO: Uncomment when test is fixed
 # def test_anchor_end():
 #     """Test end anchor ($)."""
-#     var result = match_first("c$", "abc")
+#     var result = match("c$", "abc")
 #     assert_true(result)
 #     var matched = result.value()
 #     var consumed = matched.end_idx - matched.start_idx
@@ -78,19 +78,19 @@ def test_anchor_start():
 
 def test_or_no_match():
     """Test OR pattern that should not match."""
-    var result = match_first("^a|b$", "c")
+    var result = match("^a|b$", "c")
     assert_true(not result)
 
 
 def test_or_no_match_with_bt():
     """Test OR pattern with backtracking that should not match."""
-    var result = match_first("a|b", "c")
+    var result = match("a|b", "c")
     assert_true(not result)
 
 
 def test_match_group_zero_or_more():
     """Test group with zero or more quantifier."""
-    var result = match_first("(a)*", "aa")
+    var result = match("(a)*", "aa")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -99,13 +99,13 @@ def test_match_group_zero_or_more():
 
 def test_fail_group_one_or_more():
     """Test group one or more that should fail."""
-    var result = match_first("^(a)+", "b")
+    var result = match("^(a)+", "b")
     assert_true(not result)
 
 
 def test_match_or_left():
     """Test OR pattern matching left side."""
-    var result = match_first("na|nb", "na")
+    var result = match("na|nb", "na")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -114,7 +114,7 @@ def test_match_or_left():
 
 def test_match_or_right():
     """Test OR pattern matching right side."""
-    var result = match_first("na|nb", "nb")
+    var result = match("na|nb", "nb")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -123,7 +123,7 @@ def test_match_or_right():
 
 def test_match_space():
     """Test space matching with \\s."""
-    var result = match_first("\\s", " ")
+    var result = match("\\s", " ")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -132,7 +132,7 @@ def test_match_space():
 
 def test_match_space_tab():
     """Test space matching tab with \\s."""
-    var result = match_first("\\s", "\t")
+    var result = match("\\s", "\t")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -141,7 +141,7 @@ def test_match_space_tab():
 
 def test_match_or_right_at_start_end():
     """Test OR pattern with anchors."""
-    var result = match_first("^na|nb$", "nb")
+    var result = match("^na|nb$", "nb")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -150,17 +150,17 @@ def test_match_or_right_at_start_end():
 
 def test_no_match_after_end():
     """Test that pattern doesn't match when there's extra content."""
-    var result = match_first("^na|nb$", "nb ")
+    var result = match("^na|nb$", "nb ")
     assert_true(not result)
 
     # But simpler end anchor test works correctly
-    var result2 = match_first("nb$", "nb ")
+    var result2 = match("nb$", "nb ")
     assert_true(not result2)  # This correctly fails
 
 
 def test_bt_index_group():
     """Test backtracking with optional group."""
-    var result = match_first("^x(a)?ac$", "xac")
+    var result = match("^x(a)?ac$", "xac")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -170,28 +170,28 @@ def test_bt_index_group():
 def test_match_sequence_with_start_end():
     """Test various start/end anchor combinations."""
     # Should match 'a' at start, ignoring rest
-    var result1 = match_first("^a|b$", "a  ")
+    var result1 = match("^a|b$", "a  ")
     assert_true(result1)
 
     # Should not match 'a' when not at start
-    var result2 = match_first("^a|b$", " a  ")
+    var result2 = match("^a|b$", " a  ")
     assert_true(not result2)
 
     # Should match 'b' at end, ignoring prefix
     # Not passing yet
-    # var result3 = match_first("^a|b$", "  b")
+    # var result3 = match("^a|b$", "  b")
     # assert_true(result3)
 
 
 def test_question_mark():
     """Test question mark quantifier."""
-    var result1 = match_first("https?://", "http://")
+    var result1 = match("https?://", "http://")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 7)
 
-    var result2 = match_first("https?://", "https://")
+    var result2 = match("https?://", "https://")
     assert_true(result2)
     var matched2 = result2.value()
     var consumed2 = matched2.end_idx - matched2.start_idx
@@ -200,7 +200,7 @@ def test_question_mark():
 
 def test_bt_index_leaf():
     """Test backtracking with leaf elements."""
-    var result = match_first("^aaaa.*a$", "aaaaa")
+    var result = match("^aaaa.*a$", "aaaaa")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -209,7 +209,7 @@ def test_bt_index_leaf():
 
 def test_bt_index_or():
     """Test backtracking with OR in group."""
-    var result = match_first("^x(a|b)?bc$", "xbc")
+    var result = match("^x(a|b)?bc$", "xbc")
     assert_true(result)
     var matched = result.value()
     var consumed = matched.end_idx - matched.start_idx
@@ -218,19 +218,19 @@ def test_bt_index_or():
 
 def test_match_empty():
     """Test matching empty strings."""
-    var result1 = match_first("^$", "")
+    var result1 = match("^$", "")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 0)
 
-    var result2 = match_first("$", "")
+    var result2 = match("$", "")
     assert_true(result2)
     var matched2 = result2.value()
     var consumed2 = matched2.end_idx - matched2.start_idx
     assert_equal(consumed2, 0)
 
-    var result3 = match_first("^", "")
+    var result3 = match("^", "")
     assert_true(result3)
     var matched3 = result3.value()
     var consumed3 = matched3.end_idx - matched3.start_idx
@@ -240,62 +240,62 @@ def test_match_empty():
 def test_match_space_extended():
     """Test extended space matching with various characters."""
     # Test newline
-    var result1 = match_first("\\s", "\n")
+    var result1 = match("\\s", "\n")
     assert_true(result1)
 
     # Test carriage return
-    var result2 = match_first("\\s", "\r")
+    var result2 = match("\\s", "\r")
     assert_true(result2)
 
     # Test form feed
-    var result3 = match_first("\\s", "\f")
+    var result3 = match("\\s", "\f")
     assert_true(result3)
 
 
 def test_match_space_quantified():
     """Test space matching with quantifiers."""
-    var result1 = match_first("\\s+", "\r\t\n \f")
+    var result1 = match("\\s+", "\r\t\n \f")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 5)
 
     # This should fail because \r\t is 2 chars but ^..$ expects exact match
-    var result2 = match_first("^\\s$", "\r\t")
+    var result2 = match("^\\s$", "\r\t")
     assert_true(not result2)
 
 
 def test_character_ranges():
     """Test basic character range matching."""
     # Test [a-z] range
-    var result1 = match_first("[a-z]", "m")
+    var result1 = match("[a-z]", "m")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 1)
 
     # Test [0-9] range
-    var result2 = match_first("[0-9]", "5")
+    var result2 = match("[0-9]", "5")
     assert_true(result2)
     var matched2 = result2.value()
     var consumed2 = matched2.end_idx - matched2.start_idx
     assert_equal(consumed2, 1)
 
     # Test negated range [^a-z]
-    var result3 = match_first("[^a-z]", "5")
+    var result3 = match("[^a-z]", "5")
     assert_true(result3)
     var matched3 = result3.value()
     var consumed3 = matched3.end_idx - matched3.start_idx
     assert_equal(consumed3, 1)
 
     # Test that [^a-z] doesn't match lowercase
-    var result4 = match_first("[^a-z]", "m")
+    var result4 = match("[^a-z]", "m")
     assert_true(not result4)
 
 
 def test_character_ranges_quantified():
     """Test character ranges with quantifiers."""
-    var result1 = match_first("[a-z]+", "hello")
+    var result1 = match("[a-z]+", "hello")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
@@ -305,18 +305,18 @@ def test_character_ranges_quantified():
 def test_curly_brace_quantifiers():
     """Test curly brace quantifiers {n}, {n,m}."""
     # Test exact quantifier {3}
-    var result1 = match_first("a{3}", "aaa")
+    var result1 = match("a{3}", "aaa")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 3)
 
     # Test that a{3} doesn't match 2 a's
-    var result2 = match_first("a{3}", "aa")
+    var result2 = match("a{3}", "aa")
     assert_true(not result2)
 
     # Test range quantifier {2,4}
-    var result3 = match_first("a{2,4}", "aaa")
+    var result3 = match("a{2,4}", "aaa")
     assert_true(result3)
     var matched3 = result3.value()
     var consumed3 = matched3.end_idx - matched3.start_idx
@@ -326,46 +326,46 @@ def test_curly_brace_quantifiers():
 def test_complex_pattern_with_ranges():
     """Test complex patterns combining groups, ranges, and quantifiers."""
     # Test basic range functionality
-    var result1 = match_first("[c-n]", "h")
+    var result1 = match("[c-n]", "h")
     assert_true(result1)
 
     # Test range with quantifier
-    var result2 = match_first("a[c-n]+", "ahh")
+    var result2 = match("a[c-n]+", "ahh")
     assert_true(result2)
     var matched2 = result2.value()
     var consumed2 = matched2.end_idx - matched2.start_idx
     assert_equal(consumed2, 3)
 
     # Test basic group with OR and range - debug first
-    var test_range_alone = match_first("[c-n]", "h")
+    var test_range_alone = match("[c-n]", "h")
     print("Range alone [c-n] on h:", test_range_alone.__bool__())
 
-    var test_or_simple = match_first("(a|b)", "b")
+    var test_or_simple = match("(a|b)", "b")
     print("Simple OR (a|b) on b:", test_or_simple.__bool__())
 
-    var result3 = match_first("(b|[c-n])", "h")
+    var result3 = match("(b|[c-n])", "h")
     print("Group OR (b|[c-n]) on h:", result3.__bool__())
     assert_true(result3)
 
     # Test quantified curly braces
-    var result4 = match_first("b{3}", "bbb")
+    var result4 = match("b{3}", "bbb")
     assert_true(result4)
 
 
 def test_email_validation_simple():
     """Test simple email validation patterns."""
     # Test basic email-like pattern
-    var result1 = match_first(".*@.*", "vr@gmail.com")
+    var result1 = match(".*@.*", "vr@gmail.com")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 12)
 
     # Test pattern with alternation - debug first
-    var test_alt = match_first("(com|it)", "com")
+    var test_alt = match("(com|it)", "com")
     print("Simple alternation (com|it) on com:", test_alt.__bool__())
 
-    var result2 = match_first(".*(com|it)", "gmail.com")
+    var result2 = match(".*(com|it)", "gmail.com")
     print("Complex .*(com|it) on gmail.com:", result2.__bool__())
     assert_true(result2)
 
@@ -373,14 +373,14 @@ def test_email_validation_simple():
 def test_multiple_patterns():
     """Test various regex patterns."""
     # Test pattern with optional group and anchors
-    var result1 = match_first("^x(a|b)?bc$", "xbc")
+    var result1 = match("^x(a|b)?bc$", "xbc")
     assert_true(result1)
     var matched1 = result1.value()
     var consumed1 = matched1.end_idx - matched1.start_idx
     assert_equal(consumed1, 3)
 
     # Test complex backtracking pattern
-    var result2 = match_first("^aaaa.*a$", "aaaaa")
+    var result2 = match("^aaaa.*a$", "aaaaa")
     assert_true(result2)
     var matched2 = result2.value()
     var consumed2 = matched2.end_idx - matched2.start_idx
@@ -1034,7 +1034,7 @@ def test_phone_numbers():
     # Simplified phone number pattern that works with current implementation
     # This tests basic phone number matching with + prefix and digit sequences
     pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
-    result = match_first(pattern, "+1-541-236-5432")
+    result = match(pattern, "+1-541-236-5432")
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), "+1-541-236-5432")
 
@@ -1042,11 +1042,11 @@ def test_phone_numbers():
 def test_es_phone_numbers():
     es_pattern = "[5-9]\\d{8}"
     phone = "810123456"
-    var result = match_first(es_pattern, phone)
+    var result = match(es_pattern, phone)
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), phone)
     es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
-    var result2 = match_first(es_fixed_line_pattern, phone)
+    var result2 = match(es_fixed_line_pattern, phone)
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), phone)
 
@@ -1065,7 +1065,7 @@ def test_comprehensive_spanish_phone_patterns():
 
     for i in range(len(mobile_numbers)):
         var number = mobile_numbers[i]
-        var result = match_first(mobile_pattern, number)
+        var result = match(mobile_pattern, number)
         assert_true(result.__bool__())
         assert_equal(result.value().get_match_text(), number)
 
@@ -1077,29 +1077,29 @@ def test_comprehensive_spanish_phone_patterns():
 
     for i in range(len(invalid_numbers)):
         var number = invalid_numbers[i]
-        var result = match_first(mobile_pattern, number)
+        var result = match(mobile_pattern, number)
         assert_true(not result.__bool__())
 
 
 def test_non_capturing_groups_comprehensive():
     """Test non-capturing groups in various contexts."""
     # Test simple non-capturing group
-    var result1 = match_first("(?:ab)+", "ababab")
+    var result1 = match("(?:ab)+", "ababab")
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "ababab")
 
     # Test non-capturing groups with simple alternation
-    var result2 = match_first("(?:cat|dog)", "cat")
+    var result2 = match("(?:cat|dog)", "cat")
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), "cat")
 
     # Test non-capturing groups with alternation and quantifier
-    var result3 = match_first("(?:a|b)+", "ababab")
+    var result3 = match("(?:a|b)+", "ababab")
     assert_true(result3.__bool__())
     assert_equal(result3.value().get_match_text(), "ababab")
 
     # Test nested non-capturing groups with alternation
-    var result4 = match_first("(?:(?:a|b)(?:c|d))+", "acbdac")
+    var result4 = match("(?:(?:a|b)(?:c|d))+", "acbdac")
     assert_true(result4.__bool__())
     assert_equal(result4.value().get_match_text(), "acbdac")
 
@@ -1107,35 +1107,35 @@ def test_non_capturing_groups_comprehensive():
 def test_complex_alternation_patterns():
     """Test complex alternation patterns like those in phone numbers."""
     # Test multiple character class alternations
-    var result1 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "81")
+    var result1 = match("(?:[1356]\\d|[28][0-8]|[47][1-9])", "81")
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "81")
 
     # Test different branches
-    var result2 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "15")
+    var result2 = match("(?:[1356]\\d|[28][0-8]|[47][1-9])", "15")
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), "15")
 
-    var result3 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "41")
+    var result3 = match("(?:[1356]\\d|[28][0-8]|[47][1-9])", "41")
     assert_true(result3.__bool__())
     assert_equal(result3.value().get_match_text(), "41")
 
     # Test pattern that should not match
-    var result4 = match_first("(?:[1356]\\d|[28][0-8]|[47][1-9])", "09")
+    var result4 = match("(?:[1356]\\d|[28][0-8]|[47][1-9])", "09")
     assert_true(not result4.__bool__())
 
 
-def test_match_first_vs_search_behavior():
-    """Test that match_first behaves like Python's re.match (only matches at start).
+def test_match_vs_search_behavior():
+    """Test that match behaves like Python's re.match (only matches at start).
     """
-    # Test case: pattern "world" should NOT match in "hello world" with match_first
-    var result1 = match_first("world", "hello world")
+    # Test case: pattern "world" should NOT match in "hello world" with match
+    var result1 = match("world", "hello world")
     assert_true(
         not result1.__bool__()
     )  # Should fail because "world" is not at position 0
 
-    # Test case: pattern "hello" SHOULD match in "hello world" with match_first
-    var result2 = match_first("hello", "hello world")
+    # Test case: pattern "hello" SHOULD match in "hello world" with match
+    var result2 = match("hello", "hello world")
     assert_true(
         result2.__bool__()
     )  # Should succeed because "hello" starts at position 0
@@ -1145,28 +1145,28 @@ def test_match_first_vs_search_behavior():
     assert_equal(match2.get_match_text(), "hello")
 
     # Test case: pattern should not match if there's prefix
-    var result3 = match_first("hello", "say hello")
+    var result3 = match("hello", "say hello")
     assert_true(
         not result3.__bool__()
     )  # Should fail because "hello" is not at position 0
 
 
-def test_match_first_anchored_patterns():
-    """Test match_first with explicitly anchored patterns."""
+def test_match_anchored_patterns():
+    """Test match with explicitly anchored patterns."""
     # Test explicit start anchor
-    var result1 = match_first("^hello", "hello world")
+    var result1 = match("^hello", "hello world")
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.get_match_text(), "hello")
 
     # Test that it fails when not at start
-    var result2 = match_first("^hello", "say hello")
+    var result2 = match("^hello", "say hello")
     assert_true(not result2.__bool__())
 
 
-def test_match_first_empty_pattern():
-    """Test match_first with empty pattern."""
-    var result1 = match_first("", "hello")
+def test_match_empty_pattern():
+    """Test match with empty pattern."""
+    var result1 = match("", "hello")
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -1178,8 +1178,8 @@ def test_specific_user_issue():
     """Test the specific issue mentioned: 'world' pattern should NOT match 'hello world'.
     """
     # This is the exact case the user mentioned
-    var result = match_first("world", "hello world")
-    print("NFA match_first('world', 'hello world') result:", result.__bool__())
+    var result = match("world", "hello world")
+    print("NFA match('world', 'hello world') result:", result.__bool__())
 
     # This should be False according to Python's re.match() behavior
     assert_true(not result.__bool__())
@@ -1188,9 +1188,9 @@ def test_specific_user_issue():
     from regex.matcher import CompiledRegex
 
     var regex = CompiledRegex("world")
-    var hybrid_result = regex.match_first("hello world")
+    var hybrid_result = regex.match("hello world")
     print(
-        "Hybrid match_first('world', 'hello world') result:",
+        "Hybrid match('world', 'hello world') result:",
         hybrid_result.__bool__(),
     )
 
@@ -1200,7 +1200,7 @@ def test_specific_user_issue():
 
 def test_nfa_digit_basic():
     """Test NFA digit matching with \\d."""
-    var result = match_first("\\d", "7")
+    var result = match("\\d", "7")
     assert_true(result)
     var matched = result.value()
     assert_equal(matched.get_match_text(), "7")
@@ -1210,7 +1210,7 @@ def test_nfa_digit_all_digits():
     """Test \\d matches all digits 0-9."""
     for i in range(10):
         var digit_char = String(i)
-        var result = match_first("\\d", digit_char)
+        var result = match("\\d", digit_char)
         assert_true(result)
         var matched = result.value()
         assert_equal(matched.get_match_text(), digit_char)
@@ -1218,26 +1218,26 @@ def test_nfa_digit_all_digits():
 
 def test_nfa_digit_not_match_letter():
     """Test \\d does not match non-digits."""
-    var result1 = match_first("\\d", "a")
+    var result1 = match("\\d", "a")
     assert_true(not result1)
 
-    var result2 = match_first("\\d", "@")
+    var result2 = match("\\d", "@")
     assert_true(not result2)
 
 
 def test_nfa_digit_quantifiers():
     """Test \\d with quantifiers."""
-    var result1 = match_first("\\d+", "12345")
+    var result1 = match("\\d+", "12345")
     assert_true(result1)
     var matched1 = result1.value()
     assert_equal(matched1.get_match_text(), "12345")
 
-    var result2 = match_first("\\d*", "")
+    var result2 = match("\\d*", "")
     assert_true(result2)
     var matched2 = result2.value()
     assert_equal(matched2.get_match_text(), "")
 
-    var result3 = match_first("\\d?", "9")
+    var result3 = match("\\d?", "9")
     assert_true(result3)
     var matched3 = result3.value()
     assert_equal(matched3.get_match_text(), "9")
@@ -1245,7 +1245,7 @@ def test_nfa_digit_quantifiers():
 
 def test_nfa_word_basic():
     """Test NFA word character matching with \\w."""
-    var result = match_first("\\w", "a")
+    var result = match("\\w", "a")
     assert_true(result)
     var matched = result.value()
     assert_equal(matched.get_match_text(), "a")
@@ -1253,44 +1253,44 @@ def test_nfa_word_basic():
 
 def test_nfa_word_all_types():
     """Test \\w matches letters, digits, and underscore."""
-    var result1 = match_first("\\w", "a")
+    var result1 = match("\\w", "a")
     assert_true(result1)
 
-    var result2 = match_first("\\w", "Z")
+    var result2 = match("\\w", "Z")
     assert_true(result2)
 
-    var result3 = match_first("\\w", "5")
+    var result3 = match("\\w", "5")
     assert_true(result3)
 
-    var result4 = match_first("\\w", "_")
+    var result4 = match("\\w", "_")
     assert_true(result4)
 
 
 def test_nfa_word_not_match_special():
     """Test \\w does not match special characters."""
-    var result1 = match_first("\\w", "@")
+    var result1 = match("\\w", "@")
     assert_true(not result1)
 
-    var result2 = match_first("\\w", " ")
+    var result2 = match("\\w", " ")
     assert_true(not result2)
 
-    var result3 = match_first("\\w", "-")
+    var result3 = match("\\w", "-")
     assert_true(not result3)
 
 
 def test_nfa_word_quantifiers():
     """Test \\w with quantifiers."""
-    var result1 = match_first("\\w+", "hello_world123")
+    var result1 = match("\\w+", "hello_world123")
     assert_true(result1)
     var matched1 = result1.value()
     assert_equal(matched1.get_match_text(), "hello_world123")
 
-    var result2 = match_first("\\w*", "")
+    var result2 = match("\\w*", "")
     assert_true(result2)
     var matched2 = result2.value()
     assert_equal(matched2.get_match_text(), "")
 
-    var result3 = match_first("\\w?", "a")
+    var result3 = match("\\w?", "a")
     assert_true(result3)
     var matched3 = result3.value()
     assert_equal(matched3.get_match_text(), "a")

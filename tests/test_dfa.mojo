@@ -14,7 +14,7 @@ def test_dfa_literal_pattern():
     dfa.compile_pattern("hello", False, False)
 
     # Test successful match
-    var result1 = dfa.match_first("hello world", 0)
+    var result1 = dfa.match("hello world", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -22,12 +22,12 @@ def test_dfa_literal_pattern():
     assert_equal(match1.get_match_text(), "hello")
 
     # Test in middle of string
-    var result2 = dfa.match_first("say hello there", 0)
+    var result2 = dfa.match("say hello there", 0)
     # Python equivalent would also return False if not at start
     assert_false(result2.__bool__())
 
     # Test no match
-    var result3 = dfa.match_first("goodbye world", 0)
+    var result3 = dfa.match("goodbye world", 0)
     assert_false(result3.__bool__())
 
 
@@ -37,14 +37,14 @@ def test_dfa_empty_pattern():
     dfa.compile_pattern("", False, False)
 
     # Empty pattern should match at any position
-    var result1 = dfa.match_first("hello", 0)
+    var result1 = dfa.match("hello", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
     assert_equal(match1.end_idx, 0)
 
     # Should also match in empty string
-    var result2 = dfa.match_first("", 0)
+    var result2 = dfa.match("", 0)
     assert_true(result2.__bool__())
 
 
@@ -54,14 +54,14 @@ def test_dfa_character_class():
     dfa.compile_character_class("abcdefghijklmnopqrstuvwxyz", 1, -1)  # [a-z]+
 
     # Test successful match
-    var result1 = dfa.match_first("hello123", 0)
+    var result1 = dfa.match("hello123", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
     assert_equal(match1.end_idx, 5)
     assert_equal(match1.get_match_text(), "hello")
 
-    var result2 = dfa.match_first("123hello", 0)
+    var result2 = dfa.match("123hello", 0)
     # Like Python, this should return False if not at start
     assert_false(result2.__bool__())
 
@@ -116,7 +116,7 @@ def test_compile_dfa_pattern():
     var ast1 = parse("hello")
     var dfa1 = compile_dfa_pattern(ast1)
 
-    var result1 = dfa1.match_first("hello world", 0)
+    var result1 = dfa1.match("hello world", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "hello")
 
@@ -127,12 +127,12 @@ def test_dfa_single_character():
     dfa.compile_pattern("a", False, False)
 
     # Should match single character
-    var result1 = dfa.match_first("a", 0)
+    var result1 = dfa.match("a", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "a")
 
     # Should match in longer string
-    var result2 = dfa.match_first("banana", 0)
+    var result2 = dfa.match("banana", 0)
     # Like Python, this should return False if not at start
     assert_false(result2.__bool__())
 
@@ -143,14 +143,14 @@ def test_dfa_case_sensitive():
     dfa.compile_pattern("Hello", False, False)
 
     # Should match exact case
-    var result1 = dfa.match_first("Hello World", 0)
+    var result1 = dfa.match("Hello World", 0)
     assert_true(result1.__bool__())
 
     # Should not match different case
-    var result2 = dfa.match_first("hello world", 0)
+    var result2 = dfa.match("hello world", 0)
     assert_false(result2.__bool__())
 
-    var result3 = dfa.match_first("HELLO WORLD", 0)
+    var result3 = dfa.match("HELLO WORLD", 0)
     assert_false(result3.__bool__())
 
 
@@ -176,16 +176,16 @@ def test_dfa_state_transitions():
     dfa.compile_pattern("abc", False, False)
 
     # Should match complete pattern
-    var result1 = dfa.match_first("abc", 0)
+    var result1 = dfa.match("abc", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "abc")
 
     # Should not match partial pattern
-    var result2 = dfa.match_first("ab", 0)
+    var result2 = dfa.match("ab", 0)
     assert_false(result2.__bool__())
 
     # Should not match with extra characters in between
-    var result3 = dfa.match_first("axbc", 0)
+    var result3 = dfa.match("axbc", 0)
     assert_false(result3.__bool__())
 
 
@@ -195,7 +195,7 @@ def test_dfa_start_anchor():
     dfa.compile_pattern("hello", True, False)  # ^hello
 
     # Should match at start
-    var result1 = dfa.match_first("hello world", 0)
+    var result1 = dfa.match("hello world", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -203,11 +203,11 @@ def test_dfa_start_anchor():
     assert_equal(match1.get_match_text(), "hello")
 
     # Should not match when not at start
-    var result2 = dfa.match_first("say hello", 0)
+    var result2 = dfa.match("say hello", 0)
     assert_false(result2.__bool__())
 
     # Should not match when start position is not 0
-    var result3 = dfa.match_first("hello world", 1)
+    var result3 = dfa.match("hello world", 1)
     assert_false(result3.__bool__())
 
 
@@ -217,12 +217,12 @@ def test_dfa_end_anchor():
     dfa.compile_pattern("world", False, True)  # world$
 
     # Should match at end
-    var result1 = dfa.match_first("hello world", 0)
+    var result1 = dfa.match("hello world", 0)
     # Like Python, this should return False as "world" is not at the beginning
     assert_false(result1.__bool__())
 
     # Should not match when not at end
-    var result2 = dfa.match_first("world peace", 0)
+    var result2 = dfa.match("world peace", 0)
     assert_false(result2.__bool__())
 
 
@@ -232,7 +232,7 @@ def test_dfa_both_anchors():
     dfa.compile_pattern("hello", True, True)  # ^hello$
 
     # Should match entire string
-    var result1 = dfa.match_first("hello", 0)
+    var result1 = dfa.match("hello", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
@@ -240,10 +240,10 @@ def test_dfa_both_anchors():
     assert_equal(match1.get_match_text(), "hello")
 
     # Should not match if there's extra content
-    var result2 = dfa.match_first("hello world", 0)
+    var result2 = dfa.match("hello world", 0)
     assert_false(result2.__bool__())
 
-    var result3 = dfa.match_first("say hello", 0)
+    var result3 = dfa.match("say hello", 0)
     assert_false(result3.__bool__())
 
 
@@ -253,21 +253,21 @@ def test_dfa_pure_anchors():
     var ast1 = parse("^")
     var dfa1 = compile_dfa_pattern(ast1)
 
-    var result1 = dfa1.match_first("hello", 0)
+    var result1 = dfa1.match("hello", 0)
     assert_true(result1.__bool__())
     var match1 = result1.value()
     assert_equal(match1.start_idx, 0)
     assert_equal(match1.end_idx, 0)  # Zero-width match
 
     # Should not match when not at start
-    var result2 = dfa1.match_first("hello", 1)
+    var result2 = dfa1.match("hello", 1)
     assert_false(result2.__bool__())
 
     # Test end anchor only ($)
     var ast2 = parse("$")
     var dfa2 = compile_dfa_pattern(ast2)
 
-    var result3 = dfa2.match_first("hello", 0)
+    var result3 = dfa2.match("hello", 0)
     # Like Python, this should return False if not at end
     assert_false(result3.__bool__())
 
@@ -309,21 +309,21 @@ def test_dfa_anchors_with_high_level_api():
     var ast1 = parse("^hello")
     var dfa1 = compile_dfa_pattern(ast1)
 
-    var result1 = dfa1.match_first("hello world", 0)
+    var result1 = dfa1.match("hello world", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "hello")
 
     var ast2 = parse("world$")
     var dfa2 = compile_dfa_pattern(ast2)
 
-    var result2 = dfa2.match_first("hello world", 0)
+    var result2 = dfa2.match("hello world", 0)
     # Like Python, this should return False if not at start
     assert_false(result2.__bool__())
 
     var ast3 = parse("^hello$")
     var dfa3 = compile_dfa_pattern(ast3)
 
-    var result3 = dfa3.match_first("hello", 0)
+    var result3 = dfa3.match("hello", 0)
     assert_true(result3.__bool__())
     assert_equal(result3.value().get_match_text(), "hello")
 
@@ -334,7 +334,7 @@ def test_phone_numbers():
     pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
     var ast = parse(pattern)
     var dfa = compile_dfa_pattern(ast)
-    var result = dfa.match_first("+1-541-236-5432", 0)
+    var result = dfa.match("+1-541-236-5432", 0)
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), "+1-541-236-5432")
 
@@ -345,13 +345,13 @@ def test_phone_numbers():
 #     phone = "810123456"
 #     var ast = parse(es_pattern)
 #     var dfa = compile_dfa_pattern(ast)
-#     var result = dfa.match_first(phone, 0)
+#     var result = dfa.match(phone, 0)
 #     assert_true(result.__bool__())
 #     assert_equal(result.value().get_match_text(), phone)
 #     es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
 #     var ast2 = parse(es_fixed_line_pattern)
 #     var dfa2 = compile_dfa_pattern(ast2)
-#     var result2 = dfa2.match_first(phone)
+#     var result2 = dfa2.match(phone)
 #     assert_true(result2.__bool__())
 #     assert_equal(result2.value().get_match_text(), phone)
 
@@ -367,7 +367,7 @@ def test_dfa_state_construction_logic():
     var dfa1 = compile_dfa_pattern(ast1)
 
     # Should work correctly
-    var result1 = dfa1.match_first("hello123", 0)
+    var result1 = dfa1.match("hello123", 0)
     assert_true(result1.__bool__())
     assert_equal(result1.value().get_match_text(), "hello123")
 
@@ -376,16 +376,16 @@ def test_dfa_state_construction_logic():
     var dfa2 = compile_dfa_pattern(ast2)
 
     # Should match capital letter, lowercase letters, then digits
-    var result2 = dfa2.match_first("Hello123", 0)
+    var result2 = dfa2.match("Hello123", 0)
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), "Hello123")
 
     # Should not match without capital letter
-    var result3 = dfa2.match_first("hello123", 0)
+    var result3 = dfa2.match("hello123", 0)
     assert_false(result3.__bool__())
 
     # Should not match without digits
-    var result4 = dfa2.match_first("Hello", 0)
+    var result4 = dfa2.match("Hello", 0)
     assert_false(result4.__bool__())
 
 
@@ -400,7 +400,7 @@ def test_dfa_optional_element_state_logic():
     var dfa = compile_dfa_pattern(ast)
 
     # Case 1: No letters, just digits (should work when fixed)
-    var result1 = dfa.match_first("123", 0)
+    var result1 = dfa.match("123", 0)
     # NOTE: This currently fails but should pass when the epsilon transition logic is fixed
     # For now, just verify it doesn't crash and returns a result
     var _ = (
@@ -410,12 +410,12 @@ def test_dfa_optional_element_state_logic():
     # TODO: Uncomment when fixed: assert_equal(result1.value().get_match_text(), "123")
 
     # Case 2: Letters followed by digits (should work)
-    var result2 = dfa.match_first("abc123", 0)
+    var result2 = dfa.match("abc123", 0)
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), "abc123")
 
     # Case 3: Only letters, no digits (should fail)
-    var result3 = dfa.match_first("abc", 0)
+    var result3 = dfa.match("abc", 0)
     assert_false(result3.__bool__())
 
     # This test documents the current behavior and will catch regressions

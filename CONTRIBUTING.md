@@ -73,7 +73,7 @@ The regex library uses a hybrid DFA/NFA architecture with intelligent pattern ro
 #### 8. **NFA Engine** (`src/regex/nfa.mojo`)
 - **Purpose**: Non-deterministic finite automaton with backtracking
 - **Algorithm**: Recursive backtracking with greedy matching
-- **Key functions**: `match_first()`, `match_node()`, `match_quantified()`
+- **Key functions**: `match()`, `match_node()`, `match_quantified()`
 - **Features**: Full regex support including groups, alternation, complex patterns
 
 ### Data Flow Example
@@ -172,7 +172,7 @@ Check the TO-DO section in the README for current feature requests and improveme
 5. **Write tests** for all new functionality
 
 ### Naming Conventions
-- **Functions**: `snake_case` (e.g., `match_first`, `parse_token_list`)
+- **Functions**: `snake_case` (e.g., `match`, `parse_token_list`)
 - **Structs**: `PascalCase` (e.g., `ASTNode`, `Token`)
 - **Constants using aliases**: `UPPER_CASE` (e.g., `ELEMENT`, `WILDCARD`)
 - **Files**: `snake_case.mojo` (e.g., `test_engine.mojo`)

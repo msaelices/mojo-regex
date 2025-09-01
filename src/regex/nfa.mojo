@@ -211,7 +211,7 @@ struct NFAEngine(Copyable, Engine):
                         text,
                         try_pos,
                         temp_matches,
-                        match_first_mode=False,
+                        match_mode=False,
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
@@ -244,7 +244,7 @@ struct NFAEngine(Copyable, Engine):
                     text,
                     current_pos,
                     temp_matches,
-                    match_first_mode=False,
+                    match_mode=False,
                     required_start_pos=-1,
                 )
                 if result[0]:  # Match found
@@ -266,7 +266,7 @@ struct NFAEngine(Copyable, Engine):
 
         return matches^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
 
@@ -292,13 +292,13 @@ struct NFAEngine(Copyable, Engine):
                 return None
 
         # Try to match at the exact start position only (like Python's re.match)
-        # Use match_first_mode for optimized early termination
+        # Use match_mode for optimized early termination
         var result = self._match_node(
             ast,
             text,
             str_i,
             matches,
-            match_first_mode=True,
+            match_mode=True,
             required_start_pos=start,
         )
         if result[0]:  # Match found
@@ -368,7 +368,7 @@ struct NFAEngine(Copyable, Engine):
                         text,
                         try_pos,
                         matches,
-                        match_first_mode=False,
+                        match_mode=False,
                         required_start_pos=-1,
                     )
                     if result[0]:  # Match found
@@ -391,7 +391,7 @@ struct NFAEngine(Copyable, Engine):
                     text,
                     search_pos,
                     matches,
-                    match_first_mode=False,
+                    match_mode=False,
                     required_start_pos=-1,
                 )
                 if result[0]:  # Match found
@@ -483,7 +483,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool = False,
+        match_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
         """Core matching function that processes AST nodes recursively.
@@ -493,8 +493,8 @@ struct NFAEngine(Copyable, Engine):
             str: The input string
             str_i: Current position in string
             matches: List to collect matched groups
-            match_first_mode: If True, optimize for match_first() with early termination
-            required_start_pos: Required starting position for match_first mode (-1 if not applicable)
+            match_mode: If True, optimize for match() with early termination
+            required_start_pos: Required starting position for match mode (-1 if not applicable)
 
         Returns:
             Tuple of (success, final_position)
@@ -518,27 +518,27 @@ struct NFAEngine(Copyable, Engine):
 
         if ast.type == ELEMENT:
             return self._match_element(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == WILDCARD:
             return self._match_wildcard(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == SPACE:
             return self._match_space(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == DIGIT:
             return self._match_digit(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == WORD:
             return self._match_word(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == RANGE:
             return self._match_range(
-                ast, str, str_i, match_first_mode, required_start_pos
+                ast, str, str_i, match_mode, required_start_pos
             )
         elif ast.type == START:
             return self._match_start(ast, str_i)
@@ -550,7 +550,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
         elif ast.type == GROUP:
@@ -559,7 +559,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
         elif ast.type == RE:
@@ -568,7 +568,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
         else:
@@ -580,7 +580,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a literal character element."""
@@ -590,7 +590,7 @@ struct NFAEngine(Copyable, Engine):
         var ch = String(str[str_i])
         if ast.get_value() and ast.get_value().value() == ch:
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -601,7 +601,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match wildcard (.) - any character except newline."""
@@ -611,7 +611,7 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = ord(str[str_i])
         if ch_code != CHAR_NEWLINE:  # Exclude newline
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -622,7 +622,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match whitespace character (\\s)."""
@@ -634,7 +634,7 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = ord(str[str_i])
         if whitespace_matcher.contains(ch_code):
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -645,7 +645,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
@@ -655,7 +655,7 @@ struct NFAEngine(Copyable, Engine):
                 ast.min == 0
             ):  # Only allow zero matches if min quantifier is 0 (*, ?)
                 return self._apply_quantifier(
-                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                    ast, str, str_i, 0, match_mode, required_start_pos
                 )
             else:
                 return (False, str_i)
@@ -665,7 +665,7 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = ord(str[str_i])
         if digit_matcher.contains(ch_code):
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             # Character doesn't match - check if quantifier allows zero matches
@@ -673,7 +673,7 @@ struct NFAEngine(Copyable, Engine):
                 ast.min == 0
             ):  # Only allow zero matches if min quantifier is 0 (*, ?)
                 return self._apply_quantifier(
-                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                    ast, str, str_i, 0, match_mode, required_start_pos
                 )
             else:
                 return (False, str_i)
@@ -684,7 +684,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match word character (\\w)."""
@@ -694,7 +694,7 @@ struct NFAEngine(Copyable, Engine):
                 ast.min == 0
             ):  # Only allow zero matches if min quantifier is 0 (*, ?)
                 return self._apply_quantifier(
-                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                    ast, str, str_i, 0, match_mode, required_start_pos
                 )
             else:
                 return (False, str_i)
@@ -704,7 +704,7 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = ord(str[str_i])
         if word_matcher.contains(ch_code):
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             # Character doesn't match - check if quantifier allows zero matches
@@ -712,7 +712,7 @@ struct NFAEngine(Copyable, Engine):
                 ast.min == 0
             ):  # Only allow zero matches if min quantifier is 0 (*, ?)
                 return self._apply_quantifier(
-                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                    ast, str, str_i, 0, match_mode, required_start_pos
                 )
             else:
                 return (False, str_i)
@@ -723,7 +723,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match character range [abc] or [^abc]."""
@@ -787,7 +787,7 @@ struct NFAEngine(Copyable, Engine):
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
-                ast, str, str_i, 1, match_first_mode, required_start_pos
+                ast, str, str_i, 1, match_mode, required_start_pos
             )
         else:
             return (False, str_i)
@@ -833,7 +833,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match OR node - try left branch first, then right."""
@@ -846,7 +846,7 @@ struct NFAEngine(Copyable, Engine):
             str,
             str_i,
             matches,
-            match_first_mode,
+            match_mode,
             required_start_pos,
         )
         if left_result[0]:
@@ -858,7 +858,7 @@ struct NFAEngine(Copyable, Engine):
             str,
             str_i,
             matches,
-            match_first_mode,
+            match_mode,
             required_start_pos,
         )
         return right_result
@@ -869,7 +869,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match GROUP node - process children sequentially with backtracking.
@@ -885,7 +885,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
 
@@ -896,7 +896,7 @@ struct NFAEngine(Copyable, Engine):
             str,
             str_i,
             matches,
-            match_first_mode,
+            match_mode,
             required_start_pos,
         )
         if not result[0]:
@@ -915,7 +915,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a group that has a quantifier applied to it."""
@@ -935,7 +935,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 current_pos,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
             if group_result[0]:
@@ -943,7 +943,7 @@ struct NFAEngine(Copyable, Engine):
                 current_pos = group_result[1]
                 # Conservative early termination check only for extreme cases
                 if (
-                    match_first_mode
+                    match_mode
                     and required_start_pos >= 0
                     and current_pos > required_start_pos + 100
                 ):
@@ -967,7 +967,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a sequence of AST nodes with backtracking support."""
@@ -984,7 +984,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
 
@@ -1000,7 +1000,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
         else:
@@ -1010,7 +1010,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
             if not result[0]:
@@ -1021,7 +1021,7 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 result[1],
                 matches,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
 
@@ -1039,7 +1039,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a quantified node followed by other nodes, with backtracking.
@@ -1058,14 +1058,14 @@ struct NFAEngine(Copyable, Engine):
                 str,
                 str_i,
                 match_count,
-                match_first_mode,
+                match_mode,
                 required_start_pos,
             )
             if consumed >= 0:  # Successfully matched this many times
                 var new_pos = str_i + consumed
                 # Conservative early termination only for extreme cases
                 if (
-                    match_first_mode
+                    match_mode
                     and required_start_pos >= 0
                     and new_pos > required_start_pos + 100
                 ):
@@ -1077,7 +1077,7 @@ struct NFAEngine(Copyable, Engine):
                     str,
                     new_pos,
                     matches,
-                    match_first_mode,
+                    match_mode,
                     required_start_pos,
                 )
                 if result[0]:
@@ -1093,7 +1093,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         count: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Int:
         """Try to match exactly 'count' repetitions of the node. Returns characters consumed or -1.
@@ -1102,9 +1102,9 @@ struct NFAEngine(Copyable, Engine):
         var matched = 0
 
         while matched < count and pos < len(str):
-            # Conservative early termination for match_first_mode only in extreme cases
+            # Conservative early termination for match_mode only in extreme cases
             if (
-                match_first_mode
+                match_mode
                 and required_start_pos >= 0
                 and pos > required_start_pos + 100
             ):
@@ -1127,7 +1127,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         mut matches: List[Match, hint_trivial_type=True],
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match RE root node."""
@@ -1139,7 +1139,7 @@ struct NFAEngine(Copyable, Engine):
             str,
             str_i,
             matches,
-            match_first_mode,
+            match_mode,
             required_start_pos,
         )
 
@@ -1149,7 +1149,7 @@ struct NFAEngine(Copyable, Engine):
         str: String,
         str_i: Int,
         char_consumed: Int,
-        match_first_mode: Bool,
+        match_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Apply quantifier logic to a matched element."""
@@ -1181,14 +1181,14 @@ struct NFAEngine(Copyable, Engine):
             # print("DEBUG: SIMD result =", simd_result[0], simd_result[1])
             return simd_result
 
-        # Use regular greedy matching, but with early termination for match_first_mode
+        # Use regular greedy matching, but with early termination for match_mode
         var matches_count = 0
         var current_pos = str_i
 
         # Try to match as many times as possible (greedy)
         while matches_count < max_matches and current_pos < len(str):
-            # Early termination for match_first_mode: if we're getting too far from start
-            if match_first_mode and required_start_pos >= 0:
+            # Early termination for match_mode: if we're getting too far from start
+            if match_mode and required_start_pos >= 0:
                 # Allow reasonable expansion but prevent excessive backtracking
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
@@ -1508,7 +1508,7 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return engine.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+fn match(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
@@ -1519,7 +1519,7 @@ fn match_first(pattern: String, text: String) raises -> Optional[Match]:
         Optional Match if pattern matches at start of text.
     """
     var engine = NFAEngine(pattern)
-    var result = engine.match_first(text, 0)
+    var result = engine.match(text, 0)
 
     # Python's re.match only succeeds if match starts at position 0
     if result and result.value().start_idx == 0:

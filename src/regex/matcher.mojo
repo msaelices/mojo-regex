@@ -96,7 +96,7 @@ fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 trait RegexMatcher:
     """Interface for different regex matching engines."""
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find the first match in text starting from the given position.
 
         Args:
@@ -151,9 +151,9 @@ struct DFAMatcher(Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.engine_ptr[].match_first(text, start)
+        return self.engine_ptr[].match(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
@@ -192,9 +192,9 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = other.engine^
         self.ast = other.ast^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
-        return self.engine.match_first(text, start)
+        return self.engine.match(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
@@ -449,7 +449,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
 
@@ -466,10 +466,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             and self.complexity.value == PatternComplexity.SIMPLE
         ):
             # Use high-performance DFA for simple patterns
-            return self.dfa_matcher.match_first(text, start)
+            return self.dfa_matcher.match(text, start)
         else:
             # Fall back to NFA for complex patterns
-            return self.nfa_matcher.match_first(text, start)
+            return self.nfa_matcher.match(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
@@ -655,7 +655,7 @@ struct CompiledRegex(Copyable, Movable):
     #         call_location,
     #     )
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
@@ -665,7 +665,7 @@ struct CompiledRegex(Copyable, Movable):
         Returns:
             Optional Match if found.
         """
-        return self.matcher.match_first(text, start)
+        return self.matcher.match(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
@@ -797,7 +797,7 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     """
     var compiled = compile_regex(pattern)
     # search() should find a match anywhere, not just at the beginning
-    # so we use match_next instead of match_first
+    # so we use match_next instead of match
     return compiled.match_next(text)
 
 
@@ -815,7 +815,7 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return compiled.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+fn match(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
@@ -826,7 +826,7 @@ fn match_first(pattern: String, text: String) raises -> Optional[Match]:
         Optional Match if pattern matches at start of text.
     """
     var compiled = compile_regex(pattern)
-    var result = compiled.match_first(text, 0)
+    var result = compiled.match(text, 0)
 
     # Python's re.match only succeeds if match starts at position 0
     if result and result.value().start_idx == 0:
