@@ -132,16 +132,14 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             return self.lookup_table[char_code] == 1
         return False
 
-    fn find_first_match[
-        CHUNK_SIZE: Int
-    ](self, chunk: SIMD[DType.uint8, CHUNK_SIZE]) -> Int:
+    fn find_first_match[size: Int](self, chunk: SIMD[DType.uint8, size]) -> Int:
         """Find first character in SIMD chunk that matches this class.
 
         This method operates directly on SIMD vectors, avoiding string slicing overhead.
         Optimized for early return - exits as soon as first match is found.
 
         Parameters:
-            CHUNK_SIZE: Size of the SIMD chunk to process.
+            size: Size of the SIMD chunk to process.
 
         Args:
             chunk: SIMD vector of characters to check.
@@ -153,23 +151,23 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         if self.use_shuffle:
 
             @parameter
-            if CHUNK_SIZE == 16 or CHUNK_SIZE == 32:
+            if size == 16 or size == 32:
                 # Fast path: use _dynamic_shuffle for optimal sizes
                 var result = self.lookup_table._dynamic_shuffle(chunk)
 
                 # Find first matching position immediately without creating boolean vector
                 @parameter
-                for i in range(CHUNK_SIZE):
+                for i in range(size):
                     if result[i] != 0:
                         return i
                 return -1
             else:
                 # Fallback for other sizes - process in 16-byte sub-chunks
                 @parameter
-                for offset in range(0, CHUNK_SIZE, 16):
+                for offset in range(0, size, 16):
 
                     @parameter
-                    if offset + 16 <= CHUNK_SIZE:
+                    if offset + 16 <= size:
                         var sub_chunk = chunk.slice[16, offset=offset]()
                         var sub_result = self.lookup_table._dynamic_shuffle(
                             sub_chunk
@@ -179,7 +177,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
                                 return offset + i
                     else:
                         # Handle remaining elements
-                        for i in range(offset, CHUNK_SIZE):
+                        for i in range(offset, size):
                             var char_code = Int(chunk[i])
                             if self.lookup_table[char_code] == 1:
                                 return i
@@ -187,7 +185,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
         else:
             # Simple lookup for small character classes - early return optimization
             @parameter
-            for i in range(CHUNK_SIZE):
+            for i in range(size):
                 var char_code = Int(chunk[i])
                 if char_code < 256 and self.lookup_table[char_code] == 1:
                     return i
