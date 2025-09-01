@@ -44,9 +44,9 @@
 ### Basic Usage
 
 ```mojo
-from regex import match_first, findall, search
+from regex import match, findall, search
 
-var result = match_first("hello", "hello world")
+var result = match("hello", "hello world")
 if result:
     print("Match found:", result.value().get_match_text())
 
@@ -61,7 +61,7 @@ var search_result = search("world", "hello world")
 print("Search found:", search_result.value().get_match_text())
 ```
 
-* Note: *The `match_first` should be just `match` but `match` is a reserved keyword in Mojo*
+* Note: *The `match` should be just `match` but `match` is a reserved keyword in Mojo*
 
 ---
 
@@ -162,8 +162,8 @@ struct PatternAnalyzer:
 struct DFAMatcher(RegexMatcher):  # or NFAMatcher
     var engine: DFAEngine  # or NFAEngine
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        return self.engine.match_first(text, start)
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
+        return self.engine.match(text, start)
 
     fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         return self.engine.match_next(text, start)
@@ -179,7 +179,7 @@ struct DFAMatcher(RegexMatcher):  # or NFAMatcher
 ```mojo
 struct DFAEngine:  # or NFAEngine
 
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+    fn match(self, text: String, start: Int) -> Optional[Match]:
         ...
 ```
 

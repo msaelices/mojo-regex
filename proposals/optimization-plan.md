@@ -36,7 +36,7 @@ This document outlines a comprehensive 3-phase optimization plan that will trans
    - No object pooling or memory reuse (zero copy goal)
 
 5. **No Pattern Compilation Caching**
-   - Regex parsing happens on every `match_first()` call
+   - Regex parsing happens on every `match()` call
    - AST construction overhead repeated unnecessarily
    - Python pre-compiles patterns to optimized bytecode
 
@@ -143,31 +143,31 @@ fn match_char_class_simd[width: Int](text: String, start: Int, char_set: String)
 
 ```mojo
 trait RegexMatcher:
-    fn match_first(self, text: String, start: Int) -> Optional[Match]
+    fn match(self, text: String, start: Int) -> Optional[Match]
     fn match_all(self, text: String) -> List[Match]
 
 struct DFAMatcher(RegexMatcher):
     var dfa: DFAEngine
 
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+    fn match(self, text: String, start: Int) -> Optional[Match]:
         return self.dfa.match_dfa(text, start)
 
 struct NFAMatcher(RegexMatcher):
     var engine: NFAEngine  # Current implementation
 
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
-        return self.engine.match_first(...)
+    fn match(self, text: String, start: Int) -> Optional[Match]:
+        return self.engine.match(...)
 
 struct HybridMatcher(RegexMatcher):
     var dfa: Optional[DFAMatcher]
     var nfa: NFAMatcher
     var complexity: PatternComplexity
 
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+    fn match(self, text: String, start: Int) -> Optional[Match]:
         if self.complexity == PatternComplexity.SIMPLE and self.dfa:
-            return self.dfa.value().match_first(text, start)
+            return self.dfa.value().match(text, start)
         else:
-            return self.nfa.match_first(text, start)
+            return self.nfa.match(text, start)
 ```
 
 ## Phase 2: Core Algorithm Optimizations
@@ -370,7 +370,7 @@ struct LazyQuantifier:
 ### 2. Fallback Strategy
 ```mojo
 struct SafeHybridMatcher:
-    fn match_first(self, text: String, start: Int) -> Optional[Match]:
+    fn match(self, text: String, start: Int) -> Optional[Match]:
         # Try optimized path
         var result = self.optimized_match(text, start)
 

@@ -6,7 +6,7 @@ Tests the literal extraction, Two-Way search, and integration with regex engines
 
 from testing import assert_true, assert_false, assert_equal
 
-from regex import match_first, findall, search
+from regex import match, findall, search
 from regex.ast import ASTNode
 from regex.matcher import HybridMatcher
 from regex.parser import parse

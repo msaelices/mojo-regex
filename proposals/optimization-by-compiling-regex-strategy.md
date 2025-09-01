@@ -185,8 +185,8 @@ struct MemchrPrefilter(PrefilterMatcher):
 
 **Integration Points**:
 - `HybridMatcher.__init__()`: Create prefilters during construction
-- `DFAEngine.match_first()`: Use prefilters for candidate identification
-- `NFAEngine.match_first()`: Same prefilter integration
+- `DFAEngine.match()`: Use prefilters for candidate identification
+- `NFAEngine.match()`: Same prefilter integration
 
 ### Phase 2: Enhanced Pattern Analysis and Caching
 

@@ -249,7 +249,7 @@ Add fast paths for common cases:
 
 ```mojo
 # From nfa.mojo
-fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+fn match(self, text: String, start: Int = 0) -> Optional[Match]:
     # Fast path: empty pattern
     if self.ast.num_children == 0:
         return Match(start, start, text)
@@ -339,7 +339,7 @@ fn bench_literal_match[text_length: Int, pattern: StaticString](mut b: Bencher):
     @parameter
     fn call_fn():
         for _ in range(100):  # Multiple iterations for stability
-            var result = match_first(pattern, test_text)
+            var result = match(pattern, test_text)
             keep(result.__bool__())  # Prevent optimization
 
     b.iter[call_fn]()

@@ -1702,7 +1702,7 @@ struct DFAEngine(Engine):
             length=self.literal_pattern.byte_length(),
         )
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -1758,7 +1758,7 @@ struct DFAEngine(Engine):
         Args:
             text: Input text to match against.
             start_pos: Position to start matching from.
-            require_exact_position: If True, only match at exact start_pos (for match_first).
+            require_exact_position: If True, only match at exact start_pos (for match).
 
         Returns:
             Optional Match if pattern matches at this position, None otherwise.
@@ -1771,7 +1771,7 @@ struct DFAEngine(Engine):
             var pattern = self.get_pattern()
             var pattern_len = len(pattern)
             if require_exact_position:
-                # For match_first, must match at exact position
+                # For match, must match at exact position
                 if verify_match(
                     pattern,
                     text,
