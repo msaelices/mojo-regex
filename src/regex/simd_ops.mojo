@@ -132,18 +132,6 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
             return self.lookup_table[char_code] == 1
         return False
 
-    fn find_first_match(self, text: StringSlice, start: Int = 0) -> Int:
-        """Find first character in text that matches this class using SIMD.
-
-        Args:
-            text: Text to search.
-            start: Starting position.
-
-        Returns:
-            Position of first match, or -1 if not found.
-        """
-        return self.find_first_match_in_text(text, start)
-
     fn find_first_match[
         CHUNK_SIZE: Int
     ](self, chunk: SIMD[DType.uint8, CHUNK_SIZE]) -> Int:
@@ -204,37 +192,6 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
                 if char_code < 256 and self.lookup_table[char_code] == 1:
                     return i
             return -1
-
-    fn find_first_match_in_text(self, text: StringSlice, start: Int = 0) -> Int:
-        """Find first character in text that matches this class using SIMD.
-
-        Args:
-            text: Text to search.
-            start: Starting position.
-
-        Returns:
-            Position of first match, or -1 if not found.
-        """
-        var pos = start
-        var text_len = len(text)
-
-        # Process chunks using SIMD
-        while pos + SIMD_WIDTH <= text_len:
-            var matches = self._check_chunk_simd(text, pos)
-            if matches.reduce_or():
-                # Found at least one match in this chunk
-                for i in range(SIMD_WIDTH):
-                    if matches[i]:
-                        return pos + i
-            pos += SIMD_WIDTH
-
-        # Handle remaining characters
-        while pos < text_len:
-            if self.contains(ord(text[pos])):
-                return pos
-            pos += 1
-
-        return -1
 
     fn find_all_matches(self, text: String) -> List[Int]:
         """Find all positions where characters match this class.
