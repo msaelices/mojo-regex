@@ -27,7 +27,7 @@ if ! git rev-parse --verify "$TARGET_BRANCH" >/dev/null 2>&1; then
 fi
 
 # Save current branch
-CURRENT_BRANCH=$(git branch --show-current)
+CURRENT_BRANCH=$(git rev-parse HEAD)
 if [ "$CURRENT_BRANCH" = "$TARGET_BRANCH" ]; then
     echo "Error: Cannot compare branch with itself ('$CURRENT_BRANCH')"
     exit 1
