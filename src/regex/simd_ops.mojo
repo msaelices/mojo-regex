@@ -163,6 +163,32 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
 
         return -1
 
+    fn find_first_match_simd[
+        CHUNK_SIZE: Int
+    ](self, chunk: SIMD[DType.uint8, CHUNK_SIZE]) -> Int:
+        """Find first character in SIMD chunk that matches this class.
+
+        This method operates directly on SIMD vectors, avoiding string slicing overhead.
+
+        Parameters:
+            CHUNK_SIZE: Size of the SIMD chunk to process.
+
+        Args:
+            chunk: SIMD vector of characters to check.
+
+        Returns:
+            Position of first match within chunk, or -1 if not found.
+        """
+        var matches = self.match_chunk[CHUNK_SIZE](chunk)
+
+        # Find first matching position in this chunk
+        @parameter
+        for i in range(CHUNK_SIZE):
+            if matches[i]:
+                return i
+
+        return -1
+
     fn find_all_matches(self, text: String) -> List[Int]:
         """Find all positions where characters match this class.
 

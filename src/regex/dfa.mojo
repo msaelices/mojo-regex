@@ -2056,23 +2056,19 @@ struct DFAEngine(Engine):
         alias CHUNK_SIZE = 16  # Process 16 characters at once
 
         while pos + CHUNK_SIZE <= text_len:
-            # Load a chunk of characters
-            var match_pos = simd_matcher.find_first_match(
-                text[pos : pos + CHUNK_SIZE]
+            # Load a chunk of characters directly into SIMD vector
+            var chars = SIMD[DType.uint8, CHUNK_SIZE]()
+
+            @parameter
+            for i in range(CHUNK_SIZE):
+                chars[i] = ord(text[pos + i])
+
+            # Use SIMD matcher to find first match in this chunk
+            var match_pos = simd_matcher.find_first_match_simd[CHUNK_SIZE](
+                chars
             )
             if match_pos != -1:
                 return pos + match_pos
-            # var chars = SIMD[DType.uint8, CHUNK_SIZE]()
-            # for i in range(CHUNK_SIZE):
-            #     chars[i] = ord(text[pos + i])
-            #
-            # # Use SIMD matcher to check all characters at once
-            # var matches = simd_matcher.match_chunk[CHUNK_SIZE](chars)
-            #
-            # # Find first matching position in this chunk
-            # for i in range(CHUNK_SIZE):
-            #     if matches[i]:
-            #         return pos + i
 
             pos += CHUNK_SIZE
 
