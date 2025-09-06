@@ -135,10 +135,6 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         """Get the literal at the specified index."""
         return self.literals[index].copy()
 
-    fn add(mut self, var literal: LiteralInfo[node_origin]):
-        """Add a literal to the set."""
-        self.literals.append(literal)
-
     fn add_literal(
         mut self,
         var literal: String,
@@ -263,26 +259,24 @@ fn _extract_from_node[
         # Single literal character
         if node.min >= 1 and node.get_value():
             if node.max == 1:
-                var info = LiteralInfo[node_origin](
-                    node=node,
+                _ = result.add_literal(
+                    literal=String(node.get_value().value()),
                     start_offset=offset,
                     is_prefix=at_start,
                     is_suffix=False,
                     is_required=is_required,
                 )
-                result.add(info)
             elif node.max == -1:
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
                 if node.min >= 1:  # a+ requires at least one
-                    var info = LiteralInfo(
-                        node=node,
+                    _ = result.add_literal(
+                        literal=String(node.get_value().value()),
                         start_offset=offset,
                         is_prefix=at_start,
                         is_suffix=False,
                         is_required=is_required,
                     )
-                    result.add(info)
 
     elif node.type == GROUP:
         # Handle groups - extract literals from group contents
