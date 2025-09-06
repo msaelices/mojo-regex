@@ -96,14 +96,16 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
 
     fn get_literal(self) -> String:
         """Get the literal string."""
-        if self.node_ptr and self.node_ptr[].get_value():
-            # If we have an AST node, use its value
-            return String(self.node_ptr[].get_value().value())
-        elif self.literal_string_idx >= 0:
+        # Always use the string index approach for consistency and to avoid pointer issues
+        if self.literal_string_idx >= 0 and self.literal_set_ptr:
             # If we have a literal string index, get it from the set
             return self.literal_set_ptr[].literal_strings[
                 self.literal_string_idx
             ]
+        elif self.node_ptr and self.node_ptr[].get_value():
+            # Fallback: If we have an AST node, use its value
+            var value_slice = self.node_ptr[].get_value().value()
+            return String(value_slice)
         else:
             # No literal available
             return ""
@@ -518,10 +520,13 @@ fn extract_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> String:
     """
     var literals = extract_literals(ast)
 
-    # Look for a prefix literal
-    for lit in literals.literals:
+    # Look for a prefix literal - extract directly to avoid pointer issues
+    for i in range(len(literals.literals)):
+        var lit = literals.literals[i]
         if lit.is_prefix and lit.is_required:
-            return lit.get_literal()
+            # Extract the literal directly from the stored strings
+            if lit.literal_string_idx >= 0:
+                return literals.literal_strings[lit.literal_string_idx]
 
     # Don't return non-prefix literals as prefix
     return ""
