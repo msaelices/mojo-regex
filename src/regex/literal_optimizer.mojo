@@ -22,15 +22,18 @@ from regex.ast import (
 )
 
 
-struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
+@register_passable("trivial")
+struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     """Information about a literal substring found in a regex pattern."""
 
     var node_ptr: UnsafePointer[
         ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
     ]
     """Pointer to the AST node containing the literal (for single nodes)."""
-    var literal_string: Optional[String]
-    """The literal string (for concatenated literals or computed values)."""
+    var literal_set_ptr: UnsafePointer[LiteralSet[node_origin]]
+    """Pointer to the LiteralSet containing the literal strings."""
+    var literal_string_idx: Int
+    """Index into LiteralSet.literal_strings for the literal string (for concatenated literals or computed values). -1 if not used."""
     var start_offset: Int
     """Minimum offset from start where this literal can appear."""
     var is_prefix: Bool
@@ -43,6 +46,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
     fn __init__(
         out self,
         ref [node_origin]node: ASTNode[ImmutableAnyOrigin],
+        ref literal_set: LiteralSet[node_origin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -52,7 +56,8 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
         self.node_ptr = UnsafePointer[
             ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
         ](to=node)
-        self.literal_string = None
+        self.literal_set_ptr = UnsafePointer(to=literal_set)
+        self.literal_string_idx = -1
         self.start_offset = start_offset
         self.is_prefix = is_prefix
         self.is_suffix = is_suffix
@@ -60,15 +65,17 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
 
     fn __init__(
         out self,
-        var literal: String,
+        literal_string_idx: Int,
+        ref literal_set: LiteralSet[node_origin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
         is_required: Bool = True,
     ):
-        """Initialize a LiteralInfo with a string literal."""
+        """Initialize a LiteralInfo with a string literal index."""
         self.node_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]]()
-        self.literal_string = literal^
+        self.literal_set_ptr = UnsafePointer(to=literal_set)
+        self.literal_string_idx = literal_string_idx
         self.start_offset = start_offset
         self.is_prefix = is_prefix
         self.is_suffix = is_suffix
@@ -92,9 +99,11 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
         if self.node_ptr and self.node_ptr[].get_value():
             # If we have an AST node, use its value
             return String(self.node_ptr[].get_value().value())
-        elif self.literal_string:
-            # If we have a literal string, return it
-            return self.literal_string.value()
+        elif self.literal_string_idx >= 0:
+            # If we have a literal string index, get it from the set
+            return self.literal_set_ptr[].literal_strings[
+                self.literal_string_idx
+            ]
         else:
             # No literal available
             return ""
@@ -103,8 +112,10 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
         """Get the length of the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             return len(self.node_ptr[].get_value().value())
-        elif self.literal_string:
-            return len(self.literal_string.value())
+        elif self.literal_string_idx >= 0:
+            return len(
+                self.literal_set_ptr[].literal_strings[self.literal_string_idx]
+            )
         else:
             return 0
 
@@ -115,12 +126,15 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
 
     var literals: List[LiteralInfo[node_origin]]
     """All literals found in the pattern."""
+    var literal_strings: List[String]
+    """Storage for all literal strings referenced by LiteralInfo instances."""
     var best_literal_idx: Optional[Int]
     """The best literal to use for prefiltering."""
 
     fn __init__(out self, *, capacity: Int = 4):
         """Initialize an empty literal set."""
         self.literals = List[LiteralInfo[node_origin]](capacity=capacity)
+        self.literal_strings = List[String](capacity=capacity)
         self.best_literal_idx = None
 
     fn __len__(self) -> Int:
@@ -131,9 +145,28 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         """Get the literal at the specified index."""
         return self.literals[index].copy()
 
-    fn add(mut self, var literal: LiteralInfo[node_origin]):
-        """Add a literal to the set."""
-        self.literals.append(literal^)
+    fn add(
+        mut self,
+        var literal: String,
+        start_offset: Int = 0,
+        is_prefix: Bool = False,
+        is_suffix: Bool = False,
+        is_required: Bool = True,
+    ) -> LiteralInfo[node_origin]:
+        """Add a literal string to the set and return a LiteralInfo referencing it.
+        """
+        var string_idx = len(self.literal_strings)
+        self.literal_strings.append(literal^)
+        var info = LiteralInfo[node_origin](
+            literal_string_idx=string_idx,
+            literal_set=self,
+            start_offset=start_offset,
+            is_prefix=is_prefix,
+            is_suffix=is_suffix,
+            is_required=is_required,
+        )
+        self.literals.append(info)
+        return info
 
     fn select_best(mut self):
         """Select the best literal for prefiltering.
@@ -181,10 +214,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
     fn get_best_literal(self) -> Optional[LiteralInfo[node_origin]]:
         """Get the best literal for prefiltering, if available."""
         if self.best_literal_idx:
-            # TODO: Optimize LiteralInfo struct to be register passable by
-            # moving the literal_string to the LiteralSet struct
-            # and storing only an index in LiteralInfo
-            return self.literals[self.best_literal_idx.value()].copy()
+            return self.literals[self.best_literal_idx.value()]
         else:
             return None
 
@@ -240,26 +270,24 @@ fn _extract_from_node[
         # Single literal character
         if node.min >= 1 and node.get_value():
             if node.max == 1:
-                var info = LiteralInfo[node_origin](
-                    node=node,
+                _ = result.add(
+                    literal=String(node.get_value().value()),
                     start_offset=offset,
                     is_prefix=at_start,
                     is_suffix=False,
                     is_required=is_required,
                 )
-                result.add(info^)
             elif node.max == -1:
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
                 if node.min >= 1:  # a+ requires at least one
-                    var info = LiteralInfo(
-                        node=node,
+                    _ = result.add(
+                        literal=String(node.get_value().value()),
                         start_offset=offset,
                         is_prefix=at_start,
                         is_suffix=False,
                         is_required=is_required,
                     )
-                    result.add(info^)
 
     elif node.type == GROUP:
         # Handle groups - extract literals from group contents
@@ -287,14 +315,13 @@ fn _extract_from_node[
         # Simplified: just check direct children of OR node
         var common_prefix = _find_common_prefix_simple(node)
         if len(common_prefix) > 0:
-            var info = LiteralInfo[node_origin](
+            _ = result.add(
                 literal=common_prefix,
                 start_offset=offset,
                 is_prefix=at_start,
                 is_suffix=False,
                 is_required=True,
             )
-            result.add(info^)
 
         # Etract literals from each branch (but they're not required)
         for i in range(node.get_children_len()):
@@ -348,14 +375,13 @@ fn _extract_sequence[
         else:
             # End of literal sequence
             if len(current_literal) > 0:
-                var info = LiteralInfo[node_origin](
+                _ = literals.add(
                     literal=current_literal,
                     start_offset=current_offset,
                     is_prefix=sequence_at_start,
                     is_suffix=False,
                     is_required=is_required,
                 )
-                literals.add(info^)
                 current_offset += len(current_literal)
                 sequence_at_start = False
                 current_literal = ""
@@ -373,14 +399,13 @@ fn _extract_sequence[
 
     # Don't forget the last literal sequence
     if len(current_literal) > 0:
-        var info = LiteralInfo[node_origin](
-            current_literal,
-            current_offset,
-            sequence_at_start,
-            False,
-            is_required,
+        _ = literals.add(
+            literal=current_literal,
+            start_offset=current_offset,
+            is_prefix=sequence_at_start,
+            is_suffix=False,
+            is_required=is_required,
         )
-        literals.add(info^)
 
 
 fn _find_common_prefix_simple(or_node: ASTNode) -> String:
