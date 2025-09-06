@@ -109,7 +109,7 @@ struct Regex[origin: Origin](
         Returns:
             An immutable version of the same `Span`.
         """
-        return rebind[Self.Immutable](self)
+        return rebind[Self.Immutable](self).copy()
 
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[ImmutableAnyOrigin]:
