@@ -610,7 +610,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return self.complexity
 
 
-struct CompiledRegex(Copyable, Movable):
+struct CompiledRegex(ImplicitlyCopyable, Movable):
     """High-level compiled regex object with caching and optimization.
 
     Uses cached HybridMatcher instances for optimal performance. The caching approach
@@ -637,6 +637,12 @@ struct CompiledRegex(Copyable, Movable):
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
         self.compiled_at = monotonic()
+
+    fn __copyinit__(out self, other: Self):
+        """Copy constructor."""
+        self.matcher = other.matcher.copy()
+        self.pattern = other.pattern
+        self.compiled_at = other.compiled_at
 
     fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
