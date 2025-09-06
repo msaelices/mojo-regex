@@ -154,7 +154,7 @@ struct PatternAnalyzer:
             ref best = literal_set.get_best_literal().value()
             if best.is_required:
                 info.has_required_literal = True
-                info.required_literal_length = best.get_literal_len()
+                info.required_literal_length = best.get_literal_len(literal_set)
 
         # Check for SIMD optimization opportunities - be more selective
         info.benefits_from_simd = self._check_simd_benefits(ast)
