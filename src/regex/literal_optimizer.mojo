@@ -236,7 +236,7 @@ fn _extract_from_node[
                     is_suffix=False,
                     is_required=is_required,
                 )
-                result.add(info)
+                result.add(info^)
             elif node.max == -1:
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
@@ -248,7 +248,7 @@ fn _extract_from_node[
                         is_suffix=False,
                         is_required=is_required,
                     )
-                    result.add(info)
+                    result.add(info^)
 
     elif node.type == GROUP:
         # Handle groups - extract literals from group contents
@@ -272,8 +272,8 @@ fn _extract_from_node[
             ref group_literals = _extract_sequence(
                 node, offset, is_required, at_start
             )
-            for ref lit in group_literals:
-                result.add(lit)
+            for var lit in group_literals:
+                result.add(lit^)
 
     elif node.type == OR:
         # For alternation, literals are only required if they appear in ALL branches
@@ -287,7 +287,7 @@ fn _extract_from_node[
                 is_suffix=False,
                 is_required=True,
             )
-            result.add(info)
+            result.add(info^)
 
         # Etract literals from each branch (but they're not required)
         for i in range(node.get_children_len()):
@@ -322,6 +322,7 @@ fn _extract_sequence[
 
     Looks for consecutive literal elements that form longer strings.
     """
+    # TODO: Add capacity to prevent reallocations
     var literals = List[LiteralInfo[node_origin]]()
     var current_literal = String("")
     var current_offset = start_offset
@@ -348,7 +349,7 @@ fn _extract_sequence[
                     is_suffix=False,
                     is_required=is_required,
                 )
-                literals.append(info)
+                literals.append(info^)
                 current_offset += len(current_literal)
                 sequence_at_start = False
                 current_literal = ""
@@ -373,7 +374,7 @@ fn _extract_sequence[
             False,
             is_required,
         )
-        literals.append(info)
+        literals.append(info^)
 
     return literals
 
