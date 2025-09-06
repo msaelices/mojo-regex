@@ -563,7 +563,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_multi_character_class_sequence(
-        mut self, ref sequence_info: SequentialPatternInfo
+        mut self, var sequence_info: SequentialPatternInfo
     ) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
 
@@ -2200,15 +2200,15 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         dfa.has_end_anchor = has_end
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
-        ref sequence_info = _extract_multi_class_sequence_info(ast)
+        sequence_info = _extract_multi_class_sequence_info(ast)
         dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
-        ref sequence_info = _extract_sequential_pattern_info(ast)
+        sequence_info = _extract_sequential_pattern_info(ast)
         dfa.compile_sequential_pattern(sequence_info^)
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
-        ref sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        sequence_info = _extract_mixed_sequential_pattern_info(ast)
         dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_alternation_pattern(ast):
         # Handle alternation patterns like a|b, cat|dog, (a|b)
@@ -2340,7 +2340,7 @@ fn _extract_character_class_info(
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
         char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=DIGITS.unsafe_ptr(), length=len(DIGITS)
+            ptr=DIGITS.unsafe_ptr(), length=UInt(len(DIGITS))
         )
     elif class_node.type == WORD:
         min_matches = class_node.min
@@ -2348,7 +2348,7 @@ fn _extract_character_class_info(
         positive_logic = class_node.positive_logic
         # Generate word character class string
         char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=WORD_CHARS.unsafe_ptr(), length=len(WORD_CHARS)
+            ptr=WORD_CHARS.unsafe_ptr(), length=UInt(len(WORD_CHARS))
         )
     elif class_node.type == RANGE:
         min_matches = class_node.min
@@ -2468,7 +2468,7 @@ fn _extract_sequential_pattern_info(
                 var pattern_element = SequentialPatternElement(
                     char_class, element.min, element.max, element.positive_logic
                 )
-                info.elements.append(pattern_element)
+                info.elements.append(pattern_element^)
 
     return info^
 
@@ -2585,7 +2585,7 @@ fn _extract_multi_class_sequence_info(
                     element.max,
                     element.positive_logic,
                 )
-                info.elements.append(pattern_element)
+                info.elements.append(pattern_element^)
 
     return info^
 
