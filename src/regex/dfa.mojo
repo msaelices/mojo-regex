@@ -1596,7 +1596,7 @@ struct DFAEngine(Engine):
         var first_element_is_digits = False
 
         for i in range(total_elements):
-            var element = sequence_info.elements[i]
+            ref element = sequence_info.elements[i]
             if (
                 element.char_class == DIGITS
                 or element.char_class == "0123456789"
