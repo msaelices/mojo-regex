@@ -206,7 +206,7 @@ struct SequentialPatternInfo(Copyable, Movable):
 
 
 @register_passable
-struct DFAState(Copyable, Movable):
+struct DFAState(ImplicitlyCopyable, Movable):
     """A single state in the DFA state machine."""
 
     var transitions: SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS]
@@ -2201,21 +2201,15 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
         ref sequence_info = _extract_multi_class_sequence_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
         ref sequence_info = _extract_sequential_pattern_info(ast)
-        dfa.compile_sequential_pattern(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        dfa.compile_sequential_pattern(sequence_info^)
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
         ref sequence_info = _extract_mixed_sequential_pattern_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_alternation_pattern(ast):
         # Handle alternation patterns like a|b, cat|dog, (a|b)
         dfa.compile_alternation(ast)
