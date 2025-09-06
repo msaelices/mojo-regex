@@ -225,7 +225,7 @@ struct CompileTimeMatcher(ImplicitlyCopyable, Movable):
     ) -> Optional[Match]:
         """Runtime literal matching fallback."""
         var pos = text.find(self.pattern, start)
-        if pos != -1:
+        if pos != -1 and pos == start:
             return Match(0, pos, pos + len(self.pattern), text)
         return None
 

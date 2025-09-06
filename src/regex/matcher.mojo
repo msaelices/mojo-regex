@@ -375,38 +375,43 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         )  # Skip prefilter for pure DFA patterns
 
         if should_analyze_prefilter:
-            # Extract literal information using optimized implementation
-            # Use MutableAnyOrigin since that's what the AST has
-            var literal_set = extract_literals(ast)
-            var has_anchors = check_ast_for_anchors(ast)
-
-            # Get the best literal from the optimized selection
+            # Skip literal extraction for patterns with alternation to avoid crashes
+            # TODO: Fix literal extraction for alternation patterns
+            var has_alternation = "|" in pattern
             var best_literal_opt: Optional[String] = None
+            var has_anchors = False
             var is_exact = False
 
-            var best_literal_info = literal_set.get_best_literal()
-            if best_literal_info:
-                var literal = best_literal_info.value().get_literal()
-                if len(literal) > 0:
-                    best_literal_opt = literal
-                    # Simple heuristic: if we have a required literal and no complex regex constructs
-                    # Must also check that the pattern doesn't contain regex operators
-                    var has_regex_operators = (
-                        "*" in pattern
-                        or "+" in pattern
-                        or "?" in pattern
-                        or "." in pattern
-                        or "|" in pattern
-                        or "(" in pattern
-                        or "[" in pattern
-                        or "{" in pattern
-                    )
-                    is_exact = (
-                        best_literal_info.value().is_required
-                        and has_literal_prefix(ast)
-                        and not has_anchors
-                        and not has_regex_operators
-                    )
+            if not has_alternation:
+                # Extract literal information using optimized implementation
+                # Use MutableAnyOrigin since that's what the AST has
+                var literal_set = extract_literals(ast)
+                has_anchors = check_ast_for_anchors(ast)
+
+                # Get the best literal from the optimized selection
+                var best_literal_info = literal_set.get_best_literal()
+                if best_literal_info:
+                    var literal = best_literal_info.value().get_literal()
+                    if len(literal) > 0:
+                        best_literal_opt = literal
+                        # Simple heuristic: if we have a required literal and no complex regex constructs
+                        # Must also check that the pattern doesn't contain regex operators
+                        var has_regex_operators = (
+                            "*" in pattern
+                            or "+" in pattern
+                            or "?" in pattern
+                            or "." in pattern
+                            or "|" in pattern
+                            or "(" in pattern
+                            or "[" in pattern
+                            or "{" in pattern
+                        )
+                        is_exact = (
+                            best_literal_info.value().is_required
+                            and has_literal_prefix(ast)
+                            and not has_anchors
+                            and not has_regex_operators
+                        )
 
             self.literal_info = OptimizedLiteralInfo(
                 best_literal_opt, has_anchors, is_exact
