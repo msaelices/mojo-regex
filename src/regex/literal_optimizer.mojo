@@ -135,7 +135,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         """Get the literal at the specified index."""
         return self.literals[index].copy()
 
-    fn add_literal(
+    fn add(
         mut self,
         var literal: String,
         start_offset: Int = 0,
@@ -259,7 +259,7 @@ fn _extract_from_node[
         # Single literal character
         if node.min >= 1 and node.get_value():
             if node.max == 1:
-                _ = result.add_literal(
+                _ = result.add(
                     literal=String(node.get_value().value()),
                     start_offset=offset,
                     is_prefix=at_start,
@@ -270,7 +270,7 @@ fn _extract_from_node[
                 # Repeated character (a+, a*)
                 # We can still use the character as a hint, but it's less specific
                 if node.min >= 1:  # a+ requires at least one
-                    _ = result.add_literal(
+                    _ = result.add(
                         literal=String(node.get_value().value()),
                         start_offset=offset,
                         is_prefix=at_start,
@@ -304,7 +304,7 @@ fn _extract_from_node[
         # Simplified: just check direct children of OR node
         var common_prefix = _find_common_prefix_simple(node)
         if len(common_prefix) > 0:
-            _ = result.add_literal(
+            _ = result.add(
                 literal=common_prefix,
                 start_offset=offset,
                 is_prefix=at_start,
@@ -364,7 +364,7 @@ fn _extract_sequence[
         else:
             # End of literal sequence
             if len(current_literal) > 0:
-                _ = literals.add_literal(
+                _ = literals.add(
                     literal=current_literal,
                     start_offset=current_offset,
                     is_prefix=sequence_at_start,
@@ -388,7 +388,7 @@ fn _extract_sequence[
 
     # Don't forget the last literal sequence
     if len(current_literal) > 0:
-        _ = literals.add_literal(
+        _ = literals.add(
             literal=current_literal,
             start_offset=current_offset,
             is_prefix=sequence_at_start,
