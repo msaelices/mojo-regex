@@ -167,7 +167,8 @@ fn create_hex_digit_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-struct RangeBasedMatcher(Copyable, Movable, SIMDMatcher):
+@register_passable("trivial")
+struct RangeBasedMatcher(ImplicitlyCopyable, Movable, SIMDMatcher):
     """Range-based SIMD matcher using comparison operations.
 
     Efficient for contiguous character ranges like [a-z], [0-9], [A-Z].

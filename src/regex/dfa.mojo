@@ -206,7 +206,7 @@ struct SequentialPatternInfo(Copyable, Movable):
 
 
 @register_passable
-struct DFAState(Copyable, Movable):
+struct DFAState(ImplicitlyCopyable, Movable):
     """A single state in the DFA state machine."""
 
     var transitions: SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS]
@@ -1596,7 +1596,7 @@ struct DFAEngine(Engine):
         var first_element_is_digits = False
 
         for i in range(total_elements):
-            var element = sequence_info.elements[i]
+            ref element = sequence_info.elements[i]
             if (
                 element.char_class == DIGITS
                 or element.char_class == "0123456789"
@@ -1699,7 +1699,7 @@ struct DFAEngine(Engine):
         """
         return Span[Byte, __origin_of(self)](
             ptr=self.literal_pattern.unsafe_ptr(),
-            length=self.literal_pattern.byte_length(),
+            length=UInt(self.literal_pattern.byte_length()),
         )
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
@@ -2200,22 +2200,16 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
         dfa.has_end_anchor = has_end
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
-        ref sequence_info = _extract_multi_class_sequence_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        sequence_info = _extract_multi_class_sequence_info(ast)
+        dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
-        ref sequence_info = _extract_sequential_pattern_info(ast)
-        dfa.compile_sequential_pattern(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        sequence_info = _extract_sequential_pattern_info(ast)
+        dfa.compile_sequential_pattern(sequence_info^)
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
-        ref sequence_info = _extract_mixed_sequential_pattern_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info)
-        dfa.has_start_anchor = sequence_info.has_start_anchor
-        dfa.has_end_anchor = sequence_info.has_end_anchor
+        sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        dfa.compile_multi_character_class_sequence(sequence_info^)
     elif _is_alternation_pattern(ast):
         # Handle alternation patterns like a|b, cat|dog, (a|b)
         dfa.compile_alternation(ast)
@@ -2346,7 +2340,7 @@ fn _extract_character_class_info(
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
         char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=DIGITS.unsafe_ptr(), length=len(DIGITS)
+            ptr=DIGITS.unsafe_ptr(), length=UInt(len(DIGITS))
         )
     elif class_node.type == WORD:
         min_matches = class_node.min
@@ -2354,7 +2348,7 @@ fn _extract_character_class_info(
         positive_logic = class_node.positive_logic
         # Generate word character class string
         char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=WORD_CHARS.unsafe_ptr(), length=len(WORD_CHARS)
+            ptr=WORD_CHARS.unsafe_ptr(), length=UInt(len(WORD_CHARS))
         )
     elif class_node.type == RANGE:
         min_matches = class_node.min
@@ -2474,7 +2468,7 @@ fn _extract_sequential_pattern_info(
                 var pattern_element = SequentialPatternElement(
                     char_class, element.min, element.max, element.positive_logic
                 )
-                info.elements.append(pattern_element)
+                info.elements.append(pattern_element^)
 
     return info^
 
@@ -2591,7 +2585,7 @@ fn _extract_multi_class_sequence_info(
                     element.max,
                     element.positive_logic,
                 )
-                info.elements.append(pattern_element)
+                info.elements.append(pattern_element^)
 
     return info^
 

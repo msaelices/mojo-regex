@@ -120,7 +120,7 @@ trait RegexMatcher:
         ...
 
 
-struct DFAMatcher(Movable, RegexMatcher):
+struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
     var engine_ptr: UnsafePointer[DFAEngine]
@@ -184,7 +184,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.engine = other.engine
+        self.engine = other.engine.copy()
         self.ast = other.ast
 
     fn __moveinit__(out self, deinit other: Self):
@@ -429,11 +429,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.dfa_matcher = other.dfa_matcher
-        self.nfa_matcher = other.nfa_matcher
+        self.dfa_matcher = other.dfa_matcher.copy()
+        self.nfa_matcher = other.nfa_matcher.copy()
         self.complexity = other.complexity
         self.prefilter = other.prefilter
-        self.literal_info = other.literal_info
+        self.literal_info = other.literal_info.copy()
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
@@ -610,7 +610,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return self.complexity
 
 
-struct CompiledRegex(Copyable, Movable):
+struct CompiledRegex(ImplicitlyCopyable, Movable):
     """High-level compiled regex object with caching and optimization.
 
     Uses cached HybridMatcher instances for optimal performance. The caching approach
@@ -637,6 +637,12 @@ struct CompiledRegex(Copyable, Movable):
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
         self.compiled_at = monotonic()
+
+    fn __copyinit__(out self, other: Self):
+        """Copy constructor."""
+        self.matcher = other.matcher.copy()
+        self.pattern = other.pattern
+        self.compiled_at = other.compiled_at
 
     fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""

@@ -109,7 +109,7 @@ struct Regex[origin: Origin](
         Returns:
             An immutable version of the same `Span`.
         """
-        return rebind[Self.Immutable](self)
+        return rebind[Self.Immutable](self).copy()
 
     @always_inline
     fn get_child(self, i: Int) -> ASTNode[ImmutableAnyOrigin]:
@@ -135,9 +135,9 @@ struct Regex[origin: Origin](
 
 
 struct ASTNode[regex_origin: ImmutableOrigin](
-    Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
+    ImplicitlyCopyable,
     Movable,
     Stringable,
     Writable,
@@ -478,7 +478,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             return None
         return StringSlice[__origin_of(self.regex_ptr[].pattern)](
             ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
-            length=self.end_idx - self.start_idx,
+            length=UInt(self.end_idx - self.start_idx),
         )
 
 

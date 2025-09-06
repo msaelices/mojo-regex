@@ -19,7 +19,7 @@ version = "0.2.1"
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-mojo = ">=25.6.0.dev2025082505,<26"
+mojo = "=0.25.6.0.dev2025090505"
 
 [tasks]
 test = "mojo test -I ./src tests/"
