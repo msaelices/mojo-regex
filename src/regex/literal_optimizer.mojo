@@ -110,7 +110,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](Copyable, Movable):
 
 
 @fieldwise_init
-struct LiteralSet[node_origin: ImmutableOrigin](Movable):
+struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
     """A set of literals extracted from a regex pattern."""
 
     var literals: List[LiteralInfo[node_origin]]
@@ -118,10 +118,18 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable):
     var best_literal_idx: Optional[Int]
     """The best literal to use for prefiltering."""
 
-    fn __init__(out self):
+    fn __init__(out self, *, capacity: Int = 4):
         """Initialize an empty literal set."""
-        self.literals = List[LiteralInfo[node_origin]]()
+        self.literals = List[LiteralInfo[node_origin]](capacity=capacity)
         self.best_literal_idx = None
+
+    fn __len__(self) -> Int:
+        """Get the number of literals in the set."""
+        return len(self.literals)
+
+    fn __getitem__(self, index: Int) -> LiteralInfo[node_origin]:
+        """Get the literal at the specified index."""
+        return self.literals[index].copy()
 
     fn add(mut self, var literal: LiteralInfo[node_origin]):
         """Add a literal to the set."""
@@ -269,11 +277,7 @@ fn _extract_from_node[
                     return
 
             # Regular group - extract sequence
-            ref group_literals = _extract_sequence(
-                node, offset, is_required, at_start
-            )
-            for var lit in group_literals:
-                result.add(lit^)
+            _extract_sequence(node, offset, is_required, at_start, result)
 
     elif node.type == OR:
         # For alternation, literals are only required if they appear in ALL branches
@@ -317,13 +321,12 @@ fn _extract_sequence[
     start_offset: Int,
     is_required: Bool,
     at_start: Bool,
-) -> List[LiteralInfo[node_origin]]:
+    mut literals: LiteralSet[node_origin],
+):
     """Extract literal sequences from a group node.
 
     Looks for consecutive literal elements that form longer strings.
     """
-    # TODO: Add capacity to prevent reallocations
-    var literals = List[LiteralInfo[node_origin]]()
     var current_literal = String("")
     var current_offset = start_offset
     var sequence_at_start = at_start
@@ -349,7 +352,7 @@ fn _extract_sequence[
                     is_suffix=False,
                     is_required=is_required,
                 )
-                literals.append(info^)
+                literals.add(info^)
                 current_offset += len(current_literal)
                 sequence_at_start = False
                 current_literal = ""
@@ -374,9 +377,7 @@ fn _extract_sequence[
             False,
             is_required,
         )
-        literals.append(info^)
-
-    return literals
+        literals.add(info^)
 
 
 fn _find_common_prefix_simple(or_node: ASTNode) -> String:
@@ -423,7 +424,10 @@ fn _get_prefix_literal(node: ASTNode) -> String:
         return String(node.get_value().value())
     elif node.type == GROUP and node.min >= 1:
         # For groups, extract the full literal sequence
-        var literals = _extract_sequence(node, 0, True, True)
+        var literals = LiteralSet[__origin_of(node)](
+            capacity=node.get_children_len()
+        )
+        _extract_sequence(node, 0, True, True, literals)
         if len(literals) > 0:
             return literals[0].get_literal()
     return ""
