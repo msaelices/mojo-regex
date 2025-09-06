@@ -181,7 +181,10 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
     fn get_best_literal(self) -> Optional[LiteralInfo[node_origin]]:
         """Get the best literal for prefiltering, if available."""
         if self.best_literal_idx:
-            return self.literals[self.best_literal_idx.value()]
+            # TODO: Optimize LiteralInfo struct to be register passable by
+            # moving the literal_string to the LiteralSet struct
+            # and storing only an index in LiteralInfo
+            return self.literals[self.best_literal_idx.value()].copy()
         else:
             return None
 
