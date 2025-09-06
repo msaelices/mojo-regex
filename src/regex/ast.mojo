@@ -135,9 +135,9 @@ struct Regex[origin: Origin](
 
 
 struct ASTNode[regex_origin: ImmutableOrigin](
-    Copyable,
     EqualityComparable,
     ImplicitlyBoolable,
+    ImplicitlyCopyable,
     Movable,
     Stringable,
     Writable,

@@ -563,7 +563,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_multi_character_class_sequence(
-        mut self, var sequence_info: SequentialPatternInfo
+        mut self, ref sequence_info: SequentialPatternInfo
     ) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
 
