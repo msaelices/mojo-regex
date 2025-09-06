@@ -478,7 +478,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
             return None
         return StringSlice[__origin_of(self.regex_ptr[].pattern)](
             ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
-            length=self.end_idx - self.start_idx,
+            length=UInt(self.end_idx - self.start_idx),
         )
 
 
