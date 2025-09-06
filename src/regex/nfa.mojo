@@ -161,7 +161,7 @@ struct NFAEngine(Copyable, Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return matches
+                return matches^
 
         # Use smart MatchList container with lazy allocation
         var current_pos = 0
