@@ -1699,7 +1699,7 @@ struct DFAEngine(Engine):
         """
         return Span[Byte, __origin_of(self)](
             ptr=self.literal_pattern.unsafe_ptr(),
-            length=self.literal_pattern.byte_length(),
+            length=UInt(self.literal_pattern.byte_length()),
         )
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:

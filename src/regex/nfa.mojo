@@ -117,11 +117,11 @@ struct NFAEngine(Copyable, Engine):
         if self.has_literal_optimization:
             return Span[Byte, __origin_of(self)](
                 ptr=self.literal_prefix.unsafe_ptr(),
-                length=self.literal_prefix.byte_length(),
+                length=UInt(self.literal_prefix.byte_length()),
             )
         return Span[Byte, __origin_of(self)](
             ptr=self.pattern.unsafe_ptr(),
-            length=self.pattern.byte_length(),
+            length=UInt(self.pattern.byte_length()),
         )
 
     fn match_all(
