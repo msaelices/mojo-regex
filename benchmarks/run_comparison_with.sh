@@ -26,14 +26,24 @@ if ! git rev-parse --verify "$TARGET_BRANCH" >/dev/null 2>&1; then
     exit 1
 fi
 
-# Save current branch
-CURRENT_BRANCH=$(git rev-parse HEAD)
+# Save current branch/commit
+CURRENT_REF=$(git rev-parse --abbrev-ref HEAD)
+CURRENT_COMMIT=$(git rev-parse HEAD)
+
+# Determine if we're on a branch or detached HEAD
+if [ "$CURRENT_REF" = "HEAD" ]; then
+    CURRENT_BRANCH="$CURRENT_COMMIT"
+    echo "Current commit (detached HEAD): $CURRENT_BRANCH"
+else
+    CURRENT_BRANCH="$CURRENT_REF"
+    echo "Current branch: $CURRENT_BRANCH"
+fi
+
 if [ "$CURRENT_BRANCH" = "$TARGET_BRANCH" ]; then
     echo "Error: Cannot compare branch with itself ('$CURRENT_BRANCH')"
     exit 1
 fi
 
-echo "Current branch: $CURRENT_BRANCH"
 echo "Target branch: $TARGET_BRANCH"
 echo ""
 
