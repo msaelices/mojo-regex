@@ -379,7 +379,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
             var best_literal_info = literal_set.get_best_literal()
             if best_literal_info:
-                var literal = best_literal_info.value().get_literal(literal_set)
+                var literal = best_literal_info.value().get_literal()
                 if len(literal) > 0:
                     best_literal_opt = literal
                     # Simple heuristic: if we have a required literal and no complex regex constructs

@@ -89,20 +89,20 @@ struct NFAEngine(Copyable, Engine):
                         # Require longer literals to justify overhead
                         if (
                             best.is_prefix
-                            and best.get_literal_len(literal_set)
+                            and best.get_literal_len()
                             > MIN_PREFIX_LITERAL_LENGTH
                         ):
                             # Use prefix literal for optimization
-                            self.literal_prefix = best.get_literal(literal_set)
+                            self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
                         elif (
                             best.is_required
-                            and best.get_literal_len(literal_set)
+                            and best.get_literal_len()
                             > MIN_REQUIRED_LITERAL_LENGTH
                         ):
                             # Use required literal for prefiltering
                             # Require even longer literals for non-prefix optimization
-                            self.literal_prefix = best.get_literal(literal_set)
+                            self.literal_prefix = best.get_literal()
                             self.has_literal_optimization = True
         except:
             self.regex = None

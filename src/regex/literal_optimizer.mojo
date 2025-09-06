@@ -30,6 +30,8 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
         ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
     ]
     """Pointer to the AST node containing the literal (for single nodes)."""
+    var literal_set_ptr: UnsafePointer[LiteralSet[node_origin]]
+    """Pointer to the LiteralSet containing the literal strings."""
     var literal_string_idx: Int
     """Index into LiteralSet.literal_strings for the literal string (for concatenated literals or computed values). -1 if not used."""
     var start_offset: Int
@@ -44,6 +46,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     fn __init__(
         out self,
         ref [node_origin]node: ASTNode[ImmutableAnyOrigin],
+        ref literal_set: LiteralSet[node_origin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -53,6 +56,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
         self.node_ptr = UnsafePointer[
             ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
         ](to=node)
+        self.literal_set_ptr = UnsafePointer(to=literal_set)
         self.literal_string_idx = -1
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -62,6 +66,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     fn __init__(
         out self,
         literal_string_idx: Int,
+        ref literal_set: LiteralSet[node_origin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -69,6 +74,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     ):
         """Initialize a LiteralInfo with a string literal index."""
         self.node_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]]()
+        self.literal_set_ptr = UnsafePointer(to=literal_set)
         self.literal_string_idx = literal_string_idx
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -88,24 +94,28 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     #     var call_location = __call_location()
     #     print("Copying LiteralInfo", call_location)
 
-    fn get_literal(self, literal_set: LiteralSet[node_origin]) -> String:
+    fn get_literal(self) -> String:
         """Get the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             # If we have an AST node, use its value
             return String(self.node_ptr[].get_value().value())
         elif self.literal_string_idx >= 0:
             # If we have a literal string index, get it from the set
-            return literal_set.literal_strings[self.literal_string_idx]
+            return self.literal_set_ptr[].literal_strings[
+                self.literal_string_idx
+            ]
         else:
             # No literal available
             return ""
 
-    fn get_literal_len(self, literal_set: LiteralSet[node_origin]) -> Int:
+    fn get_literal_len(self) -> Int:
         """Get the length of the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             return len(self.node_ptr[].get_value().value())
         elif self.literal_string_idx >= 0:
-            return len(literal_set.literal_strings[self.literal_string_idx])
+            return len(
+                self.literal_set_ptr[].literal_strings[self.literal_string_idx]
+            )
         else:
             return 0
 
@@ -149,6 +159,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         self.literal_strings.append(literal^)
         var info = LiteralInfo[node_origin](
             literal_string_idx=string_idx,
+            literal_set=self,
             start_offset=start_offset,
             is_prefix=is_prefix,
             is_suffix=is_suffix,
@@ -182,7 +193,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
                 score += 1000
 
             # Longer literals are more discriminative
-            score += lit.get_literal_len(self) * 10
+            score += lit.get_literal_len() * 10
 
             # Prefix/suffix literals allow for more targeted searching
             if lit.is_prefix:
@@ -446,7 +457,7 @@ fn _get_prefix_literal(node: ASTNode) -> String:
         )
         _extract_sequence(node, 0, True, True, literals)
         if len(literals) > 0:
-            return literals[0].get_literal(literals)
+            return literals[0].get_literal()
     return ""
 
 
@@ -510,7 +521,7 @@ fn extract_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> String:
     # Look for a prefix literal
     for lit in literals.literals:
         if lit.is_prefix and lit.is_required:
-            return lit.get_literal(literals)
+            return lit.get_literal()
 
     # Don't return non-prefix literals as prefix
     return ""
