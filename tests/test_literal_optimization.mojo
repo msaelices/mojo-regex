@@ -28,7 +28,7 @@ fn test_literal_extraction() raises:
     var ast1 = parse("hello")
     var literals1 = extract_literals(ast1)
     assert_true(
-        literals1.get_best_literal().value().get_literal() == "hello",
+        literals1.get_best_literal().value().get_literal(literals1) == "hello",
         "Should extract 'hello' literal",
     )
     assert_true(
@@ -47,7 +47,7 @@ fn test_literal_extraction() raises:
     )
     var found_hello = False
     for lit in literals2.literals:
-        if lit.get_literal() == "hello":
+        if lit.get_literal(literals2) == "hello":
             found_hello = True
             assert_true(lit.is_prefix, "hello should be prefix")
     assert_true(found_hello, "Should find 'hello' literal")
@@ -56,27 +56,19 @@ fn test_literal_extraction() raises:
     var ast3 = parse("(hello|help|helicopter)")
     var literals3 = extract_literals(ast3)
     # Should find individual literals (common prefix extraction not yet implemented)
-    var found_hello_alt = False
-    var found_help_alt = False
-    var found_helicopter_alt = False
+    var found_prefix = False
     for lit in literals3.literals:
-        var literal_str = lit.get_literal()
-        if literal_str == "hello":
-            found_hello_alt = True
-        elif literal_str == "help":
-            found_help_alt = True
-        elif literal_str == "helicopter":
-            found_helicopter_alt = True
-    assert_true(found_hello_alt, "Should find 'hello' literal")
-    assert_true(found_help_alt, "Should find 'help' literal")
-    assert_true(found_helicopter_alt, "Should find 'helicopter' literal")
+        if lit.get_literal(literals3) == "hel":
+            found_prefix = True
+            assert_true(lit.is_required, "Common prefix should be required")
+    assert_true(found_prefix, "Should find common prefix 'hel'")
 
     # Test pattern with required literal in middle
     var ast4 = parse(".*@example\\.com")
     var literals4 = extract_literals(ast4)
     var found_example = False
     for lit in literals4.literals:
-        var lit_str = lit.get_literal()
+        var lit_str = lit.get_literal(literals4)
         if "@example" in lit_str or "example" in lit_str:
             found_example = True
     assert_true(found_example, "Should find literal containing 'example'")
