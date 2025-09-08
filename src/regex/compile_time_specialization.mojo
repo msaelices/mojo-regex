@@ -189,6 +189,16 @@ struct CompileTimeMatcher(ImplicitlyCopyable, Movable):
             # Fall back to general engine
             return None
 
+    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+        """Find first occurrence starting from position (like re.search)."""
+        if self._is_literal_pattern():
+            var pos = text.find(self.pattern, start)
+            if pos != -1:
+                return Match(0, pos, pos + len(self.pattern), text)
+            return None
+        else:
+            return None
+
     fn match_all(self, text: String) -> List[Match]:
         """Match all occurrences using compile-time specialization."""
         if self._is_literal_pattern():
