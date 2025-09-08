@@ -506,7 +506,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Highest priority: Compile-time specialized matcher for literal patterns
         if self.compile_time_matcher:
-            return self.compile_time_matcher.value().match_first(text, start)
+            return self.compile_time_matcher.value().match_next(text, start)
 
         # Fast path: Exact literal bypass (only for non-anchored patterns)
         if self.is_exact_literal and not self.literal_info.has_anchors:
