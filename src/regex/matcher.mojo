@@ -26,6 +26,10 @@ from regex.literal_optimizer import (
     LiteralSet,
     has_literal_prefix,
 )
+from regex.compile_time_specialization import (
+    create_specialized_matcher,
+    CompileTimeMatcher,
+)
 
 
 # Adapter struct to maintain compatibility while using optimized literal_optimizer
@@ -325,6 +329,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """True if pattern is exactly .* (matches any string)."""
     var use_pure_dfa: Bool
     """True if pattern should use pure DFA without SIMD integration."""
+    var compile_time_matcher: Optional[CompileTimeMatcher]
+    """Optional compile-time specialized matcher for literal patterns."""
 
     fn __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -344,6 +350,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.complexity = PatternComplexity(PatternComplexity.SIMPLE)
             self.dfa_matcher = DFAMatcher()
             self.use_pure_dfa = False  # Special wildcard handling
+            self.compile_time_matcher = None  # .* is not a literal pattern
             # Create minimal NFA matcher (required field, but won't be used)
             var dummy_ast = parse(
                 "a"
@@ -368,38 +375,45 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         )  # Skip prefilter for pure DFA patterns
 
         if should_analyze_prefilter:
-            # Extract literal information using optimized implementation
-            # Use MutableAnyOrigin since that's what the AST has
-            var literal_set = extract_literals(ast)
-            var has_anchors = check_ast_for_anchors(ast)
-
-            # Get the best literal from the optimized selection
+            # Skip literal extraction for patterns with alternation to avoid crashes
+            # TODO: Fix literal extraction for alternation patterns
+            var has_alternation = "|" in pattern
             var best_literal_opt: Optional[String] = None
+            var has_anchors = False
             var is_exact = False
 
-            var best_literal_info = literal_set.get_best_literal()
-            if best_literal_info:
-                var literal = best_literal_info.value().get_literal(literal_set)
-                if len(literal) > 0:
-                    best_literal_opt = literal
-                    # Simple heuristic: if we have a required literal and no complex regex constructs
-                    # Must also check that the pattern doesn't contain regex operators
-                    var has_regex_operators = (
-                        "*" in pattern
-                        or "+" in pattern
-                        or "?" in pattern
-                        or "." in pattern
-                        or "|" in pattern
-                        or "(" in pattern
-                        or "[" in pattern
-                        or "{" in pattern
+            if not has_alternation:
+                # Extract literal information using optimized implementation
+                # Use MutableAnyOrigin since that's what the AST has
+                var literal_set = extract_literals(ast)
+                has_anchors = check_ast_for_anchors(ast)
+
+                # Get the best literal from the optimized selection
+                var best_literal_info = literal_set.get_best_literal()
+                if best_literal_info:
+                    var literal = best_literal_info.value().get_literal(
+                        literal_set
                     )
-                    is_exact = (
-                        best_literal_info.value().is_required
-                        and has_literal_prefix(ast)
-                        and not has_anchors
-                        and not has_regex_operators
-                    )
+                    if len(literal) > 0:
+                        best_literal_opt = literal
+                        # Simple heuristic: if we have a required literal and no complex regex constructs
+                        # Must also check that the pattern doesn't contain regex operators
+                        var has_regex_operators = (
+                            "*" in pattern
+                            or "+" in pattern
+                            or "?" in pattern
+                            or "." in pattern
+                            or "|" in pattern
+                            or "(" in pattern
+                            or "[" in pattern
+                            or "{" in pattern
+                        )
+                        is_exact = (
+                            best_literal_info.value().is_required
+                            and has_literal_prefix(ast)
+                            and not has_anchors
+                            and not has_regex_operators
+                        )
 
             self.literal_info = OptimizedLiteralInfo(
                 best_literal_opt, has_anchors, is_exact
@@ -427,6 +441,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             self.dfa_matcher = DFAMatcher()
 
+        # Try to create compile-time specialized matcher for literal patterns
+        self.compile_time_matcher = create_specialized_matcher(pattern)
+
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
         self.dfa_matcher = other.dfa_matcher.copy()
@@ -437,6 +454,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
+        self.compile_time_matcher = other.compile_time_matcher
 
     fn __moveinit__(out self, deinit other: Self):
         """Move constructor."""
@@ -448,6 +466,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = other.is_exact_literal
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
+        self.compile_time_matcher = other.compile_time_matcher^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
@@ -459,6 +478,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 return Match(0, start, len(text), text)
             else:
                 return None
+
+        # Highest priority: Compile-time specialized matcher for literal patterns
+        if self.compile_time_matcher:
+            return self.compile_time_matcher.value().match_first(text, start)
 
         # Prioritize DFA for SIMPLE patterns, especially pure DFA patterns
         if (
@@ -480,6 +503,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 return Match(0, start, len(text), text)
             else:
                 return None
+
+        # Highest priority: Compile-time specialized matcher for literal patterns
+        if self.compile_time_matcher:
+            return self.compile_time_matcher.value().match_next(text, start)
+
         # Fast path: Exact literal bypass (only for non-anchored patterns)
         if self.is_exact_literal and not self.literal_info.has_anchors:
             var best_literal = self.literal_info.get_best_required_literal()
@@ -531,6 +559,17 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             if len(text) >= 0:  # .* matches even empty strings
                 matches.append(Match(0, 0, len(text), text))
             return matches^
+
+        # Highest priority: Compile-time specialized matcher for literal patterns
+        if self.compile_time_matcher:
+            var literal_matches = self.compile_time_matcher.value().match_all(
+                text
+            )
+            var matches = MatchList()
+            for i in range(len(literal_matches)):
+                matches.append(literal_matches[i])
+            return matches^
+
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
             var matches = MatchList()
@@ -594,7 +633,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             base_engine = "NFA"
 
         # Add optimization information
-        if self.is_exact_literal and not self.literal_info.has_anchors:
+        if self.compile_time_matcher:
+            return "CompileTime"
+        elif self.is_exact_literal and not self.literal_info.has_anchors:
             return base_engine + "+ExactLiteral"
         elif self.prefilter and not self.literal_info.has_anchors:
             return base_engine + "+Prefilter"

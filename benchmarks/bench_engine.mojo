@@ -296,6 +296,9 @@ fn main() raises:
 
     benchmark_search("literal_match_long", "hello", text_10000, 2000)
 
+    # Compile-time specialization benchmark
+    benchmark_search("compile_time_literal", "hello", text_10000, 2000)
+
     # ===== Wildcard and Quantifier Benchmarks =====
     benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
 

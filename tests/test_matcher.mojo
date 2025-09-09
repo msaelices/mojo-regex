@@ -16,9 +16,9 @@ def test_hybrid_matcher_simple_pattern():
     """Test hybrid matcher with simple patterns that should use DFA."""
     var matcher = HybridMatcher("hello")
 
-    # Should classify as SIMPLE and use DFA
+    # Should classify as SIMPLE and use CompileTime for literal patterns
     assert_equal(matcher.get_complexity().value, PatternComplexity.SIMPLE)
-    assert_equal(matcher.get_engine_type(), "DFA")
+    assert_equal(matcher.get_engine_type(), "CompileTime")
 
     # Test matching
     var result = matcher.match_first("hello world", 0)
