@@ -190,4 +190,4 @@ fn scan(regex: String) raises -> List[Token]:
         escape_found = False
         i += 1
 
-    return tokens
+    return tokens^
