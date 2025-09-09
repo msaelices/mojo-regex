@@ -2155,7 +2155,7 @@ struct BoyerMoore:
             positions.append(pos)
             start = pos + 1  # Look for next occurrence
 
-        return positions
+        return positions^
 
 
 fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
@@ -2902,7 +2902,7 @@ fn _collect_all_alternation_branches(
             if len(branch_text) > 0:
                 branches.append(branch_text)
 
-    return branches
+    return branches^
 
 
 fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:

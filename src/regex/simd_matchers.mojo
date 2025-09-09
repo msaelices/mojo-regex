@@ -389,7 +389,7 @@ alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
 fn _init_range_matchers() -> RangeMatchers:
     """Initialize the global range matchers dictionary."""
     var matchers = RangeMatchers()
-    return matchers
+    return matchers^
 
 
 fn _get_range_matchers() -> UnsafePointer[RangeMatchers]:
@@ -408,7 +408,7 @@ alias _NIBBLE_MATCHERS_GLOBAL = ffi._Global[
 fn _init_nibble_matchers() -> NibbleMatchers:
     """Initialize the global nibble matchers dictionary."""
     var matchers = NibbleMatchers()
-    return matchers
+    return matchers^
 
 
 fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers]:
@@ -456,7 +456,7 @@ fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
         The corresponding RangeBasedMatcher instance.
     """
     var matchers_ptr = _get_range_matchers()
-    var matchers = matchers_ptr[]
+    ref matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
@@ -502,7 +502,7 @@ fn get_word_matcher() -> RangeBasedMatcher:
 fn get_whitespace_matcher() -> NibbleBasedMatcher:
     """Get cached whitespace matcher instance."""
     var matchers_ptr = _get_nibble_matchers()
-    var matchers = matchers_ptr[]
+    ref matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
