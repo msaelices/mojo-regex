@@ -4,6 +4,7 @@ SIMD-optimized matchers for character classes using advanced byte lookup techniq
 Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html
 """
 
+from os import abort
 from sys.info import simd_width_of
 from sys import ffi
 from memory import UnsafePointer
@@ -382,7 +383,7 @@ fn analyze_character_class_pattern(pattern: String) -> String:
 # Global cache for RangeBasedMatcher instances
 alias RangeMatchers = Dict[Int, RangeBasedMatcher]
 alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
-    "RangeMatchers", RangeMatchers, _init_range_matchers
+    "RangeMatchers", _init_range_matchers
 ]
 
 
@@ -394,14 +395,17 @@ fn _init_range_matchers() -> RangeMatchers:
 
 fn _get_range_matchers() -> UnsafePointer[RangeMatchers]:
     """Returns a pointer to the global range matchers dictionary."""
-    var ptr = _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[RangeMatchers]()  # Unreachable
 
 
 # Global cache for NibbleBasedMatcher instances
 alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
 alias _NIBBLE_MATCHERS_GLOBAL = ffi._Global[
-    "NibbleMatchers", NibbleMatchers, _init_nibble_matchers
+    "NibbleMatchers", _init_nibble_matchers
 ]
 
 
@@ -413,8 +417,11 @@ fn _init_nibble_matchers() -> NibbleMatchers:
 
 fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers]:
     """Returns a pointer to the global nibble matchers dictionary."""
-    var ptr = _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[NibbleMatchers]()  # Unreachable
 
 
 fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:

@@ -7,8 +7,9 @@ on pattern complexity.
 """
 from builtin._location import __call_location
 from memory import UnsafePointer
-from time import monotonic
+from os import abort
 from sys.ffi import _Global
+from time import monotonic
 
 from regex.ast import ASTNode
 from regex.matching import Match, MatchList
@@ -741,7 +742,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
 # Global pattern cache for improved performance
 alias RegexCache = Dict[String, CompiledRegex]
 
-alias _CACHE_GLOBAL = _Global["RegexCache", RegexCache, _init_regex_cache]
+alias _CACHE_GLOBAL = _Global["RegexCache", _init_regex_cache]
 
 
 fn _init_regex_cache() -> RegexCache:
@@ -751,9 +752,11 @@ fn _init_regex_cache() -> RegexCache:
 
 fn _get_regex_cache() -> UnsafePointer[RegexCache]:
     """Returns an pointer to the global regex cache."""
-
-    var ptr = _CACHE_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _CACHE_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[RegexCache]()  # Unreachable
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:

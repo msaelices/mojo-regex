@@ -291,7 +291,6 @@ Cache frequently-used SIMD matchers globally:
 # From simd_matchers.mojo - commit cecd978
 var _digit_matcher_cache = _Global[
     Optional[RangeBasedMatcher],
-    Optional[RangeBasedMatcher](None),
     _initialize_digit_matcher,
 ]
 

@@ -226,7 +226,8 @@ fn extract_literals[
         # We are assumming first child's matches the parent's origin
         ref child = ast.get_child(0)
         var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-            origin = ImmutableOrigin.cast_from[node_origin], mut=False
+            target_origin = ImmutableOrigin.cast_from[node_origin],
+            target_mut=False,
         ]()
         _extract_from_node[node_origin](child_ptr[], result, 0, True, True)
     elif ast.type == GROUP:
@@ -287,7 +288,8 @@ fn _extract_from_node[
                 # We are assumming first child's matches the parent's origin
                 ref child = node.get_child(0)
                 var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-                    origin = ImmutableOrigin.cast_from[node_origin], mut=False
+                    target_origin = ImmutableOrigin.cast_from[node_origin],
+                    target_mut=False,
                 ]()
                 # If single child is GROUP or OR, process it directly
                 if child.type == GROUP or child.type == OR:
@@ -318,7 +320,8 @@ fn _extract_from_node[
             # We are assumming first child's matches the parent's origin
             ref child = node.get_child(i)
             var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-                origin = ImmutableOrigin.cast_from[node_origin], mut=False
+                target_origin = ImmutableOrigin.cast_from[node_origin],
+                target_mut=False,
             ]()
             _extract_from_node(child_ptr[], result, offset, False, at_start)
 

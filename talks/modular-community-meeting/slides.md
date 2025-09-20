@@ -386,7 +386,7 @@ struct SIMDStringSearch:
 ```mojo
 alias RangeMatchers = Dict[Int, RangeBasedMatcher]
 alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
-    "RangeMatchers", RangeMatchers, _init_range_matchers
+    "RangeMatchers", _init_range_matchers
 ]
 fn _init_range_matchers() -> RangeMatchers: ...
 

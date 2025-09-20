@@ -167,7 +167,7 @@ struct NFAEngine(Copyable, Engine):
         var current_pos = 0
 
         # Smaller temp capacity since we clear frequently
-        var temp_matches = List[Match, hint_trivial_type=True](capacity=3)
+        var temp_matches = List[Match](capacity=3)
 
         # Use literal prefiltering if available
         if self.has_literal_optimization:
@@ -280,7 +280,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        var matches = List[Match]()
         var str_i = start
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
@@ -322,7 +322,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        var matches = List[Match]()
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
@@ -482,7 +482,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -832,7 +832,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -868,7 +868,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -914,7 +914,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -966,7 +966,7 @@ struct NFAEngine(Copyable, Engine):
         child_index: Int,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1038,7 +1038,7 @@ struct NFAEngine(Copyable, Engine):
         remaining_index: Int,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1126,7 +1126,7 @@ struct NFAEngine(Copyable, Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:

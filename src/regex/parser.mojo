@@ -230,7 +230,7 @@ fn parse_token_list[
                 )
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
+    var elements = List[ASTNode[MutableAnyOrigin]](
         capacity=len(tokens)
     )
     var i = 0
