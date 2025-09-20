@@ -1,9 +1,11 @@
-from memory import UnsafePointer, memcpy
+from memory import Pointer, UnsafePointer, memcpy
 from builtin._location import __call_location
 
 
 @register_passable("trivial")
-struct Match(Copyable, Movable):
+struct Match[
+    text_origin: Origin,
+](Copyable, Movable):
     """Contains the information of a match in a regular expression."""
 
     # Trivially copyable in lists
@@ -15,7 +17,7 @@ struct Match(Copyable, Movable):
     """Starting position of the match in the text."""
     var end_idx: Int
     """Ending position of the match in the text (exclusive)."""
-    var text_ptr: UnsafePointer[String, mut=False]
+    var text_ptr: Pointer[String, text_origin]
     """Pointer to the original text being matched."""
 
     fn __init__(
@@ -23,14 +25,16 @@ struct Match(Copyable, Movable):
         group_id: Int,
         start_idx: Int,
         end_idx: Int,
-        text: String,
+        ref [text_origin]text: String,
     ):
         self.group_id = group_id
         self.start_idx = start_idx
         self.end_idx = end_idx
-        self.text_ptr = UnsafePointer(to=text)
+        self.text_ptr = Pointer[String, text_origin](to=text)
 
-    fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
+    fn get_match_text(
+        self,
+    ) -> StringSlice[ImmutableOrigin.cast_from[text_origin]]:
         """Returns the text that was matched."""
         return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
 
