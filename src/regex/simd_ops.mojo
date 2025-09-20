@@ -17,6 +17,7 @@ The module automatically adapts to the available SIMD width:
 
 from algorithm import vectorize
 from builtin._location import __call_location
+from os import abort
 from sys import ffi
 from sys.info import simd_width_of
 
@@ -629,9 +630,7 @@ fn simd_count_char(text: String, target_char: String) -> Int:
 alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
 
 # Global SIMD matchers cache
-alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
-    "SIMDMatchers", SIMDMatchers, _init_simd_matchers
-]
+alias _SIMD_MATCHERS_GLOBAL = ffi._Global["SIMDMatchers", _init_simd_matchers]
 
 
 fn _init_simd_matchers() -> SIMDMatchers:
@@ -642,8 +641,11 @@ fn _init_simd_matchers() -> SIMDMatchers:
 
 fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers]:
     """Returns a pointer to the global SIMD matchers dictionary."""
-    var ptr = _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[SIMDMatchers]()  # Unreachable
 
 
 @always_inline
