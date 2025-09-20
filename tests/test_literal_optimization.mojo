@@ -157,7 +157,7 @@ fn test_multi_literal_searcher() raises:
     literals.append("banana")
     literals.append("cherry")
 
-    var searcher = MultiLiteralSearcher(literals)
+    var searcher = MultiLiteralSearcher(literals^)
 
     # Find first match
     var result1 = searcher.search(text)

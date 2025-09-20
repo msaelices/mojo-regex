@@ -188,7 +188,7 @@ struct CharacterClassSIMD(Copyable, Movable, SIMDMatcher):
 
         vectorize[closure, SIMD_WIDTH](text_len - pos)
 
-        return matches
+        return matches^
 
     fn match_chunk[
         size: Int
@@ -637,7 +637,7 @@ alias _SIMD_MATCHERS_GLOBAL = ffi._Global[
 fn _init_simd_matchers() -> SIMDMatchers:
     """Initialize the global SIMD matchers dictionary."""
     var matchers = SIMDMatchers()
-    return matchers
+    return matchers^
 
 
 fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers]:
@@ -766,7 +766,7 @@ fn process_text_with_matcher[
             matches.append(pos)
         pos += 1
 
-    return matches
+    return matches^
 
 
 fn apply_quantifier_simd_generic[
@@ -959,13 +959,12 @@ struct MultiLiteralSearcher(Copyable, Movable):
     var literal_count: Int
     """Number of literals (max 16 for SIMD efficiency)."""
 
-    fn __init__(out self, literals: List[String]):
+    fn __init__(out self, var literals: List[String]):
         """Initialize multi-literal searcher.
 
         Args:
             literals: List of literal strings to search for.
         """
-        self.literals = literals
         self.literal_count = min(len(literals), 16)
         self.max_len = 0
         self.min_len = 999999
@@ -978,6 +977,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
                 self.first_bytes[i] = ord(lit[0])
                 self.max_len = max(self.max_len, len(lit))
                 self.min_len = min(self.min_len, len(lit))
+        self.literals = literals^
 
     fn search(self, text: String, start: Int = 0) -> Tuple[Int, Int]:
         """Search for any literal in text.

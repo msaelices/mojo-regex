@@ -39,9 +39,9 @@ struct LiteralInfo(Copyable, Movable):
 
     fn __copyinit__(out self, other: Self):
         """Copy constructor."""
-        self.required_literals = other.required_literals
-        self.literal_prefixes = other.literal_prefixes
-        self.literal_suffixes = other.literal_suffixes
+        self.required_literals = other.required_literals.copy()
+        self.literal_prefixes = other.literal_prefixes.copy()
+        self.literal_suffixes = other.literal_suffixes.copy()
         self.is_exact_match = other.is_exact_match
         self.has_anchors = other.has_anchors
 
@@ -430,13 +430,13 @@ struct ExactLiteralMatcher(PrefilterMatcher):
     var literals: List[String]
     """List of exact literal strings this pattern matches."""
 
-    fn __init__(out self, literals: List[String]):
+    fn __init__(out self, var literals: List[String]):
         """Initialize exact literal matcher.
 
         Args:
             literals: List of literal strings the pattern matches exactly.
         """
-        self.literals = literals
+        self.literals = literals^
 
     fn find_candidates(self, text: String) -> List[Int]:
         """Find all positions where any of the literals match exactly."""
