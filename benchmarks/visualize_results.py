@@ -115,13 +115,19 @@ def create_speedup_chart(comparison_data: dict, output_file: str):
     ax.set_yticks(y_pos)
     ax.set_yticklabels(names)
     ax.invert_yaxis()
-    ax.set_xlabel(f"Speedup Factor ({test_name} vs {baseline_name})", fontsize=12)
+    ax.set_xlabel(
+        f"Speedup Factor ({test_name} vs {baseline_name})", fontsize=12
+    )
     ax.set_title(
-        f"{test_name} Performance vs {baseline_name}", fontsize=16, fontweight="bold"
+        f"{test_name} Performance vs {baseline_name}",
+        fontsize=16,
+        fontweight="bold",
     )
 
     # Add reference line at 1x
-    ax.axvline(x=1, color="red", linestyle="--", alpha=0.5, label="Equal performance")
+    ax.axvline(
+        x=1, color="red", linestyle="--", alpha=0.5, label="Equal performance"
+    )
 
     # Add grid
     ax.grid(axis="x", alpha=0.3)
@@ -129,7 +135,8 @@ def create_speedup_chart(comparison_data: dict, output_file: str):
     # Add summary text
     summary_text = (
         f"Geometric Mean Speedup: {summary['geometric_mean_speedup']:.2f}x\n"
-        f"{test_name} faster: {summary['test_faster_count']}/{summary['total_benchmarks']} benchmarks"
+        f"{test_name} faster:"
+        f" {summary['test_faster_count']}/{summary['total_benchmarks']} benchmarks"
     )
     ax.text(
         0.95,
@@ -186,9 +193,15 @@ def create_time_comparison_chart(comparison_data: dict, output_file: str):
 
     # Create bars
     bars1 = ax.bar(
-        x - width / 2, baseline_times, width, label=baseline_name, color="#ff7f0e"
+        x - width / 2,
+        baseline_times,
+        width,
+        label=baseline_name,
+        color="#ff7f0e",
     )
-    bars2 = ax.bar(x + width / 2, test_times, width, label=test_name, color="#1f77b4")
+    bars2 = ax.bar(
+        x + width / 2, test_times, width, label=test_name, color="#1f77b4"
+    )
 
     # Styling
     ax.set_xlabel("Benchmark", fontsize=12)
@@ -303,7 +316,10 @@ def create_category_analysis(comparison_data: dict, output_file: str):
     ax1.invert_yaxis()
     ax1.set_xlabel("Average Speedup Factor", fontsize=12)
     ax1.set_title(
-        f"Average Performance by Regex Category ({test_name} vs {baseline_name})",
+        (
+            f"Average Performance by Regex Category ({test_name} vs"
+            f" {baseline_name})"
+        ),
         fontsize=14,
         fontweight="bold",
     )
@@ -314,7 +330,9 @@ def create_category_analysis(comparison_data: dict, output_file: str):
     bars2 = ax2.bar(cat_names, cat_counts, color="lightcoral")
     ax2.set_xlabel("Category", fontsize=12)
     ax2.set_ylabel("Number of Benchmarks", fontsize=12)
-    ax2.set_title("Benchmark Distribution by Category", fontsize=14, fontweight="bold")
+    ax2.set_title(
+        "Benchmark Distribution by Category", fontsize=14, fontweight="bold"
+    )
     ax2.tick_params(axis="x", rotation=45)
 
     # Add count labels
@@ -340,7 +358,8 @@ def main():
     """Main visualization function."""
     # Get file paths from command line arguments or use defaults
     comparison_file = (
-        sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/comparison.json"
+        sys.argv[1] if len(sys.argv)
+        > 1 else "benchmarks/results/comparison.json"
     )
     prefix = sys.argv[2] if len(sys.argv) > 2 else ""
 

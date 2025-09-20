@@ -75,7 +75,9 @@ class Benchmark:
             # Right-align values to match Mojo format
             print(f"| {name:<25} | {time_ms:>21.17f} | {iters:>6} |")
 
-    def export_json(self, filename: str = "benchmarks/results/python_simd_results.json"):
+    def export_json(
+        self, filename: str = "benchmarks/results/python_simd_results.json"
+    ):
         """Export benchmark results to JSON file.
 
         Args:
@@ -88,14 +90,14 @@ class Benchmark:
         json_results = {
             "engine": "python_simd",
             "timestamp": datetime.now().isoformat(),
-            "results": {}
+            "results": {},
         }
 
         for name in self.results:
             json_results["results"][name] = {
                 "time_ns": self.results[name],
                 "time_ms": self.results[name] / 1_000_000,
-                "iterations": self.iterations[name]
+                "iterations": self.iterations[name],
             }
 
         # Write to file
@@ -195,7 +197,7 @@ def make_range_heavy_text(length: int) -> str:
 
 def bench_python_simd_digits(test_text: str) -> Callable[[], None]:
     """Benchmark Python regex with digit matching."""
-    pattern = re.compile(r'\d+')
+    pattern = re.compile(r"\d+")
 
     def benchmark_fn():
         for _ in range(20):
@@ -208,7 +210,7 @@ def bench_python_simd_digits(test_text: str) -> Callable[[], None]:
 
 def bench_python_simd_whitespace(test_text: str) -> Callable[[], None]:
     """Benchmark Python regex with whitespace matching."""
-    pattern = re.compile(r'\s+')
+    pattern = re.compile(r"\s+")
 
     def benchmark_fn():
         for _ in range(20):
@@ -221,7 +223,7 @@ def bench_python_simd_whitespace(test_text: str) -> Callable[[], None]:
 
 def bench_python_simd_range(test_text: str) -> Callable[[], None]:
     """Benchmark Python regex with character range matching."""
-    pattern = re.compile(r'[a-zA-Z0-9]+')
+    pattern = re.compile(r"[a-zA-Z0-9]+")
 
     def benchmark_fn():
         for _ in range(20):
@@ -234,7 +236,7 @@ def bench_python_simd_range(test_text: str) -> Callable[[], None]:
 
 def bench_python_simd_negated_range(test_text: str) -> Callable[[], None]:
     """Benchmark Python regex with negated character range matching."""
-    pattern = re.compile(r'[^a-zA-Z0-9]+')
+    pattern = re.compile(r"[^a-zA-Z0-9]+")
 
     def benchmark_fn():
         for _ in range(20):
@@ -247,7 +249,7 @@ def bench_python_simd_negated_range(test_text: str) -> Callable[[], None]:
 
 def bench_python_simd_quantified_range(test_text: str) -> Callable[[], None]:
     """Benchmark Python regex with quantified character range matching."""
-    pattern = re.compile(r'[a-z]{3,10}')
+    pattern = re.compile(r"[a-z]{3,10}")
 
     def benchmark_fn():
         for _ in range(20):
@@ -268,7 +270,10 @@ def main():
     m = Benchmark(num_repetitions=3)
 
     print("=== SIMD-Focused Python Regex Benchmarks ===")
-    print("These benchmarks provide Python baselines for comparison with Mojo NFA engine SIMD optimizations.")
+    print(
+        "These benchmarks provide Python baselines for comparison with Mojo NFA"
+        " engine SIMD optimizations."
+    )
     print("")
 
     # Pre-create test strings to avoid measurement overhead
@@ -281,57 +286,47 @@ def main():
 
     # Digit matching benchmarks
     print("--- Digit Matching (\\d+) ---")
-    m.bench_function(
-        "nfa_simd_digits_10k",
-        bench_python_simd_digits(text_10k)
-    )
-    m.bench_function(
-        "nfa_simd_digits_50k",
-        bench_python_simd_digits(text_50k)
-    )
+    m.bench_function("nfa_simd_digits_10k", bench_python_simd_digits(text_10k))
+    m.bench_function("nfa_simd_digits_50k", bench_python_simd_digits(text_50k))
 
     # Whitespace matching benchmarks
     print("--- Whitespace Matching (\\s+) ---")
     m.bench_function(
-        "nfa_simd_whitespace_10k",
-        bench_python_simd_whitespace(space_text_10k)
+        "nfa_simd_whitespace_10k", bench_python_simd_whitespace(space_text_10k)
     )
     m.bench_function(
-        "nfa_simd_whitespace_50k",
-        bench_python_simd_whitespace(space_text_50k)
+        "nfa_simd_whitespace_50k", bench_python_simd_whitespace(space_text_50k)
     )
 
     # Character range matching benchmarks
     print("--- Character Range Matching ([a-zA-Z0-9]+) ---")
     m.bench_function(
-        "nfa_simd_range_10k",
-        bench_python_simd_range(range_text_10k)
+        "nfa_simd_range_10k", bench_python_simd_range(range_text_10k)
     )
     m.bench_function(
-        "nfa_simd_range_50k",
-        bench_python_simd_range(range_text_50k)
+        "nfa_simd_range_50k", bench_python_simd_range(range_text_50k)
     )
 
     # Negated character range matching benchmarks
     print("--- Negated Character Range Matching ([^a-zA-Z0-9]+) ---")
     m.bench_function(
         "nfa_simd_negated_range_10k",
-        bench_python_simd_negated_range(range_text_10k)
+        bench_python_simd_negated_range(range_text_10k),
     )
     m.bench_function(
         "nfa_simd_negated_range_50k",
-        bench_python_simd_negated_range(range_text_50k)
+        bench_python_simd_negated_range(range_text_50k),
     )
 
     # Quantified character range matching benchmarks
     print("--- Quantified Character Range Matching ([a-z]{3,10}) ---")
     m.bench_function(
         "nfa_simd_quantified_range_10k",
-        bench_python_simd_quantified_range(range_text_10k)
+        bench_python_simd_quantified_range(range_text_10k),
     )
     m.bench_function(
         "nfa_simd_quantified_range_50k",
-        bench_python_simd_quantified_range(range_text_50k)
+        bench_python_simd_quantified_range(range_text_50k),
     )
 
     # Results summary

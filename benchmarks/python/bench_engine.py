@@ -22,7 +22,9 @@ from typing import Callable
 # ===-----------------------------------------------------------------------===#
 
 
-def benchmark_search(name: str, pattern: str, text: str, internal_iterations: int):
+def benchmark_search(
+    name: str, pattern: str, text: str, internal_iterations: int
+):
     """Benchmark search with manual timing (mirrors Mojo benchmark_search)."""
 
     # Compile pattern once for fair comparison
@@ -45,7 +47,9 @@ def benchmark_search(name: str, pattern: str, text: str, internal_iterations: in
         for _ in range(internal_iterations):
             result = compiled_pattern.search(text)
             if not result:
-                print(f"ERROR: No search match in {name} for pattern: {pattern}")
+                print(
+                    f"ERROR: No search match in {name} for pattern: {pattern}"
+                )
                 return
 
         end_time = time.perf_counter_ns()
@@ -65,8 +69,11 @@ def benchmark_search(name: str, pattern: str, text: str, internal_iterations: in
     _store_benchmark_result(name, time_ms, total_matches)
 
 
-def benchmark_match_first(name: str, pattern: str, text: str, internal_iterations: int):
-    """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first)."""
+def benchmark_match_first(
+    name: str, pattern: str, text: str, internal_iterations: int
+):
+    """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first).
+    """
 
     # Compile pattern once for fair comparison
     compiled_pattern = re.compile(pattern)
@@ -108,7 +115,9 @@ def benchmark_match_first(name: str, pattern: str, text: str, internal_iteration
     _store_benchmark_result(name, time_ms, total_matches)
 
 
-def benchmark_findall(name: str, pattern: str, text: str, internal_iterations: int):
+def benchmark_findall(
+    name: str, pattern: str, text: str, internal_iterations: int
+):
     """Benchmark findall with manual timing (mirrors Mojo benchmark_findall)."""
 
     # Compile pattern once for fair comparison
@@ -162,7 +171,9 @@ def _store_benchmark_result(name: str, time_ms: float, total_iterations: int):
     _benchmark_iterations[name] = total_iterations
 
 
-def export_json_results(filename: str = "benchmarks/results/python_results.json"):
+def export_json_results(
+    filename: str = "benchmarks/results/python_results.json",
+):
     """Export collected benchmark results to JSON file."""
     # Ensure directory exists
     os.makedirs(os.path.dirname(filename), exist_ok=True)
@@ -203,14 +214,19 @@ class Benchmark:
         pass
 
     def dump_report(self):
-        """DEPRECATED: Results are now printed directly by benchmark functions."""
+        """DEPRECATED: Results are now printed directly by benchmark functions.
+        """
         pass
 
-    def export_json(self, filename: str = "benchmarks/results/python_results.json"):
-        """DEPRECATED: Results are now printed directly by benchmark functions."""
+    def export_json(
+        self, filename: str = "benchmarks/results/python_results.json"
+    ):
+        """DEPRECATED: Results are now printed directly by benchmark functions.
+        """
         print("\nNote: JSON export disabled in new direct benchmark mode.")
         print(
-            "Results are printed directly to stdout for parsing by comparison scripts."
+            "Results are printed directly to stdout for parsing by comparison"
+            " scripts."
         )
 
 
@@ -219,7 +235,9 @@ class Benchmark:
 # ===-----------------------------------------------------------------------===
 
 
-def make_test_string(length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz") -> str:
+def make_test_string(
+    length: int, pattern: str = "abcdefghijklmnopqrstuvwxyz"
+) -> str:
     """Generate a test string of specified length by repeating a pattern."""
     if length <= 0:
         return ""
@@ -322,7 +340,8 @@ def main():
     long_text = short_text * 1000
     email_text = (
         "test@example.com user@test.org admin@example.com support@example.com"
-        " no-reply@example.com" * 50
+        " no-reply@example.com"
+        * 50
     )
 
     print("| name                      | met (ms)              | iters  |")
@@ -341,7 +360,9 @@ def main():
     # ===== Character Range Benchmarks =====
     benchmark_match_first("range_lowercase", "[a-z]+", text_range_10000, 1000)
     benchmark_search("range_digits", "[0-9]+", text_range_10000, 1000)
-    benchmark_match_first("range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000)
+    benchmark_match_first(
+        "range_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
+    )
 
     # ===== Predefined Character Class Benchmarks =====
     benchmark_search("predefined_digits", r"\d+", text_range_10000, 1000)
@@ -358,7 +379,10 @@ def main():
     # ===== NEW: Optimization Showcase Benchmarks =====
 
     # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
-    fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
+    fruit_text = (
+        "I love eating apple and banana and cherry and date and elderberry and"
+        " fig and grape with honey"
+    )
     benchmark_search(
         "large_8_alternations",
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)",
@@ -376,7 +400,11 @@ def main():
     )
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
-    user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
+    user_text = (
+        "Login attempts: user123 failed, admin456 success, guest789 failed,"
+        " root000 success, test111 pending, demo222 active, sample333 inactive,"
+        " client444 locked"
+    )
     benchmark_search(
         "literal_heavy_alternation",
         "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)",
@@ -386,7 +414,8 @@ def main():
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
     mixed_text = (
-        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in"
+        " the data"
     )
     benchmark_search(
         "complex_group_5_children",
@@ -402,7 +431,9 @@ def main():
     # ===== Literal Optimization Benchmarks =====
     benchmark_findall("literal_prefix_short", "hello.*", short_text, 1)
     benchmark_findall("literal_prefix_long", "hello.*", long_text, 1)
-    benchmark_findall("required_literal_short", ".*@example\\.com", email_text, 1)
+    benchmark_findall(
+        "required_literal_short", ".*@example\\.com", email_text, 1
+    )
     benchmark_match_first("no_literal_baseline", "[a-z]+", medium_text, 1)
     benchmark_match_first(
         "alternation_common_prefix", "(hello|help|helicopter)", medium_text, 1
@@ -422,7 +453,9 @@ def main():
     complex_number_text = (
         "Price: $123.45, Quantity: 67, Total: $890.12, Tax: 15.5%" * 100
     )
-    benchmark_findall("complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500)
+    benchmark_findall(
+        "complex_number", "[0-9]+\\.[0-9]+", complex_number_text, 500
+    )
 
     # ===== US Phone Number Benchmarks =====
     phone_text = make_phone_test_data(1000)
@@ -448,7 +481,9 @@ def main():
     )
 
     # ===== DFA-Optimized Phone Number Benchmarks =====
-    benchmark_findall("dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100)
+    benchmark_findall(
+        "dfa_simple_phone", "[0-9]{3}-[0-9]{3}-[0-9]{4}", phone_text, 100
+    )
     benchmark_findall(
         "dfa_paren_phone", "\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}", phone_text, 100
     )
@@ -482,7 +517,8 @@ def main():
 
     # Generate toll-free test data
     toll_free_text = (
-        "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or 8006667777."
+        "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or"
+        " 8006667777."
         * 100
     )
 
@@ -499,24 +535,34 @@ def main():
     serial_number_text = (
         "Serial: ABC1234-DEF5678-GHI9012 Model: XYZ123-ABC456-DEF789 "
         "Part: MNO345-PQR678-STU901 Code: VWX234-YZA567-BCD890 "
-    ) * 50
+        * 50
+    )
 
     datetime_text = (
         "2024-01-15 14:30:25.123 2024-02-28 09:45:30.456 "
         "2024-03-10 16:20:15.789 2024-04-05 11:35:40.012 "
-    ) * 100
+        * 100
+    )
 
     structured_data_text = (
-        "Record: USER12345-DEPT678-LOC901-ID234 Status: ACTIVE567-FLAG890-CODE123 "
-        "Transaction: TXN9876-AMT543-FEE210-TAX087 Reference: REF1357-NUM246-CHK802 "
-    ) * 75
+        "Record: USER12345-DEPT678-LOC901-ID234 Status:"
+        " ACTIVE567-FLAG890-CODE123 Transaction: TXN9876-AMT543-FEE210-TAX087"
+        " Reference: REF1357-NUM246-CHK802 "
+        * 75
+    )
 
     # Single quantifier patterns (baseline)
-    benchmark_findall("single_quantifier_digits", "[0-9]{4}", serial_number_text, 200)
-    benchmark_findall("single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200)
+    benchmark_findall(
+        "single_quantifier_digits", "[0-9]{4}", serial_number_text, 200
+    )
+    benchmark_findall(
+        "single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200
+    )
 
     # Multiple quantifier patterns - these benefit most from the optimization
-    benchmark_findall("dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150)
+    benchmark_findall(
+        "dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150
+    )
     benchmark_findall(
         "triple_quantifiers",
         "[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}",
@@ -585,9 +631,11 @@ def main():
 
     # Optimization test data for quantifier stress testing
     optimization_test_text = (
-        "Transaction: TXN12345-DEPT678-LOC90123-ID4567 Status: ACTIVE12-FLAG890-CODE1234 "
-        "Reference: REF13579-NUM24680-CHK80246 Product: PROD123-CAT456-TYPE789-SUB012 "
-    ) * 100
+        "Transaction: TXN12345-DEPT678-LOC90123-ID4567 Status:"
+        " ACTIVE12-FLAG890-CODE1234 Reference: REF13579-NUM24680-CHK80246"
+        " Product: PROD123-CAT456-TYPE789-SUB012 "
+        * 100
+    )
 
     # Most significant optimization cases from analysis
     benchmark_findall(

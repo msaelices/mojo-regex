@@ -36,7 +36,7 @@ alias SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
     RANGE,
 ]
 
-alias ChildrenIndexes = List[UInt8, hint_trivial_type=True]
+alias ChildrenIndexes = List[UInt8]
 
 
 struct Regex[origin: Origin](
@@ -144,6 +144,8 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 ):
     """Struct for all the Regex AST nodes."""
 
+    # Mark that is trivially copyable in lists
+    alias __copyinit__is_trivial = True
     alias max_children = 256
 
     var type: Int

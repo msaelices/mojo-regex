@@ -6,6 +6,9 @@ from builtin._location import __call_location
 struct Match(Copyable, Movable):
     """Contains the information of a match in a regular expression."""
 
+    # Trivially copyable in lists
+    alias __copyinit__is_trivial = True
+
     var group_id: Int
     """The ID of the capturing group (0 for the whole match)."""
     var start_idx: Int
