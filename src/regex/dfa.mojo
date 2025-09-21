@@ -1702,7 +1702,11 @@ struct DFAEngine(Engine):
             length=UInt(self.literal_pattern.byte_length()),
         )
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -1722,7 +1726,11 @@ struct DFAEngine(Engine):
             text, start, require_exact_position=True
         )
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Execute DFA matching against input text. It will match from the given start
         position.
 
@@ -1750,9 +1758,14 @@ struct DFAEngine(Engine):
                 return match_result
         return None
 
-    fn _try_match_at_position(
-        self, text: String, start_pos: Int, require_exact_position: Bool = False
-    ) -> Optional[Match]:
+    fn _try_match_at_position[
+        text_origin: Origin
+    ](
+        self,
+        ref [text_origin]text: String,
+        start_pos: Int,
+        require_exact_position: Bool = False,
+    ) -> Optional[Match[text_origin]]:
         """Try to match pattern starting at a specific position.
 
         Args:
@@ -1857,7 +1870,9 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) -> MatchList[text_origin]:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -1867,7 +1882,7 @@ struct DFAEngine(Engine):
             Matches container with all matches found.
         """
         # Use smart Matches container with lazy allocation
-        var matches = MatchList()
+        var matches = MatchList[text_origin]()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
@@ -1900,7 +1915,11 @@ struct DFAEngine(Engine):
 
         return matches^
 
-    fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
+    fn _try_match_simd[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start_pos: Int) -> Optional[
+        Match[text_origin]
+    ]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 
         This hybrid approach uses SIMD for fast character matching while respecting
@@ -1993,9 +2012,15 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn _optimized_simd_search(
-        self, text: String, start: Int
-    ) -> Optional[Match]:
+    fn _optimized_simd_search[
+        text_origin: Origin
+    ](
+        self,
+        ref [text_origin]text: String,
+        start: Int,
+    ) -> Optional[
+        Match[text_origin]
+    ]:
         """Optimized SIMD-based search for character class patterns.
 
         This method uses SIMD to quickly scan through the text and find positions
@@ -2037,7 +2062,10 @@ struct DFAEngine(Engine):
         return None
 
     fn _find_next_matching_char(
-        self, text: String, start: Int, simd_matcher: CharacterClassSIMD
+        self,
+        text: String,
+        start: Int,
+        simd_matcher: CharacterClassSIMD,
     ) -> Int:
         """Use SIMD to find the next character that matches the character class.
 

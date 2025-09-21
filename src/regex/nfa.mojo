@@ -124,10 +124,9 @@ struct NFAEngine(Copyable, Engine):
             length=UInt(self.pattern.byte_length()),
         )
 
-    fn match_all(
-        self,
-        text: String,
-    ) -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String,) -> MatchList[text_origin]:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -151,7 +150,7 @@ struct NFAEngine(Copyable, Engine):
             matched.
         """
         # Parse the regex if it's different from the cached one
-        var matches = MatchList()
+        var matches = MatchList[__origin_of(text)]()
         var ast: ASTNode[MutableAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
@@ -167,7 +166,7 @@ struct NFAEngine(Copyable, Engine):
         var current_pos = 0
 
         # Smaller temp capacity since we clear frequently
-        var temp_matches = List[Match](capacity=3)
+        var temp_matches = List[Match[__origin_of(text)]](capacity=3)
 
         # Use literal prefiltering if available
         if self.has_literal_optimization:
@@ -206,7 +205,7 @@ struct NFAEngine(Copyable, Engine):
                     and search_count < max_search_positions
                 ):
                     temp_matches.clear()
-                    var result = self._match_node(
+                    var result = self._match_node[__origin_of(text)](
                         ast,
                         text,
                         try_pos,
@@ -219,7 +218,9 @@ struct NFAEngine(Copyable, Engine):
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
-                            var matched = Match(0, try_pos, match_end, text)
+                            var matched = Match[__origin_of(text)](
+                                0, try_pos, match_end, text
+                            )
                             matches.append(matched)
 
                             # Move past this match to avoid overlapping matches
@@ -239,7 +240,7 @@ struct NFAEngine(Copyable, Engine):
             # No literal optimization, use standard approach
             while current_pos <= len(text):
                 temp_matches.clear()
-                var result = self._match_node(
+                var result = self._match_node[__origin_of(text)](
                     ast,
                     text,
                     current_pos,
@@ -252,7 +253,9 @@ struct NFAEngine(Copyable, Engine):
                     ref match_end = result[1]
 
                     # Create match object
-                    var matched = Match(0, match_start, match_end, text)
+                    var matched = Match[__origin_of(text)](
+                        0, match_start, match_end, text
+                    )
                     matches.append(matched)
 
                     # Move past this match to find next one
@@ -266,7 +269,11 @@ struct NFAEngine(Copyable, Engine):
 
         return matches^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
 
@@ -280,7 +287,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match[__origin_of(text)]]()
         var str_i = start
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
@@ -293,7 +300,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Try to match at the exact start position only (like Python's re.match)
         # Use match_first_mode for optimized early termination
-        var result = self._match_node(
+        var result = self._match_node[__origin_of(text)](
             ast,
             text,
             str_i,
@@ -304,11 +311,15 @@ struct NFAEngine(Copyable, Engine):
         if result[0]:  # Match found
             ref end_idx = result[1]
             # Create the match object
-            return Match(0, str_i, end_idx, text)
+            return Match[__origin_of(text)](0, str_i, end_idx, text)
 
         return None
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.
 
@@ -322,7 +333,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match[__origin_of(text)]]()
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
@@ -363,7 +374,7 @@ struct NFAEngine(Copyable, Engine):
                 )
                 while try_pos <= literal_pos:
                     matches.clear()
-                    var result = self._match_node(
+                    var result = self._match_node[__origin_of(text)](
                         ast,
                         text,
                         try_pos,
@@ -377,7 +388,9 @@ struct NFAEngine(Copyable, Engine):
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
-                            return Match(0, try_pos, match_end, text)
+                            return Match[__origin_of(text)](
+                                0, try_pos, match_end, text
+                            )
                     try_pos += 1
 
                 # Move search position past this literal occurrence
@@ -386,7 +399,7 @@ struct NFAEngine(Copyable, Engine):
             # No literal optimization, fall back to standard search
             while search_pos <= len(text):
                 matches.clear()
-                var result = self._match_node(
+                var result = self._match_node[__origin_of(text)](
                     ast,
                     text,
                     search_pos,
@@ -396,7 +409,9 @@ struct NFAEngine(Copyable, Engine):
                 )
                 if result[0]:  # Match found
                     ref end_idx = result[1]
-                    return Match(0, search_pos, end_idx, text)
+                    return Match[__origin_of(text)](
+                        0, search_pos, end_idx, text
+                    )
                 search_pos += 1
 
         return None
@@ -477,12 +492,14 @@ struct NFAEngine(Copyable, Engine):
         return self.literal_prefix in match_text
 
     @always_inline
-    fn _match_node(
+    fn _match_node[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -827,12 +844,14 @@ struct NFAEngine(Copyable, Engine):
             # Fallback to regular range matching
             return ast._is_char_in_range(ch, range_pattern)
 
-    fn _match_or(
+    fn _match_or[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -841,7 +860,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
         # Try left branch first
-        var left_result = self._match_node(
+        var left_result = self._match_node[__origin_of(str)](
             ast.get_child(0),
             str,
             str_i,
@@ -853,7 +872,7 @@ struct NFAEngine(Copyable, Engine):
             return left_result
 
         # If left fails, try right branch
-        var right_result = self._match_node(
+        var right_result = self._match_node[__origin_of(str)](
             ast.get_child(1),
             str,
             str_i,
@@ -863,12 +882,14 @@ struct NFAEngine(Copyable, Engine):
         )
         return right_result
 
-    fn _match_group(
+    fn _match_group[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -890,7 +911,7 @@ struct NFAEngine(Copyable, Engine):
             )
 
         # Simple case: no quantifier on the group itself
-        var result = self._match_sequence(
+        var result = self._match_sequence[__origin_of(str)](
             ast,
             0,
             str,
@@ -904,17 +925,19 @@ struct NFAEngine(Copyable, Engine):
 
         # If this is a capturing group, add the match
         if ast.is_capturing():
-            var matched = Match(0, start_pos, result[1], str)
+            var matched = Match[__origin_of(str)](0, start_pos, result[1], str)
             matches.append(matched)
 
         return result
 
-    fn _match_group_with_quantifier(
+    fn _match_group_with_quantifier[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -929,7 +952,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Use regular greedy matching with conservative early termination
         while group_matches < max_matches and current_pos <= len(str):
-            var group_result = self._match_sequence(
+            var group_result = self._match_sequence[__origin_of(str)](
                 ast,
                 0,
                 str,
@@ -949,7 +972,9 @@ struct NFAEngine(Copyable, Engine):
                 ):
                     break
                 if ast.is_capturing():
-                    var matched = Match(0, str_i, current_pos, str)
+                    var matched = Match[__origin_of(str)](
+                        0, str_i, current_pos, str
+                    )
                     matches.append(matched)
             else:
                 break
@@ -960,13 +985,15 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
-    fn _match_sequence(
+    fn _match_sequence[
+        text_origin: Origin
+    ](
         self,
         ast_parent: ASTNode,
         child_index: Int,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -979,7 +1006,7 @@ struct NFAEngine(Copyable, Engine):
             return (True, str_i)
 
         if child_index == children_len - 1:
-            return self._match_node(
+            return self._match_node[__origin_of(str)](
                 ast_parent.get_child(child_index),
                 str,
                 str_i,
@@ -993,7 +1020,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Try different match lengths for the first child
         if self._has_quantifier(first_child):
-            return self._match_with_backtracking(
+            return self._match_with_backtracking[__origin_of(str)](
                 first_child,
                 ast_parent,
                 child_index + 1,
@@ -1005,7 +1032,7 @@ struct NFAEngine(Copyable, Engine):
             )
         else:
             # Simple case: match first child normally, then recursively match rest
-            var result = self._match_node(
+            var result = self._match_node[__origin_of(str)](
                 first_child,
                 str,
                 str_i,
@@ -1015,7 +1042,7 @@ struct NFAEngine(Copyable, Engine):
             )
             if not result[0]:
                 return (False, str_i)
-            return self._match_sequence(
+            return self._match_sequence[__origin_of(str)](
                 ast_parent,
                 child_index + 1,
                 str,
@@ -1031,14 +1058,16 @@ struct NFAEngine(Copyable, Engine):
         return ast.min != 1 or ast.max != 1
 
     @always_inline
-    fn _match_with_backtracking(
+    fn _match_with_backtracking[
+        text_origin: Origin
+    ](
         self,
         quantified_node: ASTNode,
         ast_parent: ASTNode,
         remaining_index: Int,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1053,7 +1082,7 @@ struct NFAEngine(Copyable, Engine):
         # Use regular greedy backtracking but with conservative early termination
         var match_count = max_matches
         while match_count >= min_matches:
-            var consumed = self._try_match_count(
+            var consumed = self._try_match_count[__origin_of(str)](
                 quantified_node,
                 str,
                 str_i,
@@ -1071,7 +1100,7 @@ struct NFAEngine(Copyable, Engine):
                 ):
                     return (False, str_i)
                 # Try to match the remaining children
-                var result = self._match_sequence(
+                var result = self._match_sequence[__origin_of(str)](
                     ast_parent,
                     remaining_index,
                     str,
@@ -1087,10 +1116,12 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    fn _try_match_count(
+    fn _try_match_count[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
         count: Int,
         match_first_mode: Bool,
@@ -1121,12 +1152,14 @@ struct NFAEngine(Copyable, Engine):
         else:
             return -1
 
-    fn _match_re(
+    fn _match_re[
+        text_origin: Origin
+    ](
         self,
         ast: ASTNode,
-        str: String,
+        ref [text_origin]str: String,
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[text_origin]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1134,7 +1167,7 @@ struct NFAEngine(Copyable, Engine):
         if not ast.has_children():
             return (True, str_i)
 
-        return self._match_node(
+        return self._match_node[__origin_of(str)](
             ast.get_child(0),
             str,
             str_i,
@@ -1494,7 +1527,11 @@ struct NFAEngine(Copyable, Engine):
             return ch in range_pattern
 
 
-fn findall(pattern: String, text: String) raises -> MatchList:
+fn findall[
+    text_origin: Origin
+](pattern: String, ref [text_origin]text: String) raises -> MatchList[
+    text_origin
+]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1508,7 +1545,11 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return engine.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+fn match_first[
+    text_origin: Origin
+](pattern: String, ref [text_origin]text: String) raises -> Optional[
+    Match[text_origin]
+]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

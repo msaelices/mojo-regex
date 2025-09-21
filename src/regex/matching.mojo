@@ -39,7 +39,9 @@ struct Match[
         return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
 
 
-struct MatchList(Copyable, Movable, Sized):
+struct MatchList[
+    text_origin: Origin,
+](Copyable, Movable, Sized):
     """Smart container for regex matches with lazy allocation and optimal reservation.
 
     This struct provides zero allocation until the first match is added, then
@@ -50,7 +52,7 @@ struct MatchList(Copyable, Movable, Sized):
     alias DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _data: UnsafePointer[Match]
+    var _data: UnsafePointer[Match[text_origin]]
     """Internal list storing the matches."""
     var _len: Int
     var _capacity: Int
@@ -60,7 +62,7 @@ struct MatchList(Copyable, Movable, Sized):
         capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._data = UnsafePointer[Match]()
+        self._data = UnsafePointer[Match[text_origin]]()
         self._capacity = capacity
         self._len = 0
         if capacity > 0:
@@ -72,7 +74,7 @@ struct MatchList(Copyable, Movable, Sized):
         other: Self,
     ):
         """Copy constructor."""
-        self._data = UnsafePointer[Match]()
+        self._data = UnsafePointer[Match[text_origin]]()
         self._len = 0
         self._capacity = 0
         if other._len > 0:
@@ -93,7 +95,9 @@ struct MatchList(Copyable, Movable, Sized):
         """Return the number of matches."""
         return self._len
 
-    fn __getitem__[I: Indexer](ref self, idx: I) -> ref [self] Match:
+    fn __getitem__[
+        I: Indexer
+    ](ref self, idx: I) -> ref [self] Match[text_origin]:
         """Gets the list element at the given index.
 
         Args:
@@ -109,7 +113,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     @no_inline
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = UnsafePointer[Match].alloc(new_capacity)
+        var new_data = UnsafePointer[Match[text_origin]].alloc(new_capacity)
 
         memcpy(new_data, self._data, len(self))
 
@@ -120,7 +124,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     fn append(
         mut self,
-        m: Match,
+        m: Match[text_origin],
     ):
         """Add a match to the container, reserving capacity on first use."""
         if not self._data or self._len >= self._capacity:

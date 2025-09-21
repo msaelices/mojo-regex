@@ -10,7 +10,11 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -23,7 +27,9 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    fn match_all(self, text: String) -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) -> MatchList[text_origin]:
         """Find all non-overlapping matches using Engine.
 
         Args:

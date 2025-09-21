@@ -113,7 +113,9 @@ trait RegexMatcher:
         """
         ...
 
-    fn match_all(self, text: String) raises -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) raises -> MatchList[text_origin]:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -156,15 +158,25 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) raises -> MatchList[text_origin]:
         """Find all matches using DFA execution."""
         return self.engine_ptr[].match_all(text)
 
@@ -197,15 +209,25 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = other.engine^
         self.ast = other.ast^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using NFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) raises -> MatchList[text_origin]:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
@@ -454,7 +476,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = other.is_wildcard_match_any
         self.use_pure_dfa = other.use_pure_dfa
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
 
@@ -476,7 +502,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
@@ -528,17 +558,19 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) raises -> MatchList[text_origin]:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
-            var matches = MatchList()
+            var matches = MatchList[__origin_of(text)]()
             if len(text) >= 0:  # .* matches even empty strings
                 matches.append(Match(0, 0, len(text), text))
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var matches = MatchList()
+            var matches = MatchList[__origin_of(text)]()
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
@@ -666,7 +698,11 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     #         call_location,
     #     )
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
@@ -678,7 +714,11 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_next[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find first match in text. This is equivalent to re.search in Python.
 
         Args:
@@ -690,7 +730,9 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    fn match_all[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String) raises -> MatchList[text_origin]:
         """Find all matches in text.
 
         Args:
@@ -798,7 +840,11 @@ fn clear_regex_cache():
 
 
 # High-level convenience functions that match Python's re module interface
-fn search(pattern: String, text: String) raises -> Optional[Match]:
+fn search[
+    text_origin: Origin
+](pattern: String, ref [text_origin]text: String) raises -> Optional[
+    Match[text_origin]
+]:
     """Search for pattern in text (equivalent to re.search in Python).
 
     Args:
@@ -814,7 +860,11 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     return compiled.match_next(text)
 
 
-fn findall(pattern: String, text: String) raises -> MatchList:
+fn findall[
+    text_origin: Origin
+](pattern: String, ref [text_origin]text: String) raises -> MatchList[
+    text_origin
+]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -828,7 +878,11 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return compiled.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+fn match_first[
+    text_origin: Origin
+](pattern: String, ref [text_origin]text: String) raises -> Optional[
+    Match[text_origin]
+]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
