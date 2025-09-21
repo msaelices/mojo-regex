@@ -97,7 +97,11 @@ fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 trait RegexMatcher:
     """Interface for different regex matching engines."""
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    fn match_first[
+        text_origin: Origin
+    ](self, ref [text_origin]text: String, start: Int = 0) -> Optional[
+        Match[text_origin]
+    ]:
         """Find the first match in text starting from the given position.
 
         Args:
