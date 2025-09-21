@@ -138,7 +138,7 @@ fn parse_token_list[
             children_indexes=ChildrenIndexes(),
             start_idx=0,
             end_idx=0,
-            capturing=True,
+            capturing_group=True,
             group_id=0,
         )
         return group_node
@@ -166,7 +166,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
-                    capturing=True,
+                    capturing_group=True,
                     group_id=0,
                 )
                 left_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group)
@@ -181,7 +181,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
-                    capturing=True,
+                    capturing_group=True,
                     group_id=0,
                 )
                 right_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group_2)
@@ -230,9 +230,7 @@ fn parse_token_list[
                 )
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode[MutableAnyOrigin]](
-        capacity=len(tokens)
-    )
+    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -392,7 +390,7 @@ fn parse_token_list[
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
                 group = rebind[ASTNode[MutableAnyOrigin]](group_ast)
-                group.capturing = is_capturing
+                group.capturing_group = is_capturing
                 group.start_idx = group_content_start_pos
                 group.end_idx = paren_end_pos
             else:
@@ -408,7 +406,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(child_index),
                     start_idx=group_content_start_pos,
                     end_idx=paren_end_pos,
-                    capturing=is_capturing,
+                    capturing_group=is_capturing,
                     group_id=0,
                 )
                 group = rebind[ASTNode[MutableAnyOrigin]](group_node)
@@ -432,7 +430,7 @@ fn parse_token_list[
         children_indexes=children_indexes,
         start_idx=0,
         end_idx=len(regex.pattern),
-        capturing=True,
+        capturing_group=True,
         group_id=0,
     )
     return final_group^

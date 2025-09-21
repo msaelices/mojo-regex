@@ -158,7 +158,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
     """Starting position of this node in the original pattern string."""
     var end_idx: Int
     """Ending position of this node in the original pattern string."""
-    var capturing: Bool
+    var capturing_group: Bool
     """Whether this node represents a capturing group."""
     var children_indexes: SIMD[DType.uint8, Self.max_children]
     """Bit vector for each ASCII character, used for efficient character class lookups."""
@@ -178,7 +178,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         regex_ptr: UnsafePointer[Regex[ImmutableAnyOrigin]],
         start_idx: Int,
         end_idx: Int,
-        capturing: Bool = False,
+        capturing_group: Bool = False,
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -186,7 +186,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
         self.regex_ptr = regex_ptr
-        self.capturing = capturing
+        self.capturing_group = capturing_group
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.min = min
@@ -204,7 +204,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         child_index: UInt8,
         start_idx: Int,
         end_idx: Int,
-        capturing: Bool = False,
+        capturing_group: Bool = False,
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -212,7 +212,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
         self.type = type
-        self.capturing = capturing
+        self.capturing_group = capturing_group
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.min = min
@@ -229,7 +229,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         children_indexes: ChildrenIndexes,
         start_idx: Int,
         end_idx: Int,
-        capturing: Bool = False,
+        capturing_group: Bool = False,
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
@@ -237,7 +237,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
         self.type = type
-        self.capturing = capturing
+        self.capturing_group = capturing_group
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.min = min
@@ -259,7 +259,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         """Copy constructor for ASTNode."""
         self.type = other.type
         self.regex_ptr = other.regex_ptr
-        self.capturing = other.capturing
+        self.capturing_group = other.capturing_group
         self.start_idx = other.start_idx
         self.end_idx = other.end_idx
         self.min = other.min
@@ -283,7 +283,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
-            and self.capturing == other.capturing
+            and self.capturing_group == other.capturing_group
             and self.min == other.min
             and self.max == other.max
             and self.positive_logic == other.positive_logic
@@ -457,7 +457,7 @@ struct ASTNode[regex_origin: ImmutableOrigin](
 
     fn is_capturing(self) -> Bool:
         """Check if the node is capturing."""
-        return self.capturing
+        return self.capturing_group
 
     @always_inline
     fn get_children_len(self) -> Int:
@@ -717,7 +717,7 @@ fn GroupNode[
     children_indexes: ChildrenIndexes,
     start_idx: Int,
     end_idx: Int,
-    capturing: Bool = False,
+    capturing_group: Bool = False,
     group_id: Int = -1,
 ) -> ASTNode[regex_origin]:
     """Create a GroupNode with children."""
@@ -730,7 +730,7 @@ fn GroupNode[
         start_idx=start_idx,
         end_idx=end_idx,
         children_indexes=children_indexes,
-        capturing=capturing,
+        capturing_group=capturing_group,
         min=1,
         max=1,
     )
