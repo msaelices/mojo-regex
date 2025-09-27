@@ -4,7 +4,8 @@ SIMD-optimized matchers for character classes using advanced byte lookup techniq
 Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html
 """
 
-from sys.info import simdwidthof
+from os import abort
+from sys.info import simd_width_of
 from sys import ffi
 from memory import UnsafePointer
 from regex.aliases import (
@@ -14,9 +15,10 @@ from regex.aliases import (
     SIMD_MATCHER_ALPHA,
     SIMD_MATCHER_ALNUM,
     SIMD_MATCHER_HEX_DIGITS,
+    SIMD_MATCHER_WORD_CHARS,
 )
 
-alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 trait SIMDMatcher:
@@ -119,7 +121,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
                     var high_match = self.high_nibble_lut._dynamic_shuffle(
                         sub_high
                     )
-                    var sub_result = (low_match & high_match) != 0
+                    var sub_result = (low_match & high_match).ne(0)
                     for i in range(16):
                         result[offset + i] = sub_result[i]
                 else:
@@ -166,7 +168,8 @@ fn create_hex_digit_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-struct RangeBasedMatcher(Copyable, Movable, SIMDMatcher):
+@register_passable("trivial")
+struct RangeBasedMatcher(ImplicitlyCopyable, Movable, SIMDMatcher):
     """Range-based SIMD matcher using comparison operations.
 
     Efficient for contiguous character ranges like [a-z], [0-9], [A-Z].
@@ -283,7 +286,7 @@ fn create_alnum_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-fn create_whitespace_matcher() -> NibbleBasedMatcher:
+fn _create_whitespace_matcher() -> NibbleBasedMatcher:
     """Create a nibble-based matcher for whitespace characters.
 
     Matches: space (0x20), tab (0x09), newline (0x0A), carriage return (0x0D),
@@ -380,39 +383,45 @@ fn analyze_character_class_pattern(pattern: String) -> String:
 # Global cache for RangeBasedMatcher instances
 alias RangeMatchers = Dict[Int, RangeBasedMatcher]
 alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
-    "RangeMatchers", RangeMatchers, _init_range_matchers
+    "RangeMatchers", _init_range_matchers
 ]
 
 
 fn _init_range_matchers() -> RangeMatchers:
     """Initialize the global range matchers dictionary."""
     var matchers = RangeMatchers()
-    return matchers
+    return matchers^
 
 
 fn _get_range_matchers() -> UnsafePointer[RangeMatchers]:
     """Returns a pointer to the global range matchers dictionary."""
-    var ptr = _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[RangeMatchers]()  # Unreachable
 
 
 # Global cache for NibbleBasedMatcher instances
 alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
 alias _NIBBLE_MATCHERS_GLOBAL = ffi._Global[
-    "NibbleMatchers", NibbleMatchers, _init_nibble_matchers
+    "NibbleMatchers", _init_nibble_matchers
 ]
 
 
 fn _init_nibble_matchers() -> NibbleMatchers:
     """Initialize the global nibble matchers dictionary."""
     var matchers = NibbleMatchers()
-    return matchers
+    return matchers^
 
 
 fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers]:
     """Returns a pointer to the global nibble matchers dictionary."""
-    var ptr = _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
-    return ptr
+    try:
+        return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+    return UnsafePointer[NibbleMatchers]()  # Unreachable
 
 
 fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
@@ -432,6 +441,13 @@ fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
         matcher.add_range(ord("0"), ord("9"))
         matcher.add_range(ord("A"), ord("F"))
         matcher.add_range(ord("a"), ord("f"))
+    elif matcher_type == SIMD_MATCHER_WORD_CHARS:
+        matcher.add_range(ord("a"), ord("z"))
+        matcher.add_range(ord("A"), ord("Z"))
+        matcher.add_range(ord("0"), ord("9"))
+        matcher.add_range(
+            ord("_"), ord("_")
+        )  # Single character range for underscore
 
     return matcher
 
@@ -447,7 +463,7 @@ fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
         The corresponding RangeBasedMatcher instance.
     """
     var matchers_ptr = _get_range_matchers()
-    var matchers = matchers_ptr[]
+    ref matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
@@ -484,16 +500,22 @@ fn get_hex_digit_matcher() -> RangeBasedMatcher:
 
 
 @always_inline
+fn get_word_matcher() -> RangeBasedMatcher:
+    """Get cached word character matcher instance."""
+    return get_range_matcher(SIMD_MATCHER_WORD_CHARS)
+
+
+@always_inline
 fn get_whitespace_matcher() -> NibbleBasedMatcher:
     """Get cached whitespace matcher instance."""
     var matchers_ptr = _get_nibble_matchers()
-    var matchers = matchers_ptr[]
+    ref matchers = matchers_ptr[]
 
     # Try to get from cache
     try:
         return matchers[SIMD_MATCHER_WHITESPACE]
     except:
         # Create and cache the matcher
-        var matcher = create_whitespace_matcher()
+        var matcher = _create_whitespace_matcher()
         matchers[SIMD_MATCHER_WHITESPACE] = matcher
         return matcher

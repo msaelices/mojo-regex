@@ -82,7 +82,7 @@ Not all patterns benefit equally from SIMD. Use a hybrid approach:
 
 ```mojo
 # From simd_ops.mojo - commit 3e2cf21
-fn __init__(out self, owned char_class: String):
+fn __init__(out self, var char_class: String):
     self.use_shuffle_optimization = len(char_class) > 3
 
     if self.use_shuffle_optimization:
@@ -267,7 +267,7 @@ Optimize character range operations:
 
 ```mojo
 # From dfa.mojo - commit b2d284f
-fn expand_character_range(start: String, end: String) -> String:
+fn _expand_character_range(start: String, end: String) -> String:
     """Expand character range without excessive allocations."""
     var start_code = ord(start[0])
     var end_code = ord(end[0])
@@ -291,7 +291,6 @@ Cache frequently-used SIMD matchers globally:
 # From simd_matchers.mojo - commit cecd978
 var _digit_matcher_cache = _Global[
     Optional[RangeBasedMatcher],
-    Optional[RangeBasedMatcher](None),
     _initialize_digit_matcher,
 ]
 

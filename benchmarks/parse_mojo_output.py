@@ -25,14 +25,14 @@ def parse_mojo_benchmark_output(output: str) -> dict:
 
     # Pattern to match engine detection lines:
     # [ENGINE] literal_match_short -> Pattern: 'hello' | Engine: DFA | Complexity: SIMPLE
-    engine_pattern = r'\[ENGINE\]\s+(\S+)\s+->.*?Engine:\s+(\S+)'
+    engine_pattern = r"\[ENGINE\]\s+(\S+)\s+->.*?Engine:\s+(\S+)"
 
     # Pattern to match benchmark result lines:
     # | literal_match_short       |   0.00001621246337890 |   8300 |
-    result_pattern = r'\|\s*(\S+)\s*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|'
+    result_pattern = r"\|\s*(\S+)\s*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|"
 
     # First pass: extract engine information
-    for line in output.split('\n'):
+    for line in output.split("\n"):
         engine_match = re.search(engine_pattern, line)
         if engine_match:
             name = engine_match.group(1)
@@ -40,7 +40,7 @@ def parse_mojo_benchmark_output(output: str) -> dict:
             engine_map[name] = engine
 
     # Second pass: extract benchmark results
-    for line in output.split('\n'):
+    for line in output.split("\n"):
         match = re.match(result_pattern, line)
         if match:
             name = match.group(1)
@@ -54,7 +54,7 @@ def parse_mojo_benchmark_output(output: str) -> dict:
                 "time_ns": time_ns,
                 "time_ms": time_ms,
                 "iterations": iterations,
-                "engine": engine_map.get(name, "N/A")
+                "engine": engine_map.get(name, "N/A"),
             }
 
     return results
@@ -63,7 +63,10 @@ def parse_mojo_benchmark_output(output: str) -> dict:
 def main():
     """Read Mojo benchmark output from stdin and create JSON file."""
     # Get output file from command line argument or use default
-    output_file = sys.argv[1] if len(sys.argv) > 1 else "benchmarks/results/mojo_results.json"
+    output_file = (
+        sys.argv[1] if len(sys.argv)
+        > 1 else "benchmarks/results/mojo_results.json"
+    )
 
     # Read all input
     output = sys.stdin.read()
@@ -79,7 +82,7 @@ def main():
     json_data = {
         "engine": "mojo",
         "timestamp": datetime.now().isoformat(),
-        "results": results
+        "results": results,
     }
 
     # Ensure directory exists

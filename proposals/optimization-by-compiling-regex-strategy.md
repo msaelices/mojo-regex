@@ -16,7 +16,7 @@ This proposal outlines a phased approach to implementing these optimizations, wi
 ### Compilation Pipeline
 ```mojo
 # src/regex/dfa.mojo
-fn compile_ast_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     if is_literal_pattern(ast):
         # Handle literal patterns...
     elif _is_alternation_pattern(ast):
@@ -209,7 +209,7 @@ struct EnhancedPatternAnalyzer:
 
 **Compilation Optimization**:
 ```mojo
-fn compile_ast_pattern_optimized(
+fn compile_dfa_pattern_optimized(
     ast: ASTNode,
     props: PatternProperties  # Pre-computed properties
 ) raises -> DFAEngine:

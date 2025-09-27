@@ -72,17 +72,33 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
 
     # Check for specific engine comparisons
     if baseline_engine.lower() == "python" and test_engine.lower() == "mojo":
-        return ("Python", "Mojo", "MOJO REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
+        return (
+            "Python",
+            "Mojo",
+            "MOJO REGEX VS PYTHON REGEX BENCHMARK COMPARISON",
+        )
     elif baseline_engine.lower() == "mojo" and test_engine.lower() == "python":
-        return ("Mojo", "Python", "PYTHON REGEX VS MOJO REGEX BENCHMARK COMPARISON")
+        return (
+            "Mojo",
+            "Python",
+            "PYTHON REGEX VS MOJO REGEX BENCHMARK COMPARISON",
+        )
     elif baseline_engine.lower() == "rust" and test_engine.lower() == "mojo":
         return ("Rust", "Mojo", "MOJO REGEX VS RUST REGEX BENCHMARK COMPARISON")
     elif baseline_engine.lower() == "mojo" and test_engine.lower() == "rust":
         return ("Mojo", "Rust", "RUST REGEX VS MOJO REGEX BENCHMARK COMPARISON")
     elif baseline_engine.lower() == "python" and test_engine.lower() == "rust":
-        return ("Python", "Rust", "RUST REGEX VS PYTHON REGEX BENCHMARK COMPARISON")
+        return (
+            "Python",
+            "Rust",
+            "RUST REGEX VS PYTHON REGEX BENCHMARK COMPARISON",
+        )
     elif baseline_engine.lower() == "rust" and test_engine.lower() == "python":
-        return ("Rust", "Python", "PYTHON REGEX VS RUST REGEX BENCHMARK COMPARISON")
+        return (
+            "Rust",
+            "Python",
+            "PYTHON REGEX VS RUST REGEX BENCHMARK COMPARISON",
+        )
     else:
         # Branch comparison or generic comparison
         # Try to extract branch info from timestamp or use generic names
@@ -96,7 +112,8 @@ def detect_comparison_type(baseline_results: dict, test_results: dict) -> tuple:
             title = "CURRENT BRANCH VS OTHER BRANCH BENCHMARK COMPARISON"
         else:
             title = (
-                f"{test_name.upper()} VS {baseline_name.upper()} BENCHMARK COMPARISON"
+                f"{test_name.upper()} VS {baseline_name.upper()} BENCHMARK"
+                " COMPARISON"
             )
 
         return (baseline_name, test_name, title)
@@ -155,7 +172,9 @@ def create_comparison_report(
                 f"{baseline_name.lower()}_time_ms": baseline_time,
                 f"{test_name.lower()}_time_ms": test_time,
                 "speedup": speedup,
-                f"{baseline_name.lower()}_iterations": baseline_result["iterations"],
+                f"{baseline_name.lower()}_iterations": baseline_result[
+                    "iterations"
+                ],
                 f"{test_name.lower()}_iterations": test_result["iterations"],
                 "engine": test_result.get("engine", "N/A"),
             }
@@ -169,7 +188,9 @@ def create_comparison_report(
     # Calculate summary statistics
     if speedups:
         comparison_data["summary"]["total_benchmarks"] = len(speedups)
-        comparison_data["summary"]["average_speedup"] = sum(speedups) / len(speedups)
+        comparison_data["summary"]["average_speedup"] = sum(speedups) / len(
+            speedups
+        )
 
         # Geometric mean (better for ratios)
         product = 1.0
@@ -190,15 +211,21 @@ def create_comparison_report(
     summary = comparison_data["summary"]
     report.append("SUMMARY:")
     report.append(f"  Total benchmarks compared: {summary['total_benchmarks']}")
-    report.append(f"  {test_name} faster: {summary['test_faster_count']} benchmarks")
     report.append(
-        f"  {baseline_name} faster: {summary['baseline_faster_count']} benchmarks"
+        f"  {test_name} faster: {summary['test_faster_count']} benchmarks"
+    )
+    report.append(
+        f"  {baseline_name} faster:"
+        f" {summary['baseline_faster_count']} benchmarks"
     )
     report.append(f"  Average speedup: {summary['average_speedup']:.2f}x")
-    report.append(f"  Geometric mean speedup: {summary['geometric_mean_speedup']:.2f}x")
+    report.append(
+        f"  Geometric mean speedup: {summary['geometric_mean_speedup']:.2f}x"
+    )
     report.append("")
     report.append(
-        f"  Note: Speedup > 1.0 means {test_name} is faster than {baseline_name}"
+        f"  Note: Speedup > 1.0 means {test_name} is faster than"
+        f" {baseline_name}"
     )
     report.append("")
 
@@ -230,8 +257,8 @@ def create_comparison_report(
 
         engine = data.get("engine", "N/A")
         report.append(
-            f"{benchmark:<35} {format_time(baseline_time):>15} "
-            f"{format_time(test_time):>15} {speedup:>9.2f}x {engine:>8} {status:>15}"
+            f"{benchmark:<35} {format_time(baseline_time):>15} {format_time(test_time):>15} {speedup:>9.2f}x"
+            f" {engine:>8} {status:>15}"
         )
 
     report.append("-" * 110)
@@ -261,21 +288,28 @@ def main():
     # Get file paths from command line arguments
     if len(sys.argv) < 3:
         print(
-            "Usage: compare_benchmarks_generic.py <baseline_results.json> <test_results.json> [output.json]"
+            "Usage: compare_benchmarks_generic.py <baseline_results.json>"
+            " <test_results.json> [output.json]"
         )
         print(
-            "  baseline_results.json: Results to compare against (e.g., Python or Other branch)"
+            "  baseline_results.json: Results to compare against (e.g., Python"
+            " or Other branch)"
         )
-        print("  test_results.json: Results to test (e.g., Mojo or Current branch)")
         print(
-            "  output.json: Optional output file (default: benchmarks/results/comparison.json)"
+            "  test_results.json: Results to test (e.g., Mojo or Current"
+            " branch)"
+        )
+        print(
+            "  output.json: Optional output file (default:"
+            " benchmarks/results/comparison.json)"
         )
         sys.exit(1)
 
     baseline_file = sys.argv[1]
     test_file = sys.argv[2]
     output_file = (
-        sys.argv[3] if len(sys.argv) > 3 else "benchmarks/results/comparison.json"
+        sys.argv[3] if len(sys.argv)
+        > 3 else "benchmarks/results/comparison.json"
     )
 
     # Load results
@@ -283,7 +317,9 @@ def main():
     test_results = load_results(test_file)
 
     # Create comparison
-    comparison_data, report = create_comparison_report(baseline_results, test_results)
+    comparison_data, report = create_comparison_report(
+        baseline_results, test_results
+    )
 
     # Print report
     print(report)

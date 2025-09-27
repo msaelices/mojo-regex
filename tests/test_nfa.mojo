@@ -1196,3 +1196,101 @@ def test_specific_user_issue():
 
     # Both should behave the same
     assert_equal(result.__bool__(), hybrid_result.__bool__())
+
+
+def test_nfa_digit_basic():
+    """Test NFA digit matching with \\d."""
+    var result = match_first("\\d", "7")
+    assert_true(result)
+    var matched = result.value()
+    assert_equal(matched.get_match_text(), "7")
+
+
+def test_nfa_digit_all_digits():
+    """Test \\d matches all digits 0-9."""
+    for i in range(10):
+        var digit_char = String(i)
+        var result = match_first("\\d", digit_char)
+        assert_true(result)
+        var matched = result.value()
+        assert_equal(matched.get_match_text(), digit_char)
+
+
+def test_nfa_digit_not_match_letter():
+    """Test \\d does not match non-digits."""
+    var result1 = match_first("\\d", "a")
+    assert_true(not result1)
+
+    var result2 = match_first("\\d", "@")
+    assert_true(not result2)
+
+
+def test_nfa_digit_quantifiers():
+    """Test \\d with quantifiers."""
+    var result1 = match_first("\\d+", "12345")
+    assert_true(result1)
+    var matched1 = result1.value()
+    assert_equal(matched1.get_match_text(), "12345")
+
+    var result2 = match_first("\\d*", "")
+    assert_true(result2)
+    var matched2 = result2.value()
+    assert_equal(matched2.get_match_text(), "")
+
+    var result3 = match_first("\\d?", "9")
+    assert_true(result3)
+    var matched3 = result3.value()
+    assert_equal(matched3.get_match_text(), "9")
+
+
+def test_nfa_word_basic():
+    """Test NFA word character matching with \\w."""
+    var result = match_first("\\w", "a")
+    assert_true(result)
+    var matched = result.value()
+    assert_equal(matched.get_match_text(), "a")
+
+
+def test_nfa_word_all_types():
+    """Test \\w matches letters, digits, and underscore."""
+    var result1 = match_first("\\w", "a")
+    assert_true(result1)
+
+    var result2 = match_first("\\w", "Z")
+    assert_true(result2)
+
+    var result3 = match_first("\\w", "5")
+    assert_true(result3)
+
+    var result4 = match_first("\\w", "_")
+    assert_true(result4)
+
+
+def test_nfa_word_not_match_special():
+    """Test \\w does not match special characters."""
+    var result1 = match_first("\\w", "@")
+    assert_true(not result1)
+
+    var result2 = match_first("\\w", " ")
+    assert_true(not result2)
+
+    var result3 = match_first("\\w", "-")
+    assert_true(not result3)
+
+
+def test_nfa_word_quantifiers():
+    """Test \\w with quantifiers."""
+    var result1 = match_first("\\w+", "hello_world123")
+    assert_true(result1)
+    var matched1 = result1.value()
+    assert_equal(matched1.get_match_text(), "hello_world123")
+
+    var result2 = match_first("\\w*", "")
+    assert_true(result2)
+    var matched2 = result2.value()
+    assert_equal(matched2.get_match_text(), "")
+
+    var result3 = match_first("\\w?", "a")
+    assert_true(result3)
+    var matched3 = result3.value()
+    assert_equal(matched3.get_match_text(), "a")

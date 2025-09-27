@@ -134,9 +134,9 @@ fn benchmark_range_vs_nibble() raises:
     )
 
     # Test with CharacterClassSIMD for comparison
-    from regex.simd_ops import create_ascii_digits
+    from regex.simd_ops import _create_ascii_digits
 
-    var simd_digit_matcher = create_ascii_digits()
+    var simd_digit_matcher = _create_ascii_digits()
 
     start = now()
     var simd_count = simd_digit_matcher.count_matches(test_data)

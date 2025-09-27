@@ -1,6 +1,6 @@
 from memory import UnsafePointer
 
-from regex.ast import ASTNode
+from regex.ast import ASTNode, DIGIT, WORD, SPACE
 from regex.aliases import (
     CHAR_ZERO,
     CHAR_NINE,
@@ -9,12 +9,12 @@ from regex.aliases import (
     SIMD_MATCHER_WHITESPACE,
 )
 from regex.engine import Engine
-from regex.matching import Match
+from regex.matching import Match, MatchList
 from regex.parser import parse
 from regex.simd_ops import (
-    TwoWaySearcher,
+    twoway_search,
     CharacterClassSIMD,
-    get_simd_matcher,
+    get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
 )
@@ -23,6 +23,7 @@ from regex.simd_matchers import (
     get_whitespace_matcher,
     get_alpha_matcher,
     get_alnum_matcher,
+    get_word_matcher,
     RangeBasedMatcher,
 )
 from regex.literal_optimizer import extract_literals, extract_literal_prefix
@@ -41,7 +42,7 @@ alias MIN_PREFIX_LITERAL_LENGTH = 3
 alias MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
-struct NFAEngine(Engine):
+struct NFAEngine(Copyable, Engine):
     """A regex engine that can match regex patterns against text."""
 
     var pattern: String
@@ -56,8 +57,6 @@ struct NFAEngine(Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
-    var literal_searcher: Optional[TwoWaySearcher]
-    """SIMD searcher for literal prefix."""
 
     fn __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -66,7 +65,6 @@ struct NFAEngine(Engine):
         self.pattern = pattern
         self.literal_prefix = ""
         self.has_literal_optimization = False
-        self.literal_searcher = None
 
         try:
             self.regex = parse(pattern)
@@ -91,34 +89,45 @@ struct NFAEngine(Engine):
                         # Require longer literals to justify overhead
                         if (
                             best.is_prefix
-                            and best.get_literal_len()
+                            and best.get_literal_len(literal_set)
                             > MIN_PREFIX_LITERAL_LENGTH
                         ):
                             # Use prefix literal for optimization
-                            self.literal_prefix = best.get_literal()
+                            self.literal_prefix = best.get_literal(literal_set)
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
-                            )
                         elif (
                             best.is_required
-                            and best.get_literal_len()
+                            and best.get_literal_len(literal_set)
                             > MIN_REQUIRED_LITERAL_LENGTH
                         ):
                             # Use required literal for prefiltering
                             # Require even longer literals for non-prefix optimization
-                            self.literal_prefix = best.get_literal()
+                            self.literal_prefix = best.get_literal(literal_set)
                             self.has_literal_optimization = True
-                            self.literal_searcher = TwoWaySearcher(
-                                self.literal_prefix
-                            )
         except:
             self.regex = None
+
+    @always_inline
+    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
+        """Returns a contiguous slice of the pattern bytes.
+
+        Returns:
+            A contiguous slice pointing to the bytes owned by the pattern.
+        """
+        if self.has_literal_optimization:
+            return Span[Byte, __origin_of(self)](
+                ptr=self.literal_prefix.unsafe_ptr(),
+                length=UInt(self.literal_prefix.byte_length()),
+            )
+        return Span[Byte, __origin_of(self)](
+            ptr=self.pattern.unsafe_ptr(),
+            length=UInt(self.pattern.byte_length()),
+        )
 
     fn match_all(
         self,
         text: String,
-    ) -> List[Match, hint_trivial_type=True]:
+    ) -> MatchList:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -142,6 +151,7 @@ struct NFAEngine(Engine):
             matched.
         """
         # Parse the regex if it's different from the cached one
+        var matches = MatchList()
         var ast: ASTNode[MutableAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
@@ -151,20 +161,23 @@ struct NFAEngine(Engine):
             try:
                 ast = parse(self.pattern)
             except:
-                return []
+                return matches^
 
-        var matches = List[Match, hint_trivial_type=True](capacity=len(text))
+        # Use smart MatchList container with lazy allocation
         var current_pos = 0
 
-        var temp_matches = List[Match, hint_trivial_type=True](capacity=10)
+        # Smaller temp capacity since we clear frequently
+        var temp_matches = List[Match](capacity=3)
 
         # Use literal prefiltering if available
-        if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
-
+        if self.has_literal_optimization:
             while current_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = searcher.search(text, current_pos)
+                var literal_pos = twoway_search(
+                    self.get_pattern(),
+                    text,
+                    current_pos,
+                )
                 if literal_pos == -1:
                     # No more occurrences of required literal
                     break
@@ -176,13 +189,22 @@ struct NFAEngine(Engine):
 
                 # Try to match the full pattern starting from before the literal
                 var try_pos = literal_pos
+                var search_window = (
+                    10  # Reduced from 100 to 10 for better performance
+                )
                 if self.literal_prefix and not self._is_prefix_literal():
-                    try_pos = max(current_pos, literal_pos - 100)
+                    try_pos = max(current_pos, literal_pos - search_window)
 
-                # Search for matches around the literal
+                # Search for matches around the literal with limited iterations
                 var found_match = False
+                var max_search_positions = min(5, literal_pos - try_pos + 1)
+                var search_count = 0
 
-                while try_pos <= literal_pos and try_pos <= len(text):
+                while (
+                    try_pos <= literal_pos
+                    and try_pos <= len(text)
+                    and search_count < max_search_positions
+                ):
                     temp_matches.clear()
                     var result = self._match_node(
                         ast,
@@ -208,6 +230,7 @@ struct NFAEngine(Engine):
                             found_match = True
                             break
                     try_pos += 1
+                    search_count += 1
 
                 if not found_match:
                     # No match found around this literal, move past it
@@ -241,7 +264,7 @@ struct NFAEngine(Engine):
                 else:
                     current_pos += 1
 
-        return matches
+        return matches^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
@@ -257,7 +280,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        var matches = List[Match]()
         var str_i = start
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
@@ -299,7 +322,7 @@ struct NFAEngine(Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match, hint_trivial_type=True]()
+        var matches = List[Match]()
         var ast: ASTNode[MutableAnyOrigin]
         if self.regex:
             ast = self.regex.value()
@@ -312,12 +335,14 @@ struct NFAEngine(Engine):
         var search_pos = start
 
         # Use literal prefiltering if available
-        if self.has_literal_optimization and self.literal_searcher:
-            ref searcher = self.literal_searcher.value()
-
+        if self.has_literal_optimization:
             while search_pos <= len(text):
                 # Find next occurrence of literal
-                var literal_pos = searcher.search(text, search_pos)
+                var literal_pos = twoway_search(
+                    self.get_pattern(),
+                    text,
+                    search_pos,
+                )
                 if literal_pos == -1:
                     # No more occurrences of required literal
                     return None
@@ -427,9 +452,6 @@ struct NFAEngine(Engine):
                 ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
-                # More complex pattern, use helper to expand
-                from regex.dfa import expand_character_range
-
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns
                 char_class = String()
@@ -439,7 +461,7 @@ struct NFAEngine(Engine):
 
         # Create SIMD matcher
         if char_class:
-            return CharacterClassSIMD(char_class)
+            return get_character_class_matcher(char_class)
 
         return None
 
@@ -460,7 +482,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -483,6 +505,7 @@ struct NFAEngine(Engine):
             WILDCARD,
             SPACE,
             DIGIT,
+            WORD,
             RANGE,
             START,
             END,
@@ -507,6 +530,10 @@ struct NFAEngine(Engine):
             )
         elif ast.type == DIGIT:
             return self._match_digit(
+                ast, str, str_i, match_first_mode, required_start_pos
+            )
+        elif ast.type == WORD:
+            return self._match_word(
                 ast, str, str_i, match_first_mode, required_start_pos
             )
         elif ast.type == RANGE:
@@ -623,7 +650,15 @@ struct NFAEngine(Engine):
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
         if str_i >= len(str):
-            return (False, str_i)
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
         # Use specialized SIMD digit matcher for better performance
         var digit_matcher = get_digit_matcher()
@@ -633,7 +668,54 @@ struct NFAEngine(Engine):
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
         else:
-            return (False, str_i)
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
+
+    @always_inline
+    fn _match_word(
+        self,
+        ast: ASTNode,
+        str: String,
+        str_i: Int,
+        match_first_mode: Bool,
+        required_start_pos: Int,
+    ) capturing -> Tuple[Bool, Int]:
+        """Match word character (\\w)."""
+        if str_i >= len(str):
+            # End of string - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
+
+        # Use specialized SIMD word matcher for better performance
+        var word_matcher = get_word_matcher()
+        var ch_code = ord(str[str_i])
+        if word_matcher.contains(ch_code):
+            return self._apply_quantifier(
+                ast, str, str_i, 1, match_first_mode, required_start_pos
+            )
+        else:
+            # Character doesn't match - check if quantifier allows zero matches
+            if (
+                ast.min == 0
+            ):  # Only allow zero matches if min quantifier is 0 (*, ?)
+                return self._apply_quantifier(
+                    ast, str, str_i, 0, match_first_mode, required_start_pos
+                )
+            else:
+                return (False, str_i)
 
     @always_inline
     fn _match_range(
@@ -750,7 +832,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -786,7 +868,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -832,7 +914,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -884,7 +966,7 @@ struct NFAEngine(Engine):
         child_index: Int,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -956,7 +1038,7 @@ struct NFAEngine(Engine):
         remaining_index: Int,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1044,7 +1126,7 @@ struct NFAEngine(Engine):
         ast: ASTNode,
         str: String,
         str_i: Int,
-        mut matches: List[Match, hint_trivial_type=True],
+        mut matches: List[Match],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1145,7 +1227,7 @@ struct NFAEngine(Engine):
         Returns:
             Tuple of (success, final_position).
         """
-        from regex.ast import DIGIT, SPACE, RANGE
+        from regex.ast import DIGIT, SPACE, WORD, RANGE
 
         # Use specialized matchers for better performance
         if ast.type == DIGIT:
@@ -1157,6 +1239,11 @@ struct NFAEngine(Engine):
             var whitespace_matcher = get_whitespace_matcher()
             return apply_quantifier_simd_generic(
                 whitespace_matcher, str, str_i, min_matches, max_matches
+            )
+        elif ast.type == WORD:
+            var word_matcher = get_word_matcher()
+            return apply_quantifier_simd_generic(
+                word_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
             ref range_pattern = String(ast.get_value().value())
@@ -1407,9 +1494,7 @@ struct NFAEngine(Engine):
             return ch in range_pattern
 
 
-fn findall(
-    pattern: String, text: String
-) raises -> List[Match, hint_trivial_type=True]:
+fn findall(pattern: String, text: String) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1417,7 +1502,7 @@ fn findall(
         text: Text to search in.
 
     Returns:
-        List of all matches found.
+        MatchList container with all matches found.
     """
     var engine = NFAEngine(pattern)
     return engine.match_all(text)

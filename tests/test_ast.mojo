@@ -190,7 +190,7 @@ fn test_GroupNode() raises:
         children_indexes=children_indexes,
         start_idx=0,
         end_idx=4,
-        capturing=True,
+        capturing_group=True,
     )
     assert_true(group.__bool__())
     assert_equal(group.type, GROUP)

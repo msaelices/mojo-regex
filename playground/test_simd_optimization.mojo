@@ -1,7 +1,7 @@
 from time import perf_counter_ns as now
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 
-alias SIMD_WIDTH = simdwidthof[DType.uint8]()
+alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 @register_passable("trivial")
@@ -10,7 +10,7 @@ struct CharacterClassSIMD(Copyable, Movable):
 
     var lookup_table: SIMD[DType.uint8, 256]
 
-    fn __init__(out self, owned char_class: String):
+    fn __init__(out self, var char_class: String):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         for i in range(len(char_class)):
             var char_code = ord(char_class[i])

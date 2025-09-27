@@ -1,5 +1,5 @@
 from time import perf_counter_ns as now
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 from src.regex.simd_matchers import (
     create_hex_digit_matcher,
     create_digit_matcher,

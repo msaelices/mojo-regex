@@ -1,4 +1,4 @@
-from regex.aliases import CHAR_COLON
+from regex.aliases import CHAR_COLON, CHAR_ZERO, CHAR_NINE
 from regex.lexer import scan
 from regex.tokens import (
     Token,
@@ -29,6 +29,7 @@ from regex.ast import (
     WildcardElement,
     SpaceElement,
     DigitElement,
+    WordElement,
     RangeElement,
     StartElement,
     EndElement,
@@ -39,6 +40,7 @@ from regex.ast import (
     WILDCARD,
     SPACE,
     DIGIT,
+    WORD,
     RANGE,
     START,
     END,
@@ -68,28 +70,36 @@ fn check_for_quantifiers[
     elif next_token.type == Token.LEFTCURLYBRACE:
         # Parse curly brace quantifiers
         i += 2  # Skip element and {
-        var min_val = String(
-            capacity=String.INLINE_CAPACITY
-        )  # Pre-allocate for min value
-        var max_val = String(
-            capacity=String.INLINE_CAPACITY
-        )  # Pre-allocate for max value
+        var min_val = 0
+        var max_val = 0
+        var has_min = False
+        var has_max = False
 
-        # Parse min value
+        # Parse min value directly as integer
         while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-            min_val += String(chr(tokens[i].char))
+            var digit_char = tokens[i].char
+            if digit_char >= CHAR_ZERO and digit_char <= CHAR_NINE:
+                min_val = min_val * 10 + (digit_char - CHAR_ZERO)
+                has_min = True
+            else:
+                raise Error("Invalid digit in quantifier")
             i += 1
 
-        elem.min = atol(min_val) if min_val != "" else 0
+        elem.min = min_val if has_min else 0
 
         # Check for comma (range) or closing brace (exact)
         if i < len(tokens) and tokens[i].type == Token.COMMA:
             i += 1  # Skip comma
-            # Parse max value
+            # Parse max value directly as integer
             while i < len(tokens) and tokens[i].type == Token.ELEMENT:
-                max_val += String(chr(tokens[i].char))
+                var digit_char = tokens[i].char
+                if digit_char >= ord("0") and digit_char <= ord("9"):
+                    max_val = max_val * 10 + (digit_char - ord("0"))
+                    has_max = True
+                else:
+                    raise Error("Invalid digit in quantifier")
                 i += 1
-            elem.max = atol(max_val) if max_val != "" else -1
+            elem.max = max_val if has_max else -1
         else:
             # Exact quantifier {n}
             elem.max = elem.min
@@ -118,7 +128,7 @@ fn parse_token_list[
     regex_origin: Origin[mut=True]
 ](
     ref [regex_origin]regex: Regex[ImmutableAnyOrigin],
-    owned tokens: List[Token],
+    var tokens: List[Token],
 ) raises -> ASTNode[MutableAnyOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
@@ -128,7 +138,7 @@ fn parse_token_list[
             children_indexes=ChildrenIndexes(),
             start_idx=0,
             end_idx=0,
-            capturing=True,
+            capturing_group=True,
             group_id=0,
         )
         return group_node
@@ -156,7 +166,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
-                    capturing=True,
+                    capturing_group=True,
                     group_id=0,
                 )
                 left_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group)
@@ -171,7 +181,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
                     end_idx=0,
-                    capturing=True,
+                    capturing_group=True,
                     group_id=0,
                 )
                 right_ast = rebind[ASTNode[MutableAnyOrigin]](empty_group_2)
@@ -220,9 +230,7 @@ fn parse_token_list[
                 )
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode[MutableAnyOrigin], hint_trivial_type=True](
-        capacity=len(tokens)
-    )
+    var elements = List[ASTNode[MutableAnyOrigin]](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -267,6 +275,17 @@ fn parse_token_list[
                 + 2,  # Digit tokens like \d are 2 characters
             )
             # Check for quantifiers after the digit
+            if i + 1 < len(tokens):
+                check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
+        elif token.type == Token.WORD:
+            var elem = WordElement[ImmutableAnyOrigin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos
+                + 2,  # Word tokens like \w are 2 characters
+            )
+            # Check for quantifiers after the word
             if i + 1 < len(tokens):
                 check_for_quantifiers[ImmutableAnyOrigin](i, elem, tokens)
             elements.append(elem^)
@@ -371,7 +390,7 @@ fn parse_token_list[
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
                 group = rebind[ASTNode[MutableAnyOrigin]](group_ast)
-                group.capturing = is_capturing
+                group.capturing_group = is_capturing
                 group.start_idx = group_content_start_pos
                 group.end_idx = paren_end_pos
             else:
@@ -387,7 +406,7 @@ fn parse_token_list[
                     children_indexes=ChildrenIndexes(child_index),
                     start_idx=group_content_start_pos,
                     end_idx=paren_end_pos,
-                    capturing=is_capturing,
+                    capturing_group=is_capturing,
                     group_id=0,
                 )
                 group = rebind[ASTNode[MutableAnyOrigin]](group_node)
@@ -411,7 +430,7 @@ fn parse_token_list[
         children_indexes=children_indexes,
         start_idx=0,
         end_idx=len(regex.pattern),
-        capturing=True,
+        capturing_group=True,
         group_id=0,
     )
     return final_group^

@@ -3,6 +3,7 @@ from regex.aliases import (
     CHAR_LIT_TAB,
     CHAR_LIT_SPACE,
     CHAR_DIGIT,
+    CHAR_WORD,
     CHAR_COLON,
     CHAR_DOT,
     CHAR_SLASH,
@@ -30,7 +31,9 @@ from regex.aliases import (
 )
 
 
-struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
+struct Token(
+    EqualityComparable, ImplicitlyBoolable, ImplicitlyCopyable, Movable
+):
     """Token struct."""
 
     var type: Int
@@ -48,61 +51,65 @@ struct Token(Copyable, EqualityComparable, ImplicitlyBoolable, Movable):
     """Token of a space."""
     alias DIGIT = 3
     """Token of a digit."""
-    alias START = 4
+    alias WORD = 4
+    """Token of a word character."""
+    alias START = 5
     """Token of match start."""
-    alias END = 5
+    alias END = 6
     """Token of match end."""
-    alias ESCAPE = 6
+    alias ESCAPE = 7
     """Token of the escape character."""
-    alias COMMA = 7
+    alias COMMA = 8
     """Token of a comma."""
-    alias PARENTHESIS = 8
+    alias PARENTHESIS = 9
     """Token of a parenthesis."""
-    alias LEFTPARENTHESIS = 9
+    alias LEFTPARENTHESIS = 10
     """Left parenthesis token."""
-    alias RIGHTPARENTHESIS = 10
+    alias RIGHTPARENTHESIS = 11
     """Right parenthesis token."""
-    alias CURLYBRACE = 11
+    alias CURLYBRACE = 12
     """Curly brace token."""
-    alias LEFTCURLYBRACE = 12
+    alias LEFTCURLYBRACE = 13
     """Left curly brace token."""
-    alias RIGHTCURLYBRACE = 13
+    alias RIGHTCURLYBRACE = 14
     """Right curly brace token."""
-    alias BRACKET = 14
+    alias BRACKET = 15
     """Brackets token."""
-    alias LEFTBRACKET = 15
+    alias LEFTBRACKET = 16
     """Left bracket token."""
-    alias RIGHTBRACKET = 16
+    alias RIGHTBRACKET = 17
     """Right bracket token."""
-    alias QUANTIFIER = 17
+    alias QUANTIFIER = 18
     """Quantifier token."""
-    alias ZEROORMORE = 18
+    alias ZEROORMORE = 19
     """Quantifier 'zero or more' token."""
-    alias ONEORMORE = 19
+    alias ONEORMORE = 20
     """Quantifier 'one or more' token."""
-    alias ZEROORONE = 20
+    alias ZEROORONE = 21
     """Quantifier 'zero or one' token."""
-    alias ASTERISK = 21
+    alias ASTERISK = 22
     """Quantifier 'zero or more' token using character '*'."""
-    alias PLUS = 22
+    alias PLUS = 23
     """Quantifier 'one or more' token using character '+'."""
-    alias QUESTIONMARK = 23
+    alias QUESTIONMARK = 24
     """Quantifier 'zero or one' token using character '?'."""
-    alias ORTOKEN = 24
+    alias ORTOKEN = 25
     """Token of the or."""
-    alias VERTICALBAR = 25
+    alias VERTICALBAR = 26
     """Token of the or using '|'."""
-    alias NOTTOKEN = 26
+    alias NOTTOKEN = 27
     """Token of the negation."""
-    alias CIRCUMFLEX = 27
+    alias CIRCUMFLEX = 28
     """Token of the negation using '^'."""
-    alias DASH = 28
+    alias DASH = 29
     """Token of the dash '-'."""
 
     fn __init__(out self, type: Int):
         var char: Int
         if type == Self.WILDCARD:
             char = CHAR_DOT
+        elif type == Self.WORD:
+            char = CHAR_WORD
         elif type == Self.START:
             char = CHAR_CIRCUMFLEX
         elif type == Self.END:
@@ -345,3 +352,9 @@ fn SpaceToken(char: Int) -> Token:
 fn DigitToken(char: Int) -> Token:
     """Token of a digit."""
     return Token(type=Token.DIGIT, char=char)
+
+
+@always_inline
+fn WordToken(char: Int) -> Token:
+    """Token of a word character."""
+    return Token(type=Token.WORD, char=char)

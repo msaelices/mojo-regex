@@ -110,11 +110,11 @@ struct DFAEngine:
 ### 1.3 SIMD Character Class Optimization
 
 ```mojo
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 
 fn match_char_class_simd[width: Int](text: String, start: Int, char_set: String) -> Int:
     """Vectorized character class matching using SIMD."""
-    alias simd_width = simdwidthof[DType.uint8]()
+    alias simd_width = simd_width_of[DType.uint8]()
 
     # Create SIMD bitmask for character class
     var mask = SIMD[DType.uint8, simd_width]()

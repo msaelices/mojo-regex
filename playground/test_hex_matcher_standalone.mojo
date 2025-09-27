@@ -1,5 +1,5 @@
 from time import perf_counter_ns as now
-from sys.info import simdwidthof
+from sys.info import simd_width_of
 
 alias SIMD_WIDTH = 16  # Test with 16-byte chunks for optimal performance
 
