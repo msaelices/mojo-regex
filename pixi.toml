@@ -13,7 +13,7 @@ version = "0.4.0"
 
 [package]
 name = "mojo-regex"
-version = "0.5.0.dev2025090505"
+version = "0.5.0"
 
 [package.build]
 backend = { name = "pixi-build-rattler-build", version = "*" }
