@@ -68,7 +68,7 @@ alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 fn _expand_character_range(
     node_type: Int,
-    range_str: StringSlice[ImmutableAnyOrigin],
+    range_str: StringSlice[ImmutAnyOrigin],
 ) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
@@ -767,7 +767,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_alternation(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
+    fn compile_alternation(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile an alternation pattern like a|b or (cat|dog) into a DFA.
 
         Creates a state machine with parallel branches that converge to accepting states.
@@ -825,7 +825,7 @@ struct DFAEngine(Engine):
                     current_state_index = next_state_index
 
     fn compile_quantified_group(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile a quantified group pattern like (abc)+, (test)*, (a)? into a DFA.
 
@@ -967,7 +967,7 @@ struct DFAEngine(Engine):
                 current_state_index = next_index
 
     fn compile_simple_quantifier(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile a simple quantifier pattern like a*, test+, char? into a DFA.
 
@@ -1162,7 +1162,7 @@ struct DFAEngine(Engine):
             return new_state_index
 
     fn compile_wildcard_quantifier(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile a wildcard quantifier pattern like .*, .+, .? into a DFA.
 
@@ -1255,7 +1255,7 @@ struct DFAEngine(Engine):
                 self.states[0].add_transition(i, accepting_index)
 
     fn compile_common_prefix_alternation(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile common prefix alternation patterns like (hello|help|helicopter) into a DFA.
 
@@ -1288,7 +1288,7 @@ struct DFAEngine(Engine):
         self._build_prefix_trie(branches)
 
     fn _extract_all_prefix_branches(
-        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+        self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from nested OR structure."""
         from regex.ast import OR, GROUP, ELEMENT
@@ -1396,7 +1396,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_quantified_alternation_group(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile quantified alternation groups like (a|b)*, (cat|dog)+ into a DFA.
 
@@ -1445,7 +1445,7 @@ struct DFAEngine(Engine):
             )
 
     fn _extract_all_alternation_branches_for_quantified(
-        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+        self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from alternation for quantified groups.
         """
@@ -1691,15 +1691,15 @@ struct DFAEngine(Engine):
                     state.add_transition(char_code, to_state)
 
     @always_inline
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
+    fn get_pattern[o: ImmutOrigin](ref [o]self) -> Span[Byte, o]:
         """Returns a contiguous slice of the pattern bytes.
 
         Returns:
             A contiguous slice pointing to the bytes owned by the pattern.
         """
-        return Span[Byte, __origin_of(self)](
+        return Span[Byte, origin_of(self)](
             ptr=self.literal_pattern.unsafe_ptr(),
-            length=UInt(self.literal_pattern.byte_length()),
+            length=self.literal_pattern.byte_length(),
         )
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
@@ -2158,7 +2158,7 @@ struct BoyerMoore:
         return positions^
 
 
-fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_dfa_pattern(ast: ASTNode[MutAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -2259,7 +2259,7 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     return dfa^
 
 
-fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_character_class_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, [a-z]+, etc.).
 
     Args:
@@ -2291,9 +2291,9 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_character_class_info(
-    ast: ASTNode[ImmutableAnyOrigin],
+    ast: ASTNode[ImmutAnyOrigin],
 ) -> Tuple[
-    Optional[StringSlice[ImmutableAnyOrigin]], Int, Int, Bool, Bool, Bool
+    Optional[StringSlice[ImmutAnyOrigin]], Int, Int, Bool, Bool, Bool
 ]:
     """Extract character class information from AST.
 
@@ -2305,7 +2305,7 @@ fn _extract_character_class_info(
     """
     from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
-    var char_class: Optional[StringSlice[ImmutableAnyOrigin]] = None
+    var char_class: Optional[StringSlice[ImmutAnyOrigin]] = None
     var min_matches = 1
     var max_matches = 1
     var has_start = False
@@ -2313,7 +2313,7 @@ fn _extract_character_class_info(
     var positive_logic = True
 
     # Find the character class node (DIGIT, WORD, or RANGE)
-    var class_node: ASTNode[ImmutableAnyOrigin]
+    var class_node: ASTNode[ImmutAnyOrigin]
     if ast.type == DIGIT or ast.type == WORD or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
@@ -2339,16 +2339,16 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=DIGITS.unsafe_ptr(), length=UInt(len(DIGITS))
+        char_class = StringSlice[ImmutAnyOrigin](
+            ptr=DIGITS.unsafe_ptr(), length=len(DIGITS)
         )
     elif class_node.type == WORD:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate word character class string
-        char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=WORD_CHARS.unsafe_ptr(), length=UInt(len(WORD_CHARS))
+        char_class = StringSlice[ImmutAnyOrigin](
+            ptr=WORD_CHARS.unsafe_ptr(), length=len(WORD_CHARS)
         )
     elif class_node.type == RANGE:
         min_matches = class_node.min
@@ -2367,7 +2367,7 @@ fn _extract_character_class_info(
     )
 
 
-fn _is_pure_anchor_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_pure_anchor_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is just anchors (^, $, or ^$).
 
     Args:
@@ -2395,7 +2395,7 @@ fn _is_pure_anchor_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _is_sequential_character_class_pattern(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a sequence of character classes with quantifiers.
 
@@ -2429,7 +2429,7 @@ fn _is_sequential_character_class_pattern(
 
 
 fn _extract_sequential_pattern_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a sequential pattern.
 
@@ -2473,7 +2473,7 @@ fn _extract_sequential_pattern_info(
     return info^
 
 
-fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a sequence of multiple character classes.
 
     Examples: [a-z]+[0-9]+, digit+word+, [A-Z][a-z]*[0-9]{2,4}
@@ -2535,7 +2535,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_multi_class_sequence_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a multi-character class sequence.
 
@@ -2590,7 +2590,7 @@ fn _extract_multi_class_sequence_info(
     return info^
 
 
-fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_mixed_sequential_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a mixed sequential pattern with optional literals.
 
     Examples: [0-9]+\\.?[0-9]*, [a-z]+@[a-z]+\\.[a-z]+
@@ -2636,7 +2636,7 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_mixed_sequential_pattern_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a mixed sequential pattern.
 
@@ -2651,7 +2651,7 @@ fn _extract_mixed_sequential_pattern_info(
     return _extract_multi_class_sequence_info(ast)
 
 
-fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple alternation like a|b, cat|dog, (a|b).
 
     Args:
@@ -2671,7 +2671,7 @@ fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return _is_pure_alternation_pattern(ast)
 
 
-fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if alternation branches are simple (literal elements only).
 
     Args:
@@ -2708,7 +2708,7 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _group_contains_only_literals(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a group contains only literal elements.
 
     Args:
@@ -2731,7 +2731,7 @@ fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _find_and_check_or_node(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Recursively search for an OR node and check if its branches are simple.
 
     Args:
@@ -2755,8 +2755,8 @@ fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _find_or_node(
-    ast: ASTNode[MutableAnyOrigin],
-) -> Optional[ASTNode[MutableAnyOrigin]]:
+    ast: ASTNode[MutAnyOrigin],
+) -> Optional[ASTNode[MutAnyOrigin]]:
     """Recursively find the first OR node in the AST.
 
     Args:
@@ -2780,7 +2780,7 @@ fn _find_or_node(
     return None
 
 
-fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
+fn _extract_branch_text(branch: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from an alternation branch.
 
     Args:
@@ -2805,7 +2805,7 @@ fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
     return String("")
 
 
-fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_quantified_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantified group like (abc)+, (test)*, (a)?.
 
     Args:
@@ -2830,7 +2830,7 @@ fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return False
 
 
-fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _group_content_is_simple(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a quantified group contains simple literal content.
 
     Args:
@@ -2853,7 +2853,7 @@ fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
+fn _extract_group_text(group: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from a quantified group.
 
     Args:
@@ -2874,7 +2874,7 @@ fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
 
 
 fn _collect_all_alternation_branches(
-    or_node: ASTNode[MutableAnyOrigin],
+    or_node: ASTNode[MutAnyOrigin],
 ) -> List[String]:
     """Recursively collect all branch texts from a potentially nested OR structure.
 
@@ -2905,7 +2905,7 @@ fn _collect_all_alternation_branches(
     return branches^
 
 
-fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a pure alternation without other complex operators.
 
     Only allows simple structures like:
@@ -2940,7 +2940,7 @@ fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return False
 
 
-fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantifier like a*, test+, char?.
 
     Args:
@@ -2981,7 +2981,7 @@ fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return has_quantifier
 
 
-fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a wildcard quantifier like .*, .+, .?.
 
     Args:
@@ -3014,7 +3014,7 @@ fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _is_common_prefix_alternation_pattern(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a common prefix alternation like (hello|help|helicopter).
 
@@ -3058,7 +3058,7 @@ fn _is_common_prefix_alternation_pattern(
 
 
 fn _extract_literal_branches(
-    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal string branches from OR tree. Returns False if non-literal elements found.
     """
@@ -3118,7 +3118,7 @@ fn _compute_common_prefix(branches: List[String]) -> String:
     return prefix
 
 
-fn _is_quantified_alternation_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_quantified_alternation_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
 
     Args:
@@ -3159,7 +3159,7 @@ fn _is_quantified_alternation_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_literal_alternation_branches(
-    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal branches from alternation. Returns False if non-literal elements found.
     """

@@ -49,9 +49,9 @@ struct NFAEngine(Copyable, Engine):
     """The regex pattern string to match against."""
     var prev_re: String
     """Previously parsed regex pattern for caching."""
-    var prev_ast: Optional[ASTNode[MutableAnyOrigin]]
+    var prev_ast: Optional[ASTNode[MutAnyOrigin]]
     """Cached AST from previous regex compilation."""
-    var regex: Optional[ASTNode[MutableAnyOrigin]]
+    var regex: Optional[ASTNode[MutAnyOrigin]]
     """Compiled AST representation of the current regex pattern."""
     var literal_prefix: String
     """Extracted literal prefix for optimization."""
@@ -108,20 +108,20 @@ struct NFAEngine(Copyable, Engine):
             self.regex = None
 
     @always_inline
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
+    fn get_pattern[o: ImmutOrigin](ref [o]self) -> Span[Byte, o]:
         """Returns a contiguous slice of the pattern bytes.
 
         Returns:
             A contiguous slice pointing to the bytes owned by the pattern.
         """
         if self.has_literal_optimization:
-            return Span[Byte, __origin_of(self)](
+            return Span[Byte, origin_of(self)](
                 ptr=self.literal_prefix.unsafe_ptr(),
-                length=UInt(self.literal_prefix.byte_length()),
+                length=self.literal_prefix.byte_length(),
             )
-        return Span[Byte, __origin_of(self)](
+        return Span[Byte, origin_of(self)](
             ptr=self.pattern.unsafe_ptr(),
-            length=UInt(self.pattern.byte_length()),
+            length=self.pattern.byte_length(),
         )
 
     fn match_all(
@@ -152,7 +152,7 @@ struct NFAEngine(Copyable, Engine):
         """
         # Parse the regex if it's different from the cached one
         var matches = MatchList()
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
         elif self.regex:
@@ -282,7 +282,7 @@ struct NFAEngine(Copyable, Engine):
         """
         var matches = List[Match]()
         var str_i = start
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -323,7 +323,7 @@ struct NFAEngine(Copyable, Engine):
             contain all the group and subgroups matched.
         """
         var matches = List[Match]()
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -815,7 +815,7 @@ struct NFAEngine(Copyable, Engine):
     fn _match_with_simd_or_fallback(
         self,
         ast: ASTNode,
-        range_pattern: StringSlice[__origin_of(ast.regex_ptr[].pattern)],
+        range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
         ch: StringSlice,
         ch_code: Int,
     ) -> Bool:

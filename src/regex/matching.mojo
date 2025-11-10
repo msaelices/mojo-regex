@@ -30,7 +30,7 @@ struct Match(Copyable, Movable):
         self.end_idx = end_idx
         self.text_ptr = UnsafePointer(to=text)
 
-    fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
+    fn get_match_text(self) -> StringSlice[ImmutAnyOrigin]:
         """Returns the text that was matched."""
         return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
 
@@ -73,7 +73,7 @@ struct MatchList(Copyable, Movable, Sized):
         self._capacity = 0
         if other._len > 0:
             self._realloc(other._capacity)
-            memcpy(self._data, other._data, other._len)
+            memcpy(dest=self._data, src=other._data, count=other._len)
             self._len = other._len
         # # Comment when debug is done
         # var call_location = __call_location()
@@ -107,7 +107,7 @@ struct MatchList(Copyable, Movable, Sized):
     fn _realloc(mut self, new_capacity: Int):
         var new_data = UnsafePointer[Match].alloc(new_capacity)
 
-        memcpy(new_data, self._data, len(self))
+        memcpy(dest=new_data, src=self._data, count=len(self))
 
         if self._data:
             self._data.free()

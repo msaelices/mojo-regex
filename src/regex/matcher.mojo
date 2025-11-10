@@ -81,7 +81,7 @@ fn create_optimized_prefilter(
     return None
 
 
-fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if AST contains start or end anchors."""
     from regex.ast import START, END, RE, GROUP
 
@@ -132,7 +132,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine_ptr = UnsafePointer[DFAEngine]()
 
     fn __init__(
-        out self, var ast: ASTNode[MutableAnyOrigin], pattern: String
+        out self, var ast: ASTNode[MutAnyOrigin], pattern: String
     ) raises:
         """Initialize DFA matcher by compiling the AST.
 
@@ -170,10 +170,10 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
-    var ast: ASTNode[MutableAnyOrigin]
+    var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
 
-    fn __init__(out self, ast: ASTNode[MutableAnyOrigin], pattern: String):
+    fn __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
         """Initialize NFA matcher with the existing engine.
 
         Args:
@@ -370,7 +370,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         if should_analyze_prefilter:
             # Extract literal information using optimized implementation
-            # Use MutableAnyOrigin since that's what the AST has
+            # Use MutAnyOrigin since that's what the AST has
             var literal_set = extract_literals(ast)
             var has_anchors = check_ast_for_anchors(ast)
 

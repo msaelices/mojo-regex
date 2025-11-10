@@ -2,7 +2,7 @@ from regex.matching import Match, MatchList
 
 
 trait Engine(Copyable, Movable):
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
+    fn get_pattern[o: ImmutOrigin](ref [o]self) -> Span[Byte, o]:
         """Returns a contiguous slice of the pattern bytes.
 
         Returns:

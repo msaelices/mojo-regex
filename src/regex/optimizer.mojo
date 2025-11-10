@@ -116,7 +116,7 @@ struct PatternAnalyzer:
         """Initialize the pattern analyzer."""
         pass
 
-    fn classify(self, ast: ASTNode[MutableAnyOrigin]) -> PatternComplexity:
+    fn classify(self, ast: ASTNode[MutAnyOrigin]) -> PatternComplexity:
         """Analyze AST to determine pattern complexity.
 
         Args:
@@ -128,7 +128,7 @@ struct PatternAnalyzer:
         return self._analyze_node(ast, depth=0)
 
     fn analyze_optimizations(
-        self, ast: ASTNode[MutableAnyOrigin]
+        self, ast: ASTNode[MutAnyOrigin]
     ) -> OptimizationInfo:
         """Analyze pattern for optimization opportunities.
 
@@ -180,7 +180,7 @@ struct PatternAnalyzer:
 
         return info^
 
-    fn should_use_pure_dfa(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn should_use_pure_dfa(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Determine if pattern should use pure DFA without SIMD integration.
 
         Pure DFA is best for simple patterns where SIMD overhead exceeds benefits.
