@@ -1,13 +1,11 @@
-from memory import UnsafePointer, memcpy
-from builtin._location import __call_location
+from memory import UnsafePointer, memcpy, alloc
 
 
-@register_passable("trivial")
-struct Match(Copyable, Movable):
+struct Match(Copyable, Movable, TrivialRegisterPassable):
     """Contains the information of a match in a regular expression."""
 
     # Trivially copyable in lists
-    alias __copyinit__is_trivial = True
+    alias __copy_ctor_is_trivial = True
 
     var group_id: Int
     """The ID of the capturing group (0 for the whole match)."""
@@ -15,7 +13,7 @@ struct Match(Copyable, Movable):
     """Starting position of the match in the text."""
     var end_idx: Int
     """Ending position of the match in the text (exclusive)."""
-    var text_ptr: UnsafePointer[String, mut=False]
+    var text_ptr: UnsafePointer[String, ImmutAnyOrigin]
     """Pointer to the original text being matched."""
 
     fn __init__(
@@ -30,9 +28,11 @@ struct Match(Copyable, Movable):
         self.end_idx = end_idx
         self.text_ptr = UnsafePointer(to=text)
 
-    fn get_match_text(self) -> StringSlice[ImmutableAnyOrigin]:
+    fn get_match_text(self) -> StringSlice[ImmutAnyOrigin]:
         """Returns the text that was matched."""
-        return self.text_ptr[].as_string_slice()[self.start_idx : self.end_idx]
+        return StringSlice(self.text_ptr[])[
+            byte = self.start_idx : self.end_idx
+        ]
 
 
 struct MatchList(Copyable, Movable, Sized):
@@ -46,7 +46,7 @@ struct MatchList(Copyable, Movable, Sized):
     alias DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _data: UnsafePointer[Match]
+    var _data: UnsafePointer[Match, MutAnyOrigin]
     """Internal list storing the matches."""
     var _len: Int
     var _capacity: Int
@@ -56,7 +56,7 @@ struct MatchList(Copyable, Movable, Sized):
         capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._data = UnsafePointer[Match]()
+        self._data = UnsafePointer[Match, MutAnyOrigin]()
         self._capacity = capacity
         self._len = 0
         if capacity > 0:
@@ -65,16 +65,16 @@ struct MatchList(Copyable, Movable, Sized):
     @always_inline
     fn __copyinit__(
         out self,
-        other: Self,
+        copy: Self,
     ):
         """Copy constructor."""
-        self._data = UnsafePointer[Match]()
+        self._data = UnsafePointer[Match, MutAnyOrigin]()
         self._len = 0
         self._capacity = 0
-        if other._len > 0:
-            self._realloc(other._capacity)
-            memcpy(self._data, other._data, other._len)
-            self._len = other._len
+        if copy._len > 0:
+            self._realloc(copy._capacity)
+            memcpy(dest=self._data, src=copy._data, count=copy._len)
+            self._len = copy._len
         # # Comment when debug is done
         # var call_location = __call_location()
         # print("Copying MatchList", call_location)
@@ -89,7 +89,7 @@ struct MatchList(Copyable, Movable, Sized):
         """Return the number of matches."""
         return self._len
 
-    fn __getitem__[I: Indexer](ref self, idx: I) -> ref [self] Match:
+    fn __getitem__[I: Indexer](ref self, idx: I) -> ref[self] Match:
         """Gets the list element at the given index.
 
         Args:
@@ -105,9 +105,9 @@ struct MatchList(Copyable, Movable, Sized):
 
     @no_inline
     fn _realloc(mut self, new_capacity: Int):
-        var new_data = UnsafePointer[Match].alloc(new_capacity)
+        var new_data = alloc[Match](new_capacity)
 
-        memcpy(new_data, self._data, len(self))
+        memcpy(dest=new_data, src=self._data, count=len(self))
 
         if self._data:
             self._data.free()

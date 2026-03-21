@@ -5,7 +5,6 @@ This module implements the literal optimization strategies described in the burn
 including literal extraction, selection of optimal search strings, and prefiltering hints.
 """
 
-from builtin._location import __call_location
 from regex.aliases import EMPTY_SLICE
 from regex.ast import (
     ASTNode,
@@ -22,13 +21,12 @@ from regex.ast import (
 )
 
 
-@register_passable("trivial")
-struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
+struct LiteralInfo[node_origin: ImmutOrigin](
+    ImplicitlyCopyable, Movable, TrivialRegisterPassable
+):
     """Information about a literal substring found in a regex pattern."""
 
-    var node_ptr: UnsafePointer[
-        ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
-    ]
+    var node_ptr: UnsafePointer[ASTNode[ImmutAnyOrigin], ImmutAnyOrigin]
     """Pointer to the AST node containing the literal (for single nodes)."""
     var literal_string_idx: Int
     """Index into LiteralSet.literal_strings for the literal string (for concatenated literals or computed values). -1 if not used."""
@@ -43,16 +41,14 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
 
     fn __init__(
         out self,
-        ref [node_origin]node: ASTNode[ImmutableAnyOrigin],
+        ref[Self.node_origin] node: ASTNode[ImmutAnyOrigin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal."""
-        self.node_ptr = UnsafePointer[
-            ASTNode[ImmutableAnyOrigin], mut=False, origin=node_origin
-        ](to=node)
+        self.node_ptr = UnsafePointer(to=node).as_any_origin()
         self.literal_string_idx = -1
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -68,7 +64,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal index."""
-        self.node_ptr = UnsafePointer[ASTNode[ImmutableAnyOrigin]]()
+        self.node_ptr = UnsafePointer[ASTNode[ImmutAnyOrigin], ImmutAnyOrigin]()
         self.literal_string_idx = literal_string_idx
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -76,7 +72,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
         self.is_required = is_required
 
     # @always_inline
-    # fn __copyinit__(out self, other: Self):
+    # fn __copyinit__(out self, copy: Self):
     #     """Copy constructor for LiteralInfo."""
     #     self.node_ptr = other.node_ptr
     #     self.literal_string = other.literal_string
@@ -88,7 +84,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
     #     var call_location = __call_location()
     #     print("Copying LiteralInfo", call_location)
 
-    fn get_literal(self, literal_set: LiteralSet[node_origin]) -> String:
+    fn get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             # If we have an AST node, use its value
@@ -100,7 +96,7 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
             # No literal available
             return ""
 
-    fn get_literal_len(self, literal_set: LiteralSet[node_origin]) -> Int:
+    fn get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
         """Get the length of the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             return len(self.node_ptr[].get_value().value())
@@ -111,10 +107,10 @@ struct LiteralInfo[node_origin: ImmutableOrigin](ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
+struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
     """A set of literals extracted from a regex pattern."""
 
-    var literals: List[LiteralInfo[node_origin]]
+    var literals: List[LiteralInfo[Self.node_origin]]
     """All literals found in the pattern."""
     var literal_strings: List[String]
     """Storage for all literal strings referenced by LiteralInfo instances."""
@@ -123,7 +119,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
 
     fn __init__(out self, *, capacity: Int = 4):
         """Initialize an empty literal set."""
-        self.literals = List[LiteralInfo[node_origin]](capacity=capacity)
+        self.literals = List[LiteralInfo[Self.node_origin]](capacity=capacity)
         self.literal_strings = List[String](capacity=capacity)
         self.best_literal_idx = None
 
@@ -131,7 +127,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         """Get the number of literals in the set."""
         return len(self.literals)
 
-    fn __getitem__(self, index: Int) -> LiteralInfo[node_origin]:
+    fn __getitem__(self, index: Int) -> LiteralInfo[Self.node_origin]:
         """Get the literal at the specified index."""
         return self.literals[index].copy()
 
@@ -142,12 +138,12 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         is_prefix: Bool = False,
         is_suffix: Bool = False,
         is_required: Bool = True,
-    ) -> LiteralInfo[node_origin]:
+    ) -> LiteralInfo[Self.node_origin]:
         """Add a literal string to the set and return a LiteralInfo referencing it.
         """
         var string_idx = len(self.literal_strings)
         self.literal_strings.append(literal^)
-        var info = LiteralInfo[node_origin](
+        var info = LiteralInfo[Self.node_origin](
             literal_string_idx=string_idx,
             start_offset=start_offset,
             is_prefix=is_prefix,
@@ -200,7 +196,7 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
         self.best_literal_idx = best_idx
 
     @always_inline
-    fn get_best_literal(self) -> Optional[LiteralInfo[node_origin]]:
+    fn get_best_literal(self) -> Optional[LiteralInfo[Self.node_origin]]:
         """Get the best literal for prefiltering, if available."""
         if self.best_literal_idx:
             return self.literals[self.best_literal_idx.value()]
@@ -209,8 +205,8 @@ struct LiteralSet[node_origin: ImmutableOrigin](Movable, Sized):
 
 
 fn extract_literals[
-    node_origin: ImmutableOrigin
-](ref [node_origin]ast: ASTNode[ImmutableAnyOrigin]) -> LiteralSet[node_origin]:
+    node_origin: ImmutOrigin
+](ref[node_origin] ast: ASTNode[ImmutAnyOrigin]) -> LiteralSet[node_origin]:
     """Extract all literals from a regex AST.
 
     Args:
@@ -222,14 +218,8 @@ fn extract_literals[
     var result = LiteralSet[node_origin]()
 
     if ast.type == RE and ast.has_children():
-        # TODO: Unsure if this is a safe origin cast
-        # We are assumming first child's matches the parent's origin
-        ref child = ast.get_child(0)
-        var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-            target_origin = ImmutableOrigin.cast_from[node_origin],
-            target_mut=False,
-        ]()
-        _extract_from_node[node_origin](child_ptr[], result, 0, True, True)
+        var child = ast.get_child(0)
+        _extract_from_node[node_origin](child, result, 0, True, True)
     elif ast.type == GROUP:
         # Handle case where AST is already a GROUP
         _extract_from_node[node_origin](ast, result, 0, True, True)
@@ -239,9 +229,9 @@ fn extract_literals[
 
 
 fn _extract_from_node[
-    node_origin: ImmutableOrigin
+    node_origin: ImmutOrigin
 ](
-    ref [node_origin]node: ASTNode[ImmutableAnyOrigin],
+    node: ASTNode[ImmutAnyOrigin],
     mut result: LiteralSet[node_origin],
     offset: Int,
     is_required: Bool,
@@ -286,20 +276,18 @@ fn _extract_from_node[
             if node.get_children_len() == 1:
                 # TODO: Unsure if this is a safe origin cast
                 # We are assumming first child's matches the parent's origin
-                ref child = node.get_child(0)
-                var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-                    target_origin = ImmutableOrigin.cast_from[node_origin],
-                    target_mut=False,
-                ]()
+                var child = node.get_child(0)
                 # If single child is GROUP or OR, process it directly
                 if child.type == GROUP or child.type == OR:
                     _extract_from_node[node_origin](
-                        child_ptr[], result, offset, is_required, at_start
+                        child, result, offset, is_required, at_start
                     )
                     return
 
             # Regular group - extract sequence
-            _extract_sequence(node, offset, is_required, at_start, result)
+            _extract_sequence[node_origin](
+                node, offset, is_required, at_start, result
+            )
 
     elif node.type == OR:
         # For alternation, literals are only required if they appear in ALL branches
@@ -316,14 +304,10 @@ fn _extract_from_node[
 
         # Etract literals from each branch (but they're not required)
         for i in range(node.get_children_len()):
-            # TODO: Unsure if this is a safe origin cast
-            # We are assumming first child's matches the parent's origin
-            ref child = node.get_child(i)
-            var child_ptr = UnsafePointer[mut=False](to=child).origin_cast[
-                target_origin = ImmutableOrigin.cast_from[node_origin],
-                target_mut=False,
-            ]()
-            _extract_from_node(child_ptr[], result, offset, False, at_start)
+            var child = node.get_child(i)
+            _extract_from_node[node_origin](
+                child, result, offset, False, at_start
+            )
 
     elif node.type == START:
         # Start anchor doesn't contribute literals but maintains position info
@@ -337,9 +321,9 @@ fn _extract_from_node[
 
 
 fn _extract_sequence[
-    node_origin: ImmutableOrigin
+    node_origin: ImmutOrigin
 ](
-    ref [node_origin]group: ASTNode,
+    group: ASTNode,
     start_offset: Int,
     is_required: Bool,
     at_start: Bool,
@@ -444,7 +428,7 @@ fn _get_prefix_literal(node: ASTNode) -> String:
         return String(node.get_value().value())
     elif node.type == GROUP and node.min >= 1:
         # For groups, extract the full literal sequence
-        var literals = LiteralSet[__origin_of(node)](
+        var literals = LiteralSet[origin_of(node)](
             capacity=node.get_children_len()
         )
         _extract_sequence(node, 0, True, True, literals)
@@ -457,12 +441,12 @@ fn _longest_common_prefix(s1: String, s2: String) -> String:
     """Find the longest common prefix of two strings."""
     var min_len = min(len(s1), len(s2))
     var i = 0
-    while i < min_len and s1[i] == s2[i]:
+    while i < min_len and s1[byte=i] == s2[byte=i]:
         i += 1
-    return s1[:i]
+    return String(s1[byte=:i])
 
 
-fn has_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn has_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern starts with a literal that can be used for optimization.
 
     Args:
@@ -499,7 +483,7 @@ fn _has_literal_prefix_node(node: ASTNode) -> Bool:
         return False
 
 
-fn extract_literal_prefix(ast: ASTNode[MutableAnyOrigin]) -> String:
+fn extract_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal prefix from a pattern, if any.
 
     Args:

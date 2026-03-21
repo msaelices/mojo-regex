@@ -30,8 +30,9 @@ from regex.literal_optimizer import (
 )
 
 
-@register_passable("trivial")
-struct PatternComplexity(Copyable, Representable, Stringable, Writable):
+struct PatternComplexity(
+    Copyable, Representable, Stringable, TrivialRegisterPassable, Writable
+):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
 
@@ -116,7 +117,7 @@ struct PatternAnalyzer:
         """Initialize the pattern analyzer."""
         pass
 
-    fn classify(self, ast: ASTNode[MutableAnyOrigin]) -> PatternComplexity:
+    fn classify(self, ast: ASTNode[MutAnyOrigin]) -> PatternComplexity:
         """Analyze AST to determine pattern complexity.
 
         Args:
@@ -128,7 +129,7 @@ struct PatternAnalyzer:
         return self._analyze_node(ast, depth=0)
 
     fn analyze_optimizations(
-        self, ast: ASTNode[MutableAnyOrigin]
+        self, ast: ASTNode[MutAnyOrigin]
     ) -> OptimizationInfo:
         """Analyze pattern for optimization opportunities.
 
@@ -180,7 +181,7 @@ struct PatternAnalyzer:
 
         return info^
 
-    fn should_use_pure_dfa(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn should_use_pure_dfa(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Determine if pattern should use pure DFA without SIMD integration.
 
         Pure DFA is best for simple patterns where SIMD overhead exceeds benefits.
@@ -632,11 +633,11 @@ struct PatternAnalyzer:
 
         # Find common prefix
         for pos in range(min_length):
-            var char_at_pos = first_branch[pos]
+            var char_at_pos = first_branch[byte=pos]
             var all_match = True
 
             for i in range(1, len(branches)):
-                if branches[i][pos] != char_at_pos:
+                if branches[i][byte=pos] != char_at_pos:
                     all_match = False
                     break
 

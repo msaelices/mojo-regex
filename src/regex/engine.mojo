@@ -2,11 +2,11 @@ from regex.matching import Match, MatchList
 
 
 trait Engine(Copyable, Movable):
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
-        """Returns a contiguous slice of the pattern bytes.
+    fn get_pattern(self) -> String:
+        """Returns the pattern string.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by the pattern.
+            The pattern string.
         """
         ...
 

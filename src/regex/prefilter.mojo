@@ -37,21 +37,21 @@ struct LiteralInfo(Copyable, Movable):
         self.is_exact_match = False
         self.has_anchors = False
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.required_literals = other.required_literals.copy()
-        self.literal_prefixes = other.literal_prefixes.copy()
-        self.literal_suffixes = other.literal_suffixes.copy()
-        self.is_exact_match = other.is_exact_match
-        self.has_anchors = other.has_anchors
+        self.required_literals = copy.required_literals.copy()
+        self.literal_prefixes = copy.literal_prefixes.copy()
+        self.literal_suffixes = copy.literal_suffixes.copy()
+        self.is_exact_match = copy.is_exact_match
+        self.has_anchors = copy.has_anchors
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.required_literals = other.required_literals^
-        self.literal_prefixes = other.literal_prefixes^
-        self.literal_suffixes = other.literal_suffixes^
-        self.is_exact_match = other.is_exact_match
-        self.has_anchors = other.has_anchors
+        self.required_literals = take.required_literals^
+        self.literal_prefixes = take.literal_prefixes^
+        self.literal_suffixes = take.literal_suffixes^
+        self.is_exact_match = take.is_exact_match
+        self.has_anchors = take.has_anchors
 
     fn has_prefilter_candidates(self) -> Bool:
         """Check if this pattern has candidates suitable for prefiltering."""
@@ -104,7 +104,7 @@ struct LiteralExtractor:
         """Initialize the literal extractor."""
         pass
 
-    fn extract(self, ast: ASTNode[MutableAnyOrigin]) -> LiteralInfo:
+    fn extract(self, ast: ASTNode[MutAnyOrigin]) -> LiteralInfo:
         """Extract literal information from an AST pattern.
 
         Args:
@@ -135,11 +135,11 @@ struct LiteralExtractor:
 
         return info^
 
-    fn _has_anchors(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn _has_anchors(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Check if pattern has start or end anchors."""
         return self._check_anchors_recursive(ast)
 
-    fn _check_anchors_recursive(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn _check_anchors_recursive(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Recursively check for anchors in AST."""
         if ast.type == START or ast.type == END:
             return True
@@ -150,7 +150,7 @@ struct LiteralExtractor:
         return False
 
     fn _extract_from_node(
-        self, ast: ASTNode[MutableAnyOrigin], mut info: LiteralInfo
+        self, ast: ASTNode[MutAnyOrigin], mut info: LiteralInfo
     ):
         """Extract literals from a specific AST node."""
         if ast.type == RE:
@@ -190,9 +190,7 @@ struct LiteralExtractor:
                     if self._is_at_end(ast):
                         info.literal_suffixes.append(char_str)
 
-    fn _extract_literal_sequence(
-        self, ast: ASTNode[MutableAnyOrigin]
-    ) -> String:
+    fn _extract_literal_sequence(self, ast: ASTNode[MutAnyOrigin]) -> String:
         """Extract literal string from a sequence of ELEMENT nodes."""
         if ast.type == ELEMENT:
             if ast.min == 1 and ast.max == 1:
@@ -215,7 +213,7 @@ struct LiteralExtractor:
         return EMPTY_STRING
 
     fn _extract_alternation_literals(
-        self, ast: ASTNode[MutableAnyOrigin], mut info: LiteralInfo
+        self, ast: ASTNode[MutAnyOrigin], mut info: LiteralInfo
     ):
         """Extract literals from alternation patterns (a|b|c)."""
         var branches = List[String]()
@@ -247,7 +245,7 @@ struct LiteralExtractor:
                 info.literal_suffixes.append(common_suffix)
 
     fn _collect_alternation_branches(
-        self, ast: ASTNode[MutableAnyOrigin], mut branches: List[String]
+        self, ast: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Collect literal branches from alternation tree."""
         if ast.type == OR:
@@ -275,11 +273,11 @@ struct LiteralExtractor:
 
         # Find common prefix
         for pos in range(min_length):
-            var char_at_pos = first_branch[pos]
+            var char_at_pos = first_branch[byte=pos]
             var all_match = True
 
             for i in range(1, len(branches)):
-                if branches[i][pos] != char_at_pos:
+                if branches[i][byte=pos] != char_at_pos:
                     all_match = False
                     break
 
@@ -309,12 +307,12 @@ struct LiteralExtractor:
 
         # Find common suffix (work backwards)
         for pos in range(1, min_length + 1):
-            var char_at_pos = first_branch[len(first_branch) - pos]
+            var char_at_pos = first_branch[byte=len(first_branch) - pos]
             var all_match = True
 
             for i in range(1, len(branches)):
                 var branch = branches[i]
-                if branch[len(branch) - pos] != char_at_pos:
+                if branch[byte=len(branch) - pos] != char_at_pos:
                     all_match = False
                     break
 
@@ -325,13 +323,13 @@ struct LiteralExtractor:
 
         return suffix^
 
-    fn _is_at_beginning(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn _is_at_beginning(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Check if this node is at the beginning of the pattern."""
         # Simplified check - in a full implementation, this would check
         # the position within the parent's children
         return True  # Conservative approach for now
 
-    fn _is_at_end(self, ast: ASTNode[MutableAnyOrigin]) -> Bool:
+    fn _is_at_end(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Check if this node is at the end of the pattern."""
         # Simplified check - in a full implementation, this would check
         # the position within the parent's children
@@ -387,15 +385,15 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         self.literal = literal
         self.is_prefix = is_prefix
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.literal = other.literal
-        self.is_prefix = other.is_prefix
+        self.literal = copy.literal
+        self.is_prefix = copy.is_prefix
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.literal = other.literal^
-        self.is_prefix = other.is_prefix
+        self.literal = take.literal^
+        self.is_prefix = take.is_prefix
 
     fn find_candidates(self, text: String) -> List[Int]:
         """Find all candidate positions of the literal in text."""
