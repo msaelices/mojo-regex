@@ -1649,6 +1649,8 @@ struct DFAEngine(Engine):
         # For very large character classes, use a more efficient approach
         var char_class_len = len(char_class)
 
+        var cc_ptr = char_class.unsafe_ptr()
+
         if positive_logic:
             # Positive logic: [abc] - add transitions for characters in char_class
             # For common patterns, use optimized handling
@@ -1666,7 +1668,7 @@ struct DFAEngine(Engine):
             else:
                 # General case - iterate through each character
                 for i in range(char_class_len):
-                    var char_code = ord(char_class[byte=i])
+                    var char_code = Int(cc_ptr[i])
                     state.add_transition(char_code, to_state)
         else:
             # Negative logic: [^abc] - add transitions for all characters NOT in char_class
@@ -1675,7 +1677,7 @@ struct DFAEngine(Engine):
 
             # Mark characters in char_class as 1 in bitmap
             for i in range(char_class_len):
-                var char_code = ord(char_class[byte=i])
+                var char_code = Int(cc_ptr[i])
                 if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
                     char_bitmap[char_code] = 1
 
@@ -1800,6 +1802,8 @@ struct DFAEngine(Engine):
         var current_state = self.start_state
         var pos = start_pos
         var last_accepting_pos = -1
+        var text_ptr = text.unsafe_ptr()
+        var text_len = len(text)
 
         # Check if start state is accepting (for patterns like a*)
         if (
@@ -1808,8 +1812,8 @@ struct DFAEngine(Engine):
         ):
             last_accepting_pos = pos
 
-        while pos < len(text):
-            var char_code = ord(text[byte=pos])
+        while pos < text_len:
+            var char_code = Int(text_ptr[pos])
 
             if current_state >= len(self.states):
                 break
@@ -1834,7 +1838,7 @@ struct DFAEngine(Engine):
 
         # Check if we ended in an accepting state (important for exact matches)
         if (
-            pos == len(text)
+            pos == text_len
             and current_state < len(self.states)
             and self.states[current_state].is_accepting
         ):
@@ -1843,7 +1847,7 @@ struct DFAEngine(Engine):
         # Return longest match found
         if last_accepting_pos != -1:
             # Check end anchor constraint
-            if self.has_end_anchor and last_accepting_pos != len(text):
+            if self.has_end_anchor and last_accepting_pos != text_len:
                 return None  # End anchor requires match to end at string end
             return Match(0, start_pos, last_accepting_pos, text)
 
@@ -1951,9 +1955,10 @@ struct DFAEngine(Engine):
         # Use SIMD to count consecutive matching characters
         var pos = start_pos
         var match_count = 0
+        var text_ptr = text.unsafe_ptr()
 
         while pos < text_len:
-            var ch_code = ord(text[byte=pos])
+            var ch_code = Int(text_ptr[pos])
             if simd_matcher.contains(ch_code):
                 match_count += 1
                 pos += 1
@@ -2043,6 +2048,7 @@ struct DFAEngine(Engine):
         """
         var pos = start
         var text_len = len(text)
+        var text_ptr = text.unsafe_ptr()
 
         # Process characters in SIMD chunks for maximum efficiency
         alias CHUNK_SIZE = 16  # Process 16 characters at once
@@ -2059,7 +2065,7 @@ struct DFAEngine(Engine):
 
         # Handle remaining characters one by one
         while pos < text_len:
-            var char_code = ord(text[byte=pos])
+            var char_code = Int(text_ptr[pos])
             if simd_matcher.contains(char_code):
                 return pos
             pos += 1
@@ -2109,6 +2115,7 @@ struct BoyerMoore:
         var m = len(self.pattern)
         var n = len(text)
         var s = start  # shift of the pattern
+        var text_ptr = text.unsafe_ptr()
 
         while s <= n - m:
             var j = m - 1
@@ -2122,7 +2129,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = ord(text[byte=s + j])
+                var bad_char = Int(text_ptr[s + j])
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 

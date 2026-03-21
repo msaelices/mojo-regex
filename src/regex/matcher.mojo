@@ -244,18 +244,18 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     var has_character_classes = False
 
     for i in range(pattern_len):
-        var c = String(pattern[byte=i])
-        if c == "*" or c == "+" or c == "?":
+        var c = ord(pattern[byte=i])
+        if c == ord("*") or c == ord("+") or c == ord("?"):
             has_quantifiers = True
-        elif c == "|":
+        elif c == ord("|"):
             has_alternation = True
-        elif c == "^" and i == 0:
+        elif c == ord("^") and i == 0:
             has_anchors = True
-        elif c == "$" and i == pattern_len - 1:
+        elif c == ord("$") and i == pattern_len - 1:
             has_anchors = True
-        elif c == ".":
+        elif c == ord("."):
             has_wildcards = True
-        elif c == "[":
+        elif c == ord("["):
             has_character_classes = True
 
     # Patterns likely to yield poor prefilters (mostly single-char literals):

@@ -157,8 +157,9 @@ struct CharacterClassSIMD(
             pos += SIMD_WIDTH
 
         # Handle remaining characters
+        var text_ptr = text.unsafe_ptr()
         while pos < text_len:
-            if self.contains(ord(text[byte=pos])):
+            if self.contains(Int(text_ptr[pos])):
                 return pos
             pos += 1
 
@@ -176,16 +177,19 @@ struct CharacterClassSIMD(
         var matches = List[Int]()
         var pos = 0
         var text_len = len(text)
+        var text_ptr = text.unsafe_ptr()
 
         def closure[
             width: Int
-        ](i: Int) unified {mut matches, read self, read text, read pos}:
+        ](i: Int) unified {
+            mut matches, read self, read text, read text_ptr, read pos
+        }:
             if width != 1:
                 var chunk_matches = self._check_chunk_simd(text, pos + i)
                 for j in range(width):
                     if chunk_matches[j]:
                         matches.append(pos + i + j)
-            elif self.contains(ord(text[byte=pos + i])):
+            elif self.contains(Int(text_ptr[pos + i])):
                 matches.append(pos + i)
 
         vectorize[SIMD_WIDTH](text_len - pos, closure)
@@ -264,14 +268,17 @@ struct CharacterClassSIMD(
         var actual_end = end if end != -1 else len(text)
         var count = 0
         var pos = start
+        var text_ptr = text.unsafe_ptr()
 
         def closure[
             width: Int
-        ](i: Int) unified {mut count, read self, read text, read pos}:
+        ](i: Int) unified {
+            mut count, read self, read text, read text_ptr, read pos
+        }:
             if width != 1:
                 var matches = self._check_chunk_simd(text, pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
-            elif self.contains(ord(text[byte=pos + i])):
+            elif self.contains(Int(text_ptr[pos + i])):
                 count += 1
 
         vectorize[SIMD_WIDTH](actual_end - pos, closure)
@@ -454,12 +461,13 @@ fn _search_short_pattern(
     """
     var pattern_len = len(pattern)
     var text_len = len(text)
+    var text_ptr = text.unsafe_ptr()
 
     if pattern_len == 1:
         # Single character - simple scan
         var target_char = pattern[0]
         for i in range(start, text_len):
-            if ord(text[byte=i]) == Int(target_char):
+            if Int(text_ptr[i]) == Int(target_char):
                 return i
     elif pattern_len == 2:
         # Two characters - check pairs
@@ -468,8 +476,8 @@ fn _search_short_pattern(
         var first_char = pattern[0]
         var second_char = pattern[1]
         for i in range(start, text_len - 1):
-            if ord(text[byte=i]) == Int(first_char) and ord(
-                text[byte=i + 1]
+            if Int(text_ptr[i]) == Int(first_char) and Int(
+                text_ptr[i + 1]
             ) == Int(second_char):
                 return i
     return -1
@@ -490,9 +498,10 @@ fn verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
     if pos + pattern_len > len(text):
         return False
 
+    var text_ptr = text.unsafe_ptr()
     for i in range(pattern_len):
         var c = pattern[i]
-        if ord(text[byte=pos + i]) != Int(c):
+        if Int(text_ptr[pos + i]) != Int(c):
             return False
 
     return True
@@ -587,8 +596,10 @@ fn simd_memcmp(
         pos += SIMD_WIDTH
 
     # Compare remaining characters
+    var s1_ptr = s1.unsafe_ptr()
+    var s2_ptr = s2.unsafe_ptr()
     while pos < length:
-        if s1[byte=s1_offset + pos] != s2[byte=s2_offset + pos]:
+        if s1_ptr[s1_offset + pos] != s2_ptr[s2_offset + pos]:
             return False
         pos += 1
 
@@ -622,8 +633,9 @@ fn simd_count_char(text: String, target_char: String) -> Int:
         pos += SIMD_WIDTH
 
     # Handle remaining characters
+    var text_ptr = text.unsafe_ptr()
     while pos < text_len:
-        if String(text[byte=pos]) == target_char:
+        if Int(text_ptr[pos]) == target_code:
             count += 1
         pos += 1
 
@@ -767,8 +779,9 @@ fn process_text_with_matcher[
         pos += 16
 
     # Handle remaining characters
+    var text_ptr = text.unsafe_ptr()
     while pos < text_len:
-        if matcher.contains(ord(text[byte=pos])):
+        if matcher.contains(Int(text_ptr[pos])):
             matches.append(pos)
         pos += 1
 
@@ -808,8 +821,9 @@ fn apply_quantifier_simd_generic[
         actual_max = len(text) - start_pos
 
     # Count consecutive matching characters
+    var text_ptr = text.unsafe_ptr()
     while pos < len(text) and match_count < actual_max:
-        if matcher.contains(ord(text[byte=pos])):
+        if matcher.contains(Int(text_ptr[pos])):
             match_count += 1
             pos += 1
         else:
@@ -841,10 +855,11 @@ fn find_in_text_simd[
     """
     var actual_end = end if end != -1 else len(text)
     var pos = start
+    var text_ptr = text.unsafe_ptr()
 
     # Process in SIMD chunks for speed
     while pos + 16 <= actual_end:
-        var chunk = text.unsafe_ptr().load[width=16](pos)
+        var chunk = text_ptr.load[width=16](pos)
         var matches = matcher.match_chunk(chunk)
 
         # Check if any match in chunk
@@ -858,7 +873,7 @@ fn find_in_text_simd[
 
     # Handle remaining characters
     while pos < actual_end:
-        if matcher.contains(ord(text[byte=pos])):
+        if matcher.contains(Int(text_ptr[pos])):
             return pos
         pos += 1
 
@@ -892,6 +907,8 @@ fn twoway_search(
         return -1
 
     # For very short patterns, use simple search
+    var text_ptr = text.unsafe_ptr()
+
     if n <= 4:
         if n == 1:
             # Single character search
@@ -902,7 +919,7 @@ fn twoway_search(
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if ord(text[byte=pos + i]) != Int(pattern[i]):
+                if Int(text_ptr[pos + i]) != Int(pattern[i]):
                     matched = False
                     break
             if matched:
@@ -935,7 +952,7 @@ fn twoway_search(
         # Simple forward comparison
         var matched = True
         for i in range(n):
-            if ord(text[byte=pos + i]) != Int(pattern[i]):
+            if Int(text_ptr[pos + i]) != Int(pattern[i]):
                 matched = False
                 break
 
@@ -1000,10 +1017,11 @@ struct MultiLiteralSearcher(Copyable, Movable):
 
         var text_len = len(text)
         var pos = start
+        var text_ptr = text.unsafe_ptr()
 
         # Process text in SIMD chunks
         while pos + SIMD_WIDTH <= text_len - self.min_len + 1:
-            var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
+            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
 
             # Check if any first bytes match
             var any_match = SIMD[DType.bool, SIMD_WIDTH](fill=False)
@@ -1022,9 +1040,8 @@ struct MultiLiteralSearcher(Copyable, Movable):
                         # Check each literal
                         for lit_idx in range(self.literal_count):
                             var lit = self.literals[lit_idx]
-                            if (
-                                len(lit) > 0
-                                and text[byte=text_pos] == lit[byte=0]
+                            if len(lit) > 0 and Int(text_ptr[text_pos]) == Int(
+                                self.first_bytes[lit_idx]
                             ):
                                 # Verify full literal
                                 if self._verify_literal(text, text_pos, lit):
@@ -1062,7 +1079,9 @@ struct MultiLiteralSearcher(Copyable, Movable):
             return simd_memcmp(text, pos, literal, 0, lit_len)
 
         # Simple comparison for short literals
+        var text_ptr = text.unsafe_ptr()
+        var lit_ptr = literal.unsafe_ptr()
         for i in range(lit_len):
-            if text[byte=pos + i] != literal[byte=i]:
+            if text_ptr[pos + i] != lit_ptr[i]:
                 return False
         return True
