@@ -377,7 +377,7 @@ fn analyze_character_class_pattern(pattern: String) -> String:
         # Check if it's a simple range
         if pattern.startswith("[") and pattern.endswith("]") and "-" in pattern:
             var inner = pattern[byte=1:-1]
-            if len(inner) == 3 and inner[byte=1] == "-":
+            if len(inner) == 3 and Int(inner.unsafe_ptr()[1]) == ord("-"):
                 return "range"
         return "lookup"
 

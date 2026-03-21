@@ -440,22 +440,23 @@ struct ASTNode[regex_origin: ImmutOrigin](
     ) -> Bool:
         """Check if a character matches range syntax like 'a-z' or 'abc'."""
         var i = 0
+        var rs_ptr = range_syntax.unsafe_ptr()
+        var ch_ord = ord(ch)
         # Skip negation character if present
-        if len(range_syntax) > 0 and range_syntax[byte=0] == "^":
+        if len(range_syntax) > 0 and Int(rs_ptr[0]) == ord("^"):
             i = 1
 
         while i < len(range_syntax):
             # Check for range pattern like 'a-z'
-            if i + 2 < len(range_syntax) and range_syntax[byte=i + 1] == "-":
-                var start_char = range_syntax[byte=i]
-                var end_char = range_syntax[byte=i + 2]
-                var ch_ord = ord(ch)
-                if ord(start_char) <= ch_ord <= ord(end_char):
+            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == ord("-"):
+                var start_code = Int(rs_ptr[i])
+                var end_code = Int(rs_ptr[i + 2])
+                if start_code <= ch_ord <= end_code:
                     return True
                 i += 3  # Skip start, dash, and end
             else:
                 # Single character match
-                if range_syntax[byte=i] == ch:
+                if Int(rs_ptr[i]) == ch_ord:
                     return True
                 i += 1
         return False

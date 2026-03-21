@@ -441,7 +441,9 @@ fn _longest_common_prefix(s1: String, s2: String) -> String:
     """Find the longest common prefix of two strings."""
     var min_len = min(len(s1), len(s2))
     var i = 0
-    while i < min_len and s1[byte=i] == s2[byte=i]:
+    var s1_ptr = s1.unsafe_ptr()
+    var s2_ptr = s2.unsafe_ptr()
+    while i < min_len and Int(s1_ptr[i]) == Int(s2_ptr[i]):
         i += 1
     return String(s1[byte=:i])
 

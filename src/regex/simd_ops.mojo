@@ -91,8 +91,9 @@ struct CharacterClassSIMD(
         )
 
         # Set bits for each character in the class
+        var cc_ptr = char_class.unsafe_ptr()
         for i in range(len(char_class)):
-            var char_code = ord(char_class[byte=i])
+            var char_code = Int(cc_ptr[i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
         # var call_location = __call_location()
@@ -997,7 +998,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
         for i in range(self.literal_count):
             var lit = literals[i]
             if len(lit) > 0:
-                self.first_bytes[i] = ord(lit[byte=0])
+                self.first_bytes[i] = Int(lit.unsafe_ptr()[0])
                 self.max_len = max(self.max_len, len(lit))
                 self.min_len = min(self.min_len, len(lit))
         self.literals = literals^

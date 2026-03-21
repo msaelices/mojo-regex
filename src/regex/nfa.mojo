@@ -583,7 +583,10 @@ struct NFAEngine(Copyable, Engine):
 
         var str_ptr = str.unsafe_ptr()
         var ch_code = Int(str_ptr[str_i])
-        if ast.get_value() and ord(ast.get_value().value()[byte=0]) == ch_code:
+        if (
+            ast.get_value()
+            and Int(ast.get_value().value().unsafe_ptr()[0]) == ch_code
+        ):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -729,7 +732,8 @@ struct NFAEngine(Copyable, Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        var ch_code = ord(str[byte=str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         var ch_found = False
 
         if ast.get_value():
@@ -771,8 +775,7 @@ struct NFAEngine(Copyable, Engine):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
-                            var ch = String(str[byte=str_i])
-                            ch_found = ch in inner
+                            ch_found = str[byte=str_i] in inner
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
@@ -1484,8 +1487,9 @@ struct NFAEngine(Copyable, Engine):
 
             # Handle simple ranges like [c-n]
             if len(inner) == 3 and inner[byte=1] == "-":
-                var start_char = ord(inner[byte=0])
-                var end_char = ord(inner[byte=2])
+                var inner_ptr = inner.unsafe_ptr()
+                var start_char = Int(inner_ptr[0])
+                var end_char = Int(inner_ptr[2])
                 return ch_code >= start_char and ch_code <= end_char
 
             # For more complex patterns, fall back to character inclusion

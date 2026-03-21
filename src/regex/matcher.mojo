@@ -243,8 +243,9 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     var has_wildcards = False
     var has_character_classes = False
 
+    var pattern_ptr = pattern.unsafe_ptr()
     for i in range(pattern_len):
-        var c = ord(pattern[byte=i])
+        var c = Int(pattern_ptr[i])
         if c == ord("*") or c == ord("+") or c == ord("?"):
             has_quantifiers = True
         elif c == ord("|"):
@@ -275,7 +276,7 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
         # Short alternation patterns like "a|b|c" yield single-char literals
         var alternation_chars = 0
         for i in range(pattern_len):
-            if pattern[byte=i] == "|":
+            if Int(pattern_ptr[i]) == ord("|"):
                 alternation_chars += 1
         # If it's mostly single chars separated by |, skip
         if (

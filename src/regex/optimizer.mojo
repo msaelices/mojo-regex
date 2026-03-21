@@ -632,17 +632,19 @@ struct PatternAnalyzer:
                 min_length = len(branches[i])
 
         # Find common prefix
+        var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = first_branch[byte=pos]
+            var char_at_pos = Int(fb_ptr[pos])
             var all_match = True
 
             for i in range(1, len(branches)):
-                if branches[i][byte=pos] != char_at_pos:
+                var br_ptr = branches[i].unsafe_ptr()
+                if Int(br_ptr[pos]) != char_at_pos:
                     all_match = False
                     break
 
             if all_match:
-                prefix += String(char_at_pos)
+                prefix += chr(char_at_pos)
             else:
                 break
 

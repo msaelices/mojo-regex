@@ -272,17 +272,19 @@ struct LiteralExtractor:
                 min_length = len(branches[i])
 
         # Find common prefix
+        var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = first_branch[byte=pos]
+            var char_at_pos = Int(fb_ptr[pos])
             var all_match = True
 
             for i in range(1, len(branches)):
-                if branches[i][byte=pos] != char_at_pos:
+                var br_ptr = branches[i].unsafe_ptr()
+                if Int(br_ptr[pos]) != char_at_pos:
                     all_match = False
                     break
 
             if all_match:
-                prefix += String(char_at_pos)
+                prefix += chr(char_at_pos)
             else:
                 break
 
@@ -306,18 +308,20 @@ struct LiteralExtractor:
             return EMPTY_STRING
 
         # Find common suffix (work backwards)
+        var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(1, min_length + 1):
-            var char_at_pos = first_branch[byte=len(first_branch) - pos]
+            var char_at_pos = Int(fb_ptr[len(first_branch) - pos])
             var all_match = True
 
             for i in range(1, len(branches)):
                 var branch = branches[i]
-                if branch[byte=len(branch) - pos] != char_at_pos:
+                var br_ptr = branch.unsafe_ptr()
+                if Int(br_ptr[len(branch) - pos]) != char_at_pos:
                     all_match = False
                     break
 
             if all_match:
-                suffix = String(char_at_pos) + suffix
+                suffix = chr(char_at_pos) + suffix
             else:
                 break
 
