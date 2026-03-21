@@ -4,7 +4,7 @@ Tests for literal optimization functionality.
 Tests the literal extraction, Two-Way search, and integration with regex engines.
 """
 
-from testing import assert_true, assert_false, assert_equal
+from std.testing import assert_true, assert_false, assert_equal, TestSuite
 
 from regex import match_first, findall, search
 from regex.ast import ASTNode
@@ -119,7 +119,9 @@ fn test_two_way_searcher() raises:
 
     # Test simple pattern
     var pattern1 = "fox"
-    var pattern1_span = Span[Byte](pattern1.unsafe_ptr(), len(pattern1))
+    var pattern1_span = Span[Byte](
+        ptr=pattern1.unsafe_ptr(), length=len(pattern1)
+    )
     var pos1 = twoway_search(pattern1_span, text)
     assert_equal(pos1, 16, "Should find 'fox' at position 16")
 
@@ -129,19 +131,25 @@ fn test_two_way_searcher() raises:
 
     # Test pattern not found
     var pattern2 = "cat"
-    var pattern2_span = Span[Byte](pattern2.unsafe_ptr(), len(pattern2))
+    var pattern2_span = Span[Byte](
+        ptr=pattern2.unsafe_ptr(), length=len(pattern2)
+    )
     var pos3 = twoway_search(pattern2_span, text)
     assert_equal(pos3, -1, "Should return -1 when pattern not found")
 
     # Test longer pattern
     var pattern3 = "quick brown"
-    var pattern3_span = Span[Byte](pattern3.unsafe_ptr(), len(pattern3))
+    var pattern3_span = Span[Byte](
+        ptr=pattern3.unsafe_ptr(), length=len(pattern3)
+    )
     var pos4 = twoway_search(pattern3_span, text)
     assert_equal(pos4, 4, "Should find 'quick brown' at position 4")
 
     # Test pattern at end - use "quick" instead of "quick." to avoid regex metachar
     var pattern4 = "quick"
-    var pattern4_span = Span[Byte](pattern4.unsafe_ptr(), len(pattern4))
+    var pattern4_span = Span[Byte](
+        ptr=pattern4.unsafe_ptr(), length=len(pattern4)
+    )
     var pos5 = twoway_search(
         pattern4_span, text, 50
     )  # Search from position 50 to find the second "quick"
@@ -235,3 +243,7 @@ fn test_pattern_analyzer_optimization_info() raises:
         info3.required_literal_length > 0,
         "Required literal should have length > 0",
     )
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

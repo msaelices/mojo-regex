@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_raises, assert_true
+from std.testing import assert_equal, assert_raises, assert_true, TestSuite
 from testutils import assert_char_equal
 
 from regex.lexer import scan
@@ -125,3 +125,7 @@ fn test_vertical_bar_lexing() raises:
 fn test_dash_lexing() raises:
     var tokens = scan("-")
     assert_equal(tokens[0].type, Token.DASH)
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

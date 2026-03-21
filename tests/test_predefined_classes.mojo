@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.matcher import match_first, findall
 from regex.nfa import match_first as nfa_match_first
@@ -7,7 +7,7 @@ from regex.nfa import match_first as nfa_match_first
 # ===== DIGIT (\d) TESTS =====
 
 
-def test_digit_all_ascii_digits():
+def test_digit_all_ascii_digits() raises:
     """Test \\d matches all ASCII digits 0-9."""
     for i in range(10):
         var digit_char = String(i)
@@ -17,7 +17,7 @@ def test_digit_all_ascii_digits():
         assert_equal(matched.get_match_text(), digit_char)
 
 
-def test_digit_unicode_edge_cases():
+def test_digit_unicode_edge_cases() raises:
     """Test \\d with Unicode and special digit characters."""
     # ASCII digits should match
     var result1 = match_first("\\d", "0")
@@ -37,7 +37,7 @@ def test_digit_unicode_edge_cases():
     assert_false(result5)
 
 
-def test_digit_quantifier_basic():
+def test_digit_quantifier_basic() raises:
     """Test \\d with basic quantifiers +, *, ?."""
     # Test + quantifier
     var result1 = match_first("\\d+", "123")
@@ -58,7 +58,7 @@ def test_digit_quantifier_basic():
     assert_equal(matched3.get_match_text(), "1")
 
 
-def test_digit_empty_string():
+def test_digit_empty_string() raises:
     """Test \\d patterns with empty strings."""
     var result1 = match_first("\\d", "")
     assert_false(result1)
@@ -77,7 +77,7 @@ def test_digit_empty_string():
     assert_false(result4)  # + requires at least one match
 
 
-def test_digit_mixed_strings():
+def test_digit_mixed_strings() raises:
     """Test \\d in mixed alphanumeric strings."""
     var result1 = match_first("\\d+", "abc123def")
     assert_false(result1)  # Doesn't start with digit
@@ -92,7 +92,7 @@ def test_digit_mixed_strings():
 # ===== WORD (\w) TESTS =====
 
 
-def test_word_all_ascii_letters():
+def test_word_all_ascii_letters() raises:
     """Test \\w matches all ASCII letters."""
     # Test lowercase
     for i in range(26):
@@ -113,7 +113,7 @@ def test_word_all_ascii_letters():
         assert_equal(matched.get_match_text(), letter)
 
 
-def test_word_digits_and_underscore():
+def test_word_digits_and_underscore() raises:
     """Test \\w matches digits and underscore."""
     # Test all digits
     for i in range(10):
@@ -130,17 +130,17 @@ def test_word_digits_and_underscore():
     assert_equal(matched.get_match_text(), "_")
 
 
-def test_word_special_characters():
+def test_word_special_characters() raises:
     """Test \\w does not match special characters."""
     var special_chars = "@#$%^&*()-+=[]{}|\\:;\"'<>,.?/~`"
 
     for i in range(len(special_chars)):
-        var char = String(special_chars[i])
+        var char = String(special_chars[byte=i])
         var result = match_first("\\w", char)
         assert_false(result)
 
 
-def test_word_whitespace():
+def test_word_whitespace() raises:
     """Test \\w does not match whitespace characters."""
     var result1 = match_first("\\w", " ")
     assert_false(result1)
@@ -152,7 +152,7 @@ def test_word_whitespace():
     assert_false(result3)
 
 
-def test_word_quantifier_basic():
+def test_word_quantifier_basic() raises:
     """Test \\w with basic quantifiers +, *, ?."""
     # Test + quantifier
     var result1 = match_first("\\w+", "hello123")
@@ -173,7 +173,7 @@ def test_word_quantifier_basic():
     assert_equal(matched3.get_match_text(), "a")
 
 
-def test_word_empty_string():
+def test_word_empty_string() raises:
     """Test \\w patterns with empty strings."""
     var result1 = match_first("\\w", "")
     assert_false(result1)
@@ -192,7 +192,7 @@ def test_word_empty_string():
     assert_false(result4)
 
 
-def test_word_mixed_strings():
+def test_word_mixed_strings() raises:
     """Test \\w in mixed strings with special characters."""
     # Test findall for multiple word sequences
     var matches = findall("\\w+", "hello@world_123#test")
@@ -205,7 +205,7 @@ def test_word_mixed_strings():
 # ===== COMPLEX PATTERN TESTS =====
 
 
-def test_digit_word_combination():
+def test_digit_word_combination() raises:
     """Test combining \\d and \\w in patterns."""
     # Pattern for identifier: starts with letter/underscore, followed by word chars
     var result1 = match_first("[a-zA-Z_]\\w*", "variable123")
@@ -217,7 +217,7 @@ def test_digit_word_combination():
     assert_false(result2)  # Starts with digit
 
 
-def test_digit_word_alternation():
+def test_digit_word_alternation() raises:
     """Test \\d and \\w in alternation patterns."""
     var result1 = match_first("\\d|\\w", "5")
     assert_true(result1)
@@ -233,7 +233,7 @@ def test_digit_word_alternation():
     assert_false(result3)
 
 
-def test_digit_word_sequences():
+def test_digit_word_sequences() raises:
     """Test sequences of \\d and \\w patterns."""
     # Pattern for simple variable names: letter followed by digits
     var result1 = match_first("[a-z]\\d+", "a123")
@@ -248,7 +248,7 @@ def test_digit_word_sequences():
     assert_equal(matched2.get_match_text(), "a5b")
 
 
-def test_anchored_patterns():
+def test_anchored_patterns() raises:
     """Test \\d and \\w with anchors."""
     var result1 = match_first("^\\d+$", "12345")
     assert_true(result1)
@@ -264,7 +264,7 @@ def test_anchored_patterns():
     assert_equal(matched3.get_match_text(), "hello_123")
 
 
-def test_greedy_vs_minimal_matching():
+def test_greedy_vs_minimal_matching() raises:
     """Test greedy behavior of \\d and \\w quantifiers."""
     # \\d+ should be greedy and match all consecutive digits
     var result1 = match_first("\\d+", "123abc")
@@ -282,7 +282,7 @@ def test_greedy_vs_minimal_matching():
 # ===== BOUNDARY AND EDGE CASE TESTS =====
 
 
-def test_single_character_strings():
+def test_single_character_strings() raises:
     """Test \\d and \\w with single character strings."""
     # Boundary cases for single characters
     var result1 = match_first("\\d", "0")
@@ -301,7 +301,7 @@ def test_single_character_strings():
     assert_true(result5)
 
 
-def test_very_long_strings():
+def test_very_long_strings() raises:
     """Test \\d and \\w with very long strings."""
     # Create long digit string
     var long_digits = String("123456789012345678901234567890")
@@ -320,7 +320,7 @@ def test_very_long_strings():
     assert_equal(matched2.get_match_text(), long_words)
 
 
-def test_zero_quantifier_edge_cases():
+def test_zero_quantifier_edge_cases() raises:
     """Test zero quantifier edge cases for \\d and \\w."""
     # Test \\d* at different positions in non-digit strings
     var result1 = match_first("\\d*abc", "abc")
@@ -335,7 +335,7 @@ def test_zero_quantifier_edge_cases():
     assert_equal(matched2.get_match_text(), "@")
 
 
-def test_multiple_consecutive_patterns():
+def test_multiple_consecutive_patterns() raises:
     """Test multiple consecutive \\d and \\w patterns."""
     var result1 = match_first("\\d\\d\\d", "123")
     assert_true(result1)
@@ -354,7 +354,7 @@ def test_multiple_consecutive_patterns():
     assert_equal(matched3.get_match_text(), "a5z")
 
 
-def test_nested_quantifiers():
+def test_nested_quantifiers() raises:
     """Test \\d and \\w in grouped patterns with quantifiers."""
     # Test (word_char digit)+ pattern
     var result1 = match_first("(\\w\\d)+", "a1b2c3")
@@ -366,7 +366,7 @@ def test_nested_quantifiers():
     assert_false(result2)  # Doesn't match pattern
 
 
-def test_performance_stress():
+def test_performance_stress() raises:
     """Test \\d and \\w with repetitive patterns."""
     # Test many digits
     var many_digits = String("")
@@ -389,7 +389,7 @@ def test_performance_stress():
 # ===== NFA SPECIFIC TESTS =====
 
 
-def test_nfa_digit_direct():
+def test_nfa_digit_direct() raises:
     """Test \\d directly through NFA engine."""
     var result1 = nfa_match_first("\\d", "5")
     assert_true(result1)
@@ -405,7 +405,7 @@ def test_nfa_digit_direct():
     assert_equal(matched3.get_match_text(), "")
 
 
-def test_nfa_word_direct():
+def test_nfa_word_direct() raises:
     """Test \\w directly through NFA engine."""
     var result1 = nfa_match_first("\\w", "a")
     assert_true(result1)
@@ -424,7 +424,7 @@ def test_nfa_word_direct():
 # ===== REGRESSION TESTS =====
 
 
-def test_digit_word_regression():
+def test_digit_word_regression() raises:
     """Regression tests for specific patterns that previously failed."""
     # These patterns were failing before the NFA routing fix
     var result1 = match_first("\\d", "5")
@@ -445,7 +445,7 @@ def test_digit_word_regression():
     assert_equal(matched4.get_match_text(), "")
 
 
-def test_complex_real_world_patterns():
+def test_complex_real_world_patterns() raises:
     """Test real-world patterns using \\d and \\w."""
     # Simple identifier pattern
     var result1 = match_first("\\w+", "variable123")
@@ -469,7 +469,7 @@ def test_complex_real_world_patterns():
 # ===== BOUNDARY VALUE TESTS =====
 
 
-def test_digit_boundary_values():
+def test_digit_boundary_values() raises:
     """Test \\d with edge cases around digit boundaries."""
     # Test ASCII values just before and after digit range
     var result1 = match_first("\\d", chr(ord("0") - 1))  # '/' character
@@ -486,7 +486,7 @@ def test_digit_boundary_values():
     assert_true(result4)
 
 
-def test_word_boundary_values():
+def test_word_boundary_values() raises:
     """Test \\w with edge cases around word character boundaries."""
     # Test ASCII values around lowercase letters
     var result1 = match_first("\\w", chr(ord("a") - 1))  # '`' character
@@ -514,3 +514,7 @@ def test_word_boundary_values():
 
     var result8 = match_first("\\w", "Z")
     assert_true(result8)
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

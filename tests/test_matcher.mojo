@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.matcher import (
     HybridMatcher,
@@ -12,7 +12,7 @@ from regex.matcher import (
 from regex.optimizer import PatternComplexity
 
 
-def test_hybrid_matcher_simple_pattern():
+def test_hybrid_matcher_simple_pattern() raises:
     """Test hybrid matcher with simple patterns that should use DFA."""
     var matcher = HybridMatcher("hello")
 
@@ -29,7 +29,7 @@ def test_hybrid_matcher_simple_pattern():
     assert_equal(match_obj.get_match_text(), "hello")
 
 
-def test_hybrid_matcher_complex_pattern():
+def test_hybrid_matcher_complex_pattern() raises:
     """Test hybrid matcher with complex patterns that should use NFA."""
     var matcher = HybridMatcher("a*")
 
@@ -39,7 +39,7 @@ def test_hybrid_matcher_complex_pattern():
     assert_true(engine_type == "DFA" or engine_type == "NFA")
 
 
-def test_hybrid_matcher_match_all():
+def test_hybrid_matcher_match_all() raises:
     """Test hybrid matcher match_all functionality."""
     var matcher = HybridMatcher("a")
 
@@ -51,7 +51,7 @@ def test_hybrid_matcher_match_all():
     assert_equal(matches[2].start_idx, 5)
 
 
-def test_compiled_regex():
+def test_compiled_regex() raises:
     """Test CompiledRegex high-level interface."""
     var regex = CompiledRegex("hello")
 
@@ -71,7 +71,7 @@ def test_compiled_regex():
     assert_false(regex.test("goodbye world"))
 
 
-def test_compiled_regex_stats():
+def test_compiled_regex_stats() raises:
     """Test CompiledRegex stats functionality."""
     var regex = CompiledRegex("hello")
     var stats = regex.get_stats()
@@ -82,7 +82,7 @@ def test_compiled_regex_stats():
     assert_true(stats.find("Complexity:") != -1)
 
 
-def test_regex_caching():
+def test_regex_caching() raises:
     """Test regex compilation caching."""
     clear_regex_cache()
 
@@ -102,7 +102,7 @@ def test_regex_caching():
     )
 
 
-def test_search_function():
+def test_search_function() raises:
     """Test high-level search function."""
     var result = search("hello", "hello world")
     assert_true(result.__bool__())
@@ -112,7 +112,7 @@ def test_search_function():
     assert_false(no_result.__bool__())
 
 
-def test_findall_function():
+def test_findall_function() raises:
     """Test high-level findall function."""
     var matches = findall("l", "hello world")
     assert_equal(len(matches), 3)
@@ -122,7 +122,7 @@ def test_findall_function():
     assert_equal(matches[2].start_idx, 9)
 
 
-def test_match_function():
+def test_match_function() raises:
     """Test high-level match function (anchored at start)."""
     # Clear cache to avoid any caching issues
     clear_regex_cache()
@@ -147,7 +147,7 @@ def test_match_function():
     assert_true(result3.__bool__())
 
 
-def test_hybrid_matcher_fallback():
+def test_hybrid_matcher_fallback() raises:
     """Test that hybrid matcher falls back properly."""
     # Test with a pattern that might fail DFA compilation
     try:
@@ -159,7 +159,7 @@ def test_hybrid_matcher_fallback():
         assert_true(True)  # Test passes if we get here
 
 
-def test_multiple_patterns():
+def test_multiple_patterns() raises:
     """Test compiling and using multiple different patterns."""
     var patterns = List[String]()
     patterns.append("hello")
@@ -180,7 +180,7 @@ def test_multiple_patterns():
 # TODO: Fix test_empty_pattern - it passes in isolation but fails in test framework
 # The empty pattern functionality works correctly (verified with standalone tests)
 # but there's an issue with how the test framework executes this specific test
-# def test_empty_pattern():
+# def test_empty_pattern() raises:
 #     """Test handling of empty patterns."""
 #     var regex = CompiledRegex("")
 #
@@ -191,7 +191,7 @@ def test_multiple_patterns():
 #     assert_equal(result.value().end_idx, 0)
 
 
-def test_pattern_with_anchors():
+def test_pattern_with_anchors() raises:
     """Test patterns with start and end anchors."""
     var start_anchor = CompiledRegex("^hello")
     var end_anchor = CompiledRegex("world$")
@@ -211,7 +211,7 @@ def test_pattern_with_anchors():
     assert_false(both_anchors.test("say hello"))
 
 
-def test_case_sensitivity():
+def test_case_sensitivity() raises:
     """Test that matching is case sensitive."""
     var regex = CompiledRegex("Hello")
 
@@ -220,7 +220,7 @@ def test_case_sensitivity():
     assert_false(regex.test("HELLO WORLD"))
 
 
-def test_special_characters():
+def test_special_characters() raises:
     """Test patterns with special characters that are treated as literals."""
     # In current implementation, most special chars are treated literally
     # when not in special contexts
@@ -232,7 +232,7 @@ def test_special_characters():
     # assert_false(regex.test("helloxworld"))
 
 
-def test_performance_simple_vs_complex():
+def test_performance_simple_vs_complex() raises:
     """Test that simple patterns use the faster DFA engine."""
     # TODO: This is not working because of some stale state
     # Compare with the below code which is working because
@@ -248,7 +248,7 @@ def test_performance_simple_vs_complex():
     # Could be DFA or NFA depending on implementation details
 
 
-def test_anchor_start():
+def test_anchor_start() raises:
     """Test start anchor (^)."""
     var result = match_first("^a", "abc")
     assert_true(result)
@@ -257,19 +257,19 @@ def test_anchor_start():
     assert_equal(consumed, 1)
 
 
-def test_or_no_match():
+def test_or_no_match() raises:
     """Test OR pattern that should not match."""
     var result = match_first("^a|b$", "c")
     assert_true(not result)
 
 
-def test_or_no_match_with_bt():
+def test_or_no_match_with_bt() raises:
     """Test OR pattern with backtracking that should not match."""
     var result = match_first("a|b", "c")
     assert_true(not result)
 
 
-def test_match_group_zero_or_more():
+def test_match_group_zero_or_more() raises:
     """Test group with zero or more quantifier."""
     var result = match_first("(a)*", "aa")
     assert_true(result)
@@ -278,13 +278,13 @@ def test_match_group_zero_or_more():
     assert_equal(consumed, 2)
 
 
-def test_fail_group_one_or_more():
+def test_fail_group_one_or_more() raises:
     """Test group one or more that should fail."""
     var result = match_first("^(a)+", "b")
     assert_true(not result)
 
 
-def test_match_or_left():
+def test_match_or_left() raises:
     """Test OR pattern matching left side."""
     var result = match_first("na|nb", "na")
     assert_true(result)
@@ -293,7 +293,7 @@ def test_match_or_left():
     assert_equal(consumed, 2)
 
 
-def test_match_or_right():
+def test_match_or_right() raises:
     """Test OR pattern matching right side."""
     var result = match_first("na|nb", "nb")
     assert_true(result)
@@ -302,7 +302,7 @@ def test_match_or_right():
     assert_equal(consumed, 2)
 
 
-def test_match_space():
+def test_match_space() raises:
     """Test space matching with \\s."""
     var result = match_first("\\s", " ")
     assert_true(result)
@@ -311,7 +311,7 @@ def test_match_space():
     assert_equal(consumed, 1)
 
 
-def test_match_space_tab():
+def test_match_space_tab() raises:
     """Test space matching tab with \\s."""
     var result = match_first("\\s", "\t")
     assert_true(result)
@@ -320,7 +320,7 @@ def test_match_space_tab():
     assert_equal(consumed, 1)
 
 
-def test_match_or_right_at_start_end():
+def test_match_or_right_at_start_end() raises:
     """Test OR pattern with anchors."""
     var result = match_first("^na|nb$", "nb")
     assert_true(result)
@@ -329,7 +329,7 @@ def test_match_or_right_at_start_end():
     assert_equal(consumed, 2)
 
 
-def test_no_match_after_end():
+def test_no_match_after_end() raises:
     """Test that pattern doesn't match when there's extra content."""
     var result = match_first("^na|nb$", "nb ")
     assert_true(not result)
@@ -339,7 +339,7 @@ def test_no_match_after_end():
     assert_true(not result2)  # This correctly fails
 
 
-def test_bt_index_group():
+def test_bt_index_group() raises:
     """Test backtracking with optional group."""
     var result = match_first("^x(a)?ac$", "xac")
     assert_true(result)
@@ -348,7 +348,7 @@ def test_bt_index_group():
     assert_equal(consumed, 3)
 
 
-def test_match_sequence_with_start_end():
+def test_match_sequence_with_start_end() raises:
     """Test various start/end anchor combinations."""
     # Should match 'a' at start, ignoring rest
     var result1 = match_first("^a|b$", "a  ")
@@ -364,7 +364,7 @@ def test_match_sequence_with_start_end():
     # assert_true(result3)
 
 
-def test_question_mark():
+def test_question_mark() raises:
     """Test question mark quantifier."""
     var result1 = match_first("https?://", "http://")
     assert_true(result1)
@@ -379,7 +379,7 @@ def test_question_mark():
     assert_equal(consumed2, 8)
 
 
-def test_bt_index_leaf():
+def test_bt_index_leaf() raises:
     """Test backtracking with leaf elements."""
     var result = match_first("^aaaa.*a$", "aaaaa")
     assert_true(result)
@@ -388,7 +388,7 @@ def test_bt_index_leaf():
     assert_equal(consumed, 5)
 
 
-def test_bt_index_or():
+def test_bt_index_or() raises:
     """Test backtracking with OR in group."""
     var result = match_first("^x(a|b)?bc$", "xbc")
     assert_true(result)
@@ -397,7 +397,7 @@ def test_bt_index_or():
     assert_equal(consumed, 3)
 
 
-def test_match_empty():
+def test_match_empty() raises:
     """Test matching empty strings."""
     var result1 = match_first("^$", "")
     assert_true(result1)
@@ -418,7 +418,7 @@ def test_match_empty():
     assert_equal(consumed3, 0)
 
 
-def test_match_space_extended():
+def test_match_space_extended() raises:
     """Test extended space matching with various characters."""
     # Test newline
     var result1 = match_first("\\s", "\n")
@@ -433,7 +433,7 @@ def test_match_space_extended():
     assert_true(result3)
 
 
-def test_match_space_quantified():
+def test_match_space_quantified() raises:
     """Test space matching with quantifiers."""
     var result1 = match_first("\\s+", "\r\t\n \f")
     assert_true(result1)
@@ -446,7 +446,7 @@ def test_match_space_quantified():
     assert_true(not result2)
 
 
-def test_character_ranges():
+def test_character_ranges() raises:
     """Test basic character range matching."""
     # Test [a-z] range
     var result1 = match_first("[a-z]", "m")
@@ -474,7 +474,7 @@ def test_character_ranges():
     assert_true(not result4)
 
 
-def test_character_ranges_quantified():
+def test_character_ranges_quantified() raises:
     """Test character ranges with quantifiers."""
     var result1 = match_first("[a-z]+", "hello")
     assert_true(result1)
@@ -483,7 +483,7 @@ def test_character_ranges_quantified():
     assert_equal(consumed1, 5)
 
 
-def test_curly_brace_quantifiers():
+def test_curly_brace_quantifiers() raises:
     """Test curly brace quantifiers {n}, {n,m}."""
     # Test exact quantifier {3}
     var result1 = match_first("a{3}", "aaa")
@@ -504,7 +504,7 @@ def test_curly_brace_quantifiers():
     assert_equal(consumed3, 3)
 
 
-def test_complex_pattern_with_ranges():
+def test_complex_pattern_with_ranges() raises:
     """Test complex patterns combining groups, ranges, and quantifiers."""
     # Test basic range functionality
     var result1 = match_first("[c-n]", "h")
@@ -533,7 +533,7 @@ def test_complex_pattern_with_ranges():
     assert_true(result4)
 
 
-def test_email_validation_simple():
+def test_email_validation_simple() raises:
     """Test simple email validation patterns."""
     # Test basic email-like pattern
     var result1 = match_first(".*@.*", "vr@gmail.com")
@@ -551,7 +551,7 @@ def test_email_validation_simple():
     assert_true(result2)
 
 
-def test_multiple_patterns_2():
+def test_multiple_patterns_2() raises:
     """Test various regex patterns."""
     # Test pattern with optional group and anchors
     var result1 = match_first("^x(a|b)?bc$", "xbc")
@@ -568,7 +568,7 @@ def test_multiple_patterns_2():
     assert_equal(consumed2, 5)
 
 
-def test_findall_simple():
+def test_findall_simple() raises:
     """Test findall with simple pattern that appears multiple times."""
     var matches = findall("a", "banana")
     assert_equal(len(matches), 3)
@@ -580,13 +580,13 @@ def test_findall_simple():
     assert_equal(matches[2].end_idx, 6)
 
 
-def test_findall_no_matches():
+def test_findall_no_matches() raises:
     """Test findall when pattern doesn't match anything."""
     var matches = findall("z", "banana")
     assert_equal(len(matches), 0)
 
 
-def test_findall_one_match():
+def test_findall_one_match() raises:
     """Test findall when pattern appears only once."""
     var matches = findall("ban", "banana")
     assert_equal(len(matches), 1)
@@ -595,7 +595,7 @@ def test_findall_one_match():
     assert_equal(matches[0].get_match_text(), "ban")
 
 
-def test_findall_overlapping_avoided():
+def test_findall_overlapping_avoided() raises:
     """Test that findall doesn't find overlapping matches."""
     var matches = findall("aa", "aaaa")
     assert_equal(len(matches), 2)
@@ -605,7 +605,7 @@ def test_findall_overlapping_avoided():
     assert_equal(matches[1].end_idx, 4)
 
 
-def test_findall_with_quantifiers():
+def test_findall_with_quantifiers() raises:
     """Test findall with quantifiers."""
     var matches = findall("[0-9]+", "abc123def456ghi")
     assert_equal(len(matches), 2)
@@ -617,7 +617,7 @@ def test_findall_with_quantifiers():
     assert_equal(matches[1].end_idx, 12)
 
 
-def test_findall_wildcard():
+def test_findall_wildcard() raises:
     """Test findall with wildcard pattern."""
     var matches = findall(".", "abc")
     assert_equal(len(matches), 3)
@@ -626,13 +626,13 @@ def test_findall_wildcard():
     assert_equal(matches[2].get_match_text(), "c")
 
 
-def test_findall_empty_string():
+def test_findall_empty_string() raises:
     """Test findall on empty string."""
     var matches = findall("a", "")
     assert_equal(len(matches), 0)
 
 
-def test_findall_anchors():
+def test_findall_anchors() raises:
     """Test findall with anchors."""
     # Start anchor should only match at beginning
     var matches1 = findall("^a", "aaa")
@@ -645,7 +645,7 @@ def test_findall_anchors():
     assert_equal(matches2[0].start_idx, 2)
 
 
-def test_findall_zero_width_matches():
+def test_findall_zero_width_matches() raises:
     """Test findall handles zero-width matches correctly."""
     # This tests that we don't get infinite loops on zero-width matches
     var matches = findall("^", "abc")
@@ -654,7 +654,7 @@ def test_findall_zero_width_matches():
     assert_equal(matches[0].end_idx, 0)
 
 
-def test_dfa_character_class_plus():
+def test_dfa_character_class_plus() raises:
     """Test DFA optimization for character classes with + quantifier."""
     # Test [a-z]+ pattern
     var result = match_first("[a-z]+", "hello123")
@@ -665,7 +665,7 @@ def test_dfa_character_class_plus():
     assert_equal(matched.get_match_text(), "hello")
 
 
-def test_dfa_character_class_star():
+def test_dfa_character_class_star() raises:
     """Test DFA optimization for character classes with * quantifier."""
     # Test [0-9]* pattern
     var result1 = match_first("[0-9]*", "123abc")
@@ -684,7 +684,7 @@ def test_dfa_character_class_star():
     assert_equal(matched2.get_match_text(), "")
 
 
-def test_dfa_character_class_exact():
+def test_dfa_character_class_exact() raises:
     """Test DFA optimization for character classes with exact quantifiers."""
     # Test [a-z]{3} pattern
     var result1 = match_first("[a-z]{3}", "hello")
@@ -699,7 +699,7 @@ def test_dfa_character_class_exact():
     assert_true(not result2.__bool__())
 
 
-def test_dfa_character_class_range():
+def test_dfa_character_class_range() raises:
     """Test DFA optimization for character classes with range quantifiers."""
     # Test [0-9]{2,4} pattern
     var result1 = match_first("[0-9]{2,4}", "12345")
@@ -722,7 +722,7 @@ def test_dfa_character_class_range():
     assert_equal(matched3.get_match_text(), "12")
 
 
-def test_dfa_character_class_anchors():
+def test_dfa_character_class_anchors() raises:
     """Test DFA character class optimization with anchors."""
     # Test ^[a-z]+$ pattern
     var result1 = match_first("^[a-z]+$", "hello")
@@ -737,7 +737,7 @@ def test_dfa_character_class_anchors():
     assert_true(not result2.__bool__())
 
 
-def test_dfa_mixed_character_classes():
+def test_dfa_mixed_character_classes() raises:
     """Test DFA with mixed character classes."""
     # Test [a-zA-Z0-9]+ pattern
     var result = match_first("[a-zA-Z0-9]+", "Hello123")
@@ -748,7 +748,7 @@ def test_dfa_mixed_character_classes():
     assert_equal(matched.get_match_text(), "Hello123")
 
 
-def test_dfa_character_class_findall():
+def test_dfa_character_class_findall() raises:
     """Test findall with DFA character class optimization."""
     # Test finding all [0-9]+ sequences
     var matches = findall("[0-9]+", "abc123def456ghi")
@@ -761,7 +761,7 @@ def test_dfa_character_class_findall():
     assert_equal(matches[1].end_idx, 12)
 
 
-def test_dfa_negated_character_class():
+def test_dfa_negated_character_class() raises:
     """Test DFA with negated character classes."""
     # Test [^0-9]+ pattern (match non-digits)
     var result = match_first("[^0-9]+", "abc123")
@@ -772,7 +772,7 @@ def test_dfa_negated_character_class():
     assert_equal(matched.get_match_text(), "abc")
 
 
-def test_dfa_performance_vs_nfa():
+def test_dfa_performance_vs_nfa() raises:
     """Test that character class patterns use DFA engine for better performance.
     """
     # Test that [a-z]+ is classified as SIMPLE and uses DFA
@@ -783,7 +783,7 @@ def test_dfa_performance_vs_nfa():
     assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
 
 
-def test_dfa_multi_character_class_basic():
+def test_dfa_multi_character_class_basic() raises:
     """Test DFA optimization for basic multi-character class sequences."""
     # Test [a-z]+[0-9]+ pattern
     var result1 = match_first("[a-z]+[0-9]+", "hello123")
@@ -802,7 +802,7 @@ def test_dfa_multi_character_class_basic():
     assert_true(not result3.__bool__())
 
 
-def test_dfa_multi_character_class_digit_alpha():
+def test_dfa_multi_character_class_digit_alpha() raises:
     """Test DFA with \\d+ followed by [a-z]+ patterns."""
     # Test \\d+[a-z]+ pattern (though \\d might not be fully implemented yet)
     var result1 = match_first("[0-9]+[a-z]+", "123abc")
@@ -817,7 +817,7 @@ def test_dfa_multi_character_class_digit_alpha():
     assert_true(not result2.__bool__())
 
 
-def test_dfa_multi_character_class_with_quantifiers():
+def test_dfa_multi_character_class_with_quantifiers() raises:
     """Test multi-character class sequences with various quantifiers."""
     # Test [a-z]+[0-9]+ pattern (both parts required)
     var result1 = match_first("[a-z]+[0-9]+", "abc123")
@@ -836,7 +836,7 @@ def test_dfa_multi_character_class_with_quantifiers():
     assert_equal(matched2.get_match_text(), "abc123")
 
 
-def test_dfa_multi_character_class_three_parts():
+def test_dfa_multi_character_class_three_parts() raises:
     """Test DFA with three character class sequence."""
     # Test [A-Z][a-z]+[0-9]+ pattern
     var result1 = match_first("[A-Z][a-z]+[0-9]+", "Hello123")
@@ -851,7 +851,7 @@ def test_dfa_multi_character_class_three_parts():
     assert_true(not result2.__bool__())
 
 
-def test_dfa_multi_character_class_anchored():
+def test_dfa_multi_character_class_anchored() raises:
     """Test anchored multi-character class sequences."""
     # Test ^[a-z]+[0-9]+$ pattern
     var result1 = match_first("^[a-z]+[0-9]+$", "hello123")
@@ -866,7 +866,7 @@ def test_dfa_multi_character_class_anchored():
     assert_true(not result2.__bool__())
 
 
-def test_dfa_multi_character_class_findall():
+def test_dfa_multi_character_class_findall() raises:
     """Test findall with multi-character class sequences."""
     # Test finding all [a-z]+[0-9]+ patterns
     var matches = findall("[a-z]+[0-9]+", "hello123 world456 test789")
@@ -879,7 +879,7 @@ def test_dfa_multi_character_class_findall():
     assert_equal(matches[2].start_idx, 18)
 
 
-def test_dfa_multi_character_class_engine_selection():
+def test_dfa_multi_character_class_engine_selection() raises:
     """Test that multi-character class sequences use DFA engine."""
     # Test that [a-z]+[0-9]+ is classified as SIMPLE and uses DFA
     var regex = CompiledRegex("[a-z]+[0-9]+")
@@ -889,7 +889,7 @@ def test_dfa_multi_character_class_engine_selection():
     assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
 
 
-def test_dfa_negated_character_class_basic():
+def test_dfa_negated_character_class_basic() raises:
     """Test basic negated character class functionality with DFA."""
     # Test [^a-z] pattern (match non-lowercase letters)
     var result1 = match_first("[^a-z]", "A")
@@ -914,7 +914,7 @@ def test_dfa_negated_character_class_basic():
     assert_true(not result4.__bool__())
 
 
-def test_dfa_negated_character_class_quantifiers():
+def test_dfa_negated_character_class_quantifiers() raises:
     """Test negated character classes with quantifiers."""
     # Test [^0-9]+ pattern (one or more non-digits)
     var result1 = match_first("[^0-9]+", "abc123")
@@ -941,7 +941,7 @@ def test_dfa_negated_character_class_quantifiers():
     assert_equal(matched3.get_match_text(), "xyz")
 
 
-def test_dfa_negated_character_class_anchors():
+def test_dfa_negated_character_class_anchors() raises:
     """Test negated character classes with anchors."""
     # Note: Currently anchored negated patterns fall back to NFA
     # Testing basic negated character class functionality instead
@@ -965,7 +965,7 @@ def test_dfa_negated_character_class_anchors():
     assert_equal(matched3.get_match_text(), "A")
 
 
-def test_dfa_negated_character_class_complex():
+def test_dfa_negated_character_class_complex() raises:
     """Test complex negated character class patterns."""
     # Test [^aeiou]+ pattern (consonants and non-letters)
     var result1 = match_first("[^aeiou]+", "bcdfg")
@@ -988,7 +988,7 @@ def test_dfa_negated_character_class_complex():
     assert_equal(matched3.get_match_text(), "hello!@#")
 
 
-def test_dfa_negated_character_class_findall():
+def test_dfa_negated_character_class_findall() raises:
     """Test findall with negated character classes."""
     # Test finding all [^0-9]+ sequences (non-digit sequences)
     var matches = findall("[^0-9]+", "abc123def456ghi")
@@ -1004,7 +1004,7 @@ def test_dfa_negated_character_class_findall():
     assert_equal(matches[2].end_idx, 15)
 
 
-def test_dfa_negated_character_class_edge_cases():
+def test_dfa_negated_character_class_edge_cases() raises:
     """Test edge cases for negated character classes."""
     # Test [^] (should match any character since nothing is excluded)
     # Note: Empty negated class behavior may depend on implementation
@@ -1028,7 +1028,7 @@ def test_dfa_negated_character_class_edge_cases():
     assert_equal(matched3.get_match_text(), "\t")
 
 
-def test_dfa_negated_vs_positive_character_classes():
+def test_dfa_negated_vs_positive_character_classes() raises:
     """Test that negated and positive character classes behave correctly."""
     # Test that [a-z] and [^a-z] are complementary
     var test_string = "Hello123World"
@@ -1046,7 +1046,7 @@ def test_dfa_negated_vs_positive_character_classes():
     assert_equal(neg_matches[1].get_match_text(), "123W")
 
 
-def test_dfa_negated_character_class_engine_selection():
+def test_dfa_negated_character_class_engine_selection() raises:
     """Test that negated character classes use DFA engine when possible."""
     # Test that [^a-z]+ is classified as SIMPLE and uses DFA
     var regex = CompiledRegex("[^a-z]+")
@@ -1056,7 +1056,7 @@ def test_dfa_negated_character_class_engine_selection():
     assert_true(stats.find("DFA") != -1 or stats.find("SIMPLE") != -1)
 
 
-def test_us_toll_free_numbers():
+def test_us_toll_free_numbers() raises:
     """Test US toll-free number pattern matching."""
     # Test simple toll-free pattern [89]00[0-9]+ (quantifiers may not work exactly as expected)
     var simple_pattern = "[89]00[0-9]+"
@@ -1087,7 +1087,7 @@ def test_us_toll_free_numbers():
     assert_true(stats.find("SIMPLE") != -1 or stats.find("DFA") != -1)
 
 
-def test_us_toll_free_numbers_complex():
+def test_us_toll_free_numbers_complex() raises:
     """Test complex US toll-free number pattern with specific prefixes."""
     # Test complex toll-free pattern 8(?:00|33|44|55|66|77|88)[2-9][0-9]+ (simplified due to quantifier limitations)
     var complex_pattern = "8(?:00|33|44|55|66|77|88)[2-9][0-9]+"
@@ -1120,7 +1120,7 @@ def test_us_toll_free_numbers_complex():
     # Note: Length validation may not work perfectly due to quantifier limitations
 
 
-def test_us_toll_free_numbers_findall():
+def test_us_toll_free_numbers_findall() raises:
     """Test finding all toll-free numbers in text."""
     var simple_pattern = "[89]00[0-9]+"
     var test_text = "Call 8001234567 for sales, or 9005551234 for support. Emergency: 8779998877."
@@ -1139,7 +1139,7 @@ def test_us_toll_free_numbers_findall():
     assert_equal(matches[1].start_idx, 30)
 
 
-def test_us_toll_free_numbers_anchored():
+def test_us_toll_free_numbers_anchored() raises:
     """Test toll-free numbers with anchors."""
     # Note: Anchors may not be fully implemented yet, so testing basic pattern matching for now
     var pattern = "[89]00[0-9]{6}"
@@ -1155,7 +1155,7 @@ def test_us_toll_free_numbers_anchored():
     assert_true(regex_pattern.test(" 8001234567 "))
 
 
-def test_us_toll_free_numbers_engine_optimization():
+def test_us_toll_free_numbers_engine_optimization() raises:
     """Test that toll-free patterns use DFA engine for optimal performance."""
     # Simple pattern should use DFA
     var simple_regex = CompiledRegex("[89]00[0-9]+")
@@ -1175,7 +1175,7 @@ def test_us_toll_free_numbers_engine_optimization():
     )
 
 
-def test_toll_free_vs_regular_phone_patterns():
+def test_toll_free_vs_regular_phone_patterns() raises:
     """Test toll-free patterns vs regular phone number patterns."""
     var toll_free = CompiledRegex("[89]00[0-9]+")
     var regular_phone = CompiledRegex("[0-9]+-[0-9]+-[0-9]+")  # Dash pattern
@@ -1211,7 +1211,7 @@ def test_toll_free_vs_regular_phone_patterns():
     )
 
 
-def test_regex_corruption_issue_39():
+def test_regex_corruption_issue_39() raises:
     """Test for regex corruption bug reported in GitHub issue #39.
 
     This test reproduces a critical bug where executing a specific sequence
@@ -1238,7 +1238,7 @@ def test_regex_corruption_issue_39():
         for _ in range(full_repeats):
             result += pattern
         for i in range(remainder):
-            result += pattern[i]
+            result += pattern[byte=i]
         return result
 
     # Clear any existing cache to start fresh
@@ -1318,7 +1318,7 @@ def test_regex_corruption_issue_39():
     )
 
 
-def test_match_digit_basic():
+def test_match_digit_basic() raises:
     """Test basic \\d digit matching."""
     var result = match_first("\\d", "5")
     assert_true(result)
@@ -1328,13 +1328,13 @@ def test_match_digit_basic():
     assert_equal(matched.get_match_text(), "5")
 
 
-def test_match_digit_not_match_letter():
+def test_match_digit_not_match_letter() raises:
     """Test \\d should not match letters."""
     var result = match_first("\\d", "a")
     assert_true(not result)
 
 
-def test_match_digit_quantifier_plus():
+def test_match_digit_quantifier_plus() raises:
     """Test \\d+ matching multiple digits."""
     var result = match_first("\\d+", "12345")
     assert_true(result)
@@ -1344,7 +1344,7 @@ def test_match_digit_quantifier_plus():
     assert_equal(matched.get_match_text(), "12345")
 
 
-def test_match_digit_quantifier_star():
+def test_match_digit_quantifier_star() raises:
     """Test \\d* matching optional digits."""
     var result1 = match_first("\\d*", "123")
     assert_true(result1)
@@ -1357,7 +1357,7 @@ def test_match_digit_quantifier_star():
     assert_equal(matched2.get_match_text(), "")
 
 
-def test_match_word_basic():
+def test_match_word_basic() raises:
     """Test basic \\w word character matching."""
     var result1 = match_first("\\w", "a")
     assert_true(result1)
@@ -1380,7 +1380,7 @@ def test_match_word_basic():
     assert_equal(matched4.get_match_text(), "_")
 
 
-def test_match_word_not_match_special():
+def test_match_word_not_match_special() raises:
     """Test \\w should not match special characters."""
     var result1 = match_first("\\w", "@")
     assert_true(not result1)
@@ -1392,7 +1392,7 @@ def test_match_word_not_match_special():
     assert_true(not result3)
 
 
-def test_match_word_quantifier_plus():
+def test_match_word_quantifier_plus() raises:
     """Test \\w+ matching multiple word characters."""
     var result = match_first("\\w+", "hello123_world")
     assert_true(result)
@@ -1402,7 +1402,7 @@ def test_match_word_quantifier_plus():
     assert_equal(matched.get_match_text(), "hello123_world")
 
 
-def test_match_word_quantifier_star():
+def test_match_word_quantifier_star() raises:
     """Test \\w* matching optional word characters."""
     var result1 = match_first("\\w*", "abc123")
     assert_true(result1)
@@ -1413,3 +1413,7 @@ def test_match_word_quantifier_star():
     assert_true(result2)
     var matched2 = result2.value()
     assert_equal(matched2.get_match_text(), "")
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

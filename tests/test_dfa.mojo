@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.dfa import (
     DFAEngine,
@@ -8,7 +8,7 @@ from regex.dfa import (
 from regex.parser import parse
 
 
-def test_dfa_literal_pattern():
+def test_dfa_literal_pattern() raises:
     """Test DFA compilation and execution for literal patterns."""
     var dfa = DFAEngine()
     dfa.compile_pattern("hello", False, False)
@@ -31,7 +31,7 @@ def test_dfa_literal_pattern():
     assert_false(result3.__bool__())
 
 
-def test_dfa_empty_pattern():
+def test_dfa_empty_pattern() raises:
     """Test DFA with empty pattern."""
     var dfa = DFAEngine()
     dfa.compile_pattern("", False, False)
@@ -48,7 +48,7 @@ def test_dfa_empty_pattern():
     assert_true(result2.__bool__())
 
 
-def test_dfa_character_class():
+def test_dfa_character_class() raises:
     """Test DFA compilation for character classes."""
     var dfa = DFAEngine()
     dfa.compile_character_class("abcdefghijklmnopqrstuvwxyz", 1, -1)  # [a-z]+
@@ -66,7 +66,7 @@ def test_dfa_character_class():
     assert_false(result2.__bool__())
 
 
-def test_dfa_match_all():
+def test_dfa_match_all() raises:
     """Test DFA match_all functionality."""
     var dfa = DFAEngine()
     dfa.compile_pattern("a", False, False)
@@ -83,7 +83,7 @@ def test_dfa_match_all():
     assert_equal(matches[2].end_idx, 6)
 
 
-def test_boyer_moore_search():
+def test_boyer_moore_search() raises:
     """Test Boyer-Moore string search algorithm."""
     var bm = BoyerMoore("hello")
 
@@ -99,7 +99,7 @@ def test_boyer_moore_search():
     assert_equal(bm.search("hello hello hello", 7), 12)
 
 
-def test_boyer_moore_search_all():
+def test_boyer_moore_search_all() raises:
     """Test Boyer-Moore finding all occurrences."""
     var bm = BoyerMoore("ll")
 
@@ -110,7 +110,7 @@ def test_boyer_moore_search_all():
     assert_equal(positions[2], 19)  # "well"
 
 
-def test_compile_dfa_pattern():
+def test_compile_dfa_pattern() raises:
     """Test high-level simple pattern compilation."""
     # Test literal pattern
     var ast1 = parse("hello")
@@ -121,7 +121,7 @@ def test_compile_dfa_pattern():
     assert_equal(result1.value().get_match_text(), "hello")
 
 
-def test_dfa_single_character():
+def test_dfa_single_character() raises:
     """Test DFA with single character patterns."""
     var dfa = DFAEngine()
     dfa.compile_pattern("a", False, False)
@@ -137,7 +137,7 @@ def test_dfa_single_character():
     assert_false(result2.__bool__())
 
 
-def test_dfa_case_sensitive():
+def test_dfa_case_sensitive() raises:
     """Test that DFA matching is case sensitive."""
     var dfa = DFAEngine()
     dfa.compile_pattern("Hello", False, False)
@@ -154,7 +154,7 @@ def test_dfa_case_sensitive():
     assert_false(result3.__bool__())
 
 
-def test_boyer_moore_edge_cases():
+def test_boyer_moore_edge_cases() raises:
     """Test Boyer-Moore with edge cases."""
     # Empty pattern
     var bm_empty = BoyerMoore("")
@@ -170,7 +170,7 @@ def test_boyer_moore_edge_cases():
     assert_equal(bm_long.search("short"), -1)
 
 
-def test_dfa_state_transitions():
+def test_dfa_state_transitions() raises:
     """Test DFA state transitions work correctly."""
     var dfa = DFAEngine()
     dfa.compile_pattern("abc", False, False)
@@ -189,7 +189,7 @@ def test_dfa_state_transitions():
     assert_false(result3.__bool__())
 
 
-def test_dfa_start_anchor():
+def test_dfa_start_anchor() raises:
     """Test DFA with start anchor (^)."""
     var dfa = DFAEngine()
     dfa.compile_pattern("hello", True, False)  # ^hello
@@ -211,7 +211,7 @@ def test_dfa_start_anchor():
     assert_false(result3.__bool__())
 
 
-def test_dfa_end_anchor():
+def test_dfa_end_anchor() raises:
     """Test DFA with end anchor ($)."""
     var dfa = DFAEngine()
     dfa.compile_pattern("world", False, True)  # world$
@@ -226,7 +226,7 @@ def test_dfa_end_anchor():
     assert_false(result2.__bool__())
 
 
-def test_dfa_both_anchors():
+def test_dfa_both_anchors() raises:
     """Test DFA with both start and end anchors (^...$)."""
     var dfa = DFAEngine()
     dfa.compile_pattern("hello", True, True)  # ^hello$
@@ -247,7 +247,7 @@ def test_dfa_both_anchors():
     assert_false(result3.__bool__())
 
 
-def test_dfa_pure_anchors():
+def test_dfa_pure_anchors() raises:
     """Test DFA with pure anchor patterns."""
     # Test start anchor only (^)
     var ast1 = parse("^")
@@ -272,7 +272,7 @@ def test_dfa_pure_anchors():
     assert_false(result3.__bool__())
 
 
-def test_dfa_anchored_match_all():
+def test_dfa_anchored_match_all() raises:
     """Test DFA match_all with anchored patterns."""
     # Start anchored pattern should only match once at beginning
     var dfa1 = DFAEngine()
@@ -303,7 +303,7 @@ def test_dfa_anchored_match_all():
     assert_equal(len(matches3b), 0)  # Should not match
 
 
-def test_dfa_anchors_with_high_level_api():
+def test_dfa_anchors_with_high_level_api() raises:
     """Test that anchored patterns now use DFA through high-level API."""
     # Test that these patterns are now classified as SIMPLE and use DFA
     var ast1 = parse("^hello")
@@ -328,7 +328,7 @@ def test_dfa_anchors_with_high_level_api():
     assert_equal(result3.value().get_match_text(), "hello")
 
 
-def test_phone_numbers():
+def test_phone_numbers() raises:
     """Test phone number pattern matching using DFA."""
     # Complex phone number pattern with sequential character classes
     pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
@@ -340,7 +340,7 @@ def test_phone_numbers():
 
 
 # Pattern too complex for current DFA implementation
-# def test_es_phone_numbers():
+# def test_es_phone_numbers() raises:
 #     es_pattern = "[5-9]\\d{8}"
 #     phone = "810123456"
 #     var ast = parse(es_pattern)
@@ -356,7 +356,7 @@ def test_phone_numbers():
 #     assert_equal(result2.value().get_match_text(), phone)
 
 
-def test_dfa_state_construction_logic():
+def test_dfa_state_construction_logic() raises:
     """Test DFA state construction to prevent assignment logic bugs.
 
     This test specifically guards against the bug where current_state_index
@@ -389,7 +389,7 @@ def test_dfa_state_construction_logic():
     assert_false(result4.__bool__())
 
 
-def test_dfa_optional_element_state_logic():
+def test_dfa_optional_element_state_logic() raises:
     """Test DFA state construction for optional elements.
 
     This test specifically targets the logic where optional first elements
@@ -420,3 +420,7 @@ def test_dfa_optional_element_state_logic():
 
     # This test documents the current behavior and will catch regressions
     # When the optional element logic is fixed, uncomment the assertions above
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

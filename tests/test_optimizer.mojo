@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.optimizer import (
     PatternAnalyzer,
@@ -269,3 +269,7 @@ fn test_complex_quantifiers() raises:
     # Very large quantifiers should be COMPLEX
     var ast2 = parse("a{1000,2000}")
     assert_equal(analyzer.classify(ast2).value, PatternComplexity.COMPLEX)
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

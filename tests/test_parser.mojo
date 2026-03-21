@@ -1,4 +1,10 @@
-from testing import assert_equal, assert_true, assert_false, assert_raises
+from std.testing import (
+    assert_equal,
+    assert_true,
+    assert_false,
+    assert_raises,
+    TestSuite,
+)
 from regex.ast import (
     ASTNode,
     GROUP,
@@ -267,7 +273,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     return Pyrser()
 #
 #
-# def test_simple_regex(parser: Pyrser):
+# def test_simple_regex(parser: Pyrser) raises:
 #     ast = parser.parse("a")
 #     print(ast)
 #     assert type(ast) is RE
@@ -275,7 +281,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert type(ast.child.children[0]) is Element
 #
 #
-# def test_grouping(parser: Pyrser):
+# def test_grouping(parser: Pyrser) raises:
 #     ast = parser.parse("a(b)c")
 #
 #     # top level group
@@ -289,27 +295,27 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert type(ast.child.children[1].children[0]) is Element
 #
 #
-# def test_curly_braces_1(parser: Pyrser):
+# def test_curly_braces_1(parser: Pyrser) raises:
 #     ast = parser.parse(r"a{5}b")
 #     assert len(ast.child.children) == 2
 #
 #
-# def test_fail_curly(parser: Pyrser):
+# def test_fail_curly(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         parser.parse("a{3,3}}")
 #
 #
-# def test_fail_no_closing_par(parser: Pyrser):
+# def test_fail_no_closing_par(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         parser.parse("a[d]((vfw)")
 #
 #
-# def test_parse_match_start_end(parser: Pyrser):
+# def test_parse_match_start_end(parser: Pyrser) raises:
 #     ast = parser.parse("^aaaa.*a$")
 #     assert len(ast.child.children) == 8
 #
 #
-# def test_complex_regex(parser: Pyrser):
+# def test_complex_regex(parser: Pyrser) raises:
 #     ast = parser.parse(r"^[a-zA-Z]{1,20}@[a-zA-Z]\.[a-z]{1,3}$")
 #     assert len(ast.child.children) == 7
 #
@@ -332,20 +338,20 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert type(ast.child.children[6]) is EndElement
 #
 #
-# def test_space_element(parser: Pyrser):
+# def test_space_element(parser: Pyrser) raises:
 #     ast = parser.parse(r"\s")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is SpaceElement
 #
 #
-# def test_range_1(parser: Pyrser):
+# def test_range_1(parser: Pyrser) raises:
 #     ast = parser.parse("[^a-z]")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is RangeElement
 #     assert ast.child.children[0].is_match("a") == False
 #
 #
-# def test_range_2(parser: Pyrser):
+# def test_range_2(parser: Pyrser) raises:
 #     ast = parser.parse(r"[^a-z-\s-]")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is RangeElement
@@ -354,7 +360,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].is_match(" ") == False
 #
 #
-# def test_range_3(parser: Pyrser):
+# def test_range_3(parser: Pyrser) raises:
 #     ast = parser.parse(r"[a-z-\s-]")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is RangeElement
@@ -363,14 +369,14 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].is_match(" ") == True
 #
 #
-# def test_range_2(parser: Pyrser):
+# def test_range_2(parser: Pyrser) raises:
 #     ast = parser.parse(r"[\]]")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is RangeElement
 #     assert ast.child.children[0].is_match("]") == True
 #
 #
-# def test_parse_curly_1(parser: Pyrser):
+# def test_parse_curly_1(parser: Pyrser) raises:
 #     ast = parser.parse(r"a{2}")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is Element
@@ -379,7 +385,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].max == 2
 #
 #
-# def test_parse_curly_2(parser: Pyrser):
+# def test_parse_curly_2(parser: Pyrser) raises:
 #     ast = parser.parse(r"a{,2}")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is Element
@@ -388,7 +394,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].max == 2
 #
 #
-# def test_parse_curly_3(parser: Pyrser):
+# def test_parse_curly_3(parser: Pyrser) raises:
 #     ast = parser.parse(r"a{2,}")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is Element
@@ -397,7 +403,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].max == math.inf
 #
 #
-# def test_parse_curly_4(parser: Pyrser):
+# def test_parse_curly_4(parser: Pyrser) raises:
 #     ast = parser.parse(r"a{,}")
 #     assert len(ast.child.children) == 1
 #     assert type(ast.child.children[0]) is Element
@@ -406,47 +412,47 @@ fn test_parse_fail_non_closed_range() raises:
 #     ast.child.children[0].max == math.inf
 #
 #
-# def test_parse_fail_empty_curly(parser: Pyrser):
+# def test_parse_fail_empty_curly(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"a{}")
 #
 #
-# def test_fail_quatifier_unescaped(parser: Pyrser):
+# def test_fail_quatifier_unescaped(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"?")
 #
 #
-# def test_parse_fail_missing_clising_bracket(parser: Pyrser):
+# def test_parse_fail_missing_clising_bracket(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"a[abc")
 #
 #
-# def test_parse_fail_unescaped_closing_bracket(parser: Pyrser):
+# def test_parse_fail_unescaped_closing_bracket(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"abc]")
 #
 #
-# def test_parse_fail_unescaped_closing_parenthesis(parser: Pyrser):
+# def test_parse_fail_unescaped_closing_parenthesis(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"a)")
 #
 #
-# def test_parse_fail_unescaped_start(parser: Pyrser):
+# def test_parse_fail_unescaped_start(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"^^")
 #
 #
-# def test_parse_fail_unescaped_end(parser: Pyrser):
+# def test_parse_fail_unescaped_end(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"$$")
 #
 #
-# def test_parse_fail_swapped_range(parser: Pyrser):
+# def test_parse_fail_swapped_range(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         ast = parser.parse(r"[z-a]")
 #
 #
-# def test_parse_fail_non_capturing_group(parser: Pyrser):
+# def test_parse_fail_non_capturing_group(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         parser.parse(r"(?")
 #
@@ -454,7 +460,7 @@ fn test_parse_fail_non_closed_range() raises:
 #         parser.parse(r"(?aa")
 #
 #
-# def test_parse_fail_non_closed_range(parser: Pyrser):
+# def test_parse_fail_non_closed_range(parser: Pyrser) raises:
 #     with pytest.raises(Exception):
 #         parser.parse(r"[a")
 #
@@ -462,7 +468,7 @@ fn test_parse_fail_non_closed_range() raises:
 #         parser.parse(r"[")
 #
 #
-# def test_parse_onrnode_groups_names(parser: Pyrser):
+# def test_parse_onrnode_groups_names(parser: Pyrser) raises:
 #     regex = r"a|b"
 #     ast = parser.parse(regex)
 #     assert len(ast.children) == 1
@@ -473,7 +479,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert ast.child.left.group_id == ast.child.right.group_id
 #
 #
-# def test_groups_names_double_ornode(parser: Pyrser):
+# def test_groups_names_double_ornode(parser: Pyrser) raises:
 #     regex = r"a|b|c"
 #     ast = parser.parse(regex)
 #     assert len(ast.children) == 1
@@ -495,3 +501,7 @@ fn test_parse_fail_non_closed_range() raises:
 #     assert central_gid == rightmost_gid
 #     assert leftmost_gname == central_gname
 #     assert central_gname == rightmost_gname
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()
