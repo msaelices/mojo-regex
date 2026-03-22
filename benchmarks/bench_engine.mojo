@@ -96,7 +96,7 @@ fn benchmark_match_first(
 
     # Target runtime: 100ms like Python
     var target_runtime = 100_000_000  # 100ms in nanoseconds
-    var total_time: Int = 0
+    var total_time: UInt = 0
     var actual_iterations = 0
 
     # Run until we hit target runtime or max iterations
@@ -154,7 +154,7 @@ fn benchmark_search(
 
     # Target runtime: 100ms like Python
     var target_runtime = 100_000_000  # 100ms in nanoseconds
-    var total_time: Int = 0
+    var total_time: UInt = 0
     var actual_iterations = 0
 
     # Run until we hit target runtime or max iterations
@@ -213,7 +213,7 @@ fn benchmark_findall(
         _ = findall(pattern, text)
 
     var target_runtime = 100_000_000
-    var total_time: Int = 0
+    var total_time: UInt = 0
     var actual_iterations = 0
 
     while total_time < target_runtime and actual_iterations < 100_000:
