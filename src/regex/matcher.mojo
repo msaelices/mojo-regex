@@ -5,10 +5,9 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
-from builtin._location import __call_location
-from memory import UnsafePointer
+from memory import UnsafePointer, alloc
 from os import abort
-from sys.ffi import _Global
+from ffi import _Global
 from time import monotonic
 
 from regex.ast import ASTNode
@@ -52,17 +51,17 @@ struct OptimizedLiteralInfo(Copyable, Movable):
         self.has_anchors = has_anchors
         self.is_exact_match = is_exact_match
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.best_literal = other.best_literal
-        self.has_anchors = other.has_anchors
-        self.is_exact_match = other.is_exact_match
+        self.best_literal = copy.best_literal
+        self.has_anchors = copy.has_anchors
+        self.is_exact_match = copy.is_exact_match
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.best_literal = other.best_literal^
-        self.has_anchors = other.has_anchors
-        self.is_exact_match = other.is_exact_match
+        self.best_literal = take.best_literal^
+        self.has_anchors = take.has_anchors
+        self.is_exact_match = take.is_exact_match
 
     fn get_best_required_literal(self) -> Optional[String]:
         """Get the best required literal for matching."""
@@ -81,7 +80,7 @@ fn create_optimized_prefilter(
     return None
 
 
-fn check_ast_for_anchors(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if AST contains start or end anchors."""
     from regex.ast import START, END, RE, GROUP
 
@@ -124,15 +123,15 @@ trait RegexMatcher:
 struct DFAMatcher(Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine_ptr: UnsafePointer[DFAEngine]
+    var engine_ptr: UnsafePointer[DFAEngine, MutAnyOrigin]
     """The underlying DFA engine for pattern matching."""
 
     fn __init__(out self):
         """Default constructor for empty DFA matcher."""
-        self.engine_ptr = UnsafePointer[DFAEngine]()
+        self.engine_ptr = UnsafePointer[DFAEngine, MutAnyOrigin]()
 
     fn __init__(
-        out self, var ast: ASTNode[MutableAnyOrigin], pattern: String
+        out self, var ast: ASTNode[MutAnyOrigin], pattern: String
     ) raises:
         """Initialize DFA matcher by compiling the AST.
 
@@ -141,12 +140,12 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
             pattern: The original regex pattern string.
         """
         engine = compile_dfa_pattern(ast)
-        self.engine_ptr = UnsafePointer[DFAEngine].alloc(1)
+        self.engine_ptr = alloc[DFAEngine](1)
         self.engine_ptr.init_pointee_move(engine^)
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.engine_ptr = other.engine_ptr
+        self.engine_ptr = copy.engine_ptr
 
     fn __bool__(self) -> Bool:
         """Check if DFA matcher is valid (compiled)."""
@@ -170,10 +169,10 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
-    var ast: ASTNode[MutableAnyOrigin]
+    var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
 
-    fn __init__(out self, ast: ASTNode[MutableAnyOrigin], pattern: String):
+    fn __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
         """Initialize NFA matcher with the existing engine.
 
         Args:
@@ -183,15 +182,15 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = NFAEngine(pattern)
         self.ast = ast
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.engine = other.engine.copy()
-        self.ast = other.ast
+        self.engine = copy.engine.copy()
+        self.ast = copy.ast
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.engine = other.engine^
-        self.ast = other.ast^
+        self.engine = take.engine^
+        self.ast = take.ast^
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
@@ -244,19 +243,20 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     var has_wildcards = False
     var has_character_classes = False
 
+    var pattern_ptr = pattern.unsafe_ptr()
     for i in range(pattern_len):
-        var c = pattern[i]
-        if c == "*" or c == "+" or c == "?":
+        var c = Int(pattern_ptr[i])
+        if c == ord("*") or c == ord("+") or c == ord("?"):
             has_quantifiers = True
-        elif c == "|":
+        elif c == ord("|"):
             has_alternation = True
-        elif c == "^" and i == 0:
+        elif c == ord("^") and i == 0:
             has_anchors = True
-        elif c == "$" and i == pattern_len - 1:
+        elif c == ord("$") and i == pattern_len - 1:
             has_anchors = True
-        elif c == ".":
+        elif c == ord("."):
             has_wildcards = True
-        elif c == "[":
+        elif c == ord("["):
             has_character_classes = True
 
     # Patterns likely to yield poor prefilters (mostly single-char literals):
@@ -276,7 +276,7 @@ fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
         # Short alternation patterns like "a|b|c" yield single-char literals
         var alternation_chars = 0
         for i in range(pattern_len):
-            if pattern[i] == "|":
+            if Int(pattern_ptr[i]) == ord("|"):
                 alternation_chars += 1
         # If it's mostly single chars separated by |, skip
         if (
@@ -370,7 +370,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         if should_analyze_prefilter:
             # Extract literal information using optimized implementation
-            # Use MutableAnyOrigin since that's what the AST has
+            # Use MutAnyOrigin since that's what the AST has
             var literal_set = extract_literals(ast)
             var has_anchors = check_ast_for_anchors(ast)
 
@@ -428,27 +428,27 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             self.dfa_matcher = DFAMatcher()
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.dfa_matcher = other.dfa_matcher.copy()
-        self.nfa_matcher = other.nfa_matcher.copy()
-        self.complexity = other.complexity
-        self.prefilter = other.prefilter
-        self.literal_info = other.literal_info.copy()
-        self.is_exact_literal = other.is_exact_literal
-        self.is_wildcard_match_any = other.is_wildcard_match_any
-        self.use_pure_dfa = other.use_pure_dfa
+        self.dfa_matcher = copy.dfa_matcher.copy()
+        self.nfa_matcher = copy.nfa_matcher.copy()
+        self.complexity = copy.complexity
+        self.prefilter = copy.prefilter.copy()
+        self.literal_info = copy.literal_info.copy()
+        self.is_exact_literal = copy.is_exact_literal
+        self.is_wildcard_match_any = copy.is_wildcard_match_any
+        self.use_pure_dfa = copy.use_pure_dfa
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.dfa_matcher = other.dfa_matcher^
-        self.nfa_matcher = other.nfa_matcher^
-        self.complexity = other.complexity
-        self.prefilter = other.prefilter^
-        self.literal_info = other.literal_info^
-        self.is_exact_literal = other.is_exact_literal
-        self.is_wildcard_match_any = other.is_wildcard_match_any
-        self.use_pure_dfa = other.use_pure_dfa
+        self.dfa_matcher = take.dfa_matcher^
+        self.nfa_matcher = take.nfa_matcher^
+        self.complexity = take.complexity
+        self.prefilter = take.prefilter^
+        self.literal_info = take.literal_info^
+        self.is_exact_literal = take.is_exact_literal
+        self.is_wildcard_match_any = take.is_wildcard_match_any
+        self.use_pure_dfa = take.use_pure_dfa
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
@@ -637,19 +637,19 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
-        self.compiled_at = monotonic()
+        self.compiled_at = Int(monotonic())
 
-    fn __copyinit__(out self, other: Self):
+    fn __copyinit__(out self, copy: Self):
         """Copy constructor."""
-        self.matcher = other.matcher.copy()
-        self.pattern = other.pattern
-        self.compiled_at = other.compiled_at
+        self.matcher = copy.matcher.copy()
+        self.pattern = copy.pattern
+        self.compiled_at = copy.compiled_at
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.matcher = other.matcher^
-        self.pattern = other.pattern^
-        self.compiled_at = other.compiled_at
+        self.matcher = take.matcher^
+        self.pattern = take.pattern^
+        self.compiled_at = take.compiled_at
 
     # @always_inline
     # fn __del__(deinit self):
@@ -750,13 +750,13 @@ fn _init_regex_cache() -> RegexCache:
     return RegexCache()
 
 
-fn _get_regex_cache() -> UnsafePointer[RegexCache]:
+fn _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
     """Returns an pointer to the global regex cache."""
     try:
         return _CACHE_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[RegexCache]()  # Unreachable
+    return UnsafePointer[RegexCache, MutAnyOrigin]()  # Unreachable
 
 
 fn compile_regex(pattern: String) raises -> CompiledRegex:

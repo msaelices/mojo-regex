@@ -1,6 +1,6 @@
 # RUN: %mojo-no-debug %s -t
 
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from std.benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from regex.nfa import NFAEngine
 from regex.ast import ASTNode
 from regex.parser import parse
@@ -34,7 +34,7 @@ fn make_digit_heavy_text[length: Int]() -> String:
 
     # Add partial pattern for remainder
     for i in range(remainder):
-        result += base_pattern[i]
+        result += base_pattern[byte=i]
 
     return result
 
@@ -63,7 +63,7 @@ fn make_space_heavy_text[length: Int]() -> String:
 
     # Add partial pattern for remainder
     for i in range(remainder):
-        result += base_pattern[i]
+        result += base_pattern[byte=i]
 
     return result
 
@@ -94,7 +94,7 @@ fn make_range_heavy_text[length: Int]() -> String:
 
     # Add partial pattern for remainder
     for i in range(remainder):
-        result += base_pattern[i]
+        result += base_pattern[byte=i]
 
     return result
 

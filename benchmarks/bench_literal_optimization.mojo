@@ -7,7 +7,7 @@ This benchmark tests the performance improvements from literal prefiltering
 on various types of patterns containing literals.
 """
 
-from benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
+from std.benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from regex import match_first, findall
 
 # Simple test texts

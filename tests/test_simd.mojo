@@ -1,4 +1,4 @@
-from testing import assert_equal, assert_true, assert_false
+from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.simd_ops import (
     CharacterClassSIMD,
@@ -15,7 +15,7 @@ from regex.simd_ops import (
 from regex.dfa import DFAEngine
 
 
-def test_character_class_simd_basic():
+def test_character_class_simd_basic() raises:
     """Test basic SIMD character class operations."""
     var char_class = CharacterClassSIMD("abc")
 
@@ -27,7 +27,7 @@ def test_character_class_simd_basic():
     assert_false(char_class.contains(ord("1")))
 
 
-def test_character_class_simd_range():
+def test_character_class_simd_range() raises:
     """Test SIMD character class with ranges."""
     var char_class = CharacterClassSIMD("a", "z")
 
@@ -42,7 +42,7 @@ def test_character_class_simd_range():
     assert_false(char_class.contains(ord("@")))
 
 
-def test_character_class_find_first():
+def test_character_class_find_first() raises:
     """Test finding first match with SIMD."""
     var char_class = CharacterClassSIMD("aeiou")  # vowels
 
@@ -57,7 +57,7 @@ def test_character_class_find_first():
     assert_equal(char_class.find_first_match("hello world", 2), 4)  # 'o'
 
 
-def test_character_class_find_all():
+def test_character_class_find_all() raises:
     """Test finding all matches with SIMD."""
     var char_class = CharacterClassSIMD("l")
 
@@ -68,7 +68,7 @@ def test_character_class_find_all():
     assert_equal(matches[2], 9)
 
 
-def test_character_class_count():
+def test_character_class_count() raises:
     """Test counting matches with SIMD."""
     var char_class = CharacterClassSIMD("a")
 
@@ -80,7 +80,7 @@ def test_character_class_count():
     assert_equal(char_class.count_matches("banana", 1, 5), 2)  # "anan"
 
 
-def test_ascii_lowercase():
+def test_ascii_lowercase() raises:
     """Test predefined ASCII lowercase character class."""
     var lowercase = _create_ascii_lowercase()
 
@@ -93,7 +93,7 @@ def test_ascii_lowercase():
     assert_false(lowercase.contains(ord("@")))
 
 
-def test_ascii_uppercase():
+def test_ascii_uppercase() raises:
     """Test predefined ASCII uppercase character class."""
     var uppercase = _create_ascii_uppercase()
 
@@ -106,7 +106,7 @@ def test_ascii_uppercase():
     assert_false(uppercase.contains(ord("@")))
 
 
-def test_ascii_digits():
+def test_ascii_digits() raises:
     """Test predefined ASCII digits character class."""
     var digits = _create_ascii_digits()
 
@@ -119,7 +119,7 @@ def test_ascii_digits():
     assert_false(digits.contains(ord("@")))
 
 
-def test_ascii_alphanumeric():
+def test_ascii_alphanumeric() raises:
     """Test predefined ASCII alphanumeric character class."""
     var alnum = _create_ascii_alphanumeric()
 
@@ -137,7 +137,7 @@ def test_ascii_alphanumeric():
     assert_false(alnum.contains(ord("!")))
 
 
-def test_whitespace():
+def test_whitespace() raises:
     """Test predefined whitespace character class."""
     var whitespace = _create_whitespace()
 
@@ -150,10 +150,10 @@ def test_whitespace():
     assert_false(whitespace.contains(ord("1")))
 
 
-def test_simd_string_search():
+def test_simd_string_search() raises:
     """Test SIMD-accelerated string search."""
     var pattern = "hello"
-    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
+    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
 
     # Test basic search
     assert_equal(simd_search(pattern_span, "hello world"), 0)
@@ -164,10 +164,10 @@ def test_simd_string_search():
     assert_equal(simd_search(pattern_span, "hello hello hello", 1), 6)
 
 
-def test_simd_string_search_all():
+def test_simd_string_search_all() raises:
     """Test finding all occurrences with SIMD string search."""
     var pattern = "ll"
-    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
+    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
     var text = "hello world, all well"
 
     # Find all non-overlapping occurrences manually using simd_search
@@ -188,20 +188,20 @@ def test_simd_string_search_all():
     assert_equal(positions[2], 19)  # "well"
 
 
-def test_simd_string_search_empty():
+def test_simd_string_search_empty() raises:
     """Test SIMD string search with empty pattern."""
     var pattern = ""
-    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
+    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
 
     # Empty pattern should match at any position
     assert_equal(simd_search(pattern_span, "hello"), 0)
     assert_equal(simd_search(pattern_span, "hello", 2), 2)
 
 
-def test_simd_string_search_single_char():
+def test_simd_string_search_single_char() raises:
     """Test SIMD string search with single character."""
     var pattern = "a"
-    var pattern_span = Span[Byte](pattern.unsafe_ptr(), len(pattern))
+    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
 
     assert_equal(simd_search(pattern_span, "banana"), 1)
     assert_equal(simd_search(pattern_span, "hello"), -1)
@@ -225,7 +225,7 @@ def test_simd_string_search_single_char():
     assert_equal(positions[2], 5)
 
 
-def test_simd_memcmp():
+def test_simd_memcmp() raises:
     """Test SIMD-accelerated memory comparison."""
     assert_true(simd_memcmp("hello", 0, "hello", 0, 5))
     assert_true(simd_memcmp("hello world", 0, "hello there", 0, 5))
@@ -239,7 +239,7 @@ def test_simd_memcmp():
     assert_true(simd_memcmp("abc", 0, "xyz", 0, 0))
 
 
-def test_simd_count_char():
+def test_simd_count_char() raises:
     """Test SIMD character counting."""
     assert_equal(simd_count_char("hello world", "l"), 3)
     assert_equal(simd_count_char("banana", "a"), 3)
@@ -250,7 +250,7 @@ def test_simd_count_char():
     assert_equal(simd_count_char("", "a"), 0)
 
 
-def test_character_class_performance():
+def test_character_class_performance() raises:
     """Test character class with larger text for performance validation."""
     var char_class = CharacterClassSIMD("aeiou")
 
@@ -268,7 +268,7 @@ def test_character_class_performance():
     assert_equal(count, len(all_matches))
 
 
-def test_simd_edge_cases():
+def test_simd_edge_cases() raises:
     """Test SIMD operations with edge cases."""
     # Empty string
     var char_class = CharacterClassSIMD("abc")
@@ -284,3 +284,7 @@ def test_simd_edge_cases():
     var empty_class = CharacterClassSIMD("")
     assert_equal(empty_class.find_first_match("hello"), -1)
     assert_equal(len(empty_class.find_all_matches("hello")), 0)
+
+
+def main() raises:
+    TestSuite.discover_tests[__functions_in_module()]().run()

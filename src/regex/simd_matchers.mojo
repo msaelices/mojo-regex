@@ -6,7 +6,7 @@ Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.htm
 
 from os import abort
 from sys.info import simd_width_of
-from sys import ffi
+from ffi import _Global
 from memory import UnsafePointer
 from regex.aliases import (
     SIMD_MATCHER_NONE,
@@ -52,8 +52,9 @@ trait SIMDMatcher:
         ...
 
 
-@register_passable("trivial")
-struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
+struct NibbleBasedMatcher(
+    Copyable, Movable, SIMDMatcher, TrivialRegisterPassable
+):
     """Nibble-based SIMD matcher using shuffle operations.
 
     This matcher splits bytes into high and low nibbles and uses
@@ -168,8 +169,9 @@ fn create_hex_digit_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-@register_passable("trivial")
-struct RangeBasedMatcher(ImplicitlyCopyable, Movable, SIMDMatcher):
+struct RangeBasedMatcher(
+    ImplicitlyCopyable, Movable, SIMDMatcher, TrivialRegisterPassable
+):
     """Range-based SIMD matcher using comparison operations.
 
     Efficient for contiguous character ranges like [a-z], [0-9], [A-Z].
@@ -374,17 +376,15 @@ fn analyze_character_class_pattern(pattern: String) -> String:
     else:
         # Check if it's a simple range
         if pattern.startswith("[") and pattern.endswith("]") and "-" in pattern:
-            var inner = pattern[1:-1]
-            if len(inner) == 3 and inner[1] == "-":
+            var inner = pattern[byte=1:-1]
+            if len(inner) == 3 and Int(inner.unsafe_ptr()[1]) == ord("-"):
                 return "range"
         return "lookup"
 
 
 # Global cache for RangeBasedMatcher instances
 alias RangeMatchers = Dict[Int, RangeBasedMatcher]
-alias _RANGE_MATCHERS_GLOBAL = ffi._Global[
-    "RangeMatchers", _init_range_matchers
-]
+alias _RANGE_MATCHERS_GLOBAL = _Global["RangeMatchers", _init_range_matchers]
 
 
 fn _init_range_matchers() -> RangeMatchers:
@@ -393,20 +393,18 @@ fn _init_range_matchers() -> RangeMatchers:
     return matchers^
 
 
-fn _get_range_matchers() -> UnsafePointer[RangeMatchers]:
+fn _get_range_matchers() -> UnsafePointer[RangeMatchers, MutAnyOrigin]:
     """Returns a pointer to the global range matchers dictionary."""
     try:
         return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[RangeMatchers]()  # Unreachable
+    return UnsafePointer[RangeMatchers, MutAnyOrigin]()  # Unreachable
 
 
 # Global cache for NibbleBasedMatcher instances
 alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
-alias _NIBBLE_MATCHERS_GLOBAL = ffi._Global[
-    "NibbleMatchers", _init_nibble_matchers
-]
+alias _NIBBLE_MATCHERS_GLOBAL = _Global["NibbleMatchers", _init_nibble_matchers]
 
 
 fn _init_nibble_matchers() -> NibbleMatchers:
@@ -415,13 +413,13 @@ fn _init_nibble_matchers() -> NibbleMatchers:
     return matchers^
 
 
-fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers]:
+fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
     """Returns a pointer to the global nibble matchers dictionary."""
     try:
         return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[NibbleMatchers]()  # Unreachable
+    return UnsafePointer[NibbleMatchers, MutAnyOrigin]()  # Unreachable
 
 
 fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:

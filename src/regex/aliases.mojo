@@ -37,7 +37,7 @@ alias CHAR_NEWLINE = ord("\n")
 
 alias ALL_EXCEPT_NEWLINE = _all_except_newline()
 
-alias EMPTY_SLICE = StringSlice[ImmutableAnyOrigin]("")
+alias EMPTY_SLICE = StringSlice[ImmutAnyOrigin]("")
 alias EMPTY_STRING = String("")
 
 # SIMD matcher type constants

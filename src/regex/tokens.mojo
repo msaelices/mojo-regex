@@ -31,9 +31,7 @@ from regex.aliases import (
 )
 
 
-struct Token(
-    EqualityComparable, ImplicitlyBoolable, ImplicitlyCopyable, Movable
-):
+struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
     """Token struct."""
 
     var type: Int

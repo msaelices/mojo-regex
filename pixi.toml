@@ -1,6 +1,6 @@
 [workspace]
 authors = ["Manuel Saelices <msaelices@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
+channels = ["conda-forge", "https://conda.modular.com/max"]
 description = "Library for dealing with regular expressions in Mojo"
 homepage = "https://github.com/msaelices/mojo-regex"
 repository = "https://github.com/msaelices/mojo-regex"
@@ -13,16 +13,16 @@ version = "0.4.0"
 
 [package]
 name = "mojo-regex"
-version = "0.5.0.dev2025090505"
+version = "0.6.0"
 
 [package.build]
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-mojo = ">0.25.6.0.dev2025090505,<1"
+mojo = ">=0.26.1,<0.27"
 
 [tasks]
-test = "mojo test -I ./src tests/"
+test = "bash -c 'status=0; for f in tests/test_*.mojo; do echo \"Running $f...\"; mojo run -I ./src $f || status=1; done; exit $status'"
 format = "mojo format benchmarks/ src/regex/ tests/"
 
 [feature.mojopkg.dependencies]

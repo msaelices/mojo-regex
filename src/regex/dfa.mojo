@@ -68,7 +68,7 @@ alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 fn _expand_character_range(
     node_type: Int,
-    range_str: StringSlice[ImmutableAnyOrigin],
+    range_str: StringSlice[ImmutAnyOrigin],
 ) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
@@ -109,35 +109,36 @@ fn _expand_character_range(
         return WORD_CHARS
 
     # Extract the inner part: [a-z] -> a-z
-    var inner = range_str[1:-1]
+    var inner = range_str[byte=1:-1]
 
     # Handle negated ranges like [^a-z]
     var negated = inner.startswith("^")
     if negated:
-        inner = inner[1:]
+        inner = inner[byte=1:]
 
     # For simple single ranges, use slicing from pre-defined sets
-    if len(inner) == 3 and inner[1] == "-":
-        var start_char = inner[0]
-        var end_char = inner[2]
+    var inner_ptr = inner.unsafe_ptr()
+    if len(inner) == 3 and Int(inner_ptr[1]) == ord("-"):
+        var start_char = inner[byte=0]
+        var end_char = inner[byte=2]
 
         # Handle lowercase letter ranges
         if ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z:
             var start_idx = ord(start_char) - CHAR_A
             var end_idx = ord(end_char) - CHAR_A + 1
-            return LOWERCASE_LETTERS[start_idx:end_idx]
+            return String(LOWERCASE_LETTERS[byte=start_idx:end_idx])
 
         # Handle uppercase letter ranges
         elif ord(start_char) >= CHAR_A and ord(end_char) <= CHAR_Z_UPPER:
             var start_idx = ord(start_char) - CHAR_A_UPPER
             var end_idx = ord(end_char) - CHAR_A_UPPER + 1
-            return UPPERCASE_LETTERS[start_idx:end_idx]
+            return String(UPPERCASE_LETTERS[byte=start_idx:end_idx])
 
         # Handle digit ranges
         elif ord(start_char) >= CHAR_ZERO and ord(end_char) <= CHAR_NINE:
             var start_idx = ord(start_char) - CHAR_ZERO
             var end_idx = ord(end_char) - CHAR_ZERO + 1
-            return DIGITS[start_idx:end_idx]
+            return String(DIGITS[byte=start_idx:end_idx])
 
     # Fallback for complex cases - expand all ranges and characters
     var result = String(
@@ -145,10 +146,10 @@ fn _expand_character_range(
     )  # Pre-allocate for worst case
     var i = 0
     while i < len(inner):
-        if i + 2 < len(inner) and inner[i + 1] == "-":
+        if i + 2 < len(inner) and Int(inner_ptr[i + 1]) == ord("-"):
             # Found a range like a-z
-            var start_char = inner[i]
-            var end_char = inner[i + 2]
+            var start_char = inner[byte=i]
+            var end_char = inner[byte=i + 2]
             var start_code = ord(start_char)
             var end_code = ord(end_char)
 
@@ -158,7 +159,7 @@ fn _expand_character_range(
             i += 3
         else:
             # Single character
-            result += inner[i]
+            result += inner[byte=i]
             i += 1
 
     return result
@@ -205,8 +206,7 @@ struct SequentialPatternInfo(Copyable, Movable):
         self.has_end_anchor = False
 
 
-@register_passable
-struct DFAState(ImplicitlyCopyable, Movable):
+struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
     """A single state in the DFA state machine."""
 
     var transitions: SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS]
@@ -278,15 +278,15 @@ struct DFAEngine(Engine):
         self.simd_char_matcher = None
         self.literal_pattern = ""
 
-    fn __moveinit__(out self, deinit other: Self):
+    fn __moveinit__(out self, deinit take: Self):
         """Move constructor."""
-        self.states = other.states^
-        self.start_state = other.start_state
-        self.has_start_anchor = other.has_start_anchor
-        self.has_end_anchor = other.has_end_anchor
-        self.is_pure_literal = other.is_pure_literal
-        self.simd_char_matcher = other.simd_char_matcher^
-        self.literal_pattern = other.literal_pattern^
+        self.states = take.states^
+        self.start_state = take.start_state
+        self.has_start_anchor = take.has_start_anchor
+        self.has_end_anchor = take.has_end_anchor
+        self.is_pure_literal = take.is_pure_literal
+        self.simd_char_matcher = take.simd_char_matcher^
+        self.literal_pattern = take.literal_pattern^
 
     fn compile_pattern(
         mut self,
@@ -321,9 +321,10 @@ struct DFAEngine(Engine):
 
         # Create states: one for each character + one final accepting state
         # Set up transitions for each character in the pattern
+        var pattern_ptr = pattern.unsafe_ptr()
         for i in range(len_pattern):
             var state = DFAState()
-            var char_code = ord(pattern[i])
+            var char_code = Int(pattern_ptr[i])
             state.add_transition(char_code, i + 1)
             self.states.append(state)
 
@@ -767,7 +768,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_alternation(mut self, ast: ASTNode[MutableAnyOrigin]) raises:
+    fn compile_alternation(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile an alternation pattern like a|b or (cat|dog) into a DFA.
 
         Creates a state machine with parallel branches that converge to accepting states.
@@ -808,9 +809,10 @@ struct DFAEngine(Engine):
 
             # Navigate/create path for this branch
             var current_state_index = 0  # Start from start state
+            var branch_text_ptr = branch_text.unsafe_ptr()
 
             for j in range(len(branch_text)):
-                var char_code = ord(branch_text[j])
+                var char_code = Int(branch_text_ptr[j])
 
                 if j == len(branch_text) - 1:
                     # Last character - transition to accepting state
@@ -824,9 +826,7 @@ struct DFAEngine(Engine):
                     )
                     current_state_index = next_state_index
 
-    fn compile_quantified_group(
-        mut self, ast: ASTNode[MutableAnyOrigin]
-    ) raises:
+    fn compile_quantified_group(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile a quantified group pattern like (abc)+, (test)*, (a)? into a DFA.
 
         Creates a state machine with loops and optional paths based on quantifiers.
@@ -887,8 +887,9 @@ struct DFAEngine(Engine):
 
         # Path through pattern (1 match)
         var current_state_index = 0
+        var group_text_ptr = group_text.unsafe_ptr()
         for i in range(len(group_text)):
-            var char_code = ord(group_text[i])
+            var char_code = Int(group_text_ptr[i])
 
             if i == len(group_text) - 1:
                 # Last character - go to accepting state
@@ -917,8 +918,9 @@ struct DFAEngine(Engine):
 
         # Create loop through pattern
         var current_state_index = 0
+        var group_text_ptr = group_text.unsafe_ptr()
         for i in range(len(group_text)):
-            var char_code = ord(group_text[i])
+            var char_code = Int(group_text_ptr[i])
 
             if i == len(group_text) - 1:
                 # Last character - loop back to start (for more matches) or stay accepting
@@ -940,8 +942,9 @@ struct DFAEngine(Engine):
         # Must match at least once, then can loop
 
         var current_state_index = 0
+        var group_text_ptr = group_text.unsafe_ptr()
         for i in range(len(group_text)):
-            var char_code = ord(group_text[i])
+            var char_code = Int(group_text_ptr[i])
 
             if i == len(group_text) - 1:
                 # Last character - create accepting state that can loop back
@@ -954,7 +957,8 @@ struct DFAEngine(Engine):
 
                 # From loop state, can start pattern again or stay accepting
                 self.states[loop_index].add_transition(
-                    ord(group_text[0]), 1 if len(group_text) > 1 else loop_index
+                    Int(group_text_ptr[0]),
+                    1 if len(group_text) > 1 else loop_index,
                 )
             else:
                 # Intermediate character - create new state
@@ -966,9 +970,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn compile_simple_quantifier(
-        mut self, ast: ASTNode[MutableAnyOrigin]
-    ) raises:
+    fn compile_simple_quantifier(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile a simple quantifier pattern like a*, test+, char? into a DFA.
 
         Creates a state machine based on the quantifier type applied to literal sequences.
@@ -1054,8 +1056,9 @@ struct DFAEngine(Engine):
 
         # Path through pattern (1 match)
         var current_state_index = 0
+        var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(len(pattern_text)):
-            var char_code = ord(pattern_text[i])
+            var char_code = Int(pattern_text_ptr[i])
 
             if i == len(pattern_text) - 1:
                 # Last character - go to accepting state
@@ -1085,8 +1088,9 @@ struct DFAEngine(Engine):
 
         # Create loop through pattern
         var current_state_index = 0
+        var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(len(pattern_text)):
-            var char_code = ord(pattern_text[i])
+            var char_code = Int(pattern_text_ptr[i])
 
             if i == len(pattern_text) - 1:
                 # Last character - loop back to start (for more matches) or stay accepting
@@ -1109,8 +1113,9 @@ struct DFAEngine(Engine):
         # Must match at least once, then can loop
 
         var current_state_index = 0
+        var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(len(pattern_text)):
-            var char_code = ord(pattern_text[i])
+            var char_code = Int(pattern_text_ptr[i])
 
             if i == len(pattern_text) - 1:
                 # Last character - create accepting state that can loop back
@@ -1123,7 +1128,7 @@ struct DFAEngine(Engine):
 
                 # From loop state, can start pattern again or stay accepting
                 self.states[loop_index].add_transition(
-                    ord(pattern_text[0]),
+                    Int(pattern_text_ptr[0]),
                     1 if len(pattern_text) > 1 else loop_index,
                 )
             else:
@@ -1161,9 +1166,7 @@ struct DFAEngine(Engine):
             self.states[from_state].add_transition(char_code, new_state_index)
             return new_state_index
 
-    fn compile_wildcard_quantifier(
-        mut self, ast: ASTNode[MutableAnyOrigin]
-    ) raises:
+    fn compile_wildcard_quantifier(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile a wildcard quantifier pattern like .*, .+, .? into a DFA.
 
         Creates a state machine that matches any character with the specified quantifier.
@@ -1255,7 +1258,7 @@ struct DFAEngine(Engine):
                 self.states[0].add_transition(i, accepting_index)
 
     fn compile_common_prefix_alternation(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile common prefix alternation patterns like (hello|help|helicopter) into a DFA.
 
@@ -1288,7 +1291,7 @@ struct DFAEngine(Engine):
         self._build_prefix_trie(branches)
 
     fn _extract_all_prefix_branches(
-        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+        self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from nested OR structure."""
         from regex.ast import OR, GROUP, ELEMENT
@@ -1322,8 +1325,9 @@ struct DFAEngine(Engine):
 
         # Build states for the common prefix
         var current_state = 0
+        var common_prefix_ptr = common_prefix.unsafe_ptr()
         for i in range(prefix_len):
-            var char_code = ord(common_prefix[i])
+            var char_code = Int(common_prefix_ptr[i])
             var next_state_index = self._find_or_create_state(
                 current_state, char_code
             )
@@ -1337,11 +1341,12 @@ struct DFAEngine(Engine):
                 self.states[current_state].is_accepting = True
             else:
                 # Branch continues - build suffix directly
-                var suffix = branch[prefix_len:]
+                var suffix = branch[byte=prefix_len:]
                 var suffix_current_state = current_state
+                var suffix_ptr = suffix.unsafe_ptr()
 
                 for j in range(len(suffix)):
-                    var char_code = ord(suffix[j])
+                    var char_code = Int(suffix_ptr[j])
 
                     if j == len(suffix) - 1:
                         # Last character - create or mark accepting state
@@ -1372,17 +1377,19 @@ struct DFAEngine(Engine):
                 min_length = len(branches[i])
 
         # Find common prefix
+        var first_branch_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = first_branch[pos]
+            var char_at_pos = Int(first_branch_ptr[pos])
             var all_match = True
 
             for i in range(1, len(branches)):
-                if branches[i][pos] != char_at_pos:
+                var branch_ptr_i = branches[i].unsafe_ptr()
+                if Int(branch_ptr_i[pos]) != char_at_pos:
                     all_match = False
                     break
 
             if all_match:
-                prefix += String(char_at_pos)
+                prefix += chr(char_at_pos)
             else:
                 break
 
@@ -1396,7 +1403,7 @@ struct DFAEngine(Engine):
         self.start_state = 0
 
     fn compile_quantified_alternation_group(
-        mut self, ast: ASTNode[MutableAnyOrigin]
+        mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile quantified alternation groups like (a|b)*, (cat|dog)+ into a DFA.
 
@@ -1445,7 +1452,7 @@ struct DFAEngine(Engine):
             )
 
     fn _extract_all_alternation_branches_for_quantified(
-        self, node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+        self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from alternation for quantified groups.
         """
@@ -1488,9 +1495,10 @@ struct DFAEngine(Engine):
         for i in range(len(branches)):
             ref branch = branches[i]
             var current_state = 0
+            var branch_ptr = branch.unsafe_ptr()
 
             for j in range(len(branch)):
-                var char_code = ord(branch[j])
+                var char_code = Int(branch_ptr[j])
 
                 if j == len(branch) - 1:
                     # Last character - go to accepting state
@@ -1515,9 +1523,10 @@ struct DFAEngine(Engine):
         for i in range(len(branches)):
             ref branch = branches[i]
             var current_state = 0
+            var branch_ptr = branch.unsafe_ptr()
 
             for j in range(len(branch)):
-                var char_code = ord(branch[j])
+                var char_code = Int(branch_ptr[j])
 
                 if j == len(branch) - 1:
                     # Last character - loop back to start for more matches
@@ -1542,9 +1551,10 @@ struct DFAEngine(Engine):
         for i in range(len(branches)):
             ref branch = branches[i]
             var current_state = 0
+            var branch_ptr = branch.unsafe_ptr()
 
             for j in range(len(branch)):
-                var char_code = ord(branch[j])
+                var char_code = Int(branch_ptr[j])
 
                 if j == len(branch) - 1:
                     # Last character - go to loop state
@@ -1561,9 +1571,10 @@ struct DFAEngine(Engine):
         for i in range(len(branches)):
             ref branch = branches[i]
             var current_state = loop_index
+            var branch_ptr = branch.unsafe_ptr()
 
             for j in range(len(branch)):
-                var char_code = ord(branch[j])
+                var char_code = Int(branch_ptr[j])
 
                 if j == len(branch) - 1:
                     # Last character - back to loop state
@@ -1655,6 +1666,8 @@ struct DFAEngine(Engine):
         # For very large character classes, use a more efficient approach
         var char_class_len = len(char_class)
 
+        var cc_ptr = char_class.unsafe_ptr()
+
         if positive_logic:
             # Positive logic: [abc] - add transitions for characters in char_class
             # For common patterns, use optimized handling
@@ -1672,7 +1685,7 @@ struct DFAEngine(Engine):
             else:
                 # General case - iterate through each character
                 for i in range(char_class_len):
-                    var char_code = ord(char_class[i])
+                    var char_code = Int(cc_ptr[i])
                     state.add_transition(char_code, to_state)
         else:
             # Negative logic: [^abc] - add transitions for all characters NOT in char_class
@@ -1681,7 +1694,7 @@ struct DFAEngine(Engine):
 
             # Mark characters in char_class as 1 in bitmap
             for i in range(char_class_len):
-                var char_code = ord(char_class[i])
+                var char_code = Int(cc_ptr[i])
                 if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
                     char_bitmap[char_code] = 1
 
@@ -1691,16 +1704,13 @@ struct DFAEngine(Engine):
                     state.add_transition(char_code, to_state)
 
     @always_inline
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
-        """Returns a contiguous slice of the pattern bytes.
+    fn get_pattern(self) -> String:
+        """Returns the pattern string.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by the pattern.
+            The pattern string.
         """
-        return Span[Byte, __origin_of(self)](
-            ptr=self.literal_pattern.unsafe_ptr(),
-            length=UInt(self.literal_pattern.byte_length()),
-        )
+        return self.literal_pattern
 
     fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
@@ -1769,11 +1779,12 @@ struct DFAEngine(Engine):
         # Fast path for pure literal patterns using SIMD
         if self.is_pure_literal:
             var pattern = self.get_pattern()
+            var pattern_bytes = pattern.as_bytes()
             var pattern_len = len(pattern)
             if require_exact_position:
                 # For match_first, must match at exact position
                 if verify_match(
-                    pattern,
+                    pattern_bytes,
                     text,
                     start_pos,
                 ):
@@ -1782,7 +1793,7 @@ struct DFAEngine(Engine):
             else:
                 # For match_next, can search from position
                 var pos = simd_search(
-                    self.get_pattern(),
+                    pattern_bytes,
                     text,
                     start_pos,
                 )
@@ -1808,6 +1819,8 @@ struct DFAEngine(Engine):
         var current_state = self.start_state
         var pos = start_pos
         var last_accepting_pos = -1
+        var text_ptr = text.unsafe_ptr()
+        var text_len = len(text)
 
         # Check if start state is accepting (for patterns like a*)
         if (
@@ -1816,8 +1829,8 @@ struct DFAEngine(Engine):
         ):
             last_accepting_pos = pos
 
-        while pos < len(text):
-            var char_code = ord(text[pos])
+        while pos < text_len:
+            var char_code = Int(text_ptr[pos])
 
             if current_state >= len(self.states):
                 break
@@ -1842,7 +1855,7 @@ struct DFAEngine(Engine):
 
         # Check if we ended in an accepting state (important for exact matches)
         if (
-            pos == len(text)
+            pos == text_len
             and current_state < len(self.states)
             and self.states[current_state].is_accepting
         ):
@@ -1851,7 +1864,7 @@ struct DFAEngine(Engine):
         # Return longest match found
         if last_accepting_pos != -1:
             # Check end anchor constraint
-            if self.has_end_anchor and last_accepting_pos != len(text):
+            if self.has_end_anchor and last_accepting_pos != text_len:
                 return None  # End anchor requires match to end at string end
             return Match(0, start_pos, last_accepting_pos, text)
 
@@ -1959,9 +1972,10 @@ struct DFAEngine(Engine):
         # Use SIMD to count consecutive matching characters
         var pos = start_pos
         var match_count = 0
+        var text_ptr = text.unsafe_ptr()
 
         while pos < text_len:
-            var ch_code = ord(text[pos])
+            var ch_code = Int(text_ptr[pos])
             if simd_matcher.contains(ch_code):
                 match_count += 1
                 pos += 1
@@ -2051,6 +2065,7 @@ struct DFAEngine(Engine):
         """
         var pos = start
         var text_len = len(text)
+        var text_ptr = text.unsafe_ptr()
 
         # Process characters in SIMD chunks for maximum efficiency
         alias CHUNK_SIZE = 16  # Process 16 characters at once
@@ -2058,7 +2073,7 @@ struct DFAEngine(Engine):
         while pos + CHUNK_SIZE <= text_len:
             # Load a chunk of characters
             var match_pos = simd_matcher.find_first_match(
-                text[pos : pos + CHUNK_SIZE]
+                text[byte = pos : pos + CHUNK_SIZE]
             )
             if match_pos != -1:
                 return pos + match_pos
@@ -2067,7 +2082,7 @@ struct DFAEngine(Engine):
 
         # Handle remaining characters one by one
         while pos < text_len:
-            var char_code = ord(text[pos])
+            var char_code = Int(text_ptr[pos])
             if simd_matcher.contains(char_code):
                 return pos
             pos += 1
@@ -2100,8 +2115,9 @@ struct BoyerMoore:
             self.bad_char_table.append(-1)
 
         # Set the last occurrence of each character in pattern
+        var pattern_ptr = self.pattern.unsafe_ptr()
         for i in range(len(self.pattern)):
-            var char_code = ord(self.pattern[i])
+            var char_code = Int(pattern_ptr[i])
             self.bad_char_table[char_code] = i
 
     fn search(self, text: String, start: Int = 0) -> Int:
@@ -2117,12 +2133,14 @@ struct BoyerMoore:
         var m = len(self.pattern)
         var n = len(text)
         var s = start  # shift of the pattern
+        var text_ptr = text.unsafe_ptr()
+        var pattern_ptr = self.pattern.unsafe_ptr()
 
         while s <= n - m:
             var j = m - 1
 
             # Compare pattern from right to left
-            while j >= 0 and self.pattern[j] == text[s + j]:
+            while j >= 0 and Int(pattern_ptr[j]) == Int(text_ptr[s + j]):
                 j -= 1
 
             if j < 0:
@@ -2130,7 +2148,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = ord(text[s + j])
+                var bad_char = Int(text_ptr[s + j])
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 
@@ -2158,7 +2176,7 @@ struct BoyerMoore:
         return positions^
 
 
-fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
+fn compile_dfa_pattern(ast: ASTNode[MutAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -2259,7 +2277,7 @@ fn compile_dfa_pattern(ast: ASTNode[MutableAnyOrigin]) raises -> DFAEngine:
     return dfa^
 
 
-fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_character_class_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, [a-z]+, etc.).
 
     Args:
@@ -2291,10 +2309,8 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_character_class_info(
-    ast: ASTNode[ImmutableAnyOrigin],
-) -> Tuple[
-    Optional[StringSlice[ImmutableAnyOrigin]], Int, Int, Bool, Bool, Bool
-]:
+    ast: ASTNode[ImmutAnyOrigin],
+) -> Tuple[Optional[String], Int, Int, Bool, Bool, Bool]:
     """Extract character class information from AST.
 
     Args:
@@ -2305,7 +2321,7 @@ fn _extract_character_class_info(
     """
     from regex.ast import RE, DIGIT, WORD, RANGE, GROUP
 
-    var char_class: Optional[StringSlice[ImmutableAnyOrigin]] = None
+    var char_class: Optional[String] = None
     var min_matches = 1
     var max_matches = 1
     var has_start = False
@@ -2313,7 +2329,7 @@ fn _extract_character_class_info(
     var positive_logic = True
 
     # Find the character class node (DIGIT, WORD, or RANGE)
-    var class_node: ASTNode[ImmutableAnyOrigin]
+    var class_node: ASTNode[ImmutAnyOrigin]
     if ast.type == DIGIT or ast.type == WORD or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:
@@ -2339,23 +2355,21 @@ fn _extract_character_class_info(
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate digit character class string "0123456789"
-        char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=DIGITS.unsafe_ptr(), length=UInt(len(DIGITS))
-        )
+        char_class = DIGITS
     elif class_node.type == WORD:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Generate word character class string
-        char_class = StringSlice[ImmutableAnyOrigin](
-            ptr=WORD_CHARS.unsafe_ptr(), length=UInt(len(WORD_CHARS))
-        )
+        char_class = WORD_CHARS
     elif class_node.type == RANGE:
         min_matches = class_node.min
         max_matches = class_node.max
         positive_logic = class_node.positive_logic
         # Use the range value directly - expansion will be done when used
-        char_class = class_node.get_value()
+        var val = class_node.get_value()
+        if val:
+            char_class = String(val.value())
 
     return (
         char_class^,
@@ -2367,7 +2381,7 @@ fn _extract_character_class_info(
     )
 
 
-fn _is_pure_anchor_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_pure_anchor_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is just anchors (^, $, or ^$).
 
     Args:
@@ -2395,7 +2409,7 @@ fn _is_pure_anchor_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _is_sequential_character_class_pattern(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a sequence of character classes with quantifiers.
 
@@ -2429,7 +2443,7 @@ fn _is_sequential_character_class_pattern(
 
 
 fn _extract_sequential_pattern_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a sequential pattern.
 
@@ -2473,7 +2487,7 @@ fn _extract_sequential_pattern_info(
     return info^
 
 
-fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a sequence of multiple character classes.
 
     Examples: [a-z]+[0-9]+, digit+word+, [A-Z][a-z]*[0-9]{2,4}
@@ -2535,7 +2549,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_multi_class_sequence_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a multi-character class sequence.
 
@@ -2590,7 +2604,7 @@ fn _extract_multi_class_sequence_info(
     return info^
 
 
-fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_mixed_sequential_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a mixed sequential pattern with optional literals.
 
     Examples: [0-9]+\\.?[0-9]*, [a-z]+@[a-z]+\\.[a-z]+
@@ -2636,7 +2650,7 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_mixed_sequential_pattern_info(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a mixed sequential pattern.
 
@@ -2651,7 +2665,7 @@ fn _extract_mixed_sequential_pattern_info(
     return _extract_multi_class_sequence_info(ast)
 
 
-fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple alternation like a|b, cat|dog, (a|b).
 
     Args:
@@ -2671,7 +2685,7 @@ fn _is_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return _is_pure_alternation_pattern(ast)
 
 
-fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if alternation branches are simple (literal elements only).
 
     Args:
@@ -2708,7 +2722,7 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _group_contains_only_literals(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a group contains only literal elements.
 
     Args:
@@ -2731,7 +2745,7 @@ fn _group_contains_only_literals(group: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _find_and_check_or_node(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Recursively search for an OR node and check if its branches are simple.
 
     Args:
@@ -2755,8 +2769,8 @@ fn _find_and_check_or_node(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _find_or_node(
-    ast: ASTNode[MutableAnyOrigin],
-) -> Optional[ASTNode[MutableAnyOrigin]]:
+    ast: ASTNode[MutAnyOrigin],
+) -> Optional[ASTNode[MutAnyOrigin]]:
     """Recursively find the first OR node in the AST.
 
     Args:
@@ -2780,7 +2794,7 @@ fn _find_or_node(
     return None
 
 
-fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
+fn _extract_branch_text(branch: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from an alternation branch.
 
     Args:
@@ -2805,7 +2819,7 @@ fn _extract_branch_text(branch: ASTNode[MutableAnyOrigin]) -> String:
     return String("")
 
 
-fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_quantified_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantified group like (abc)+, (test)*, (a)?.
 
     Args:
@@ -2830,7 +2844,7 @@ fn _is_quantified_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return False
 
 
-fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _group_content_is_simple(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a quantified group contains simple literal content.
 
     Args:
@@ -2853,7 +2867,7 @@ fn _group_content_is_simple(group: ASTNode[MutableAnyOrigin]) -> Bool:
     return True
 
 
-fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
+fn _extract_group_text(group: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from a quantified group.
 
     Args:
@@ -2874,7 +2888,7 @@ fn _extract_group_text(group: ASTNode[MutableAnyOrigin]) -> String:
 
 
 fn _collect_all_alternation_branches(
-    or_node: ASTNode[MutableAnyOrigin],
+    or_node: ASTNode[MutAnyOrigin],
 ) -> List[String]:
     """Recursively collect all branch texts from a potentially nested OR structure.
 
@@ -2905,7 +2919,7 @@ fn _collect_all_alternation_branches(
     return branches^
 
 
-fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a pure alternation without other complex operators.
 
     Only allows simple structures like:
@@ -2940,7 +2954,7 @@ fn _is_pure_alternation_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return False
 
 
-fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_simple_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantifier like a*, test+, char?.
 
     Args:
@@ -2981,7 +2995,7 @@ fn _is_simple_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
     return has_quantifier
 
 
-fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a wildcard quantifier like .*, .+, .?.
 
     Args:
@@ -3014,7 +3028,7 @@ fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _is_common_prefix_alternation_pattern(
-    ast: ASTNode[MutableAnyOrigin],
+    ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a common prefix alternation like (hello|help|helicopter).
 
@@ -3058,7 +3072,7 @@ fn _is_common_prefix_alternation_pattern(
 
 
 fn _extract_literal_branches(
-    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal string branches from OR tree. Returns False if non-literal elements found.
     """
@@ -3101,24 +3115,26 @@ fn _compute_common_prefix(branches: List[String]) -> String:
             min_length = len(branches[i])
 
     # Find common prefix
+    var first_branch_ptr = first_branch.unsafe_ptr()
     for pos in range(min_length):
-        var char_at_pos = first_branch[pos]
+        var char_at_pos = Int(first_branch_ptr[pos])
         var all_match = True
 
         for i in range(1, len(branches)):
-            if branches[i][pos] != char_at_pos:
+            var branch_ptr_i = branches[i].unsafe_ptr()
+            if Int(branch_ptr_i[pos]) != char_at_pos:
                 all_match = False
                 break
 
         if all_match:
-            prefix += String(char_at_pos)
+            prefix += chr(char_at_pos)
         else:
             break
 
     return prefix
 
 
-fn _is_quantified_alternation_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
+fn _is_quantified_alternation_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
 
     Args:
@@ -3159,7 +3175,7 @@ fn _is_quantified_alternation_group(ast: ASTNode[MutableAnyOrigin]) -> Bool:
 
 
 fn _extract_literal_alternation_branches(
-    node: ASTNode[MutableAnyOrigin], mut branches: List[String]
+    node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal branches from alternation. Returns False if non-literal elements found.
     """

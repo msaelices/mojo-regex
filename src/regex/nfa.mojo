@@ -49,9 +49,9 @@ struct NFAEngine(Copyable, Engine):
     """The regex pattern string to match against."""
     var prev_re: String
     """Previously parsed regex pattern for caching."""
-    var prev_ast: Optional[ASTNode[MutableAnyOrigin]]
+    var prev_ast: Optional[ASTNode[MutAnyOrigin]]
     """Cached AST from previous regex compilation."""
-    var regex: Optional[ASTNode[MutableAnyOrigin]]
+    var regex: Optional[ASTNode[MutAnyOrigin]]
     """Compiled AST representation of the current regex pattern."""
     var literal_prefix: String
     """Extracted literal prefix for optimization."""
@@ -108,21 +108,15 @@ struct NFAEngine(Copyable, Engine):
             self.regex = None
 
     @always_inline
-    fn get_pattern[o: ImmutableOrigin](ref [o]self) -> Span[Byte, o]:
-        """Returns a contiguous slice of the pattern bytes.
+    fn get_pattern(self) -> String:
+        """Returns the pattern string.
 
         Returns:
-            A contiguous slice pointing to the bytes owned by the pattern.
+            The pattern string.
         """
         if self.has_literal_optimization:
-            return Span[Byte, __origin_of(self)](
-                ptr=self.literal_prefix.unsafe_ptr(),
-                length=UInt(self.literal_prefix.byte_length()),
-            )
-        return Span[Byte, __origin_of(self)](
-            ptr=self.pattern.unsafe_ptr(),
-            length=UInt(self.pattern.byte_length()),
-        )
+            return self.literal_prefix
+        return self.pattern
 
     fn match_all(
         self,
@@ -152,7 +146,7 @@ struct NFAEngine(Copyable, Engine):
         """
         # Parse the regex if it's different from the cached one
         var matches = MatchList()
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.prev_ast:
             ast = self.prev_ast.value()
         elif self.regex:
@@ -174,7 +168,7 @@ struct NFAEngine(Copyable, Engine):
             while current_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.get_pattern(),
+                    self.get_pattern().as_bytes(),
                     text,
                     current_pos,
                 )
@@ -282,7 +276,7 @@ struct NFAEngine(Copyable, Engine):
         """
         var matches = List[Match]()
         var str_i = start
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -323,7 +317,7 @@ struct NFAEngine(Copyable, Engine):
             contain all the group and subgroups matched.
         """
         var matches = List[Match]()
-        var ast: ASTNode[MutableAnyOrigin]
+        var ast: ASTNode[MutAnyOrigin]
         if self.regex:
             ast = self.regex.value()
         else:
@@ -339,7 +333,7 @@ struct NFAEngine(Copyable, Engine):
             while search_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.get_pattern(),
+                    self.get_pattern().as_bytes(),
                     text,
                     search_pos,
                 )
@@ -423,7 +417,7 @@ struct NFAEngine(Copyable, Engine):
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             # It's a pattern like "[a-z]", need to expand it
-            var inner = range_pattern[1:-1]
+            var inner = range_pattern[byte=1:-1]
 
             # Handle common patterns with specialized matchers
             # Return None for simple ranges to use RangeBasedMatcher instead
@@ -473,7 +467,7 @@ struct NFAEngine(Copyable, Engine):
             return True
 
         # Check if the literal appears within the match bounds
-        var match_text = text[start:end]
+        var match_text = text[byte=start:end]
         return self.literal_prefix in match_text
 
     @always_inline
@@ -587,8 +581,12 @@ struct NFAEngine(Copyable, Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        var ch = String(str[str_i])
-        if ast.get_value() and ast.get_value().value() == ch:
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
+        if (
+            ast.get_value()
+            and Int(ast.get_value().value().unsafe_ptr()[0]) == ch_code
+        ):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -608,7 +606,8 @@ struct NFAEngine(Copyable, Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        var ch_code = ord(str[str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         if ch_code != CHAR_NEWLINE:  # Exclude newline
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -631,7 +630,8 @@ struct NFAEngine(Copyable, Engine):
 
         # Use specialized SIMD whitespace matcher for better performance
         var whitespace_matcher = get_whitespace_matcher()
-        var ch_code = ord(str[str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         if whitespace_matcher.contains(ch_code):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -662,7 +662,8 @@ struct NFAEngine(Copyable, Engine):
 
         # Use specialized SIMD digit matcher for better performance
         var digit_matcher = get_digit_matcher()
-        var ch_code = ord(str[str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         if digit_matcher.contains(ch_code):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -701,7 +702,8 @@ struct NFAEngine(Copyable, Engine):
 
         # Use specialized SIMD word matcher for better performance
         var word_matcher = get_word_matcher()
-        var ch_code = ord(str[str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         if word_matcher.contains(ch_code):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -730,7 +732,8 @@ struct NFAEngine(Copyable, Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        var ch_code = ord(str[str_i])
+        var str_ptr = str.unsafe_ptr()
+        var ch_code = Int(str_ptr[str_i])
         var ch_found = False
 
         if ast.get_value():
@@ -758,7 +761,7 @@ struct NFAEngine(Copyable, Engine):
                 if range_pattern.startswith("[") and range_pattern.endswith(
                     "]"
                 ):
-                    var inner = range_pattern[1:-1]
+                    var inner = range_pattern[byte=1:-1]
                     var has_lower = "a-z" in inner
                     var has_upper = "A-Z" in inner
                     var has_digits = "0-9" in inner
@@ -772,17 +775,16 @@ struct NFAEngine(Copyable, Engine):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
-                            var ch = String(str[str_i])
-                            ch_found = ch in inner
+                            ch_found = str[byte=str_i] in inner
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
-                            ast, range_pattern, str[str_i], ch_code
+                            ast, range_pattern, str[byte=str_i], ch_code
                         )
                 else:
                     # Not a bracketed pattern, try SIMD matcher
                     ch_found = self._match_with_simd_or_fallback(
-                        ast, range_pattern, str[str_i], ch_code
+                        ast, range_pattern, str[byte=str_i], ch_code
                     )
 
         if ch_found == ast.positive_logic:
@@ -815,7 +817,7 @@ struct NFAEngine(Copyable, Engine):
     fn _match_with_simd_or_fallback(
         self,
         ast: ASTNode,
-        range_pattern: StringSlice[__origin_of(ast.regex_ptr[].pattern)],
+        range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
         ch: StringSlice,
         ch_code: Int,
     ) -> Bool:
@@ -1110,7 +1112,7 @@ struct NFAEngine(Copyable, Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match(String(str[pos]), pos, len(str)):
+            if ast.is_match(String(str[byte=pos]), pos, len(str)):
                 matched += 1
                 pos += 1
             else:
@@ -1193,7 +1195,9 @@ struct NFAEngine(Copyable, Engine):
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
 
-            if ast.is_match(String(str[current_pos]), current_pos, len(str)):
+            if ast.is_match(
+                String(str[byte=current_pos]), current_pos, len(str)
+            ):
                 matches_count += 1
                 current_pos += 1
             else:
@@ -1228,6 +1232,8 @@ struct NFAEngine(Copyable, Engine):
             Tuple of (success, final_position).
         """
         from regex.ast import DIGIT, SPACE, WORD, RANGE
+
+        var str_ptr = str.unsafe_ptr()
 
         # Use specialized matchers for better performance
         if ast.type == DIGIT:
@@ -1264,7 +1270,7 @@ struct NFAEngine(Copyable, Engine):
                         actual_max = len(str) - str_i
 
                     while pos < len(str) and match_count < actual_max:
-                        var ch_code = ord(str[pos])
+                        var ch_code = Int(str_ptr[pos])
                         if not alnum_matcher.contains(ch_code):  # Negated
                             match_count += 1
                             pos += 1
@@ -1284,7 +1290,7 @@ struct NFAEngine(Copyable, Engine):
                     actual_max = len(str) - str_i
 
                 while pos < len(str) and match_count < actual_max:
-                    var ch_code = ord(str[pos])
+                    var ch_code = Int(str_ptr[pos])
                     var is_match = ch_code >= ord("a") and ch_code <= ord("z")
                     if is_match == ast.positive_logic:
                         match_count += 1
@@ -1305,7 +1311,7 @@ struct NFAEngine(Copyable, Engine):
                     actual_max = len(str) - str_i
 
                 while pos < len(str) and match_count < actual_max:
-                    var ch_code = ord(str[pos])
+                    var ch_code = Int(str_ptr[pos])
                     var is_match = ch_code >= ord("A") and ch_code <= ord("Z")
                     if is_match == ast.positive_logic:
                         match_count += 1
@@ -1333,7 +1339,7 @@ struct NFAEngine(Copyable, Engine):
                         actual_max = len(str) - str_i
 
                     while pos < len(str) and match_count < actual_max:
-                        var ch_code = ord(str[pos])
+                        var ch_code = Int(str_ptr[pos])
                         if not digit_matcher.contains(ch_code):  # Negated
                             match_count += 1
                             pos += 1
@@ -1360,7 +1366,7 @@ struct NFAEngine(Copyable, Engine):
                         actual_max = len(str) - str_i
 
                     while pos < len(str) and match_count < actual_max:
-                        var ch_code = ord(str[pos])
+                        var ch_code = Int(str_ptr[pos])
                         if not alpha_matcher.contains(ch_code):  # Negated
                             match_count += 1
                             pos += 1
@@ -1377,7 +1383,7 @@ struct NFAEngine(Copyable, Engine):
                 if range_pattern.startswith("[") and range_pattern.endswith(
                     "]"
                 ):
-                    var inner = range_pattern[1:-1]
+                    var inner = range_pattern[byte=1:-1]
                     var has_lower = "a-z" in inner
                     var has_upper = "A-Z" in inner
                     var has_digits = "0-9" in inner
@@ -1389,7 +1395,7 @@ struct NFAEngine(Copyable, Engine):
                 if is_complex_pattern:
                     # Handle complex patterns like [a-zA-Z0-9._%+-] efficiently
                     var alnum_matcher = get_alnum_matcher()
-                    var inner = range_pattern[1:-1]
+                    var inner = range_pattern[byte=1:-1]
                     var pos = str_i
                     var match_count = 0
                     var actual_max = max_matches
@@ -1397,7 +1403,7 @@ struct NFAEngine(Copyable, Engine):
                         actual_max = len(str) - str_i
 
                     while pos < len(str) and match_count < actual_max:
-                        var ch_code = ord(str[pos])
+                        var ch_code = Int(str_ptr[pos])
                         var is_match: Bool
 
                         # Check alphanumeric first (common case)
@@ -1405,7 +1411,7 @@ struct NFAEngine(Copyable, Engine):
                             is_match = True
                         else:
                             # Check special characters
-                            var ch = String(str[pos])
+                            var ch = chr(ch_code)
                             is_match = ch in inner
 
                         if is_match == ast.positive_logic:
@@ -1436,7 +1442,7 @@ struct NFAEngine(Copyable, Engine):
                             actual_max = len(str) - str_i
 
                         while pos < len(str) and match_count < actual_max:
-                            var ch_code = ord(str[pos])
+                            var ch_code = Int(str_ptr[pos])
                             if not matcher.contains(ch_code):  # Negated
                                 match_count += 1
                                 pos += 1
@@ -1457,7 +1463,7 @@ struct NFAEngine(Copyable, Engine):
                     actual_max = len(str) - str_i
 
                 while pos < len(str) and match_count < actual_max:
-                    var ch_code = ord(str[pos])
+                    var ch_code = Int(str_ptr[pos])
                     var is_match = self._match_char_in_range(
                         range_pattern, ch_code
                     )
@@ -1477,12 +1483,13 @@ struct NFAEngine(Copyable, Engine):
     fn _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
-            var inner = range_pattern[1:-1]
+            var inner = range_pattern[byte=1:-1]
 
             # Handle simple ranges like [c-n]
-            if len(inner) == 3 and inner[1] == "-":
-                var start_char = ord(inner[0])
-                var end_char = ord(inner[2])
+            if len(inner) == 3 and inner[byte=1] == "-":
+                var inner_ptr = inner.unsafe_ptr()
+                var start_char = Int(inner_ptr[0])
+                var end_char = Int(inner_ptr[2])
                 return ch_code >= start_char and ch_code <= end_char
 
             # For more complex patterns, fall back to character inclusion

@@ -1,4 +1,4 @@
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from regex import match_first, findall, search
 from regex.matcher import compile_regex
 
@@ -19,23 +19,22 @@ fn make_test_string(length: Int) -> String:
     for _ in range(full_repeats):
         result += pattern
     for i in range(remainder):
-        result += pattern[i]
+        result += pattern[byte=i]
     return result
 
 
 fn make_phone_test_data(num_phones: Int) -> String:
     """Generate test data containing US phone numbers in various formats."""
     var result = String()
-    var phone_patterns = List[String](
-        "555-123-4567",
-        "(555) 123-4567",
-        "555.123.4567",
-        "5551234567",
-        "+1-555-123-4567",
-        "1-555-123-4568",
-        "(555)123-4569",
-        "555 123 4570",
-    )
+    var phone_patterns = List[String]()
+    phone_patterns.append("555-123-4567")
+    phone_patterns.append("(555) 123-4567")
+    phone_patterns.append("555.123.4567")
+    phone_patterns.append("5551234567")
+    phone_patterns.append("+1-555-123-4567")
+    phone_patterns.append("1-555-123-4568")
+    phone_patterns.append("(555)123-4569")
+    phone_patterns.append("555 123 4570")
     var filler_text = " Contact us at "
     var extra_text = " or email support@company.com for assistance. "
 
@@ -52,18 +51,17 @@ fn make_phone_test_data(num_phones: Int) -> String:
 fn make_complex_pattern_test_data(num_entries: Int) -> String:
     """Generate test data for US national phone number validation."""
     var result = String()
-    var complex_patterns = List[String](
-        "305200123456",  # Matches first alternation
-        "505601234567",  # Matches first alternation
-        "274212345678",  # Matches second alternation
-        "305912345678",  # Matches second alternation
-        "212345672890",  # Matches third alternation
-        "312345672890",  # Matches third alternation
-        "412345672890",  # Matches third alternation
-        "512345672890",  # Matches third alternation
-        "1234567890",  # Should NOT match
-        "30520",  # Should NOT match (too short)
-    )
+    var complex_patterns = List[String]()
+    complex_patterns.append("305200123456")  # Matches first alternation
+    complex_patterns.append("505601234567")  # Matches first alternation
+    complex_patterns.append("274212345678")  # Matches second alternation
+    complex_patterns.append("305912345678")  # Matches second alternation
+    complex_patterns.append("212345672890")  # Matches third alternation
+    complex_patterns.append("312345672890")  # Matches third alternation
+    complex_patterns.append("412345672890")  # Matches third alternation
+    complex_patterns.append("512345672890")  # Matches third alternation
+    complex_patterns.append("1234567890")  # Should NOT match
+    complex_patterns.append("30520")  # Should NOT match (too short)
     var filler_text = " ID: "
     var extra_text = " Status: ACTIVE "
 
@@ -131,8 +129,8 @@ fn benchmark_match_first(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[:20]
-        + " " * (21 - len(String(time_ms)[:20]))
+        + String(time_ms)[byte=:20]
+        + " " * (21 - len(String(time_ms)[byte=:20]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
@@ -191,8 +189,8 @@ fn benchmark_search(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[:20]
-        + " " * (21 - len(String(time_ms)[:20]))
+        + String(time_ms)[byte=:20]
+        + " " * (21 - len(String(time_ms)[byte=:20]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
@@ -245,8 +243,8 @@ fn benchmark_findall(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[:20]
-        + " " * (21 - len(String(time_ms)[:20]))
+        + String(time_ms)[byte=:20]
+        + " " * (21 - len(String(time_ms)[byte=:20]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
