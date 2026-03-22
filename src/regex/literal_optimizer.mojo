@@ -39,7 +39,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     var is_required: Bool
     """True if this literal must appear in every possible match."""
 
-    fn __init__(
+    def __init__(
         out self,
         ref[Self.node_origin] node: ASTNode[ImmutAnyOrigin],
         start_offset: Int = 0,
@@ -55,7 +55,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
         self.is_suffix = is_suffix
         self.is_required = is_required
 
-    fn __init__(
+    def __init__(
         out self,
         literal_string_idx: Int,
         start_offset: Int = 0,
@@ -84,7 +84,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     #     var call_location = __call_location()
     #     print("Copying LiteralInfo", call_location)
 
-    fn get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
+    def get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             # If we have an AST node, use its value
@@ -96,7 +96,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
             # No literal available
             return ""
 
-    fn get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
+    def get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
         """Get the length of the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
             return len(self.node_ptr[].get_value().value())
@@ -117,21 +117,21 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
     var best_literal_idx: Optional[Int]
     """The best literal to use for prefiltering."""
 
-    fn __init__(out self, *, capacity: Int = 4):
+    def __init__(out self, *, capacity: Int = 4):
         """Initialize an empty literal set."""
         self.literals = List[LiteralInfo[Self.node_origin]](capacity=capacity)
         self.literal_strings = List[String](capacity=capacity)
         self.best_literal_idx = None
 
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Get the number of literals in the set."""
         return len(self.literals)
 
-    fn __getitem__(self, index: Int) -> LiteralInfo[Self.node_origin]:
+    def __getitem__(self, index: Int) -> LiteralInfo[Self.node_origin]:
         """Get the literal at the specified index."""
         return self.literals[index].copy()
 
-    fn add(
+    def add(
         mut self,
         var literal: String,
         start_offset: Int = 0,
@@ -153,7 +153,7 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
         self.literals.append(info)
         return info
 
-    fn select_best(mut self):
+    def select_best(mut self):
         """Select the best literal for prefiltering.
 
         Selection criteria:
@@ -196,7 +196,7 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
         self.best_literal_idx = best_idx
 
     @always_inline
-    fn get_best_literal(self) -> Optional[LiteralInfo[Self.node_origin]]:
+    def get_best_literal(self) -> Optional[LiteralInfo[Self.node_origin]]:
         """Get the best literal for prefiltering, if available."""
         if self.best_literal_idx:
             return self.literals[self.best_literal_idx.value()]
@@ -204,7 +204,7 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
             return None
 
 
-fn extract_literals[
+def extract_literals[
     node_origin: ImmutOrigin
 ](ref[node_origin] ast: ASTNode[ImmutAnyOrigin]) -> LiteralSet[node_origin]:
     """Extract all literals from a regex AST.
@@ -228,7 +228,7 @@ fn extract_literals[
     return result^
 
 
-fn _extract_from_node[
+def _extract_from_node[
     node_origin: ImmutOrigin
 ](
     node: ASTNode[ImmutAnyOrigin],
@@ -320,7 +320,7 @@ fn _extract_from_node[
     # Character classes, wildcards, etc. don't contribute literals
 
 
-fn _extract_sequence[
+def _extract_sequence[
     node_origin: ImmutOrigin
 ](
     group: ASTNode,
@@ -384,7 +384,7 @@ fn _extract_sequence[
         )
 
 
-fn _find_common_prefix_simple(or_node: ASTNode) -> String:
+def _find_common_prefix_simple(or_node: ASTNode) -> String:
     """Find the longest common prefix among all branches of OR node tree."""
     # Collect all leaf branches from the OR tree
     var prefixes = List[String]()
@@ -403,7 +403,7 @@ fn _find_common_prefix_simple(or_node: ASTNode) -> String:
     return common
 
 
-fn _collect_or_prefixes(node: ASTNode, mut prefixes: List[String]):
+def _collect_or_prefixes(node: ASTNode, mut prefixes: List[String]):
     """Recursively collect prefixes from OR tree structure."""
     if node.type != OR:
         # This is a leaf - get its prefix
@@ -417,7 +417,7 @@ fn _collect_or_prefixes(node: ASTNode, mut prefixes: List[String]):
         _collect_or_prefixes(node.get_child(i), prefixes)
 
 
-fn _get_prefix_literal(node: ASTNode) -> String:
+def _get_prefix_literal(node: ASTNode) -> String:
     """Get the literal prefix of a node, if any."""
     if (
         node.type == ELEMENT
@@ -437,7 +437,7 @@ fn _get_prefix_literal(node: ASTNode) -> String:
     return ""
 
 
-fn _longest_common_prefix(s1: String, s2: String) -> String:
+def _longest_common_prefix(s1: String, s2: String) -> String:
     """Find the longest common prefix of two strings."""
     var min_len = min(len(s1), len(s2))
     var i = 0
@@ -448,7 +448,7 @@ fn _longest_common_prefix(s1: String, s2: String) -> String:
     return String(s1[byte=:i])
 
 
-fn has_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def has_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern starts with a literal that can be used for optimization.
 
     Args:
@@ -464,7 +464,7 @@ fn has_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return _has_literal_prefix_node(first_child)
 
 
-fn _has_literal_prefix_node(node: ASTNode) -> Bool:
+def _has_literal_prefix_node(node: ASTNode) -> Bool:
     """Check if a node represents or starts with a literal prefix."""
     if node.type == START:
         # Skip start anchor and check next
@@ -485,7 +485,7 @@ fn _has_literal_prefix_node(node: ASTNode) -> Bool:
         return False
 
 
-fn extract_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> String:
+def extract_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal prefix from a pattern, if any.
 
     Args:

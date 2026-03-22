@@ -40,7 +40,7 @@ struct OptimizedLiteralInfo(Copyable, Movable):
     var is_exact_match: Bool
     """True if pattern matches only exact literals."""
 
-    fn __init__(
+    def __init__(
         out self,
         best_literal: Optional[String],
         has_anchors: Bool,
@@ -51,24 +51,24 @@ struct OptimizedLiteralInfo(Copyable, Movable):
         self.has_anchors = has_anchors
         self.is_exact_match = is_exact_match
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.best_literal = copy.best_literal
         self.has_anchors = copy.has_anchors
         self.is_exact_match = copy.is_exact_match
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.best_literal = take.best_literal^
         self.has_anchors = take.has_anchors
         self.is_exact_match = take.is_exact_match
 
-    fn get_best_required_literal(self) -> Optional[String]:
+    def get_best_required_literal(self) -> Optional[String]:
         """Get the best required literal for matching."""
         return self.best_literal
 
 
-fn create_optimized_prefilter(
+def create_optimized_prefilter(
     literal_info: OptimizedLiteralInfo,
 ) -> Optional[MemchrPrefilter]:
     """Create optimized prefilter using the better literal selection."""
@@ -80,7 +80,7 @@ fn create_optimized_prefilter(
     return None
 
 
-fn check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if AST contains start or end anchors."""
     from regex.ast import START, END, RE, GROUP
 
@@ -96,7 +96,7 @@ fn check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
 trait RegexMatcher:
     """Interface for different regex matching engines."""
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find the first match in text starting from the given position.
 
         Args:
@@ -108,7 +108,7 @@ trait RegexMatcher:
         """
         ...
 
-    fn match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: String) raises -> MatchList:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -126,11 +126,11 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
     var engine_ptr: UnsafePointer[DFAEngine, MutAnyOrigin]
     """The underlying DFA engine for pattern matching."""
 
-    fn __init__(out self):
+    def __init__(out self):
         """Default constructor for empty DFA matcher."""
         self.engine_ptr = UnsafePointer[DFAEngine, MutAnyOrigin]()
 
-    fn __init__(
+    def __init__(
         out self, var ast: ASTNode[MutAnyOrigin], pattern: String
     ) raises:
         """Initialize DFA matcher by compiling the AST.
@@ -143,23 +143,23 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine_ptr = alloc[DFAEngine](1)
         self.engine_ptr.init_pointee_move(engine^)
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.engine_ptr = copy.engine_ptr
 
-    fn __bool__(self) -> Bool:
+    def __bool__(self) -> Bool:
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: String) raises -> MatchList:
         """Find all matches using DFA execution."""
         return self.engine_ptr[].match_all(text)
 
@@ -172,7 +172,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
 
-    fn __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
+    def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
         """Initialize NFA matcher with the existing engine.
 
         Args:
@@ -182,31 +182,31 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = NFAEngine(pattern)
         self.ast = ast
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.engine = take.engine^
         self.ast = take.ast^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: String) raises -> MatchList:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
 
 
 @always_inline
-fn _is_wildcard_match_any(pattern: String) -> Bool:
+def _is_wildcard_match_any(pattern: String) -> Bool:
     """Check if pattern is exactly .* which matches any string.
 
     Args:
@@ -218,7 +218,7 @@ fn _is_wildcard_match_any(pattern: String) -> Bool:
     return pattern == ".*"
 
 
-fn _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
+def _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     """Check if pattern is too simple to benefit from prefilter analysis.
 
     This function identifies patterns that are unlikely to yield useful prefilters,
@@ -327,7 +327,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     var use_pure_dfa: Bool
     """True if pattern should use pure DFA without SIMD integration."""
 
-    fn __init__(out self, pattern: String) raises:
+    def __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
 
         Args:
@@ -428,7 +428,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             self.dfa_matcher = DFAMatcher()
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.dfa_matcher = copy.dfa_matcher.copy()
         self.nfa_matcher = copy.nfa_matcher.copy()
@@ -439,7 +439,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = copy.is_wildcard_match_any
         self.use_pure_dfa = copy.use_pure_dfa
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.dfa_matcher = take.dfa_matcher^
         self.nfa_matcher = take.nfa_matcher^
@@ -450,7 +450,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
 
@@ -472,7 +472,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
@@ -524,7 +524,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: String) raises -> MatchList:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
@@ -579,7 +579,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_all(text)
 
-    fn get_engine_type(self) -> String:
+    def get_engine_type(self) -> String:
         """Get the type of engine being used (for debugging/profiling).
 
         Returns:
@@ -602,7 +602,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return base_engine
 
-    fn get_complexity(self) -> PatternComplexity:
+    def get_complexity(self) -> PatternComplexity:
         """Get the analyzed complexity of the pattern.
 
         Returns:
@@ -629,7 +629,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     var compiled_at: Int
     """Timestamp when the regex was compiled, used for cache management."""
 
-    fn __init__(out self, pattern: String) raises:
+    def __init__(out self, pattern: String) raises:
         """Compile a regex pattern with automatic optimization.
 
         Args:
@@ -639,13 +639,13 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.matcher = HybridMatcher(pattern)
         self.compiled_at = Int(monotonic())
 
-    fn __copyinit__(out self, copy: Self):
+    def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.matcher = copy.matcher.copy()
         self.pattern = copy.pattern
         self.compiled_at = copy.compiled_at
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.matcher = take.matcher^
         self.pattern = take.pattern^
@@ -662,7 +662,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     #         call_location,
     #     )
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
@@ -674,7 +674,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_first(text, start)
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
 
         Args:
@@ -686,7 +686,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    fn match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: String) raises -> MatchList:
         """Find all matches in text.
 
         Args:
@@ -697,7 +697,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_all(text)
 
-    fn test(mut self, text: String) -> Bool:
+    def test(mut self, text: String) -> Bool:
         """Test if pattern matches anywhere in text.
 
         Args:
@@ -709,7 +709,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         var result = self.matcher.match_next(text, 0)
         return result.__bool__()
 
-    fn get_stats(self) -> String:
+    def get_stats(self) -> String:
         """Get performance statistics and engine information.
 
         Returns:
@@ -745,12 +745,12 @@ alias RegexCache = Dict[String, CompiledRegex]
 alias _CACHE_GLOBAL = _Global["RegexCache", _init_regex_cache]
 
 
-fn _init_regex_cache() -> RegexCache:
+def _init_regex_cache() -> RegexCache:
     """Initialize the global regex cache."""
     return RegexCache()
 
 
-fn _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
+def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
     """Returns an pointer to the global regex cache."""
     try:
         return _CACHE_GLOBAL.get_or_create_ptr()
@@ -759,7 +759,7 @@ fn _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
     return UnsafePointer[RegexCache, MutAnyOrigin]()  # Unreachable
 
 
-fn compile_regex(pattern: String) raises -> CompiledRegex:
+def compile_regex(pattern: String) raises -> CompiledRegex:
     """Compile a regex pattern with caching for repeated use.
 
     Args:
@@ -787,14 +787,14 @@ fn compile_regex(pattern: String) raises -> CompiledRegex:
     return compiled
 
 
-fn clear_regex_cache():
+def clear_regex_cache():
     """Clear the compiled regex cache."""
     regex_cache_ptr = _get_regex_cache()
     regex_cache_ptr[].clear()
 
 
 # High-level convenience functions that match Python's re module interface
-fn search(pattern: String, text: String) raises -> Optional[Match]:
+def search(pattern: String, text: String) raises -> Optional[Match]:
     """Search for pattern in text (equivalent to re.search in Python).
 
     Args:
@@ -810,7 +810,7 @@ fn search(pattern: String, text: String) raises -> Optional[Match]:
     return compiled.match_next(text)
 
 
-fn findall(pattern: String, text: String) raises -> MatchList:
+def findall(pattern: String, text: String) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -824,7 +824,7 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return compiled.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+def match_first(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

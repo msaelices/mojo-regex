@@ -8,7 +8,7 @@ from src.regex.simd_ops import (
 from src.regex.simd_matchers import create_hex_digit_matcher, RangeBasedMatcher
 
 
-fn test_simd_operations():
+def test_simd_operations():
     """Test basic SIMD operations."""
     print("Testing SIMD Operations")
     print("=" * 50)
@@ -95,7 +95,7 @@ fn test_simd_operations():
             print("    ✓", test_consonants[i], "is not a vowel")
 
 
-fn test_performance():
+def test_performance():
     """Demonstrate performance characteristics."""
     print("\n\nPerformance Characteristics")
     print("=" * 50)
@@ -118,7 +118,7 @@ fn test_performance():
     print("- Significant speedup for bulk character matching")
 
 
-fn main():
+def main():
     test_simd_operations()
     test_performance()
     print("\n✅ SIMD optimizations successfully integrated!")

@@ -38,7 +38,7 @@ alias ChildrenIndexes = List[UInt8]
 
 
 @always_inline
-fn _make_children_indexes(*values: UInt8) -> ChildrenIndexes:
+def _make_children_indexes(*values: UInt8) -> ChildrenIndexes:
     """Helper to create a ChildrenIndexes list from variadic UInt8 values."""
     var result = ChildrenIndexes(capacity=len(values))
     for i in range(len(values)):
@@ -56,7 +56,7 @@ struct Regex[origin: Origin](
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 
-    fn __init__(out self, ref[Self.origin] pattern: String):
+    def __init__(out self, ref[Self.origin] pattern: String):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children_len = 0
@@ -64,21 +64,21 @@ struct Regex[origin: Origin](
             len(pattern) * 2
         )  # Allocate enough space for children
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """Return a string representation of the Regex."""
         return String("Regex(pattern=", self.pattern, ")")
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Return a string representation of the Regex."""
         return String("Regex(pattern=", self.pattern, ")")
 
     @always_inline
-    fn __eq__[o: Origin](self, other: Regex[origin=o]) -> Bool:
+    def __eq__[o: Origin](self, other: Regex[origin=o]) -> Bool:
         """Check if two Regex instances are equal."""
         return self.pattern == other.pattern
 
     @always_inline
-    fn __ne__[o: Origin](self, other: Regex[origin=o]) -> Bool:
+    def __ne__[o: Origin](self, other: Regex[origin=o]) -> Bool:
         """Check if two Regex instances are not equal."""
         return self.pattern != other.pattern
 
@@ -98,7 +98,7 @@ struct Regex[origin: Origin](
     #     print("Deleting Regex:", self, "in ", call_location)
 
     @no_inline
-    fn write_to[W: Writer, //](self, mut writer: W):
+    def write_to[W: Writer, //](self, mut writer: W):
         """Writes a string representation of the Regex to the writer.
 
         Parameters:
@@ -110,7 +110,7 @@ struct Regex[origin: Origin](
         writer.write("Regex(pattern=", self.pattern, ")")
 
     @always_inline
-    fn get_immutable(self) -> Self.Immutable:
+    def get_immutable(self) -> Self.Immutable:
         """Return an immutable version of this `Span`.
 
         Returns:
@@ -119,17 +119,17 @@ struct Regex[origin: Origin](
         return rebind[Self.Immutable](self).copy()
 
     @always_inline
-    fn get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
+    def get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
         """Get the child ASTNode at index `i`."""
         return self.children_ptr[i]
 
     @always_inline
-    fn get_children_len(self) -> Int:
+    def get_children_len(self) -> Int:
         """Get the number of children in the Regex."""
         return self.children_len
 
     @always_inline
-    fn append_child(mut self, var child: ASTNode[ImmutAnyOrigin]):
+    def append_child(mut self, var child: ASTNode[ImmutAnyOrigin]):
         """Append a child ASTNode to the Regex."""
         # print(
         #     "Appending child to Regex at ",
@@ -177,7 +177,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     """For character ranges: True for [abc], False for [^abc]."""
 
     @always_inline
-    fn __init__(
+    def __init__(
         out self,
         type: Int,
         regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
@@ -202,7 +202,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         )  # Initialize with all bits set to 0
         self.children_len = 0
 
-    fn __init__(
+    def __init__(
         out self,
         regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
         type: Int,
@@ -227,7 +227,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
 
-    fn __init__(
+    def __init__(
         out self,
         regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
         type: Int,
@@ -260,7 +260,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     #     print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
-    fn __copyinit__(out self, copy: ASTNode[Self.regex_origin]):
+    def __copyinit__(out self, copy: ASTNode[Self.regex_origin]):
         """Copy constructor for ASTNode."""
         self.type = copy.type
         self.regex_ptr = copy.regex_ptr
@@ -276,15 +276,15 @@ struct ASTNode[regex_origin: ImmutOrigin](
         # print("Copying ASTNode:", self, "in ", call_location)
 
     @always_inline
-    fn __bool__(self) -> Bool:
+    def __bool__(self) -> Bool:
         """Return True if the node is not None."""
         return True
 
-    fn __as_bool__(self) -> Bool:
+    def __as_bool__(self) -> Bool:
         """Return a boolean representation of the node."""
         return self.__bool__()
 
-    fn __eq__(self, other: ASTNode[Self.regex_origin]) -> Bool:
+    def __eq__(self, other: ASTNode[Self.regex_origin]) -> Bool:
         """Check if two AST nodes are equal."""
         return (
             self.type == other.type
@@ -296,11 +296,11 @@ struct ASTNode[regex_origin: ImmutOrigin](
             and self.children_indexes == other.children_indexes
         )
 
-    fn __ne__(self, other: ASTNode[Self.regex_origin]) -> Bool:
+    def __ne__(self, other: ASTNode[Self.regex_origin]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         """Return a string representation of the PhoneNumberDesc."""
         return String(
             "ASTNode(type=",
@@ -311,13 +311,13 @@ struct ASTNode[regex_origin: ImmutOrigin](
             sep="",
         )
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         """Returns a user-friendly string representation of the PhoneNumberDesc.
         """
         return String.write(self)
 
     @no_inline
-    fn write_to[W: Writer, //](self, mut writer: W):
+    def write_to[W: Writer, //](self, mut writer: W):
         """Writes a string representation of the PhoneNumberDesc to the writer.
 
         Parameters:
@@ -338,7 +338,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             writer.write("ASTNode(type=", self.type, ", value=None)")
 
     @always_inline
-    fn is_leaf(self) -> Bool:
+    def is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
         if LEAF_ELEMS.eq(self.type).reduce_or():
             return True
@@ -346,7 +346,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return False
 
     @always_inline
-    fn is_simd_optimizable(self, min_matches: Int, max_matches: Int) -> Bool:
+    def is_simd_optimizable(self, min_matches: Int, max_matches: Int) -> Bool:
         """Check if the AST node would benefit from SIMD quantifier optimization.
 
         Only use SIMD for patterns that will truly benefit, avoiding overhead
@@ -374,7 +374,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         else:
             return False  # Simple quantifiers use regular matching
 
-    fn is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
+    def is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
         if self.type == ELEMENT:
             return self.get_value() and (self.get_value().value() == value)
@@ -416,7 +416,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         else:
             return False
 
-    fn _is_char_in_range(
+    def _is_char_in_range(
         self,
         ch: StringSlice,
         range_pattern: StringSlice[origin_of(self.regex_ptr[].pattern)],
@@ -433,7 +433,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             # It's already expanded, just check if char is in the string
             return range_pattern.find(ch) != -1
 
-    fn _char_matches_range_syntax(
+    def _char_matches_range_syntax(
         self,
         ch: StringSlice,
         range_syntax: StringSlice[origin_of(self.regex_ptr[].pattern)],
@@ -461,25 +461,25 @@ struct ASTNode[regex_origin: ImmutOrigin](
                 i += 1
         return False
 
-    fn is_capturing(self) -> Bool:
+    def is_capturing(self) -> Bool:
         """Check if the node is capturing."""
         return self.capturing_group
 
     @always_inline
-    fn get_children_len(self) -> Int:
+    def get_children_len(self) -> Int:
         return self.children_len
 
     @always_inline
-    fn has_children(self) -> Bool:
+    def has_children(self) -> Bool:
         return self.get_children_len() > 0
 
     @always_inline
-    fn get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
+    def get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
         """Get the children of the AST node."""
         return self.regex_ptr[].get_child(Int(self.children_indexes[i] - 1))
 
     @always_inline
-    fn get_value(
+    def get_value(
         self,
     ) -> Optional[StringSlice[origin_of(self.regex_ptr[].pattern)]]:
         if self.start_idx == self.end_idx:
@@ -493,7 +493,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
 
 @always_inline
-fn Element[
+def Element[
     regex_origin: MutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -513,7 +513,7 @@ fn Element[
 
 
 @always_inline
-fn WildcardElement[
+def WildcardElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -533,7 +533,7 @@ fn WildcardElement[
 
 
 @always_inline
-fn SpaceElement[
+def SpaceElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -553,7 +553,7 @@ fn SpaceElement[
 
 
 @always_inline
-fn DigitElement[
+def DigitElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -573,7 +573,7 @@ fn DigitElement[
 
 
 @always_inline
-fn WordElement[
+def WordElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -593,7 +593,7 @@ fn WordElement[
 
 
 @always_inline
-fn RangeElement[
+def RangeElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -615,7 +615,7 @@ fn RangeElement[
 
 
 @always_inline
-fn StartElement[
+def StartElement[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -635,7 +635,7 @@ fn StartElement[
 
 
 @always_inline
-fn EndElement[
+def EndElement[
     regex_origin: ImmutOrigin
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -655,7 +655,7 @@ fn EndElement[
 
 
 @always_inline
-fn OrNode[
+def OrNode[
     regex_origin: ImmutOrigin
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -680,7 +680,7 @@ fn OrNode[
 
 
 @always_inline
-fn NotNode[
+def NotNode[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -700,7 +700,7 @@ fn NotNode[
 
 
 @always_inline
-fn GroupNode[
+def GroupNode[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],

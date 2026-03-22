@@ -1,4 +1,4 @@
-fn _all_except_newline() -> String:
+def _all_except_newline() -> String:
     """Return a string containing all characters except newline."""
     return String("").join([chr(i) for i in range(32, 127) if i != ord("\n")])
 

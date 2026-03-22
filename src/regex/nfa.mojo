@@ -58,7 +58,7 @@ struct NFAEngine(Copyable, Engine):
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
 
-    fn __init__(out self, pattern: String):
+    def __init__(out self, pattern: String):
         """Initialize the regex engine."""
         self.prev_re = ""
         self.prev_ast = None
@@ -108,7 +108,7 @@ struct NFAEngine(Copyable, Engine):
             self.regex = None
 
     @always_inline
-    fn get_pattern(self) -> String:
+    def get_pattern(self) -> String:
         """Returns the pattern string.
 
         Returns:
@@ -118,7 +118,7 @@ struct NFAEngine(Copyable, Engine):
             return self.literal_prefix
         return self.pattern
 
-    fn match_all(
+    def match_all(
         self,
         text: String,
     ) -> MatchList:
@@ -260,7 +260,7 @@ struct NFAEngine(Copyable, Engine):
 
         return matches^
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
 
@@ -302,7 +302,7 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.
 
@@ -395,12 +395,12 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
-    fn _is_prefix_literal(self) -> Bool:
+    def _is_prefix_literal(self) -> Bool:
         """Check if the extracted literal is a prefix literal."""
         # Simple heuristic: if pattern starts with the literal, it's a prefix
         return self.pattern.startswith(self.literal_prefix)
 
-    fn _create_range_matcher(
+    def _create_range_matcher(
         self, range_pattern: StringSlice
     ) -> Optional[CharacterClassSIMD]:
         """Create SIMD matcher for a range pattern.
@@ -459,7 +459,7 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
-    fn _match_contains_literal(
+    def _match_contains_literal(
         self, text: String, start: Int, end: Int
     ) -> Bool:
         """Verify that a match contains the required literal."""
@@ -471,7 +471,7 @@ struct NFAEngine(Copyable, Engine):
         return self.literal_prefix in match_text
 
     @always_inline
-    fn _match_node(
+    def _match_node(
         self,
         ast: ASTNode,
         str: String,
@@ -569,7 +569,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_element(
+    def _match_element(
         self,
         ast: ASTNode,
         str: String,
@@ -594,7 +594,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_wildcard(
+    def _match_wildcard(
         self,
         ast: ASTNode,
         str: String,
@@ -616,7 +616,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_space(
+    def _match_space(
         self,
         ast: ASTNode,
         str: String,
@@ -640,7 +640,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_digit(
+    def _match_digit(
         self,
         ast: ASTNode,
         str: String,
@@ -680,7 +680,7 @@ struct NFAEngine(Copyable, Engine):
                 return (False, str_i)
 
     @always_inline
-    fn _match_word(
+    def _match_word(
         self,
         ast: ASTNode,
         str: String,
@@ -720,7 +720,7 @@ struct NFAEngine(Copyable, Engine):
                 return (False, str_i)
 
     @always_inline
-    fn _match_range(
+    def _match_range(
         self,
         ast: ASTNode,
         str: String,
@@ -795,7 +795,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_start(
+    def _match_start(
         self, ast: ASTNode, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match start anchor (^)."""
@@ -805,7 +805,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    fn _match_end(
+    def _match_end(
         self, ast: ASTNode, str: String, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match end anchor ($)."""
@@ -814,7 +814,7 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
-    fn _match_with_simd_or_fallback(
+    def _match_with_simd_or_fallback(
         self,
         ast: ASTNode,
         range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
@@ -829,7 +829,7 @@ struct NFAEngine(Copyable, Engine):
             # Fallback to regular range matching
             return ast._is_char_in_range(ch, range_pattern)
 
-    fn _match_or(
+    def _match_or(
         self,
         ast: ASTNode,
         str: String,
@@ -865,7 +865,7 @@ struct NFAEngine(Copyable, Engine):
         )
         return right_result
 
-    fn _match_group(
+    def _match_group(
         self,
         ast: ASTNode,
         str: String,
@@ -911,7 +911,7 @@ struct NFAEngine(Copyable, Engine):
 
         return result
 
-    fn _match_group_with_quantifier(
+    def _match_group_with_quantifier(
         self,
         ast: ASTNode,
         str: String,
@@ -962,7 +962,7 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
-    fn _match_sequence(
+    def _match_sequence(
         self,
         ast_parent: ASTNode,
         child_index: Int,
@@ -1028,12 +1028,12 @@ struct NFAEngine(Copyable, Engine):
             )
 
     @always_inline
-    fn _has_quantifier(self, ast: ASTNode) capturing -> Bool:
+    def _has_quantifier(self, ast: ASTNode) capturing -> Bool:
         """Check if node has quantifier (min != 1 or max != 1)."""
         return ast.min != 1 or ast.max != 1
 
     @always_inline
-    fn _match_with_backtracking(
+    def _match_with_backtracking(
         self,
         quantified_node: ASTNode,
         ast_parent: ASTNode,
@@ -1089,7 +1089,7 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    fn _try_match_count(
+    def _try_match_count(
         self,
         ast: ASTNode,
         str: String,
@@ -1123,7 +1123,7 @@ struct NFAEngine(Copyable, Engine):
         else:
             return -1
 
-    fn _match_re(
+    def _match_re(
         self,
         ast: ASTNode,
         str: String,
@@ -1145,7 +1145,7 @@ struct NFAEngine(Copyable, Engine):
             required_start_pos,
         )
 
-    fn _apply_quantifier(
+    def _apply_quantifier(
         self,
         ast: ASTNode,
         str: String,
@@ -1211,7 +1211,7 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
-    fn _apply_quantifier_simd(
+    def _apply_quantifier_simd(
         self,
         ast: ASTNode,
         str: String,
@@ -1480,7 +1480,7 @@ struct NFAEngine(Copyable, Engine):
 
         return (False, str_i)
 
-    fn _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
+    def _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             var inner = range_pattern[byte=1:-1]
@@ -1501,7 +1501,7 @@ struct NFAEngine(Copyable, Engine):
             return ch in range_pattern
 
 
-fn findall(pattern: String, text: String) raises -> MatchList:
+def findall(pattern: String, text: String) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1515,7 +1515,7 @@ fn findall(pattern: String, text: String) raises -> MatchList:
     return engine.match_all(text)
 
 
-fn match_first(pattern: String, text: String) raises -> Optional[Match]:
+def match_first(pattern: String, text: String) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

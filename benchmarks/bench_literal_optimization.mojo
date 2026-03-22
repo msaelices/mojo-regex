@@ -21,12 +21,12 @@ alias EMAIL_LONG = EMAIL_TEXT * 20
 
 
 @parameter
-fn bench_literal_prefix_short(mut b: Bencher) raises:
+def bench_literal_prefix_short(mut b: Bencher) raises:
     """Benchmark literal prefix pattern on short text."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall("hello.*world", SHORT_TEXT)
         keep(len(results))
 
@@ -34,12 +34,12 @@ fn bench_literal_prefix_short(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_literal_prefix_medium(mut b: Bencher) raises:
+def bench_literal_prefix_medium(mut b: Bencher) raises:
     """Benchmark literal prefix pattern on medium text."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall("hello.*", MEDIUM_TEXT)
         keep(len(results))
 
@@ -47,12 +47,12 @@ fn bench_literal_prefix_medium(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_literal_prefix_long(mut b: Bencher) raises:
+def bench_literal_prefix_long(mut b: Bencher) raises:
     """Benchmark literal prefix pattern on long text."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall("hello.*", LONG_TEXT)
         keep(len(results))
 
@@ -60,12 +60,12 @@ fn bench_literal_prefix_long(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_required_literal_short(mut b: Bencher) raises:
+def bench_required_literal_short(mut b: Bencher) raises:
     """Benchmark required literal (not prefix) on short text."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall(".*@example\\.com", EMAIL_TEXT)
         keep(len(results))
 
@@ -73,12 +73,12 @@ fn bench_required_literal_short(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_required_literal_long(mut b: Bencher) raises:
+def bench_required_literal_long(mut b: Bencher) raises:
     """Benchmark required literal (not prefix) on long text."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall(".*@example\\.com", EMAIL_LONG)
         keep(len(results))
 
@@ -86,12 +86,12 @@ fn bench_required_literal_long(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_no_literal_baseline(mut b: Bencher) raises:
+def bench_no_literal_baseline(mut b: Bencher) raises:
     """Benchmark pattern with no literals as baseline."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall("[a-z]+", MEDIUM_TEXT)
         keep(len(results))
 
@@ -99,12 +99,12 @@ fn bench_no_literal_baseline(mut b: Bencher) raises:
 
 
 @parameter
-fn bench_alternation_common_prefix(mut b: Bencher) raises:
+def bench_alternation_common_prefix(mut b: Bencher) raises:
     """Benchmark alternation with common prefix."""
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         var results = findall("(hello|help|helicopter)", MEDIUM_TEXT)
         keep(len(results))
 

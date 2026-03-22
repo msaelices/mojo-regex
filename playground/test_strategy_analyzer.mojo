@@ -5,7 +5,7 @@ from regex.simd_matchers import (
 )
 
 
-fn test_pattern_analysis() raises:
+def test_pattern_analysis() raises:
     """Test the character class pattern analyzer."""
     print("Testing character class pattern analysis...")
 
@@ -43,7 +43,7 @@ fn test_pattern_analysis() raises:
         raise Error("Some pattern analysis tests failed")
 
 
-fn test_specialized_matchers() raises:
+def test_specialized_matchers() raises:
     """Test the specialized SIMD matchers."""
     print("\n\nTesting specialized matchers...")
 
@@ -108,7 +108,7 @@ fn test_specialized_matchers() raises:
         )
 
 
-fn main() raises:
+def main() raises:
     test_pattern_analysis()
     test_specialized_matchers()
     print("\n✅ All tests passed!")

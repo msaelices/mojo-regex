@@ -20,7 +20,7 @@ from regex.ast import (
 from regex.parser import parse
 
 
-fn test_simple_regex() raises:
+def test_simple_regex() raises:
     var ast = parse("a")
     assert_true(ast.__bool__())
     assert_equal(ast.type, RE)
@@ -33,7 +33,7 @@ fn test_simple_regex() raises:
     assert_equal(element.get_value().value(), "a")
 
 
-fn test_grouping() raises:
+def test_grouping() raises:
     var ast = parse("a(b)c")
 
     # Top level group
@@ -51,7 +51,7 @@ fn test_grouping() raises:
     assert_equal(nested_group.get_child(0).get_value().value(), "b")
 
 
-fn test_quantifiers() raises:
+def test_quantifiers() raises:
     var ast = parse("a*")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -60,7 +60,7 @@ fn test_quantifiers() raises:
     assert_equal(element.max, -1)  # -1 represents infinity
 
 
-fn test_match_start_end() raises:
+def test_match_start_end() raises:
     var ast = parse("^a$")
     var top_group = ast.get_child(0)
     assert_equal(top_group.get_children_len(), 3)
@@ -69,21 +69,21 @@ fn test_match_start_end() raises:
     assert_equal(top_group.get_child(2).type, END)
 
 
-fn test_wildcard() raises:
+def test_wildcard() raises:
     var ast = parse(".")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
     assert_equal(element.type, WILDCARD)
 
 
-fn test_space_element() raises:
+def test_space_element() raises:
     var ast = parse("\\s")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
     assert_equal(element.type, SPACE)
 
 
-fn test_range_positive() raises:
+def test_range_positive() raises:
     var ast = parse("[abc]")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -94,7 +94,7 @@ fn test_range_positive() raises:
     assert_false(element.is_match("x"))
 
 
-fn test_range_negative() raises:
+def test_range_negative() raises:
     var ast = parse("[^abc]")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -107,14 +107,14 @@ fn test_range_negative() raises:
     assert_true(element.is_match("x"))
 
 
-fn test_or_operation() raises:
+def test_or_operation() raises:
     var ast = parse("a|b")
     var top_node = ast.get_child(0)
     assert_equal(top_node.type, OR)
     assert_equal(top_node.get_children_len(), 2)
 
 
-fn test_curly_exact() raises:
+def test_curly_exact() raises:
     var ast = parse("a{3}")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -122,7 +122,7 @@ fn test_curly_exact() raises:
     assert_equal(element.max, 3)
 
 
-fn test_curly_range() raises:
+def test_curly_range() raises:
     var ast = parse("a{2,5}")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -130,13 +130,13 @@ fn test_curly_range() raises:
     assert_equal(element.max, 5)
 
 
-fn test_curly_braces_1() raises:
+def test_curly_braces_1() raises:
     var ast = parse("a{5}b")
     var top_group = ast.get_child(0)
     assert_equal(top_group.get_children_len(), 2)
 
 
-fn test_parse_curly_2() raises:
+def test_parse_curly_2() raises:
     var ast = parse("a{,2}")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -145,7 +145,7 @@ fn test_parse_curly_2() raises:
     assert_equal(element.max, 2)
 
 
-fn test_parse_curly_3() raises:
+def test_parse_curly_3() raises:
     var ast = parse("a{2,}")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -154,7 +154,7 @@ fn test_parse_curly_3() raises:
     assert_equal(element.max, -1)  # -1 represents infinity
 
 
-fn test_parse_curly_4() raises:
+def test_parse_curly_4() raises:
     var ast = parse("a{,}")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -163,13 +163,13 @@ fn test_parse_curly_4() raises:
     assert_equal(element.max, -1)  # -1 represents infinity
 
 
-fn test_parse_match_start_end() raises:
+def test_parse_match_start_end() raises:
     var ast = parse("^aaaa.*a$")
     var top_group = ast.get_child(0)
     assert_equal(top_group.get_children_len(), 8)
 
 
-fn test_complex_regex() raises:
+def test_complex_regex() raises:
     var ast = parse("^[a-zA-Z]{1,20}@[a-zA-Z]\\.[a-z]{1,3}$")
     var top_group = ast.get_child(0)
     # Our parser correctly produces 7 elements:
@@ -192,7 +192,7 @@ fn test_complex_regex() raises:
     assert_equal(top_group.get_child(5).max, 3)
 
 
-fn test_range_1() raises:
+def test_range_1() raises:
     var ast = parse("[^a-z]")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -203,7 +203,7 @@ fn test_range_1() raises:
     assert_false(element.is_match("a"))
 
 
-fn test_range_2() raises:
+def test_range_2() raises:
     var ast = parse("[^a-z-\\s-]")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -213,7 +213,7 @@ fn test_range_2() raises:
     # Note: Space matching would need to be tested differently due to escaping
 
 
-fn test_range_3() raises:
+def test_range_3() raises:
     var ast = parse("[a-z-\\s-]")
     var top_group = ast.get_child(0)
     var element = top_group.get_child(0)
@@ -223,29 +223,29 @@ fn test_range_3() raises:
     # Note: Space matching would need to be tested differently due to escaping
 
 
-fn test_parse_fail_missing_closing_bracket() raises:
+def test_parse_fail_missing_closing_bracket() raises:
     with assert_raises():
         _ = parse("a[abc")
 
 
-fn test_parse_fail_unescaped_closing_bracket() raises:
+def test_parse_fail_unescaped_closing_bracket() raises:
     # Parser validation should raise error for unescaped closing bracket
     with assert_raises():
         _ = parse("abc]")
 
 
-fn test_parse_fail_unescaped_closing_parenthesis() raises:
+def test_parse_fail_unescaped_closing_parenthesis() raises:
     # Parser validation should raise error for unescaped closing parenthesis
     with assert_raises():
         _ = parse("a)")
 
 
-fn test_fail_no_closing_par() raises:
+def test_fail_no_closing_par() raises:
     with assert_raises():
         _ = parse("a[d]((vfw)")
 
 
-fn test_parse_fail_non_closed_range() raises:
+def test_parse_fail_non_closed_range() raises:
     with assert_raises():
         _ = parse("[a")
 

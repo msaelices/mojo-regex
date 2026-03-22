@@ -6,7 +6,7 @@ from regex.parser import parse
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
-fn benchmark_simple(pattern: String, text: String) raises -> Float64:
+def benchmark_simple(pattern: String, text: String) raises -> Float64:
     """Quick benchmark to measure performance."""
     var regex = compile_regex(pattern)
     var iterations = 1000
@@ -21,7 +21,7 @@ fn benchmark_simple(pattern: String, text: String) raises -> Float64:
     return Float64(total_time) / Float64(iterations) / 1_000_000.0  # ms
 
 
-fn main() raises:
+def main() raises:
     print("=== ENGINE USAGE ANALYSIS ===")
     print()
 

@@ -24,7 +24,7 @@ alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 trait SIMDMatcher:
     """Base trait for SIMD character class matchers."""
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match the character class.
@@ -40,7 +40,7 @@ trait SIMDMatcher:
         """
         ...
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if a single character is in this character class.
 
         Args:
@@ -67,7 +67,7 @@ struct NibbleBasedMatcher(
     var high_nibble_lut: SIMD[DType.uint8, 16]
     """Lookup table for high nibbles (0x0-0xF)."""
 
-    fn __init__(
+    def __init__(
         out self,
         low_lut: SIMD[DType.uint8, 16],
         high_lut: SIMD[DType.uint8, 16],
@@ -81,7 +81,7 @@ struct NibbleBasedMatcher(
         self.low_nibble_lut = low_lut
         self.high_nibble_lut = high_lut
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match using nibble-based lookup.
@@ -132,7 +132,7 @@ struct NibbleBasedMatcher(
 
             return result
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if a single character matches.
 
         Args:
@@ -153,7 +153,7 @@ struct NibbleBasedMatcher(
         return (low_match & high_match) != 0
 
 
-fn create_hex_digit_matcher() -> RangeBasedMatcher:
+def create_hex_digit_matcher() -> RangeBasedMatcher:
     """Create a matcher for hex digits [0-9A-Fa-f].
 
     Note: Using range-based matcher for now as nibble-based approach
@@ -186,13 +186,13 @@ struct RangeBasedMatcher(
     var num_ranges: Int
     """Number of active ranges."""
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize empty range matcher."""
         self.start_ranges = SIMD[DType.uint8, 4](0)
         self.end_ranges = SIMD[DType.uint8, 4](0)
         self.num_ranges = 0
 
-    fn add_range(mut self, start: UInt8, end: UInt8):
+    def add_range(mut self, start: UInt8, end: UInt8):
         """Add a character range.
 
         Args:
@@ -204,7 +204,7 @@ struct RangeBasedMatcher(
             self.end_ranges[self.num_ranges] = end
             self.num_ranges += 1
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match any range.
@@ -230,7 +230,7 @@ struct RangeBasedMatcher(
 
         return result
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if a single character matches any range.
 
         Args:
@@ -252,7 +252,7 @@ struct RangeBasedMatcher(
         return False
 
 
-fn create_digit_matcher() -> RangeBasedMatcher:
+def create_digit_matcher() -> RangeBasedMatcher:
     """Create a range-based matcher for digits [0-9].
 
     Returns:
@@ -263,7 +263,7 @@ fn create_digit_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-fn create_alpha_matcher() -> RangeBasedMatcher:
+def create_alpha_matcher() -> RangeBasedMatcher:
     """Create a range-based matcher for alphabetic characters [a-zA-Z].
 
     Returns:
@@ -275,7 +275,7 @@ fn create_alpha_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-fn create_alnum_matcher() -> RangeBasedMatcher:
+def create_alnum_matcher() -> RangeBasedMatcher:
     """Create a range-based matcher for alphanumeric characters [a-zA-Z0-9].
 
     Returns:
@@ -288,7 +288,7 @@ fn create_alnum_matcher() -> RangeBasedMatcher:
     return matcher
 
 
-fn _create_whitespace_matcher() -> NibbleBasedMatcher:
+def _create_whitespace_matcher() -> NibbleBasedMatcher:
     """Create a nibble-based matcher for whitespace characters.
 
     Matches: space (0x20), tab (0x09), newline (0x0A), carriage return (0x0D),
@@ -348,7 +348,7 @@ fn _create_whitespace_matcher() -> NibbleBasedMatcher:
     return NibbleBasedMatcher(low_lut, high_lut)
 
 
-fn analyze_character_class_pattern(pattern: String) -> String:
+def analyze_character_class_pattern(pattern: String) -> String:
     """Analyze a character class pattern and determine the optimal SIMD strategy.
 
     Args:
@@ -387,13 +387,13 @@ alias RangeMatchers = Dict[Int, RangeBasedMatcher]
 alias _RANGE_MATCHERS_GLOBAL = _Global["RangeMatchers", _init_range_matchers]
 
 
-fn _init_range_matchers() -> RangeMatchers:
+def _init_range_matchers() -> RangeMatchers:
     """Initialize the global range matchers dictionary."""
     var matchers = RangeMatchers()
     return matchers^
 
 
-fn _get_range_matchers() -> UnsafePointer[RangeMatchers, MutAnyOrigin]:
+def _get_range_matchers() -> UnsafePointer[RangeMatchers, MutAnyOrigin]:
     """Returns a pointer to the global range matchers dictionary."""
     try:
         return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
@@ -407,13 +407,13 @@ alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
 alias _NIBBLE_MATCHERS_GLOBAL = _Global["NibbleMatchers", _init_nibble_matchers]
 
 
-fn _init_nibble_matchers() -> NibbleMatchers:
+def _init_nibble_matchers() -> NibbleMatchers:
     """Initialize the global nibble matchers dictionary."""
     var matchers = NibbleMatchers()
     return matchers^
 
 
-fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
+def _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
     """Returns a pointer to the global nibble matchers dictionary."""
     try:
         return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
@@ -422,7 +422,7 @@ fn _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
     return UnsafePointer[NibbleMatchers, MutAnyOrigin]()  # Unreachable
 
 
-fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
+def _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
     """Create a new range matcher for the given type."""
     var matcher = RangeBasedMatcher()
 
@@ -451,7 +451,7 @@ fn _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
 
 
 @always_inline
-fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
+def get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
     """Get a range matcher by type from the global cache.
 
     Args:
@@ -474,37 +474,37 @@ fn get_range_matcher(matcher_type: Int) -> RangeBasedMatcher:
 
 
 @always_inline
-fn get_digit_matcher() -> RangeBasedMatcher:
+def get_digit_matcher() -> RangeBasedMatcher:
     """Get cached digit matcher instance."""
     return get_range_matcher(SIMD_MATCHER_DIGITS)
 
 
 @always_inline
-fn get_alpha_matcher() -> RangeBasedMatcher:
+def get_alpha_matcher() -> RangeBasedMatcher:
     """Get cached alpha matcher instance."""
     return get_range_matcher(SIMD_MATCHER_ALPHA)
 
 
 @always_inline
-fn get_alnum_matcher() -> RangeBasedMatcher:
+def get_alnum_matcher() -> RangeBasedMatcher:
     """Get cached alphanumeric matcher instance."""
     return get_range_matcher(SIMD_MATCHER_ALNUM)
 
 
 @always_inline
-fn get_hex_digit_matcher() -> RangeBasedMatcher:
+def get_hex_digit_matcher() -> RangeBasedMatcher:
     """Get cached hex digit matcher instance."""
     return get_range_matcher(SIMD_MATCHER_HEX_DIGITS)
 
 
 @always_inline
-fn get_word_matcher() -> RangeBasedMatcher:
+def get_word_matcher() -> RangeBasedMatcher:
     """Get cached word character matcher instance."""
     return get_range_matcher(SIMD_MATCHER_WORD_CHARS)
 
 
 @always_inline
-fn get_whitespace_matcher() -> NibbleBasedMatcher:
+def get_whitespace_matcher() -> NibbleBasedMatcher:
     """Get cached whitespace matcher instance."""
     var matchers_ptr = _get_nibble_matchers()
     ref matchers = matchers_ptr[]

@@ -102,7 +102,7 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
     alias DASH = 29
     """Token of the dash '-'."""
 
-    fn __init__(out self, type: Int):
+    def __init__(out self, type: Int):
         var char: Int
         if type == Self.WILDCARD:
             char = CHAR_DOT
@@ -148,7 +148,7 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: Int):
+    def __init__(out self, type: Int, char: Int):
         """Initialize a Token with a specific type and character.
         Args:
             type: The type of the token.
@@ -158,7 +158,7 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
         self.char = char
         self.start_pos = 0  # Default to 0, will be set by lexer
 
-    fn __init__(out self, type: Int, char: Int, start_pos: Int):
+    def __init__(out self, type: Int, char: Int, start_pos: Int):
         """Initialize a Token with a specific type, character and position.
         Args:
             type: The type of the token.
@@ -169,19 +169,19 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
         self.char = char
         self.start_pos = start_pos
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         """Equality operator for Token."""
         return self.type == other.type and self.char == other.char
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         """Inequality operator for Token."""
         return not self.__eq__(other)
 
-    fn __bool__(self: Self) -> Bool:
+    def __bool__(self: Self) -> Bool:
         """Boolean conversion for Token."""
         return self.type != Self.ELEMENT or self.char != Int(0)
 
-    fn __as_bool__(self) -> Bool:
+    def __as_bool__(self) -> Bool:
         """Get the boolean representation of the value.
 
         Returns:
@@ -191,168 +191,168 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
 
 
 @always_inline
-fn Asterisk() -> Token:
+def Asterisk() -> Token:
     """Quantifier 'zero or more' token using character '*'."""
     return Token(Token.ASTERISK)
 
 
 @always_inline
-fn Wildcard() -> Token:
+def Wildcard() -> Token:
     """Token using '.' as wildcard."""
     return Token(Token.WILDCARD)
 
 
 @always_inline
-fn NotToken(char: Int) -> Token:
+def NotToken(char: Int) -> Token:
     """Token of the negation."""
     return Token(Token.NOTTOKEN, char=char)
 
 
 @always_inline
-fn StartToken(char: Int) -> Token:
+def StartToken(char: Int) -> Token:
     """Token of match start."""
     return Token(Token.START, char=char)
 
 
 @always_inline
-fn Start() -> Token:
+def Start() -> Token:
     """Token using '^' to match start."""
     return Token(Token.START)
 
 
 @always_inline
-fn EndToken(char: Int) -> Token:
+def EndToken(char: Int) -> Token:
     """Token of match end."""
     return Token(Token.END, char=char)
 
 
 @always_inline
-fn End() -> Token:
+def End() -> Token:
     """Token using '$' to match end."""
     return Token(Token.END)
 
 
 @always_inline
-fn Escape() -> Token:
+def Escape() -> Token:
     """Token of the escape character."""
     return Token(Token.ESCAPE)
 
 
 @always_inline
-fn Comma() -> Token:
+def Comma() -> Token:
     """Token of a comma."""
     return Token(Token.COMMA)
 
 
 @always_inline
-fn LeftParenthesis() -> Token:
+def LeftParenthesis() -> Token:
     """Left parenthesis token."""
     return Token(Token.LEFTPARENTHESIS)
 
 
 @always_inline
-fn RightParenthesis() -> Token:
+def RightParenthesis() -> Token:
     """Right parenthesis token."""
     return Token(Token.RIGHTPARENTHESIS)
 
 
 @always_inline
-fn LeftCurlyBrace() -> Token:
+def LeftCurlyBrace() -> Token:
     """Left curly brace token."""
     return Token(Token.LEFTCURLYBRACE)
 
 
 @always_inline
-fn RightCurlyBrace() -> Token:
+def RightCurlyBrace() -> Token:
     """Right curly brace token."""
     return Token(Token.RIGHTCURLYBRACE)
 
 
 @always_inline
-fn LeftBracket() -> Token:
+def LeftBracket() -> Token:
     """Left bracket token."""
     return Token(Token.LEFTBRACKET)
 
 
 @always_inline
-fn RightBracket() -> Token:
+def RightBracket() -> Token:
     """Right bracket token."""
     return Token(Token.RIGHTBRACKET)
 
 
 @always_inline
-fn ZeroOrMore(char: Int) -> Token:
+def ZeroOrMore(char: Int) -> Token:
     """Quantifier 'zero or more' token."""
     return Token(type=Token.ZEROORMORE, char=char)
 
 
 @always_inline
-fn OneOrMore(char: Int) -> Token:
+def OneOrMore(char: Int) -> Token:
     """Quantifier 'one or more' token."""
     return Token(type=Token.ONEORMORE, char=char)
 
 
 @always_inline
-fn ZeroOrOne(char: Int) -> Token:
+def ZeroOrOne(char: Int) -> Token:
     """Quantifier 'zero or one' token."""
     return Token(type=Token.ZEROORONE, char=char)
 
 
 @always_inline
-fn Plus() -> Token:
+def Plus() -> Token:
     """Quantifier 'one or more' token using character '+'."""
     return Token(Token.PLUS)
 
 
 @always_inline
-fn QuestionMark() -> Token:
+def QuestionMark() -> Token:
     """Quantifier 'zero or one' token using character '?'."""
     return Token(Token.QUESTIONMARK)
 
 
 @always_inline
-fn OrToken(char: Int) -> Token:
+def OrToken(char: Int) -> Token:
     """Token of the or."""
     return Token(type=Token.ORTOKEN, char=char)
 
 
 @always_inline
-fn VerticalBar() -> Token:
+def VerticalBar() -> Token:
     """Token of the or using '|'."""
     return Token(Token.VERTICALBAR)
 
 
 @always_inline
-fn Circumflex() -> Token:
+def Circumflex() -> Token:
     """Token of the negation using '^'."""
     return Token(Token.CIRCUMFLEX)
 
 
 @always_inline
-fn Dash() -> Token:
+def Dash() -> Token:
     """Token of the dash '-'."""
     return Token(Token.DASH)
 
 
 @always_inline
-fn ElementToken(char: Int) -> Token:
+def ElementToken(char: Int) -> Token:
     """Token that are not associated to special meaning."""
     return Token(type=Token.ELEMENT, char=char)
 
 
 @always_inline
-fn SpaceToken(char: Int) -> Token:
+def SpaceToken(char: Int) -> Token:
     """Token of a space."""
     return Token(type=Token.SPACE, char=char)
 
 
 @always_inline
-fn DigitToken(char: Int) -> Token:
+def DigitToken(char: Int) -> Token:
     """Token of a digit."""
     return Token(type=Token.DIGIT, char=char)
 
 
 @always_inline
-fn WordToken(char: Int) -> Token:
+def WordToken(char: Int) -> Token:
     """Token of a word character."""
     return Token(type=Token.WORD, char=char)

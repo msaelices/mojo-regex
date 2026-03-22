@@ -8,7 +8,7 @@ from src.regex.simd_matchers import (
 alias SIMD_WIDTH = 16  # Test with 16-byte chunks for optimal performance
 
 
-fn test_hex_matcher() raises:
+def test_hex_matcher() raises:
     """Test the nibble-based hex digit matcher."""
     print("Testing nibble-based hex digit matcher...")
 
@@ -51,7 +51,7 @@ fn test_hex_matcher() raises:
     print("\nHex matcher test passed!")
 
 
-fn test_performance_comparison() raises:
+def test_performance_comparison() raises:
     """Compare performance of nibble-based vs simple lookup."""
     print("\n\nPerformance comparison:")
 
@@ -102,7 +102,7 @@ fn test_performance_comparison() raises:
     print("Performance test passed!")
 
 
-fn test_digit_range_matcher() raises:
+def test_digit_range_matcher() raises:
     """Test the range-based digit matcher."""
     print("\n\nTesting range-based digit matcher...")
 
@@ -128,7 +128,7 @@ fn test_digit_range_matcher() raises:
     print("Digit range matcher test passed!")
 
 
-fn main() raises:
+def main() raises:
     test_hex_matcher()
     test_performance_comparison()
     test_digit_range_matcher()
