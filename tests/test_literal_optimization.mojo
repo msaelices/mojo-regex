@@ -22,7 +22,7 @@ from regex.optimizer import PatternAnalyzer
 from regex.nfa import NFAEngine
 
 
-fn test_literal_extraction() raises:
+def test_literal_extraction() raises:
     """Test literal extraction from various patterns."""
     # Test simple literal pattern
     var ast1 = parse("hello")
@@ -74,7 +74,7 @@ fn test_literal_extraction() raises:
     assert_true(found_example, "Should find literal containing 'example'")
 
 
-fn test_has_literal_prefix() raises:
+def test_has_literal_prefix() raises:
     """Test literal prefix detection."""
     # Positive cases
     assert_true(
@@ -104,7 +104,7 @@ fn test_has_literal_prefix() raises:
     )
 
 
-fn test_extract_literal_prefix() raises:
+def test_extract_literal_prefix() raises:
     """Test literal prefix extraction."""
     assert_equal(extract_literal_prefix(parse("hello")), "hello")
     assert_equal(extract_literal_prefix(parse("hello.*world")), "hello")
@@ -113,7 +113,7 @@ fn test_extract_literal_prefix() raises:
     assert_equal(extract_literal_prefix(parse("[a-z]+")), "")
 
 
-fn test_two_way_searcher() raises:
+def test_two_way_searcher() raises:
     """Test Two-Way string search algorithm."""
     var text = "The quick brown fox jumps over the lazy dog. The fox is quick."
 
@@ -156,7 +156,7 @@ fn test_two_way_searcher() raises:
     assert_equal(pos5, 56, "Should find second 'quick' at position 56")
 
 
-fn test_multi_literal_searcher() raises:
+def test_multi_literal_searcher() raises:
     """Test multi-literal search functionality."""
     var text = "apple banana cherry apple pie banana split"
 
@@ -183,7 +183,7 @@ fn test_multi_literal_searcher() raises:
     assert_equal(result3[1], 2, "Should match 'cherry' (index 2)")
 
 
-fn test_literal_optimization_in_regex() raises:
+def test_literal_optimization_in_regex() raises:
     """Test literal optimization integrated with regex matching."""
     print("Testing literal optimization in regex matching...")
 
@@ -218,7 +218,7 @@ fn test_literal_optimization_in_regex() raises:
     assert_equal(len(matches4), 3, "Should find three number matches")
 
 
-fn test_pattern_analyzer_optimization_info() raises:
+def test_pattern_analyzer_optimization_info() raises:
     """Test PatternAnalyzer optimization analysis."""
     print("Testing pattern optimization analysis...")
 

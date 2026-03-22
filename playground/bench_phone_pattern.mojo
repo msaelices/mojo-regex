@@ -4,7 +4,7 @@ from time import perf_counter_ns
 from regex.matcher import compile_regex
 
 
-fn benchmark_pattern(
+def benchmark_pattern(
     pattern: String, text: String, iterations: Int
 ) raises -> Float64:
     """Benchmark a single pattern against text."""
@@ -25,7 +25,7 @@ fn benchmark_pattern(
     )  # Convert to ms
 
 
-fn main() raises:
+def main() raises:
     print("=== NATIONAL PHONE PATTERN PERFORMANCE TEST ===")
     print()
 

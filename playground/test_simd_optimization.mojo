@@ -10,14 +10,14 @@ struct CharacterClassSIMD(Copyable, Movable):
 
     var lookup_table: SIMD[DType.uint8, 256]
 
-    fn __init__(out self, var char_class: String):
+    def __init__(out self, var char_class: String):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         for i in range(len(char_class)):
             var char_code = ord(char_class[i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
 
-    fn _check_chunk_simd(
+    def _check_chunk_simd(
         self, text: String, pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations."""
@@ -57,7 +57,7 @@ struct CharacterClassSIMD(Copyable, Movable):
             return matches
 
 
-fn test_simd_performance() raises:
+def test_simd_performance() raises:
     """Test that our SIMD optimization actually works."""
     # Create a character class for digits
     var digit_class = CharacterClassSIMD("0123456789")
@@ -99,5 +99,5 @@ fn test_simd_performance() raises:
     print("Test passed!")
 
 
-fn main() raises:
+def main() raises:
     test_simd_performance()

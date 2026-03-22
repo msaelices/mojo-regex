@@ -10,7 +10,7 @@ from regex.parser import parse
 # ===-----------------------------------------------------------------------===#
 
 
-fn make_digit_heavy_text[length: Int]() -> String:
+def make_digit_heavy_text[length: Int]() -> String:
     """Generate text with heavy digit content for SIMD digit matching.
 
     Parameters:
@@ -39,7 +39,7 @@ fn make_digit_heavy_text[length: Int]() -> String:
     return result
 
 
-fn make_space_heavy_text[length: Int]() -> String:
+def make_space_heavy_text[length: Int]() -> String:
     """Generate text with heavy whitespace content for SIMD whitespace matching.
 
     Parameters:
@@ -68,7 +68,7 @@ fn make_space_heavy_text[length: Int]() -> String:
     return result
 
 
-fn make_range_heavy_text[length: Int]() -> String:
+def make_range_heavy_text[length: Int]() -> String:
     """Generate text with heavy character range content for SIMD range matching.
 
     Parameters:
@@ -105,14 +105,14 @@ fn make_range_heavy_text[length: Int]() -> String:
 
 
 @parameter
-fn bench_nfa_simd_digits[text_length: Int](mut b: Bencher) raises:
+def bench_nfa_simd_digits[text_length: Int](mut b: Bencher) raises:
     """Benchmark NFA engine with SIMD-optimized digit matching."""
     var test_text = make_digit_heavy_text[text_length]()
     var engine = NFAEngine("\\d+")
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         for _ in range(20):
             var result = engine.match_all(test_text)
             keep(len(result))
@@ -122,14 +122,14 @@ fn bench_nfa_simd_digits[text_length: Int](mut b: Bencher) raises:
 
 
 @parameter
-fn bench_nfa_simd_whitespace[text_length: Int](mut b: Bencher) raises:
+def bench_nfa_simd_whitespace[text_length: Int](mut b: Bencher) raises:
     """Benchmark NFA engine with SIMD-optimized whitespace matching."""
     var test_text = make_space_heavy_text[text_length]()
     var engine = NFAEngine("\\s+")
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         for _ in range(20):
             var result = engine.match_all(test_text)
             keep(len(result))
@@ -139,14 +139,14 @@ fn bench_nfa_simd_whitespace[text_length: Int](mut b: Bencher) raises:
 
 
 @parameter
-fn bench_nfa_simd_range[text_length: Int](mut b: Bencher) raises:
+def bench_nfa_simd_range[text_length: Int](mut b: Bencher) raises:
     """Benchmark NFA engine with SIMD-optimized character range matching."""
     var test_text = make_range_heavy_text[text_length]()
     var engine = NFAEngine("[a-zA-Z0-9]+")
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         for _ in range(20):
             var result = engine.match_all(test_text)
             keep(len(result))
@@ -156,7 +156,7 @@ fn bench_nfa_simd_range[text_length: Int](mut b: Bencher) raises:
 
 
 @parameter
-fn bench_nfa_simd_negated_range[text_length: Int](mut b: Bencher) raises:
+def bench_nfa_simd_negated_range[text_length: Int](mut b: Bencher) raises:
     """Benchmark NFA engine with SIMD-optimized negated character range matching.
     """
     var test_text = make_range_heavy_text[text_length]()
@@ -164,7 +164,7 @@ fn bench_nfa_simd_negated_range[text_length: Int](mut b: Bencher) raises:
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         for _ in range(20):
             var result = engine.match_all(test_text)
             keep(len(result))
@@ -174,7 +174,7 @@ fn bench_nfa_simd_negated_range[text_length: Int](mut b: Bencher) raises:
 
 
 @parameter
-fn bench_nfa_simd_quantified_range[text_length: Int](mut b: Bencher) raises:
+def bench_nfa_simd_quantified_range[text_length: Int](mut b: Bencher) raises:
     """Benchmark NFA engine with SIMD-optimized quantified character range matching.
     """
     var test_text = make_range_heavy_text[text_length]()
@@ -182,7 +182,7 @@ fn bench_nfa_simd_quantified_range[text_length: Int](mut b: Bencher) raises:
 
     @always_inline
     @parameter
-    fn call_fn() raises:
+    def call_fn() raises:
         for _ in range(20):
             var result = engine.match_all(test_text)
             keep(len(result))

@@ -16,7 +16,7 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
     var text_ptr: UnsafePointer[String, ImmutAnyOrigin]
     """Pointer to the original text being matched."""
 
-    fn __init__(
+    def __init__(
         out self,
         group_id: Int,
         start_idx: Int,
@@ -28,7 +28,7 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
         self.end_idx = end_idx
         self.text_ptr = UnsafePointer(to=text)
 
-    fn get_match_text(self) -> StringSlice[ImmutAnyOrigin]:
+    def get_match_text(self) -> StringSlice[ImmutAnyOrigin]:
         """Returns the text that was matched."""
         return StringSlice(self.text_ptr[])[
             byte = self.start_idx : self.end_idx
@@ -51,7 +51,7 @@ struct MatchList(Copyable, Movable, Sized):
     var _len: Int
     var _capacity: Int
 
-    fn __init__(
+    def __init__(
         out self,
         capacity: Int = 0,
     ):
@@ -63,7 +63,7 @@ struct MatchList(Copyable, Movable, Sized):
             self._realloc(capacity)
 
     @always_inline
-    fn __copyinit__(
+    def __copyinit__(
         out self,
         copy: Self,
     ):
@@ -79,17 +79,17 @@ struct MatchList(Copyable, Movable, Sized):
         # var call_location = __call_location()
         # print("Copying MatchList", call_location)
 
-    fn __del__(deinit self):
+    def __del__(deinit self):
         """Destructor to free allocated memory."""
         if self._data:
             self._data.free()
 
     @always_inline
-    fn __len__(self) -> Int:
+    def __len__(self) -> Int:
         """Return the number of matches."""
         return self._len
 
-    fn __getitem__[I: Indexer](ref self, idx: I) -> ref[self] Match:
+    def __getitem__[I: Indexer](ref self, idx: I) -> ref[self] Match:
         """Gets the list element at the given index.
 
         Args:
@@ -104,7 +104,7 @@ struct MatchList(Copyable, Movable, Sized):
         return self._data[idx]
 
     @no_inline
-    fn _realloc(mut self, new_capacity: Int):
+    def _realloc(mut self, new_capacity: Int):
         var new_data = alloc[Match](new_capacity)
 
         memcpy(dest=new_data, src=self._data, count=len(self))
@@ -114,7 +114,7 @@ struct MatchList(Copyable, Movable, Sized):
         self._data = new_data
         self._capacity = new_capacity
 
-    fn append(
+    def append(
         mut self,
         m: Match,
     ):
@@ -127,7 +127,7 @@ struct MatchList(Copyable, Movable, Sized):
         self._data[self._len] = m
         self._len += 1
 
-    fn clear(
+    def clear(
         mut self,
     ):
         """Remove all matches but keep allocated capacity."""

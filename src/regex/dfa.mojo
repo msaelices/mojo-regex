@@ -66,7 +66,7 @@ alias ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
 alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
-fn _expand_character_range(
+def _expand_character_range(
     node_type: Int,
     range_str: StringSlice[ImmutAnyOrigin],
 ) -> String:
@@ -177,7 +177,7 @@ struct SequentialPatternElement(Copyable, Movable):
     var positive_logic: Bool
     """True for [abc], False for [^abc]."""
 
-    fn __init__(
+    def __init__(
         out self,
         var char_class: String,
         min_matches: Int,
@@ -200,7 +200,7 @@ struct SequentialPatternInfo(Copyable, Movable):
     var has_end_anchor: Bool
     """Whether the pattern ends with $ anchor."""
 
-    fn __init__(out self):
+    def __init__(out self):
         self.elements = List[SequentialPatternElement]()
         self.has_start_anchor = False
         self.has_end_anchor = False
@@ -216,7 +216,7 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
     var match_length: Int  # Length of match when this state is reached
     """Length of the match when this state is reached, used for quantifiers."""
 
-    fn __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
+    def __init__(out self, is_accepting: Bool = False, match_length: Int = 0):
         """Initialize a DFA state with no transitions."""
         self.transitions = SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS](
             -1
@@ -225,7 +225,7 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
         self.match_length = match_length
 
     @always_inline
-    fn add_transition(mut self, char_code: Int, target_state: Int):
+    def add_transition(mut self, char_code: Int, target_state: Int):
         """Add a transition from this state to target_state on character char_code.
 
         Args:
@@ -236,7 +236,7 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
             self.transitions[char_code] = target_state
 
     @always_inline
-    fn get_transition(self, char_code: Int) -> Int:
+    def get_transition(self, char_code: Int) -> Int:
         """Get the target state for a given character.
 
         Args:
@@ -268,7 +268,7 @@ struct DFAEngine(Engine):
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize an empty DFA engine."""
         self.states = List[DFAState](capacity=DEFAULT_DFA_CAPACITY)
         self.start_state = 0
@@ -278,7 +278,7 @@ struct DFAEngine(Engine):
         self.simd_char_matcher = None
         self.literal_pattern = ""
 
-    fn __moveinit__(out self, deinit take: Self):
+    def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.states = take.states^
         self.start_state = take.start_state
@@ -288,7 +288,7 @@ struct DFAEngine(Engine):
         self.simd_char_matcher = take.simd_char_matcher^
         self.literal_pattern = take.literal_pattern^
 
-    fn compile_pattern(
+    def compile_pattern(
         mut self,
         pattern: String,
         has_start_anchor: Bool,
@@ -334,7 +334,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_character_class(
+    def compile_character_class(
         mut self, var char_class: String, min_matches: Int, max_matches: Int
     ) raises:
         """Compile a character class pattern like [a-z]+ into a DFA.
@@ -348,7 +348,7 @@ struct DFAEngine(Engine):
             char_class^, min_matches, max_matches, True
         )
 
-    fn compile_character_class_with_logic(
+    def compile_character_class_with_logic(
         mut self,
         var char_class: String,
         min_matches: Int,
@@ -454,7 +454,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_sequential_pattern(
+    def compile_sequential_pattern(
         mut self, pattern_info: SequentialPatternInfo
     ) raises:
         """Compile a sequential pattern like [+]*\\d+[-]*\\d+ into a DFA.
@@ -563,7 +563,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_multi_character_class_sequence(
+    def compile_multi_character_class_sequence(
         mut self, var sequence_info: SequentialPatternInfo
     ) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
@@ -768,7 +768,7 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    fn compile_alternation(mut self, ast: ASTNode[MutAnyOrigin]) raises:
+    def compile_alternation(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile an alternation pattern like a|b or (cat|dog) into a DFA.
 
         Creates a state machine with parallel branches that converge to accepting states.
@@ -826,7 +826,7 @@ struct DFAEngine(Engine):
                     )
                     current_state_index = next_state_index
 
-    fn compile_quantified_group(mut self, ast: ASTNode[MutAnyOrigin]) raises:
+    def compile_quantified_group(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile a quantified group pattern like (abc)+, (test)*, (a)? into a DFA.
 
         Creates a state machine with loops and optional paths based on quantifiers.
@@ -876,7 +876,7 @@ struct DFAEngine(Engine):
         else:
             raise Error("Unsupported quantifier range for group")
 
-    fn _compile_optional_group(
+    def _compile_optional_group(
         mut self, group_text: String, accepting_index: Int
     ):
         """Compile an optional group (pattern)? - match 0 or 1 times."""
@@ -906,7 +906,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn _compile_zero_or_more_group(
+    def _compile_zero_or_more_group(
         mut self, group_text: String, accepting_index: Int
     ):
         """Compile a zero-or-more group (pattern)* - match 0 or more times."""
@@ -935,7 +935,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn _compile_one_or_more_group(
+    def _compile_one_or_more_group(
         mut self, group_text: String, accepting_index: Int
     ):
         """Compile a one-or-more group (pattern)+ - match 1 or more times."""
@@ -970,7 +970,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn compile_simple_quantifier(mut self, ast: ASTNode[MutAnyOrigin]) raises:
+    def compile_simple_quantifier(mut self, ast: ASTNode[MutAnyOrigin]) raises:
         """Compile a simple quantifier pattern like a*, test+, char? into a DFA.
 
         Creates a state machine based on the quantifier type applied to literal sequences.
@@ -1043,7 +1043,7 @@ struct DFAEngine(Engine):
         else:
             raise Error("Unsupported quantifier type for simple quantifier")
 
-    fn _compile_simple_optional(
+    def _compile_simple_optional(
         mut self, pattern_text: String, accepting_index: Int
     ):
         """Compile a simple optional pattern (pattern?) - match 0 or 1 times."""
@@ -1075,7 +1075,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn _compile_simple_zero_or_more(
+    def _compile_simple_zero_or_more(
         mut self, pattern_text: String, accepting_index: Int
     ):
         """Compile a simple zero-or-more pattern (pattern*) - match 0 or more times.
@@ -1105,7 +1105,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn _compile_simple_one_or_more(
+    def _compile_simple_one_or_more(
         mut self, pattern_text: String, accepting_index: Int
     ):
         """Compile a simple one-or-more pattern (pattern+) - match 1 or more times.
@@ -1141,7 +1141,7 @@ struct DFAEngine(Engine):
                 )
                 current_state_index = next_index
 
-    fn _find_or_create_state(mut self, from_state: Int, char_code: Int) -> Int:
+    def _find_or_create_state(mut self, from_state: Int, char_code: Int) -> Int:
         """Find existing state for transition or create new one.
 
         Args:
@@ -1166,7 +1166,9 @@ struct DFAEngine(Engine):
             self.states[from_state].add_transition(char_code, new_state_index)
             return new_state_index
 
-    fn compile_wildcard_quantifier(mut self, ast: ASTNode[MutAnyOrigin]) raises:
+    def compile_wildcard_quantifier(
+        mut self, ast: ASTNode[MutAnyOrigin]
+    ) raises:
         """Compile a wildcard quantifier pattern like .*, .+, .? into a DFA.
 
         Creates a state machine that matches any character with the specified quantifier.
@@ -1213,7 +1215,7 @@ struct DFAEngine(Engine):
         else:
             raise Error("Unsupported quantifier type for wildcard quantifier")
 
-    fn _compile_wildcard_optional(mut self, accepting_index: Int):
+    def _compile_wildcard_optional(mut self, accepting_index: Int):
         """Compile .? - match any character 0 or 1 times."""
         # Start state is accepting (0 matches)
         self.states[0].is_accepting = True
@@ -1223,7 +1225,7 @@ struct DFAEngine(Engine):
             if i != ord("\n"):  # Wildcard doesn't match newline by default
                 self.states[0].add_transition(i, accepting_index)
 
-    fn _compile_wildcard_zero_or_more(mut self, accepting_index: Int):
+    def _compile_wildcard_zero_or_more(mut self, accepting_index: Int):
         """Compile .* - match any character 0 or more times."""
         # Start state is accepting (0 matches)
         self.states[0].is_accepting = True
@@ -1233,7 +1235,7 @@ struct DFAEngine(Engine):
             if i != ord("\n"):  # Wildcard doesn't match newline by default
                 self.states[0].add_transition(i, 0)  # Loop back to start
 
-    fn _compile_wildcard_one_or_more(mut self, accepting_index: Int):
+    def _compile_wildcard_one_or_more(mut self, accepting_index: Int):
         """Compile .+ - match any character 1 or more times."""
         # Create an accepting state that can loop
         var loop_state = DFAState(is_accepting=True)
@@ -1250,14 +1252,14 @@ struct DFAEngine(Engine):
             if i != ord("\n"):
                 self.states[loop_index].add_transition(i, loop_index)
 
-    fn _compile_wildcard_single(mut self, accepting_index: Int):
+    def _compile_wildcard_single(mut self, accepting_index: Int):
         """Compile . - match any single character."""
         # Add transitions from start state to accepting for any character except newline
         for i in range(256):
             if i != ord("\n"):  # Wildcard doesn't match newline by default
                 self.states[0].add_transition(i, accepting_index)
 
-    fn compile_common_prefix_alternation(
+    def compile_common_prefix_alternation(
         mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile common prefix alternation patterns like (hello|help|helicopter) into a DFA.
@@ -1290,7 +1292,7 @@ struct DFAEngine(Engine):
         # Build trie-like DFA structure
         self._build_prefix_trie(branches)
 
-    fn _extract_all_prefix_branches(
+    def _extract_all_prefix_branches(
         self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from nested OR structure."""
@@ -1314,7 +1316,7 @@ struct DFAEngine(Engine):
                     branch_text += String(char_value)
             branches.append(branch_text)
 
-    fn _build_prefix_trie(mut self, branches: List[String]) raises:
+    def _build_prefix_trie(mut self, branches: List[String]) raises:
         """Build a trie-like DFA structure from alternation branches."""
         if len(branches) == 0:
             return
@@ -1360,7 +1362,7 @@ struct DFAEngine(Engine):
                             suffix_current_state, char_code
                         )
 
-    fn _find_common_prefix(self, branches: List[String]) -> String:
+    def _find_common_prefix(self, branches: List[String]) -> String:
         """Find the longest common prefix among all branches."""
         if len(branches) == 0:
             return String("")
@@ -1396,13 +1398,13 @@ struct DFAEngine(Engine):
         return prefix
 
     @always_inline
-    fn _create_accepting_state(mut self: Self):
+    def _create_accepting_state(mut self: Self):
         """Create a single accepting state as the pattern is empty."""
         var state = DFAState(is_accepting=True, match_length=0)
         self.states.append(state)
         self.start_state = 0
 
-    fn compile_quantified_alternation_group(
+    def compile_quantified_alternation_group(
         mut self, ast: ASTNode[MutAnyOrigin]
     ) raises:
         """Compile quantified alternation groups like (a|b)*, (cat|dog)+ into a DFA.
@@ -1451,7 +1453,7 @@ struct DFAEngine(Engine):
                 "Unsupported quantifier type for quantified alternation group"
             )
 
-    fn _extract_all_alternation_branches_for_quantified(
+    def _extract_all_alternation_branches_for_quantified(
         self, node: ASTNode[MutAnyOrigin], mut branches: List[String]
     ):
         """Extract all string branches from alternation for quantified groups.
@@ -1478,7 +1480,7 @@ struct DFAEngine(Engine):
                     branch_text += String(char_value)
             branches.append(branch_text)
 
-    fn _compile_quantified_alternation_optional(
+    def _compile_quantified_alternation_optional(
         mut self, branches: List[String]
     ) raises:
         """Compile (a|b)? - match one of the alternation branches 0 or 1 times.
@@ -1511,7 +1513,7 @@ struct DFAEngine(Engine):
                         current_state, char_code
                     )
 
-    fn _compile_quantified_alternation_zero_or_more(
+    def _compile_quantified_alternation_zero_or_more(
         mut self, branches: List[String]
     ) raises:
         """Compile (a|b)* - match any of the alternation branches 0 or more times.
@@ -1537,7 +1539,7 @@ struct DFAEngine(Engine):
                         current_state, char_code
                     )
 
-    fn _compile_quantified_alternation_one_or_more(
+    def _compile_quantified_alternation_one_or_more(
         mut self, branches: List[String]
     ) raises:
         """Compile (a|b)+ - match any of the alternation branches 1 or more times.
@@ -1587,7 +1589,7 @@ struct DFAEngine(Engine):
                         current_state, char_code
                     )
 
-    fn _try_enable_simd_for_sequence(
+    def _try_enable_simd_for_sequence(
         mut self, sequence_info: SequentialPatternInfo
     ):
         """Try to enable SIMD optimization for multi-character sequences dominated by digits.
@@ -1628,7 +1630,7 @@ struct DFAEngine(Engine):
             self.simd_char_matcher = get_character_class_matcher(DIGITS)
 
     @always_inline
-    fn _add_character_class_transitions(
+    def _add_character_class_transitions(
         mut self, from_state: Int, to_state: Int, char_class: String
     ):
         """Add transitions for all characters in a character class.
@@ -1643,7 +1645,7 @@ struct DFAEngine(Engine):
         )
 
     @always_inline
-    fn _add_character_class_transitions_with_logic(
+    def _add_character_class_transitions_with_logic(
         mut self,
         from_state: Int,
         to_state: Int,
@@ -1704,7 +1706,7 @@ struct DFAEngine(Engine):
                     state.add_transition(char_code, to_state)
 
     @always_inline
-    fn get_pattern(self) -> String:
+    def get_pattern(self) -> String:
         """Returns the pattern string.
 
         Returns:
@@ -1712,7 +1714,7 @@ struct DFAEngine(Engine):
         """
         return self.literal_pattern
 
-    fn match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -1732,7 +1734,7 @@ struct DFAEngine(Engine):
             text, start, require_exact_position=True
         )
 
-    fn match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
         position.
 
@@ -1760,7 +1762,7 @@ struct DFAEngine(Engine):
                 return match_result
         return None
 
-    fn _try_match_at_position(
+    def _try_match_at_position(
         self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
         """Try to match pattern starting at a specific position.
@@ -1870,7 +1872,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn match_all(self, text: String) -> MatchList:
+    def match_all(self, text: String) -> MatchList:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -1913,7 +1915,7 @@ struct DFAEngine(Engine):
 
         return matches^
 
-    fn _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
+    def _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 
         This hybrid approach uses SIMD for fast character matching while respecting
@@ -2007,7 +2009,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn _optimized_simd_search(
+    def _optimized_simd_search(
         self, text: String, start: Int
     ) -> Optional[Match]:
         """Optimized SIMD-based search for character class patterns.
@@ -2050,7 +2052,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    fn _find_next_matching_char(
+    def _find_next_matching_char(
         self, text: String, start: Int, simd_matcher: CharacterClassSIMD
     ) -> Int:
         """Use SIMD to find the next character that matches the character class.
@@ -2098,7 +2100,7 @@ struct BoyerMoore:
     var bad_char_table: List[Int]
     """Bad character heuristic table for Boyer-Moore algorithm."""
 
-    fn __init__(out self, pattern: String):
+    def __init__(out self, pattern: String):
         """Initialize Boyer-Moore with a pattern.
 
         Args:
@@ -2108,7 +2110,7 @@ struct BoyerMoore:
         self.bad_char_table = List[Int](capacity=256)
         self._build_bad_char_table()
 
-    fn _build_bad_char_table(mut self):
+    def _build_bad_char_table(mut self):
         """Build the bad character heuristic table."""
         # Initialize all characters to -1 (not in pattern)
         for _ in range(256):
@@ -2120,7 +2122,7 @@ struct BoyerMoore:
             var char_code = Int(pattern_ptr[i])
             self.bad_char_table[char_code] = i
 
-    fn search(self, text: String, start: Int = 0) -> Int:
+    def search(self, text: String, start: Int = 0) -> Int:
         """Search for pattern in text using Boyer-Moore algorithm.
 
         Args:
@@ -2154,7 +2156,7 @@ struct BoyerMoore:
 
         return -1  # Pattern not found
 
-    fn search_all(self, text: String) -> List[Int]:
+    def search_all(self, text: String) -> List[Int]:
         """Find all occurrences of pattern in text.
 
         Args:
@@ -2176,7 +2178,7 @@ struct BoyerMoore:
         return positions^
 
 
-fn compile_dfa_pattern(ast: ASTNode[MutAnyOrigin]) raises -> DFAEngine:
+def compile_dfa_pattern(ast: ASTNode[MutAnyOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
 
     Args:
@@ -2277,7 +2279,7 @@ fn compile_dfa_pattern(ast: ASTNode[MutAnyOrigin]) raises -> DFAEngine:
     return dfa^
 
 
-fn _is_simple_character_class_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_simple_character_class_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple character class (single \\d, \\d+, \\d{3}, [a-z]+, etc.).
 
     Args:
@@ -2308,7 +2310,7 @@ fn _is_simple_character_class_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return False
 
 
-fn _extract_character_class_info(
+def _extract_character_class_info(
     ast: ASTNode[ImmutAnyOrigin],
 ) -> Tuple[Optional[String], Int, Int, Bool, Bool, Bool]:
     """Extract character class information from AST.
@@ -2381,7 +2383,7 @@ fn _extract_character_class_info(
     )
 
 
-fn _is_pure_anchor_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_pure_anchor_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is just anchors (^, $, or ^$).
 
     Args:
@@ -2408,7 +2410,7 @@ fn _is_pure_anchor_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
         return False
 
 
-fn _is_sequential_character_class_pattern(
+def _is_sequential_character_class_pattern(
     ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a sequence of character classes with quantifiers.
@@ -2442,7 +2444,7 @@ fn _is_sequential_character_class_pattern(
     return child.get_children_len() >= 2
 
 
-fn _extract_sequential_pattern_info(
+def _extract_sequential_pattern_info(
     ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a sequential pattern.
@@ -2487,7 +2489,7 @@ fn _extract_sequential_pattern_info(
     return info^
 
 
-fn _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a sequence of multiple character classes.
 
     Examples: [a-z]+[0-9]+, digit+word+, [A-Z][a-z]*[0-9]{2,4}
@@ -2548,7 +2550,7 @@ fn _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return char_class_count >= 2
 
 
-fn _extract_multi_class_sequence_info(
+def _extract_multi_class_sequence_info(
     ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a multi-character class sequence.
@@ -2604,7 +2606,7 @@ fn _extract_multi_class_sequence_info(
     return info^
 
 
-fn _is_mixed_sequential_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_mixed_sequential_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a mixed sequential pattern with optional literals.
 
     Examples: [0-9]+\\.?[0-9]*, [a-z]+@[a-z]+\\.[a-z]+
@@ -2649,7 +2651,7 @@ fn _is_mixed_sequential_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return has_char_class and has_optional_literal
 
 
-fn _extract_mixed_sequential_pattern_info(
+def _extract_mixed_sequential_pattern_info(
     ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
     """Extract information about a mixed sequential pattern.
@@ -2665,7 +2667,7 @@ fn _extract_mixed_sequential_pattern_info(
     return _extract_multi_class_sequence_info(ast)
 
 
-fn _is_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple alternation like a|b, cat|dog, (a|b).
 
     Args:
@@ -2685,7 +2687,7 @@ fn _is_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return _is_pure_alternation_pattern(ast)
 
 
-fn _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if alternation branches are simple (literal elements only).
 
     Args:
@@ -2722,7 +2724,7 @@ fn _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return True
 
 
-fn _group_contains_only_literals(group: ASTNode[MutAnyOrigin]) -> Bool:
+def _group_contains_only_literals(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a group contains only literal elements.
 
     Args:
@@ -2745,7 +2747,7 @@ fn _group_contains_only_literals(group: ASTNode[MutAnyOrigin]) -> Bool:
     return True
 
 
-fn _find_and_check_or_node(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _find_and_check_or_node(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Recursively search for an OR node and check if its branches are simple.
 
     Args:
@@ -2768,7 +2770,7 @@ fn _find_and_check_or_node(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return False
 
 
-fn _find_or_node(
+def _find_or_node(
     ast: ASTNode[MutAnyOrigin],
 ) -> Optional[ASTNode[MutAnyOrigin]]:
     """Recursively find the first OR node in the AST.
@@ -2794,7 +2796,7 @@ fn _find_or_node(
     return None
 
 
-fn _extract_branch_text(branch: ASTNode[MutAnyOrigin]) -> String:
+def _extract_branch_text(branch: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from an alternation branch.
 
     Args:
@@ -2819,7 +2821,7 @@ fn _extract_branch_text(branch: ASTNode[MutAnyOrigin]) -> String:
     return String("")
 
 
-fn _is_quantified_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_quantified_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantified group like (abc)+, (test)*, (a)?.
 
     Args:
@@ -2844,7 +2846,7 @@ fn _is_quantified_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return False
 
 
-fn _group_content_is_simple(group: ASTNode[MutAnyOrigin]) -> Bool:
+def _group_content_is_simple(group: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a quantified group contains simple literal content.
 
     Args:
@@ -2867,7 +2869,7 @@ fn _group_content_is_simple(group: ASTNode[MutAnyOrigin]) -> Bool:
     return True
 
 
-fn _extract_group_text(group: ASTNode[MutAnyOrigin]) -> String:
+def _extract_group_text(group: ASTNode[MutAnyOrigin]) -> String:
     """Extract the literal text from a quantified group.
 
     Args:
@@ -2887,7 +2889,7 @@ fn _extract_group_text(group: ASTNode[MutAnyOrigin]) -> String:
     return result
 
 
-fn _collect_all_alternation_branches(
+def _collect_all_alternation_branches(
     or_node: ASTNode[MutAnyOrigin],
 ) -> List[String]:
     """Recursively collect all branch texts from a potentially nested OR structure.
@@ -2919,7 +2921,7 @@ fn _collect_all_alternation_branches(
     return branches^
 
 
-fn _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a pure alternation without other complex operators.
 
     Only allows simple structures like:
@@ -2954,7 +2956,7 @@ fn _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return False
 
 
-fn _is_simple_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_simple_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a simple quantifier like a*, test+, char?.
 
     Args:
@@ -2995,7 +2997,7 @@ fn _is_simple_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return has_quantifier
 
 
-fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_wildcard_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a wildcard quantifier like .*, .+, .?.
 
     Args:
@@ -3027,7 +3029,7 @@ fn _is_wildcard_quantifier_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     )
 
 
-fn _is_common_prefix_alternation_pattern(
+def _is_common_prefix_alternation_pattern(
     ast: ASTNode[MutAnyOrigin],
 ) -> Bool:
     """Check if pattern is a common prefix alternation like (hello|help|helicopter).
@@ -3071,7 +3073,7 @@ fn _is_common_prefix_alternation_pattern(
     return len(common_prefix) >= 2
 
 
-fn _extract_literal_branches(
+def _extract_literal_branches(
     node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal string branches from OR tree. Returns False if non-literal elements found.
@@ -3098,7 +3100,7 @@ fn _extract_literal_branches(
         return False  # Unexpected node type
 
 
-fn _compute_common_prefix(branches: List[String]) -> String:
+def _compute_common_prefix(branches: List[String]) -> String:
     """Compute the longest common prefix among all branches."""
     if len(branches) == 0:
         return String("")
@@ -3134,7 +3136,7 @@ fn _compute_common_prefix(branches: List[String]) -> String:
     return prefix
 
 
-fn _is_quantified_alternation_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def _is_quantified_alternation_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
 
     Args:
@@ -3174,7 +3176,7 @@ fn _is_quantified_alternation_group(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return _extract_literal_alternation_branches(or_node, branches)
 
 
-fn _extract_literal_alternation_branches(
+def _extract_literal_alternation_branches(
     node: ASTNode[MutAnyOrigin], mut branches: List[String]
 ) -> Bool:
     """Extract literal branches from alternation. Returns False if non-literal elements found.

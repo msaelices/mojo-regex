@@ -8,7 +8,7 @@ from regex.matcher import compile_regex
 # ===-----------------------------------------------------------------------===#
 
 
-fn make_test_string(length: Int) -> String:
+def make_test_string(length: Int) -> String:
     """Generate test string by repeating alphabet."""
     var result = String()
     var pattern = String("abcdefghijklmnopqrstuvwxyz")
@@ -23,7 +23,7 @@ fn make_test_string(length: Int) -> String:
     return result
 
 
-fn make_phone_test_data(num_phones: Int) -> String:
+def make_phone_test_data(num_phones: Int) -> String:
     """Generate test data containing US phone numbers in various formats."""
     var result = String()
     var phone_patterns = List[String]()
@@ -48,7 +48,7 @@ fn make_phone_test_data(num_phones: Int) -> String:
     return result
 
 
-fn make_complex_pattern_test_data(num_entries: Int) -> String:
+def make_complex_pattern_test_data(num_entries: Int) -> String:
     """Generate test data for US national phone number validation."""
     var result = String()
     var complex_patterns = List[String]()
@@ -80,7 +80,7 @@ fn make_complex_pattern_test_data(num_entries: Int) -> String:
 # ===-----------------------------------------------------------------------===#
 
 
-fn benchmark_match_first(
+def benchmark_match_first(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark match_first with manual timing."""
@@ -138,7 +138,7 @@ fn benchmark_match_first(
     )
 
 
-fn benchmark_search(
+def benchmark_search(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark search (match_next) with manual timing."""
@@ -198,7 +198,7 @@ fn benchmark_search(
     )
 
 
-fn benchmark_findall(
+def benchmark_findall(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark findall with manual timing."""
@@ -257,7 +257,7 @@ fn benchmark_findall(
 # ===-----------------------------------------------------------------------===#
 
 
-fn main() raises:
+def main() raises:
     """Run all regex benchmarks with manual timing."""
     print("=== REGEX ENGINE BENCHMARKS (Manual Timing) ===")
     print("Using Python-compatible time.perf_counter_ns() for fair comparison")

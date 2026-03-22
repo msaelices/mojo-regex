@@ -54,11 +54,11 @@ from regex.tokens import (
 
 
 @always_inline
-fn _is_digit(ch: Int) -> Bool:
+def _is_digit(ch: Int) -> Bool:
     return ch >= CHAR_ZERO and ch <= CHAR_NINE
 
 
-fn scan(regex: String) raises -> List[Token]:
+def scan(regex: String) raises -> List[Token]:
     """
     Scans the input regex string and returns a list of tokens.
 

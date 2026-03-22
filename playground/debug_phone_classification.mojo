@@ -5,7 +5,7 @@ from regex.parser import parse
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
-fn main() raises:
+def main() raises:
     print("=== US PHONE PATTERN CLASSIFICATION DEBUG ===")
     print()
 

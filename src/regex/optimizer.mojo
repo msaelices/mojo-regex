@@ -42,16 +42,16 @@ struct PatternComplexity(
 
     var value: Int
 
-    fn __init__(out self, value: Int):
+    def __init__(out self, value: Int):
         self.value = value
 
-    fn __eq__(self, other: Self) -> Bool:
+    def __eq__(self, other: Self) -> Bool:
         return self.value == other.value
 
-    fn __ne__(self, other: Self) -> Bool:
+    def __ne__(self, other: Self) -> Bool:
         return self.value != other.value
 
-    fn __repr__(self) -> String:
+    def __repr__(self) -> String:
         if self.value == PatternComplexity.SIMPLE:
             return "PatternComplexity(SIMPLE)"
         elif self.value == PatternComplexity.MEDIUM:
@@ -61,7 +61,7 @@ struct PatternComplexity(
         else:
             return String("PatternComplexity(UNKNOWN:", self.value, ")")
 
-    fn __str__(self) -> String:
+    def __str__(self) -> String:
         if self.value == PatternComplexity.SIMPLE:
             return "SIMPLE"
         elif self.value == PatternComplexity.MEDIUM:
@@ -72,7 +72,7 @@ struct PatternComplexity(
             return String("UNKNOWN:", self.value)
 
     @no_inline
-    fn write_to[W: Writer, //](self, mut writer: W):
+    def write_to[W: Writer, //](self, mut writer: W):
         """Writes a string representation of the PhoneNumberDesc to the writer.
 
         Parameters:
@@ -100,7 +100,7 @@ struct OptimizationInfo(Movable):
     var suggested_engine: String
     """Suggested engine based on optimization analysis (DFA, NFA, or Hybrid)."""
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize with no optimizations."""
         self.has_literal_prefix = False
         self.literal_prefix_length = 0
@@ -113,11 +113,11 @@ struct OptimizationInfo(Movable):
 struct PatternAnalyzer:
     """Analyzes regex patterns to determine optimal execution strategy."""
 
-    fn __init__(out self):
+    def __init__(out self):
         """Initialize the pattern analyzer."""
         pass
 
-    fn classify(self, ast: ASTNode[MutAnyOrigin]) -> PatternComplexity:
+    def classify(self, ast: ASTNode[MutAnyOrigin]) -> PatternComplexity:
         """Analyze AST to determine pattern complexity.
 
         Args:
@@ -128,7 +128,7 @@ struct PatternAnalyzer:
         """
         return self._analyze_node(ast, depth=0)
 
-    fn analyze_optimizations(
+    def analyze_optimizations(
         self, ast: ASTNode[MutAnyOrigin]
     ) -> OptimizationInfo:
         """Analyze pattern for optimization opportunities.
@@ -181,7 +181,7 @@ struct PatternAnalyzer:
 
         return info^
 
-    fn should_use_pure_dfa(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
+    def should_use_pure_dfa(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
         """Determine if pattern should use pure DFA without SIMD integration.
 
         Pure DFA is best for simple patterns where SIMD overhead exceeds benefits.
@@ -210,7 +210,7 @@ struct PatternAnalyzer:
 
         return False
 
-    fn _is_single_quantified_char_class(self, ast: ASTNode) -> Bool:
+    def _is_single_quantified_char_class(self, ast: ASTNode) -> Bool:
         """Check if pattern is a single quantified character class."""
 
         if ast.type != RE:
@@ -226,7 +226,7 @@ struct PatternAnalyzer:
 
         return False
 
-    fn _check_simd_benefits(self, ast: ASTNode) -> Bool:
+    def _check_simd_benefits(self, ast: ASTNode) -> Bool:
         """Check if pattern would benefit from SIMD optimizations.
 
         Args:
@@ -241,7 +241,7 @@ struct PatternAnalyzer:
         # or complex quantified patterns. Simple single character classes should use DFA.
         return simd_nodes > 2
 
-    fn _count_simd_nodes(self, ast: ASTNode) -> Int:
+    def _count_simd_nodes(self, ast: ASTNode) -> Int:
         """Count nodes that benefit from SIMD optimization."""
         var count = 0
 
@@ -267,7 +267,7 @@ struct PatternAnalyzer:
 
         return count
 
-    fn _analyze_node(self, ast: ASTNode, depth: Int) -> PatternComplexity:
+    def _analyze_node(self, ast: ASTNode, depth: Int) -> PatternComplexity:
         """Recursively analyze AST nodes to determine complexity.
 
         Args:
@@ -327,7 +327,7 @@ struct PatternAnalyzer:
             # Unknown node type - assume complex for safety
             return PatternComplexity(PatternComplexity.COMPLEX)
 
-    fn _classify_quantifier(self, ast: ASTNode) -> PatternComplexity:
+    def _classify_quantifier(self, ast: ASTNode) -> PatternComplexity:
         """Classify pattern based on quantifier complexity.
 
         Args:
@@ -358,7 +358,7 @@ struct PatternAnalyzer:
             # Very large or complex quantifiers - complex
             return PatternComplexity(PatternComplexity.COMPLEX)
 
-    fn _analyze_alternation(
+    def _analyze_alternation(
         self, ast: ASTNode, depth: Int
     ) -> PatternComplexity:
         """Analyze alternation (OR) complexity.
@@ -405,7 +405,7 @@ struct PatternAnalyzer:
             # Mark as MEDIUM instead of falling back, to avoid slow NFA path
             return PatternComplexity(PatternComplexity.MEDIUM)
 
-    fn _analyze_group(self, ast: ASTNode, depth: Int) -> PatternComplexity:
+    def _analyze_group(self, ast: ASTNode, depth: Int) -> PatternComplexity:
         """Analyze group complexity.
 
         Args:
@@ -483,7 +483,7 @@ struct PatternAnalyzer:
         else:
             return PatternComplexity(PatternComplexity.MEDIUM)
 
-    fn _is_multi_char_class_sequence(self, ast: ASTNode) -> Bool:
+    def _is_multi_char_class_sequence(self, ast: ASTNode) -> Bool:
         """Check if this GROUP represents a multi-character class sequence.
 
         Args:
@@ -528,7 +528,7 @@ struct PatternAnalyzer:
         # and any number of single literals (like @ and .)
         return char_class_count >= 2
 
-    fn _is_simple_quantified_group(self, ast: ASTNode) -> Bool:
+    def _is_simple_quantified_group(self, ast: ASTNode) -> Bool:
         """Check if a quantified group is simple enough for DFA compilation.
 
         A simple quantified group is one that:
@@ -559,7 +559,7 @@ struct PatternAnalyzer:
 
         return True
 
-    fn _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
+    def _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
         """Check if alternation tree represents a common prefix alternation.
 
         This checks if a (potentially deep) alternation tree like:
@@ -586,7 +586,7 @@ struct PatternAnalyzer:
         var common_prefix = self._compute_common_prefix_in_optimizer(branches)
         return len(common_prefix) >= 2
 
-    fn _extract_literal_branches_from_tree(
+    def _extract_literal_branches_from_tree(
         self, node: ASTNode, mut branches: List[String]
     ) -> Bool:
         """Extract literal string branches from OR tree."""
@@ -613,7 +613,7 @@ struct PatternAnalyzer:
         else:
             return False  # Unexpected node type
 
-    fn _compute_common_prefix_in_optimizer(
+    def _compute_common_prefix_in_optimizer(
         self, branches: List[String]
     ) -> String:
         """Compute the longest common prefix among all branches."""
@@ -650,7 +650,7 @@ struct PatternAnalyzer:
 
         return prefix
 
-    fn _is_quantified_alternation_group_in_optimizer(
+    def _is_quantified_alternation_group_in_optimizer(
         self, ast: ASTNode
     ) -> Bool:
         """Check if pattern is a quantified alternation group like (a|b)*, (cat|dog)+.
@@ -681,7 +681,7 @@ struct PatternAnalyzer:
         var branches = List[String]()
         return self._extract_literal_branches_from_or(or_node, branches)
 
-    fn _extract_literal_branches_from_or(
+    def _extract_literal_branches_from_or(
         self, node: ASTNode, mut branches: List[String]
     ) -> Bool:
         """Extract literal branches from OR node for optimizer."""
@@ -708,7 +708,7 @@ struct PatternAnalyzer:
         else:
             return False  # Unexpected node type
 
-    fn _is_literal_heavy_alternation(self, ast: ASTNode) -> Bool:
+    def _is_literal_heavy_alternation(self, ast: ASTNode) -> Bool:
         """Check if alternation consists mainly of literal patterns that DFA can handle efficiently.
 
         Args:
@@ -732,7 +732,7 @@ struct PatternAnalyzer:
             total_branches * 4
         )  # 80% threshold
 
-    fn _is_dfa_compatible_branch(self, ast: ASTNode) -> Bool:
+    def _is_dfa_compatible_branch(self, ast: ASTNode) -> Bool:
         """Check if a single alternation branch is DFA-compatible.
 
         Args:
@@ -765,7 +765,7 @@ struct PatternAnalyzer:
 
         return False
 
-    fn _is_simple_dfa_node(self, ast: ASTNode) -> Bool:
+    def _is_simple_dfa_node(self, ast: ASTNode) -> Bool:
         """Check if a node is simple enough for DFA processing.
 
         Args:
@@ -786,7 +786,7 @@ struct PatternAnalyzer:
         return False
 
 
-fn is_literal_pattern(ast: ASTNode) -> Bool:
+def is_literal_pattern(ast: ASTNode) -> Bool:
     """Check if pattern is a simple literal string (possibly with anchors).
 
     Args:
@@ -804,7 +804,7 @@ fn is_literal_pattern(ast: ASTNode) -> Bool:
     return _is_literal_sequence(ast.get_child(0))
 
 
-fn _is_literal_sequence(ast: ASTNode) -> Bool:
+def _is_literal_sequence(ast: ASTNode) -> Bool:
     """Check if an AST node represents a literal character sequence.
 
     Args:
@@ -835,7 +835,7 @@ fn _is_literal_sequence(ast: ASTNode) -> Bool:
         return False
 
 
-fn get_literal_string(ast: ASTNode) -> String:
+def get_literal_string(ast: ASTNode) -> String:
     """Extract literal string from a literal pattern AST.
 
     Args:
@@ -853,7 +853,7 @@ fn get_literal_string(ast: ASTNode) -> String:
         return ""
 
 
-fn _extract_literal_chars(ast: ASTNode) -> String:
+def _extract_literal_chars(ast: ASTNode) -> String:
     """Extract literal characters from an AST node.
 
     Args:
@@ -876,7 +876,7 @@ fn _extract_literal_chars(ast: ASTNode) -> String:
         return EMPTY_STRING  # Non-literal nodes return empty string
 
 
-fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
+def pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     """Check if pattern has start (^) or end ($) anchors.
 
     Args:
@@ -895,7 +895,7 @@ fn pattern_has_anchors(ast: ASTNode) -> Tuple[Bool, Bool]:
     return (has_start, has_end)
 
 
-fn _check_anchors_recursive(ast: ASTNode) -> Tuple[Bool, Bool]:
+def _check_anchors_recursive(ast: ASTNode) -> Tuple[Bool, Bool]:
     """Recursively check for anchors in AST.
 
     Args:

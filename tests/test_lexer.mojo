@@ -26,56 +26,56 @@ from regex.tokens import (
 )
 
 
-fn test_simple_re_lexing() raises:
+def test_simple_re_lexing() raises:
     var tokens = scan("a")
     assert_char_equal(tokens[0].char, "a")
     assert_equal(tokens[0].type, Token.ELEMENT)
 
 
-fn test_escaping_char() raises:
+def test_escaping_char() raises:
     var tokens = scan("a\\\\a\\\\t\\.")
     assert_equal(tokens[1].type, Token.ELEMENT)
     assert_char_equal(tokens[1].char, "\\")
 
 
-fn test_escaping_get_tab() raises:
+def test_escaping_get_tab() raises:
     var tokens = scan("a\\h\\t")
     assert_equal(tokens[2].type, Token.ELEMENT)
     assert_char_equal(tokens[2].char, "\t")
 
 
-fn test_escaping_wildcard() raises:
+def test_escaping_wildcard() raises:
     var tokens = scan("\\.")
     assert_equal(tokens[0].type, Token.ELEMENT)
     assert_char_equal(tokens[0].char, ".")
 
 
-fn test_get_comma() raises:
+def test_get_comma() raises:
     var tokens = scan("a{3,5}")
     assert_equal(tokens[3].type, Token.COMMA)
 
 
-fn test_comma_is_element() raises:
+def test_comma_is_element() raises:
     var tokens = scan("a,")
     assert_equal(tokens[1].type, Token.ELEMENT)
 
 
-fn test_match_start() raises:
+def test_match_start() raises:
     var tokens = scan("^a")
     assert_equal(tokens[0].type, Token.START)
 
 
-fn test_match_end() raises:
+def test_match_end() raises:
     var tokens = scan("fdsad\\$cs$")
     assert_equal(tokens[len(tokens) - 1].type, Token.END)
 
 
-fn test_fail_curly() raises:
+def test_fail_curly() raises:
     with assert_raises():
         _ = scan("advfe{a}")
 
 
-fn test_lexer_1() raises:
+def test_lexer_1() raises:
     var tokens = scan("-\\\\/\\s~")
     assert_equal(len(tokens), 5)
     assert_equal(tokens[0].type, Token.DASH)
@@ -85,44 +85,44 @@ fn test_lexer_1() raises:
     assert_equal(tokens[4].type, Token.ELEMENT)
 
 
-fn test_wildcard_lexing() raises:
+def test_wildcard_lexing() raises:
     var tokens = scan(".")
     assert_equal(tokens[0].type, Token.WILDCARD)
     assert_char_equal(tokens[0].char, ".")
 
 
-fn test_parenthesis_lexing() raises:
+def test_parenthesis_lexing() raises:
     var tokens = scan("()")
     assert_equal(tokens[0].type, Token.LEFTPARENTHESIS)
     assert_equal(tokens[1].type, Token.RIGHTPARENTHESIS)
 
 
-fn test_bracket_lexing() raises:
+def test_bracket_lexing() raises:
     var tokens = scan("[]")
     assert_equal(tokens[0].type, Token.LEFTBRACKET)
     assert_equal(tokens[1].type, Token.RIGHTBRACKET)
 
 
-fn test_curly_brace_lexing() raises:
+def test_curly_brace_lexing() raises:
     var tokens = scan("{1}")
     assert_equal(tokens[0].type, Token.LEFTCURLYBRACE)
     assert_equal(tokens[1].type, Token.ELEMENT)
     assert_equal(tokens[2].type, Token.RIGHTCURLYBRACE)
 
 
-fn test_quantifiers_lexing() raises:
+def test_quantifiers_lexing() raises:
     var tokens = scan("*+?")
     assert_equal(tokens[0].type, Token.ASTERISK)
     assert_equal(tokens[1].type, Token.PLUS)
     assert_equal(tokens[2].type, Token.QUESTIONMARK)
 
 
-fn test_vertical_bar_lexing() raises:
+def test_vertical_bar_lexing() raises:
     var tokens = scan("|")
     assert_equal(tokens[0].type, Token.VERTICALBAR)
 
 
-fn test_dash_lexing() raises:
+def test_dash_lexing() raises:
     var tokens = scan("-")
     assert_equal(tokens[0].type, Token.DASH)
 

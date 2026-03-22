@@ -71,7 +71,7 @@ struct CharacterClassSIMD(
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
 
-    fn __init__(out self, var char_class: String):
+    def __init__(out self, var char_class: String):
         """Initialize SIMD character class matcher.
 
         Args:
@@ -99,7 +99,7 @@ struct CharacterClassSIMD(
         # var call_location = __call_location()
         # print("Init CharacterClassSIMD", call_location)
 
-    fn __init__(out self, start_char: String, end_char: String):
+    def __init__(out self, start_char: String, end_char: String):
         """Initialize with a character range like 'a'-'z'.
 
         Args:
@@ -121,7 +121,7 @@ struct CharacterClassSIMD(
         # var call_location = __call_location()
         # print("Init CharacterClassSIMD", call_location)
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
 
         Args:
@@ -134,7 +134,7 @@ struct CharacterClassSIMD(
             return self.lookup_table[char_code] == 1
         return False
 
-    fn find_first_match(self, text: StringSlice, start: Int = 0) -> Int:
+    def find_first_match(self, text: StringSlice, start: Int = 0) -> Int:
         """Find first character in text that matches this class using SIMD.
 
         Args:
@@ -166,7 +166,7 @@ struct CharacterClassSIMD(
 
         return -1
 
-    fn find_all_matches(self, text: String) -> List[Int]:
+    def find_all_matches(self, text: String) -> List[Int]:
         """Find all positions where characters match this class.
 
         Args:
@@ -197,7 +197,7 @@ struct CharacterClassSIMD(
 
         return matches^
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match the character class.
@@ -255,7 +255,7 @@ struct CharacterClassSIMD(
 
             return matches
 
-    fn count_matches(self, text: String, start: Int = 0, end: Int = -1) -> Int:
+    def count_matches(self, text: String, start: Int = 0, end: Int = -1) -> Int:
         """Count how many characters match this class in the given range.
 
         Args:
@@ -286,7 +286,7 @@ struct CharacterClassSIMD(
 
         return count
 
-    fn _check_chunk_simd(
+    def _check_chunk_simd(
         self, text: StringSlice, pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations.
@@ -349,25 +349,25 @@ struct CharacterClassSIMD(
 
 
 @always_inline
-fn _create_ascii_lowercase() -> CharacterClassSIMD:
+def _create_ascii_lowercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII lowercase letters [a-z]."""
     return CharacterClassSIMD("a", "z")
 
 
 @always_inline
-fn _create_ascii_uppercase() -> CharacterClassSIMD:
+def _create_ascii_uppercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII uppercase letters [A-Z]."""
     return CharacterClassSIMD("A", "Z")
 
 
 @always_inline
-fn _create_ascii_digits() -> CharacterClassSIMD:
+def _create_ascii_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII digits [0-9]."""
     return CharacterClassSIMD("0", "9")
 
 
 @always_inline
-fn _create_ascii_alphanumeric() -> CharacterClassSIMD:
+def _create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -387,14 +387,14 @@ fn _create_ascii_alphanumeric() -> CharacterClassSIMD:
 
 
 @always_inline
-fn _create_whitespace() -> CharacterClassSIMD:
+def _create_whitespace() -> CharacterClassSIMD:
     """Create SIMD matcher for whitespace characters [ \\t\\n\\r\\f\\v]."""
     var whitespace_chars = " \t\n\r\f\v"
     return CharacterClassSIMD(whitespace_chars)
 
 
 @always_inline
-fn _create_ascii_alpha() -> CharacterClassSIMD:
+def _create_ascii_alpha() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII letters [a-zA-Z]."""
     var result = CharacterClassSIMD("")
 
@@ -410,7 +410,7 @@ fn _create_ascii_alpha() -> CharacterClassSIMD:
 
 
 @always_inline
-fn _create_ascii_alnum_lower() -> CharacterClassSIMD:
+def _create_ascii_alnum_lower() -> CharacterClassSIMD:
     """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -426,7 +426,7 @@ fn _create_ascii_alnum_lower() -> CharacterClassSIMD:
 
 
 @always_inline
-fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
+def _create_ascii_alnum_upper() -> CharacterClassSIMD:
     """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
     var result = CharacterClassSIMD("")
 
@@ -442,12 +442,12 @@ fn _create_ascii_alnum_upper() -> CharacterClassSIMD:
 
 
 @always_inline
-fn _create_word_chars() -> CharacterClassSIMD:
+def _create_word_chars() -> CharacterClassSIMD:
     """Create SIMD matcher for word characters [a-zA-Z0-9_]."""
     return CharacterClassSIMD(WORD_CHARS)
 
 
-fn _search_short_pattern(
+def _search_short_pattern(
     pattern: Span[Byte, _], text: String, start: Int
 ) -> Int:
     """Optimized search for very short patterns (1-2 characters).
@@ -484,7 +484,7 @@ fn _search_short_pattern(
     return -1
 
 
-fn verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
+def verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
     Args:
@@ -508,7 +508,7 @@ fn verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
     return True
 
 
-fn simd_search(
+def simd_search(
     pattern: Span[Byte, _],
     text: String,
     start: Int = 0,
@@ -563,7 +563,7 @@ fn simd_search(
     return -1
 
 
-fn simd_memcmp(
+def simd_memcmp(
     s1: String, s1_offset: Int, s2: String, s2_offset: Int, length: Int
 ) -> Bool:
     """SIMD-accelerated memory comparison for string matching.
@@ -607,7 +607,7 @@ fn simd_memcmp(
     return True
 
 
-fn simd_count_char(text: String, target_char: String) -> Int:
+def simd_count_char(text: String, target_char: String) -> Int:
     """Count occurrences of a character using SIMD.
 
     Args:
@@ -650,13 +650,13 @@ alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
 alias _SIMD_MATCHERS_GLOBAL = _Global["SIMDMatchers", _init_simd_matchers]
 
 
-fn _init_simd_matchers() -> SIMDMatchers:
+def _init_simd_matchers() -> SIMDMatchers:
     """Initialize the global SIMD matchers dictionary."""
     var matchers = SIMDMatchers()
     return matchers^
 
 
-fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutAnyOrigin]:
+def _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutAnyOrigin]:
     """Returns a pointer to the global SIMD matchers dictionary."""
     try:
         return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
@@ -666,7 +666,7 @@ fn _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutAnyOrigin]:
 
 
 @always_inline
-fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
+def get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
     """Get a SIMD matcher by type from the global cache.
     Args:
         matcher_type: One of the SIMD_MATCHER_* constants.
@@ -706,7 +706,7 @@ fn get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
 
 
 @always_inline
-fn get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
+def get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
     """Get optimal cached matcher for character class string.
 
     This function detects common character class patterns and returns
@@ -747,7 +747,7 @@ fn get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
         return CharacterClassSIMD(char_class)
 
 
-fn process_text_with_matcher[
+def process_text_with_matcher[
     T: SIMDMatcher
 ](matcher: T, text: String, start: Int = 0) -> List[Int]:
     """Process text with any SIMD matcher implementation.
@@ -789,7 +789,7 @@ fn process_text_with_matcher[
     return matches^
 
 
-fn apply_quantifier_simd_generic[
+def apply_quantifier_simd_generic[
     T: SIMDMatcher
 ](
     matcher: T,
@@ -837,7 +837,7 @@ fn apply_quantifier_simd_generic[
         return (False, start_pos)
 
 
-fn find_in_text_simd[
+def find_in_text_simd[
     T: SIMDMatcher
 ](matcher: T, text: String, start: Int = 0, end: Int = -1,) -> Int:
     """Find first occurrence of a character matching the given matcher.
@@ -881,7 +881,7 @@ fn find_in_text_simd[
     return -1
 
 
-fn twoway_search(
+def twoway_search(
     pattern: Span[Byte, _],
     text: String,
     start: Int = 0,
@@ -983,7 +983,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
     var literal_count: Int
     """Number of literals (max 16 for SIMD efficiency)."""
 
-    fn __init__(out self, var literals: List[String]):
+    def __init__(out self, var literals: List[String]):
         """Initialize multi-literal searcher.
 
         Args:
@@ -1003,7 +1003,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
                 self.min_len = min(self.min_len, len(lit))
         self.literals = literals^
 
-    fn search(self, text: String, start: Int = 0) -> Tuple[Int, Int]:
+    def search(self, text: String, start: Int = 0) -> Tuple[Int, Int]:
         """Search for any literal in text.
 
         Args:
@@ -1060,7 +1060,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
 
         return (-1, -1)
 
-    fn _verify_literal(self, text: String, pos: Int, literal: String) -> Bool:
+    def _verify_literal(self, text: String, pos: Int, literal: String) -> Bool:
         """Verify that literal matches at given position.
 
         Args:

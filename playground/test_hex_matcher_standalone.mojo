@@ -7,13 +7,13 @@ alias SIMD_WIDTH = 16  # Test with 16-byte chunks for optimal performance
 trait SIMDMatcher:
     """Base trait for SIMD character class matchers."""
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match the character class."""
         ...
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if a single character is in this character class."""
         ...
 
@@ -28,7 +28,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
     var high_nibble_lut: SIMD[DType.uint8, 16]
     """Lookup table for high nibbles (0x0-0xF)."""
 
-    fn __init__(
+    def __init__(
         out self,
         low_lut: SIMD[DType.uint8, 16],
         high_lut: SIMD[DType.uint8, 16],
@@ -37,7 +37,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
         self.low_nibble_lut = low_lut
         self.high_nibble_lut = high_lut
 
-    fn match_chunk[
+    def match_chunk[
         size: Int
     ](self, chunk: SIMD[DType.uint8, size]) -> SIMD[DType.bool, size]:
         """Check if characters in chunk match using nibble-based lookup."""
@@ -78,7 +78,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
 
             return result
 
-    fn contains(self, char_code: Int) -> Bool:
+    def contains(self, char_code: Int) -> Bool:
         """Check if a single character matches."""
         if char_code < 0 or char_code > 255:
             return False
@@ -92,7 +92,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
         return (low_match & high_match) != 0
 
 
-fn create_hex_digit_matcher() -> NibbleBasedMatcher:
+def create_hex_digit_matcher() -> NibbleBasedMatcher:
     """Create a nibble-based matcher for hex digits [0-9A-Fa-f]."""
     # For hex digits:
     # - Digits '0'-'9': 0x30-0x39 (high nibble=3, low nibble=0-9)
@@ -142,7 +142,7 @@ fn create_hex_digit_matcher() -> NibbleBasedMatcher:
     return NibbleBasedMatcher(low_lut, high_lut)
 
 
-fn test_hex_matcher() raises:
+def test_hex_matcher() raises:
     """Test the nibble-based hex digit matcher."""
     print("Testing nibble-based hex digit matcher...")
 
@@ -185,7 +185,7 @@ fn test_hex_matcher() raises:
     print("\nHex matcher test passed!")
 
 
-fn test_performance_comparison() raises:
+def test_performance_comparison() raises:
     """Compare performance of nibble-based vs simple lookup."""
     print("\n\nPerformance comparison:")
 
@@ -236,7 +236,7 @@ fn test_performance_comparison() raises:
     print("Performance test passed!")
 
 
-fn main() raises:
+def main() raises:
     test_hex_matcher()
     test_performance_comparison()
     print("\n✅ All tests passed!")

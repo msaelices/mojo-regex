@@ -7,7 +7,7 @@ from regex.simd_matchers import (
 )
 
 
-fn test_digit_range_matcher() raises:
+def test_digit_range_matcher() raises:
     """Test the range-based digit matcher."""
     print("Testing range-based digit matcher...")
 
@@ -33,7 +33,7 @@ fn test_digit_range_matcher() raises:
     print("Digit range matcher test passed!")
 
 
-fn test_alpha_range_matcher() raises:
+def test_alpha_range_matcher() raises:
     """Test the range-based alphabetic matcher."""
     print("\n\nTesting range-based alphabetic matcher...")
 
@@ -61,7 +61,7 @@ fn test_alpha_range_matcher() raises:
     print("Alpha range matcher test passed!")
 
 
-fn test_alnum_range_matcher() raises:
+def test_alnum_range_matcher() raises:
     """Test the range-based alphanumeric matcher."""
     print("\n\nTesting range-based alphanumeric matcher...")
 
@@ -91,7 +91,7 @@ fn test_alnum_range_matcher() raises:
     print("Alnum range matcher test passed!")
 
 
-fn benchmark_range_vs_nibble() raises:
+def benchmark_range_vs_nibble() raises:
     """Compare performance of range-based vs nibble-based matchers."""
     print("\n\nPerformance comparison: range-based vs nibble-based")
 
@@ -155,7 +155,7 @@ fn benchmark_range_vs_nibble() raises:
     print("\nRange-based is", speedup, "x faster than lookup-based")
 
 
-fn main() raises:
+def main() raises:
     test_digit_range_matcher()
     test_alpha_range_matcher()
     test_alnum_range_matcher()

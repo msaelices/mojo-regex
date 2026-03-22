@@ -53,7 +53,7 @@ from regex.ast import (
 
 
 @always_inline
-fn check_for_quantifiers[
+def check_for_quantifiers[
     regex_origin: ImmutOrigin
 ](mut i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]) raises:
     """Check for quantifiers after an element and set min/max accordingly."""
@@ -114,7 +114,7 @@ fn check_for_quantifiers[
         i -= 1  # Compensate for the i += 1 at the end of the loop
 
 
-fn get_range_str(start: String, end: String) -> String:
+def get_range_str(start: String, end: String) -> String:
     """Generate a string containing all characters in the range [start, end]."""
     var start_ord = ord(start)
     var end_ord = ord(end)
@@ -127,7 +127,7 @@ fn get_range_str(start: String, end: String) -> String:
     return result
 
 
-fn parse_token_list[
+def parse_token_list[
     regex_origin: Origin[mut=True]
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
@@ -439,7 +439,7 @@ fn parse_token_list[
     return final_group^
 
 
-fn parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
+def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
