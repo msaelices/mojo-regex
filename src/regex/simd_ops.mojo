@@ -149,7 +149,7 @@ struct CharacterClassSIMD(
 
         # Process chunks using SIMD
         while pos + SIMD_WIDTH <= text_len:
-            var matches = self._check_chunk_simd(text, pos)
+            var matches = self._check_chunk_simd(text.unsafe_ptr(), pos)
             if matches.reduce_or():
                 # Found at least one match in this chunk
                 for i in range(SIMD_WIDTH):
@@ -186,7 +186,9 @@ struct CharacterClassSIMD(
             mut matches, read self, read text, read text_ptr, read pos
         }:
             if width != 1:
-                var chunk_matches = self._check_chunk_simd(text, pos + i)
+                var chunk_matches = self._check_chunk_simd(
+                    text.unsafe_ptr(), pos + i
+                )
                 for j in range(width):
                     if chunk_matches[j]:
                         matches.append(pos + i + j)
@@ -277,7 +279,7 @@ struct CharacterClassSIMD(
             mut count, read self, read text, read text_ptr, read pos
         }:
             if width != 1:
-                var matches = self._check_chunk_simd(text, pos + i)
+                var matches = self._check_chunk_simd(text.unsafe_ptr(), pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
             elif self.contains(Int(text_ptr[pos + i])):
                 count += 1
@@ -287,19 +289,19 @@ struct CharacterClassSIMD(
         return count
 
     def _check_chunk_simd(
-        self, text: StringSlice, pos: Int
+        self, text_ptr: UnsafePointer[Byte, _], pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations.
 
         Args:
-            text: Text to check.
+            text_ptr: Pointer to text bytes.
             pos: Starting position of chunk.
 
         Returns:
             SIMD vector of booleans indicating matches
         """
         # Load chunk of characters
-        var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
+        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
 
         # Use hybrid approach based on pattern characteristics
         if self.use_shuffle:
@@ -313,7 +315,7 @@ struct CharacterClassSIMD(
                 return result.ne(0)
             else:
                 # Fallback for other sizes - still avoid the loop by using vectorized operations
-                var matches = SIMD[DType.bool, SIMD_WIDTH](False)
+                var matches = SIMD[DType.bool, SIMD_WIDTH](fill=False)
 
                 # Process in 16-byte sub-chunks when possible
                 @parameter
