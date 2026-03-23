@@ -21,7 +21,7 @@ from regex.tokens import (
     NotToken,
     Wildcard,
 )
-from memory import alloc
+from std.memory import alloc
 
 from regex.ast import (
     ASTNode,

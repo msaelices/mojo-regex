@@ -1,40 +1,40 @@
-from memory import Pointer, UnsafePointer, memcpy, alloc
-from os import abort
+from std.memory import Pointer, UnsafePointer, memcpy, alloc
+from std.os import abort
 
 from regex.aliases import CHAR_ZERO, CHAR_NINE, WORD_CHARS
 
 
-alias RE = 0
-alias ELEMENT = 1
-alias WILDCARD = 2
-alias SPACE = 3
-alias DIGIT = 4
-alias WORD = 5
-alias RANGE = 6
-alias START = 7
-alias END = 8
-alias OR = 9
-alias NOT = 10
-alias GROUP = 11
+comptime RE = 0
+comptime ELEMENT = 1
+comptime WILDCARD = 2
+comptime SPACE = 3
+comptime DIGIT = 4
+comptime WORD = 5
+comptime RANGE = 6
+comptime START = 7
+comptime END = 8
+comptime OR = 9
+comptime NOT = 10
+comptime GROUP = 11
 
-alias LEAF_ELEMS: SIMD[DType.int8, 8] = [
-    ELEMENT,
-    WILDCARD,
-    SPACE,
-    DIGIT,
-    WORD,
-    RANGE,
-    START,
-    END,
+comptime LEAF_ELEMS: SIMD[DType.int8, 8] = [
+    Int8(ELEMENT),
+    Int8(WILDCARD),
+    Int8(SPACE),
+    Int8(DIGIT),
+    Int8(WORD),
+    Int8(RANGE),
+    Int8(START),
+    Int8(END),
 ]
-alias SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
-    SPACE,
-    DIGIT,
-    WORD,
-    RANGE,
+comptime SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
+    Int8(SPACE),
+    Int8(DIGIT),
+    Int8(WORD),
+    Int8(RANGE),
 ]
 
-alias ChildrenIndexes = List[UInt8]
+comptime ChildrenIndexes = List[UInt8]
 
 
 @always_inline
@@ -46,11 +46,9 @@ def _make_children_indexes(*values: UInt8) -> ChildrenIndexes:
     return result^
 
 
-struct Regex[origin: Origin](
-    Copyable, Equatable, Movable, Stringable, Writable
-):
-    alias ImmOrigin = ImmutOrigin(Self.origin)
-    alias Immutable = Regex[origin=Self.ImmOrigin]
+struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
+    comptime ImmOrigin = ImmutOrigin(Self.origin)
+    comptime Immutable = Regex[origin=Self.ImmOrigin]
     var pattern: String
     var children_ptr: UnsafePointer[ASTNode[ImmutAnyOrigin], MutAnyOrigin]
     var children_len: Int
@@ -146,14 +144,13 @@ struct ASTNode[regex_origin: ImmutOrigin](
     Equatable,
     ImplicitlyCopyable,
     Movable,
-    Stringable,
     Writable,
 ):
     """Struct for all the Regex AST nodes."""
 
     # Mark that is trivially copyable in lists
-    alias __copy_ctor_is_trivial = True
-    alias max_children = 256
+    comptime __copy_ctor_is_trivial = True
+    comptime max_children = 256
 
     var type: Int
     """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
@@ -352,7 +349,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         Only use SIMD for patterns that will truly benefit, avoiding overhead
         for simple cases that can be handled more efficiently by regular matching.
         """
-        if not SIMD_QUANTIFIERS.eq(self.type).reduce_or():
+        if not SIMD_QUANTIFIERS.eq(Int8(self.type)).reduce_or():
             return False
 
         if min_matches == 1 and max_matches == 1:

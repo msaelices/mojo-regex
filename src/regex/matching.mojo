@@ -1,11 +1,11 @@
-from memory import UnsafePointer, memcpy, alloc
+from std.memory import UnsafePointer, memcpy, alloc
 
 
 struct Match(Copyable, Movable, TrivialRegisterPassable):
     """Contains the information of a match in a regular expression."""
 
     # Trivially copyable in lists
-    alias __copy_ctor_is_trivial = True
+    comptime __copy_ctor_is_trivial = True
 
     var group_id: Int
     """The ID of the capturing group (0 for the whole match)."""
@@ -43,7 +43,7 @@ struct MatchList(Copyable, Movable, Sized):
     Provides List-compatible interface for easy integration with existing code.
     """
 
-    alias DEFAULT_RESERVE_SIZE = 8
+    comptime DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
     var _data: UnsafePointer[Match, MutAnyOrigin]

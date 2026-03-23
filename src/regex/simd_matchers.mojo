@@ -4,10 +4,10 @@ SIMD-optimized matchers for character classes using advanced byte lookup techniq
 Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.html
 """
 
-from os import abort
-from sys.info import simd_width_of
-from ffi import _Global
-from memory import UnsafePointer
+from std.os import abort
+from std.sys.info import simd_width_of
+from std.ffi import _Global
+from std.memory import UnsafePointer
 from regex.aliases import (
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_WHITESPACE,
@@ -18,7 +18,7 @@ from regex.aliases import (
     SIMD_MATCHER_WORD_CHARS,
 )
 
-alias SIMD_WIDTH = simd_width_of[DType.uint8]()
+comptime SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 trait SIMDMatcher:
@@ -98,9 +98,7 @@ struct NibbleBasedMatcher(
         # Extract nibbles
         var low_nibbles = chunk & 0x0F
         var high_nibbles = (chunk >> 4) & 0x0F
-
-        @parameter
-        if size == 16:
+        comptime if size == 16:
             # Fast path for 16-byte chunks
             var low_match = self.low_nibble_lut._dynamic_shuffle(low_nibbles)
             var high_match = self.high_nibble_lut._dynamic_shuffle(high_nibbles)
@@ -108,12 +106,8 @@ struct NibbleBasedMatcher(
         else:
             # Process in 16-byte sub-chunks
             var result = SIMD[DType.bool, size](False)
-
-            @parameter
-            for offset in range(0, size, 16):
-
-                @parameter
-                if offset + 16 <= size:
+            comptime for offset in range(0, size, 16):
+                comptime if offset + 16 <= size:
                     var sub_low = low_nibbles.slice[16, offset=offset]()
                     var sub_high = high_nibbles.slice[16, offset=offset]()
                     var low_match = self.low_nibble_lut._dynamic_shuffle(
@@ -383,8 +377,8 @@ def analyze_character_class_pattern(pattern: String) -> String:
 
 
 # Global cache for RangeBasedMatcher instances
-alias RangeMatchers = Dict[Int, RangeBasedMatcher]
-alias _RANGE_MATCHERS_GLOBAL = _Global["RangeMatchers", _init_range_matchers]
+comptime RangeMatchers = Dict[Int, RangeBasedMatcher]
+comptime _RANGE_MATCHERS_GLOBAL = _Global["RangeMatchers", _init_range_matchers]
 
 
 def _init_range_matchers() -> RangeMatchers:
@@ -399,12 +393,13 @@ def _get_range_matchers() -> UnsafePointer[RangeMatchers, MutAnyOrigin]:
         return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[RangeMatchers, MutAnyOrigin]()  # Unreachable
 
 
 # Global cache for NibbleBasedMatcher instances
-alias NibbleMatchers = Dict[Int, NibbleBasedMatcher]
-alias _NIBBLE_MATCHERS_GLOBAL = _Global["NibbleMatchers", _init_nibble_matchers]
+comptime NibbleMatchers = Dict[Int, NibbleBasedMatcher]
+comptime _NIBBLE_MATCHERS_GLOBAL = _Global[
+    "NibbleMatchers", _init_nibble_matchers
+]
 
 
 def _init_nibble_matchers() -> NibbleMatchers:
@@ -419,7 +414,6 @@ def _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
         return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[NibbleMatchers, MutAnyOrigin]()  # Unreachable
 
 
 def _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
@@ -427,24 +421,24 @@ def _create_range_matcher_for_type(matcher_type: Int) -> RangeBasedMatcher:
     var matcher = RangeBasedMatcher()
 
     if matcher_type == SIMD_MATCHER_DIGITS:
-        matcher.add_range(ord("0"), ord("9"))
+        matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
     elif matcher_type == SIMD_MATCHER_ALPHA:
-        matcher.add_range(ord("a"), ord("z"))
-        matcher.add_range(ord("A"), ord("Z"))
+        matcher.add_range(UInt8(ord("a")), UInt8(ord("z")))
+        matcher.add_range(UInt8(ord("A")), UInt8(ord("Z")))
     elif matcher_type == SIMD_MATCHER_ALNUM:
-        matcher.add_range(ord("a"), ord("z"))
-        matcher.add_range(ord("A"), ord("Z"))
-        matcher.add_range(ord("0"), ord("9"))
+        matcher.add_range(UInt8(ord("a")), UInt8(ord("z")))
+        matcher.add_range(UInt8(ord("A")), UInt8(ord("Z")))
+        matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
     elif matcher_type == SIMD_MATCHER_HEX_DIGITS:
-        matcher.add_range(ord("0"), ord("9"))
-        matcher.add_range(ord("A"), ord("F"))
-        matcher.add_range(ord("a"), ord("f"))
+        matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
+        matcher.add_range(UInt8(ord("A")), UInt8(ord("F")))
+        matcher.add_range(UInt8(ord("a")), UInt8(ord("f")))
     elif matcher_type == SIMD_MATCHER_WORD_CHARS:
-        matcher.add_range(ord("a"), ord("z"))
-        matcher.add_range(ord("A"), ord("Z"))
-        matcher.add_range(ord("0"), ord("9"))
+        matcher.add_range(UInt8(ord("a")), UInt8(ord("z")))
+        matcher.add_range(UInt8(ord("A")), UInt8(ord("Z")))
+        matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
         matcher.add_range(
-            ord("_"), ord("_")
+            UInt8(ord("_")), UInt8(ord("_"))
         )  # Single character range for underscore
 
     return matcher

@@ -1,4 +1,4 @@
-from memory import UnsafePointer
+from std.memory import UnsafePointer
 
 from regex.ast import ASTNode, DIGIT, WORD, SPACE
 from regex.aliases import (
@@ -33,13 +33,13 @@ from regex.optimizer import PatternAnalyzer, PatternComplexity
 # Threshold for complex character class patterns (e.g. [a-zA-Z0-9._%+-])
 # When a pattern has alphanumeric ranges plus more than this many characters,
 # use optimized two-phase matching (check alphanumeric first, then special chars)
-alias COMPLEX_CHAR_CLASS_THRESHOLD = 10
+comptime COMPLEX_CHAR_CLASS_THRESHOLD = 10
 
 # Minimum literal length thresholds for optimization
 # Prefix literals need to be longer than this to justify optimization overhead
-alias MIN_PREFIX_LITERAL_LENGTH = 3
+comptime MIN_PREFIX_LITERAL_LENGTH = 3
 # Non-prefix literals need even longer length to be worth the overhead
-alias MIN_REQUIRED_LITERAL_LENGTH = 4
+comptime MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
 struct NFAEngine(Copyable, Engine):
