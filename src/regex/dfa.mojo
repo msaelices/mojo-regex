@@ -1891,36 +1891,54 @@ struct DFAEngine(Engine):
         Returns:
             Matches container with all matches found.
         """
-        # Use smart Matches container with lazy allocation
         var matches = MatchList()
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
-            # Anchored patterns can only match once
             var match_result = self.match_next(text, 0)
             if match_result:
                 matches.append(match_result.value())
             return matches^
 
-        # Skip SIMD path - removed for performance
-
         var pos = 0
         var text_len = len(text)
+        var text_ptr = text.unsafe_ptr()
+        var num_states = len(self.states)
 
+        # Fast path: use SIMD matcher to skip non-matching positions
+        if self._has_simd_matcher and num_states > 0:
+            while pos < text_len:
+                # Skip characters that can't start a match
+                while pos < text_len and not self._simd_char_matcher.contains(
+                    Int(text_ptr[pos])
+                ):
+                    pos += 1
+                if pos >= text_len:
+                    break
+                # Found a candidate -- run DFA from here
+                var match_result = self._try_match_at_position(text, pos)
+                if match_result:
+                    ref match_obj = match_result.value()
+                    matches.append(match_obj)
+                    if match_obj.end_idx == match_obj.start_idx:
+                        pos += 1
+                    else:
+                        pos = match_obj.end_idx
+                else:
+                    pos += 1
+            return matches^
+
+        # General path: try every position
         while pos <= text_len:
-            # Try to match at current position directly
             var match_result = self._try_match_at_position(text, pos)
             if match_result:
                 ref match_obj = match_result.value()
                 matches.append(match_obj)
-                # Move past this match to find next one
                 if match_obj.end_idx == match_obj.start_idx:
-                    # Zero-width match, advance by one to avoid infinite loop
                     pos += 1
                 else:
                     pos = match_obj.end_idx
             else:
-                # No match at this position, try next
                 pos += 1
 
         return matches^
