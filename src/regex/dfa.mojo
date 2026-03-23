@@ -268,7 +268,9 @@ struct DFAEngine(Engine):
     var _has_simd_matcher: Bool
     """Whether the SIMD matcher is set. Workaround for Mojo 0.26.2 bug where
     Optional[T] silently fails for large TrivialRegisterPassable structs
-    stored in complex container structs."""
+    (https://github.com/modular/modular/issues/6253).
+    TODO: Revert to Optional[CharacterClassSIMD] once upgraded to Mojo 0.26.3+
+    where this bug is fixed."""
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
