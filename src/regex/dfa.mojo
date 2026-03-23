@@ -263,8 +263,14 @@ struct DFAEngine(Engine):
     """Whether the pattern ends with $ anchor."""
     var is_pure_literal: Bool
     """Whether this is a pure literal pattern (no regex operators)."""
-    var simd_char_matcher: Optional[CharacterClassSIMD]
+    var _simd_char_matcher: CharacterClassSIMD
     """SIMD-optimized character class matcher for simple patterns."""
+    var _has_simd_matcher: Bool
+    """Whether the SIMD matcher is set. Workaround for Mojo 0.26.2 bug where
+    Optional[T] silently fails for large TrivialRegisterPassable structs
+    (https://github.com/modular/modular/issues/6253).
+    TODO: Revert to Optional[CharacterClassSIMD] once upgraded to Mojo 0.26.3+
+    where this bug is fixed."""
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
@@ -275,7 +281,8 @@ struct DFAEngine(Engine):
         self.has_start_anchor = False
         self.has_end_anchor = False
         self.is_pure_literal = False
-        self.simd_char_matcher = None
+        self._simd_char_matcher = CharacterClassSIMD("")
+        self._has_simd_matcher = False
         self.literal_pattern = ""
 
     def __moveinit__(out self, deinit take: Self):
@@ -285,7 +292,8 @@ struct DFAEngine(Engine):
         self.has_start_anchor = take.has_start_anchor
         self.has_end_anchor = take.has_end_anchor
         self.is_pure_literal = take.is_pure_literal
-        self.simd_char_matcher = take.simd_char_matcher^
+        self._simd_char_matcher = take._simd_char_matcher
+        self._has_simd_matcher = take._has_simd_matcher
         self.literal_pattern = take.literal_pattern^
 
     def compile_pattern(
@@ -365,7 +373,8 @@ struct DFAEngine(Engine):
         """
         # Try to use SIMD optimization for simple character class patterns
         if min_matches >= 0 and positive_logic:
-            self.simd_char_matcher = get_character_class_matcher(char_class)
+            self._simd_char_matcher = get_character_class_matcher(char_class)
+            self._has_simd_matcher = True
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -1627,7 +1636,8 @@ struct DFAEngine(Engine):
             and sequence_info.elements[0].min_matches >= 1
             and digit_elements * 2 >= total_elements
         ):
-            self.simd_char_matcher = get_character_class_matcher(DIGITS)
+            self._simd_char_matcher = get_character_class_matcher(DIGITS)
+            self._has_simd_matcher = True
 
     @always_inline
     def _add_character_class_transitions(
@@ -1752,7 +1762,7 @@ struct DFAEngine(Engine):
                 return None
 
         # Optimization: Use SIMD to quickly find candidate positions for character class patterns
-        if self.simd_char_matcher and not self.has_end_anchor:
+        if self._has_simd_matcher and not self.has_end_anchor:
             return self._optimized_simd_search(text, start)
 
         # Fallback: Try to find a match starting from each position from 'start' onwards
@@ -1804,7 +1814,7 @@ struct DFAEngine(Engine):
                 return None
 
         # Try SIMD matching for simple character class patterns
-        if self.simd_char_matcher and len(self.states) > 0:
+        if self._has_simd_matcher and len(self.states) > 0:
             var match_result = self._try_match_simd(text, start_pos)
             if match_result:
                 return match_result
@@ -1928,10 +1938,10 @@ struct DFAEngine(Engine):
         Returns:
             Optional Match if pattern matches at this position, None otherwise.
         """
-        if not self.simd_char_matcher:
+        if not self._has_simd_matcher:
             return None
 
-        ref simd_matcher = self.simd_char_matcher.value()
+        ref simd_matcher = self._simd_char_matcher
         var text_len = len(text)
 
         if len(self.states) == 0:
@@ -2025,10 +2035,10 @@ struct DFAEngine(Engine):
         Returns:
             Optional Match if found, None otherwise.
         """
-        if not self.simd_char_matcher:
+        if not self._has_simd_matcher:
             return None
 
-        ref simd_matcher = self.simd_char_matcher.value()
+        ref simd_matcher = self._simd_char_matcher
         var text_len = len(text)
         var pos = start
 
