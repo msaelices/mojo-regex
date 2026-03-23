@@ -131,6 +131,18 @@ These thresholds determine when literal prefiltering kicks in. Patterns with
 2-character literals (like `\d{3}-\d{3}` where `-` is literal) miss the
 optimization. Lowering to 2/3 would enable prefiltering for more patterns.
 
+## ~~Medium: DFA match_all scanning every position~~ (Fixed, PR #65)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/65
+
+The DFA `match_all` loop was calling `_try_match_at_position` at every text
+position. Now uses the SIMD character class matcher to skip non-matching
+positions, only running the full DFA when a candidate is found.
+
+- match_all_digits: 16x faster (1.94ms -> 0.12ms, now 9x faster than Python)
+- dfa_digits_only: 8.4x faster (2.85ms -> 0.34ms, now 2.9x faster than Python)
+- single_quantifier_digits: 4.5x faster (now 1.7x faster than Python)
+
 ## Medium: find_all_matches Append in Closure
 
 **File:** `src/regex/simd_ops.mojo` lines 178-190
