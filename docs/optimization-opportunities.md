@@ -73,6 +73,22 @@ Workaround: replaced `Optional[CharacterClassSIMD]` with a plain field + Bool fl
 - range_digits: 0.105ms -> 0.040ms (2.6x faster)
 - predefined_digits: 0.147ms -> 0.038ms (3.9x faster)
 
+## ~~High: Grouped literal alternations misrouted to NFA~~ (Fixed, PR #64)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/64
+
+Patterns like `(apple|banana|cherry|date|elderberry|fig|grape|honey)` were
+classified as COMPLEX due to nested GROUP wrappers exceeding the optimizer's
+depth threshold, routing them to the slow NFA+Prefilter engine instead of
+the O(n) DFA engine.
+
+Two fixes: the optimizer now recognizes pure literal alternation trees
+regardless of GROUP nesting depth, and the DFA compiler unwraps nested
+GROUP wrappers when checking for alternation patterns.
+
+- large_8_alternations: 0.025ms -> 0.0003ms (80x faster, now 3.7x faster than Python)
+- literal_heavy_alternation: 0.060ms -> 0.0004ms (167x faster)
+
 ## Medium: SIMD First-Match Scalar Fallback
 
 **File:** `src/regex/simd_ops.mojo` lines 150-160
@@ -123,17 +139,17 @@ The vectorize closure calls `matches.append()` which may trigger reallocation
 inside the SIMD loop. A two-pass approach (count matches, pre-allocate, fill)
 would eliminate this.
 
-## Low: NFA String Allocations in is_match
+## ~~Low: NFA String Allocations in is_match~~ (Fixed, PR #63)
 
-**File:** `src/regex/nfa.mojo` lines 1112, 1196
+**PR:** https://github.com/msaelices/mojo-regex/pull/63
 
-```mojo
-if ast.is_match(String(str[byte=pos]), pos, len(str)):
-```
+Added `is_match_char(ch_code: Int)` to ASTNode for zero-allocation character
+matching. The NFA hot loops now use `ast.is_match_char(Int(str_ptr[pos]), ...)`
+instead of `ast.is_match(String(str[byte=pos]), ...)`.
 
-The `is_match()` API takes `String`, forcing allocation per character during
-backtracking. Changing the API to accept `StringSlice` or a byte value would
-eliminate these allocations.
+- literal_prefix_long: 14.5x faster
+- alternation_quantifiers: 4.5x faster
+- flexible_phone: 1.5x faster
 
 ## Low: MatchList Capacity Tuning
 
