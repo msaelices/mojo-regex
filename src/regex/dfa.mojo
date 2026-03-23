@@ -56,14 +56,14 @@ from regex.simd_matchers import (
     NibbleBasedMatcher,
 )
 
-alias DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
-alias DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
+comptime DEFAULT_DFA_CAPACITY = 64  # Default capacity for DFA states
+comptime DEFAULT_DFA_TRANSITIONS = 256  # Number of ASCII transitions (0-255)
 
 # Pre-defined character sets for efficient lookup
-alias LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
-alias UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-alias ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
-alias ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
+comptime LOWERCASE_LETTERS = "abcdefghijklmnopqrstuvwxyz"
+comptime UPPERCASE_LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+comptime ALL_LETTERS = LOWERCASE_LETTERS + UPPERCASE_LETTERS
+comptime ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
 def _expand_character_range(
@@ -233,7 +233,7 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
             target_state: Target state index, or -1 for no transition.
         """
         if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
-            self.transitions[char_code] = target_state
+            self.transitions[char_code] = Int32(target_state)
 
     @always_inline
     def get_transition(self, char_code: Int) -> Int:
@@ -2095,7 +2095,7 @@ struct DFAEngine(Engine):
         var text_ptr = text.unsafe_ptr()
 
         # Process characters in SIMD chunks for maximum efficiency
-        alias CHUNK_SIZE = 16  # Process 16 characters at once
+        comptime CHUNK_SIZE = 16  # Process 16 characters at once
 
         while pos + CHUNK_SIZE <= text_len:
             # Load a chunk of characters

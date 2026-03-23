@@ -5,10 +5,10 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
-from memory import UnsafePointer, alloc
-from os import abort
-from ffi import _Global
-from time import monotonic
+from std.memory import UnsafePointer, alloc
+from std.os import abort
+from std.ffi import _Global
+from std.time import monotonic
 
 from regex.ast import ASTNode
 from regex.matching import Match, MatchList
@@ -740,9 +740,9 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
 #  - Attempted to free corrupted pointer
 #  - Possible double free detected
 # Global pattern cache for improved performance
-alias RegexCache = Dict[String, CompiledRegex]
+comptime RegexCache = Dict[String, CompiledRegex]
 
-alias _CACHE_GLOBAL = _Global["RegexCache", _init_regex_cache]
+comptime _CACHE_GLOBAL = _Global["RegexCache", _init_regex_cache]
 
 
 def _init_regex_cache() -> RegexCache:
@@ -756,7 +756,6 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
         return _CACHE_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[RegexCache, MutAnyOrigin]()  # Unreachable
 
 
 def compile_regex(pattern: String) raises -> CompiledRegex:

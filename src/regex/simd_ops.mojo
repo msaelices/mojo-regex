@@ -15,10 +15,10 @@ The module automatically adapts to the available SIMD width:
 - Other widths: Falls back to scalar or sub-optimal vectorized operations
 """
 
-from algorithm import vectorize
-from os import abort
-from sys.info import simd_width_of
-from ffi import _Global
+from std.algorithm import vectorize
+from std.os import abort
+from std.sys.info import simd_width_of
+from std.ffi import _Global
 
 from regex.aliases import (
     SIMD_MATCHER_NONE,
@@ -49,14 +49,14 @@ from regex.simd_matchers import (
 )
 
 # SIMD width for character operations (uint8)
-alias SIMD_WIDTH = simd_width_of[DType.uint8]()
-alias USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
+comptime SIMD_WIDTH = simd_width_of[DType.uint8]()
+comptime USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
 # Shuffle optimization thresholds
 # Below this size, simple lookup is faster than shuffle
-alias SHUFFLE_MIN_SIZE = 4
+comptime SHUFFLE_MIN_SIZE = 4
 # Above this size, shuffle becomes inefficient due to sparsity
-alias SHUFFLE_MAX_SIZE = 32
+comptime SHUFFLE_MAX_SIZE = 32
 
 
 struct CharacterClassSIMD(
@@ -217,9 +217,7 @@ struct CharacterClassSIMD(
         """
         # Use hybrid approach based on pattern characteristics
         if self.use_shuffle:
-
-            @parameter
-            if size == 16 or size == 32:
+            comptime if size == 16 or size == 32:
                 # Fast path: use _dynamic_shuffle for optimal sizes
                 var result = self.lookup_table._dynamic_shuffle(chunk)
                 return result.ne(0)
@@ -228,11 +226,8 @@ struct CharacterClassSIMD(
                 var matches = SIMD[DType.bool, size](False)
 
                 # Process in 16-byte sub-chunks when possible
-                @parameter
-                for offset in range(0, size, 16):
-
-                    @parameter
-                    if offset + 16 <= size:
+                comptime for offset in range(0, size, 16):
+                    comptime if offset + 16 <= size:
                         var sub_chunk = chunk.slice[16, offset=offset]()
                         var sub_result = self.lookup_table._dynamic_shuffle(
                             sub_chunk
@@ -249,9 +244,7 @@ struct CharacterClassSIMD(
         else:
             # Simple lookup for small character classes
             var matches = SIMD[DType.bool, size](fill=False)
-
-            @parameter
-            for i in range(size):
+            comptime for i in range(size):
                 var char_code = Int(chunk[i])
                 matches[i] = self.lookup_table[char_code] == 1
 
@@ -305,9 +298,7 @@ struct CharacterClassSIMD(
 
         # Use hybrid approach based on pattern characteristics
         if self.use_shuffle:
-
-            @parameter
-            if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
+            comptime if SIMD_WIDTH == 16 or SIMD_WIDTH == 32:
                 # Fast path: use _dynamic_shuffle for 16-byte (SSE) or 32-byte (AVX2) chunks
                 # The lookup table acts as our shuffle table
                 # Hardware support: SSE3/SSSE3 for 16-byte, AVX2 for 32-byte
@@ -318,11 +309,8 @@ struct CharacterClassSIMD(
                 var matches = SIMD[DType.bool, SIMD_WIDTH](fill=False)
 
                 # Process in 16-byte sub-chunks when possible
-                @parameter
-                for offset in range(0, SIMD_WIDTH, 16):
-
-                    @parameter
-                    if offset + 16 <= SIMD_WIDTH:
+                comptime for offset in range(0, SIMD_WIDTH, 16):
+                    comptime if offset + 16 <= SIMD_WIDTH:
                         var sub_chunk = chunk.slice[16, offset=offset]()
                         var sub_result = self.lookup_table._dynamic_shuffle(
                             sub_chunk
@@ -341,8 +329,7 @@ struct CharacterClassSIMD(
             var matches = SIMD[DType.bool, SIMD_WIDTH](fill=False)
 
             # Unroll for better performance
-            @parameter
-            for i in range(SIMD_WIDTH):
+            comptime for i in range(SIMD_WIDTH):
                 var char_code = Int(chunk[i])
                 if char_code < 256:
                     matches[i] = self.lookup_table[char_code] == 1
@@ -646,10 +633,10 @@ def simd_count_char(text: String, target_char: String) -> Int:
 
 
 # Global SIMD matchers dictionary type
-alias SIMDMatchers = Dict[Int, CharacterClassSIMD]
+comptime SIMDMatchers = Dict[Int, CharacterClassSIMD]
 
 # Global SIMD matchers cache
-alias _SIMD_MATCHERS_GLOBAL = _Global["SIMDMatchers", _init_simd_matchers]
+comptime _SIMD_MATCHERS_GLOBAL = _Global["SIMDMatchers", _init_simd_matchers]
 
 
 def _init_simd_matchers() -> SIMDMatchers:
@@ -664,7 +651,6 @@ def _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutAnyOrigin]:
         return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
-    return UnsafePointer[SIMDMatchers, MutAnyOrigin]()  # Unreachable
 
 
 @always_inline

@@ -41,65 +41,65 @@ struct Token(Boolable, Equatable, ImplicitlyCopyable, Movable):
     var start_pos: Int
     """Position in original pattern where this token starts."""
 
-    alias ELEMENT = 0
+    comptime ELEMENT = 0
     """Token that are not associated to special meaning."""
-    alias WILDCARD = 1
+    comptime WILDCARD = 1
     """Token using "." as wildcard."""
-    alias SPACE = 2
+    comptime SPACE = 2
     """Token of a space."""
-    alias DIGIT = 3
+    comptime DIGIT = 3
     """Token of a digit."""
-    alias WORD = 4
+    comptime WORD = 4
     """Token of a word character."""
-    alias START = 5
+    comptime START = 5
     """Token of match start."""
-    alias END = 6
+    comptime END = 6
     """Token of match end."""
-    alias ESCAPE = 7
+    comptime ESCAPE = 7
     """Token of the escape character."""
-    alias COMMA = 8
+    comptime COMMA = 8
     """Token of a comma."""
-    alias PARENTHESIS = 9
+    comptime PARENTHESIS = 9
     """Token of a parenthesis."""
-    alias LEFTPARENTHESIS = 10
+    comptime LEFTPARENTHESIS = 10
     """Left parenthesis token."""
-    alias RIGHTPARENTHESIS = 11
+    comptime RIGHTPARENTHESIS = 11
     """Right parenthesis token."""
-    alias CURLYBRACE = 12
+    comptime CURLYBRACE = 12
     """Curly brace token."""
-    alias LEFTCURLYBRACE = 13
+    comptime LEFTCURLYBRACE = 13
     """Left curly brace token."""
-    alias RIGHTCURLYBRACE = 14
+    comptime RIGHTCURLYBRACE = 14
     """Right curly brace token."""
-    alias BRACKET = 15
+    comptime BRACKET = 15
     """Brackets token."""
-    alias LEFTBRACKET = 16
+    comptime LEFTBRACKET = 16
     """Left bracket token."""
-    alias RIGHTBRACKET = 17
+    comptime RIGHTBRACKET = 17
     """Right bracket token."""
-    alias QUANTIFIER = 18
+    comptime QUANTIFIER = 18
     """Quantifier token."""
-    alias ZEROORMORE = 19
+    comptime ZEROORMORE = 19
     """Quantifier 'zero or more' token."""
-    alias ONEORMORE = 20
+    comptime ONEORMORE = 20
     """Quantifier 'one or more' token."""
-    alias ZEROORONE = 21
+    comptime ZEROORONE = 21
     """Quantifier 'zero or one' token."""
-    alias ASTERISK = 22
+    comptime ASTERISK = 22
     """Quantifier 'zero or more' token using character '*'."""
-    alias PLUS = 23
+    comptime PLUS = 23
     """Quantifier 'one or more' token using character '+'."""
-    alias QUESTIONMARK = 24
+    comptime QUESTIONMARK = 24
     """Quantifier 'zero or one' token using character '?'."""
-    alias ORTOKEN = 25
+    comptime ORTOKEN = 25
     """Token of the or."""
-    alias VERTICALBAR = 26
+    comptime VERTICALBAR = 26
     """Token of the or using '|'."""
-    alias NOTTOKEN = 27
+    comptime NOTTOKEN = 27
     """Token of the negation."""
-    alias CIRCUMFLEX = 28
+    comptime CIRCUMFLEX = 28
     """Token of the negation using '^'."""
-    alias DASH = 29
+    comptime DASH = 29
     """Token of the dash '-'."""
 
     def __init__(out self, type: Int):

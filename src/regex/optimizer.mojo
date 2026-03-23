@@ -30,15 +30,13 @@ from regex.literal_optimizer import (
 )
 
 
-struct PatternComplexity(
-    Copyable, Representable, Stringable, TrivialRegisterPassable, Writable
-):
+struct PatternComplexity(Copyable, TrivialRegisterPassable, Writable):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
 
-    alias SIMPLE = 0  # "hello", "a+", "[a-z]*", "^start", "end$" - can use DFA
-    alias MEDIUM = 1  # "(a|b)+", simple groups, basic quantifiers - hybrid approach
-    alias COMPLEX = 2  # Backreferences, lookahead, nested groups - requires NFA
+    comptime SIMPLE = 0  # "hello", "a+", "[a-z]*", "^start", "end$" - can use DFA
+    comptime MEDIUM = 1  # "(a|b)+", simple groups, basic quantifiers - hybrid approach
+    comptime COMPLEX = 2  # Backreferences, lookahead, nested groups - requires NFA
 
     var value: Int
 
