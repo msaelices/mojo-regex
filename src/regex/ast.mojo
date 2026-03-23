@@ -8,6 +8,14 @@ from regex.aliases import (
     CHAR_Z,
     CHAR_A_UPPER,
     CHAR_Z_UPPER,
+    CHAR_NEWLINE,
+    CHAR_SPACE,
+    CHAR_TAB_CHAR,
+    CHAR_CR,
+    CHAR_FF,
+    CHAR_UNDERSCORE,
+    CHAR_CIRCUMFLEX,
+    CHAR_DASH,
     WORD_CHARS,
 )
 
@@ -395,36 +403,38 @@ struct ASTNode[regex_origin: ImmutOrigin](
     def is_match_char(
         self, ch_code: Int, str_i: Int = 0, str_len: Int = 0
     ) -> Bool:
-        """Check if the node matches a given character code. Zero-allocation
-        fast path that avoids creating String objects per character."""
+        """Check if the node matches a character code without allocating."""
         if self.type == ELEMENT:
-            if self.get_value():
-                ref val = self.get_value().value()
+            var value = self.get_value()
+            if value:
+                ref val = value.value()
                 return len(val) == 1 and Int(val.unsafe_ptr()[0]) == ch_code
             return False
         elif self.type == WILDCARD:
-            return ch_code != ord("\n")
+            return ch_code != CHAR_NEWLINE
         elif self.type == SPACE:
             return (
-                ch_code == ord(" ")
-                or ch_code == ord("\t")
-                or ch_code == ord("\n")
-                or ch_code == ord("\r")
-                or ch_code == ord("\f")
+                ch_code == CHAR_SPACE
+                or ch_code == CHAR_TAB_CHAR
+                or ch_code == CHAR_NEWLINE
+                or ch_code == CHAR_CR
+                or ch_code == CHAR_FF
             )
         elif self.type == DIGIT:
             return CHAR_ZERO <= ch_code <= CHAR_NINE
         elif self.type == WORD:
+            # O(1) range checks instead of O(n) string search
             return (
                 (CHAR_A <= ch_code <= CHAR_Z)
                 or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
                 or (CHAR_ZERO <= ch_code <= CHAR_NINE)
-                or ch_code == ord("_")
+                or ch_code == CHAR_UNDERSCORE
             )
         elif self.type == RANGE:
             var ch_found = False
-            if self.get_value():
-                ref range_pattern = self.get_value().value()
+            var value = self.get_value()
+            if value:
+                ref range_pattern = value.value()
                 ch_found = self._is_char_in_range_by_code(
                     ch_code, range_pattern
                 )
@@ -462,11 +472,11 @@ struct ASTNode[regex_origin: ImmutOrigin](
         """Check if a character code matches range syntax like 'a-z'."""
         var rs_ptr = range_syntax.unsafe_ptr()
         var i = 0
-        if len(range_syntax) > 0 and Int(rs_ptr[0]) == ord("^"):
+        if len(range_syntax) > 0 and Int(rs_ptr[0]) == CHAR_CIRCUMFLEX:
             i = 1
 
         while i < len(range_syntax):
-            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == ord("-"):
+            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == CHAR_DASH:
                 var start_code = Int(rs_ptr[i])
                 var end_code = Int(rs_ptr[i + 2])
                 if start_code <= ch_code <= end_code:
@@ -483,45 +493,18 @@ struct ASTNode[regex_origin: ImmutOrigin](
         ch: StringSlice,
         range_pattern: StringSlice[origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
-        """Check if a character is in a range pattern like '[a-z]' or 'abcxyz'.
-        """
-        # If the range_pattern starts with '[', it's the original pattern like "[a-z]"
-        # We need to parse it. Otherwise, it's already expanded like "abcdefghijklmnopqrstuvwxyz"
-        if range_pattern.startswith("["):
-            # Remove brackets and parse the range
-            var inner_pattern = range_pattern[byte=1:-1]  # Remove [ and ]
-            return self._char_matches_range_syntax(ch, inner_pattern)
-        else:
-            # It's already expanded, just check if char is in the string
-            return range_pattern.find(ch) != -1
+        """Check if a character is in a range pattern. Delegates to the
+        int-based version."""
+        return self._is_char_in_range_by_code(ord(ch), range_pattern)
 
     def _char_matches_range_syntax(
         self,
         ch: StringSlice,
         range_syntax: StringSlice[origin_of(self.regex_ptr[].pattern)],
     ) -> Bool:
-        """Check if a character matches range syntax like 'a-z' or 'abc'."""
-        var i = 0
-        var rs_ptr = range_syntax.unsafe_ptr()
-        var ch_ord = ord(ch)
-        # Skip negation character if present
-        if len(range_syntax) > 0 and Int(rs_ptr[0]) == ord("^"):
-            i = 1
-
-        while i < len(range_syntax):
-            # Check for range pattern like 'a-z'
-            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == ord("-"):
-                var start_code = Int(rs_ptr[i])
-                var end_code = Int(rs_ptr[i + 2])
-                if start_code <= ch_ord <= end_code:
-                    return True
-                i += 3  # Skip start, dash, and end
-            else:
-                # Single character match
-                if Int(rs_ptr[i]) == ch_ord:
-                    return True
-                i += 1
-        return False
+        """Check if a character matches range syntax. Delegates to the
+        int-based version."""
+        return self._char_code_matches_range(ord(ch), range_syntax)
 
     def is_capturing(self) -> Bool:
         """Check if the node is capturing."""

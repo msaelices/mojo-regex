@@ -34,6 +34,11 @@ comptime CHAR_Z = ord("z")
 comptime CHAR_A_UPPER = ord("A")
 comptime CHAR_Z_UPPER = ord("Z")
 comptime CHAR_NEWLINE = ord("\n")
+comptime CHAR_SPACE = ord(" ")
+comptime CHAR_TAB_CHAR = ord("\t")
+comptime CHAR_CR = ord("\r")
+comptime CHAR_FF = ord("\f")
+comptime CHAR_UNDERSCORE = ord("_")
 
 comptime ALL_EXCEPT_NEWLINE = _all_except_newline()
 

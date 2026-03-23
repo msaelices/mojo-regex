@@ -1103,8 +1103,9 @@ struct NFAEngine(Copyable, Engine):
         var pos = str_i
         var matched = 0
         var str_ptr = str.unsafe_ptr()
+        var str_len = len(str)
 
-        while matched < count and pos < len(str):
+        while matched < count and pos < str_len:
             # Conservative early termination for match_first_mode only in extreme cases
             if (
                 match_first_mode
@@ -1113,7 +1114,7 @@ struct NFAEngine(Copyable, Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match_char(Int(str_ptr[pos]), pos, len(str)):
+            if ast.is_match_char(Int(str_ptr[pos]), pos, str_len):
                 matched += 1
                 pos += 1
             else:
