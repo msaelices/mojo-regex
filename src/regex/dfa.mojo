@@ -2957,11 +2957,12 @@ def _is_pure_alternation_pattern(ast: ASTNode[MutAnyOrigin]) -> Bool:
     if child.type == OR:
         return _is_simple_alternation_branches(child)
 
-    # Case 2: RE -> GROUP -> OR (grouped alternation)
-    if child.type == GROUP and child.get_children_len() == 1:
-        var grandchild = child.get_child(0)
-        if grandchild.type == OR:
-            return _is_simple_alternation_branches(grandchild)
+    # Case 2: RE -> GROUP(s) -> OR (grouped alternation, unwrap nested GROUPs)
+    var node = child
+    while node.type == GROUP and node.get_children_len() == 1:
+        node = node.get_child(0)
+    if node.type == OR:
+        return _is_simple_alternation_branches(node)
 
     return False
 
