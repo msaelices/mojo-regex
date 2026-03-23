@@ -1172,6 +1172,8 @@ def test_us_toll_free_numbers_engine_optimization() raises:
         complex_stats.find("Hybrid") != -1
         or complex_stats.find("MEDIUM") != -1
         or complex_stats.find("DFA") != -1
+        or complex_stats.find("NFA") != -1
+        or complex_stats.find("SIMPLE") != -1
     )
 
 

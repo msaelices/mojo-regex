@@ -437,6 +437,13 @@ struct PatternAnalyzer:
                 # Complex quantified groups still need NFA
                 return PatternComplexity(PatternComplexity.MEDIUM)
 
+        # Fast path: group containing a single OR of literal branches
+        if ast.get_children_len() == 1:
+            ref only_child = ast.get_child(0)
+            if only_child.type == OR or only_child.type == GROUP:
+                if self._is_all_literal_branches(only_child):
+                    return PatternComplexity(PatternComplexity.SIMPLE)
+
         # Analyze group contents
         var max_child_complexity = PatternComplexity(PatternComplexity.SIMPLE)
         for i in range(ast.get_children_len()):
@@ -482,6 +489,26 @@ struct PatternAnalyzer:
                 return PatternComplexity(PatternComplexity.MEDIUM)
         else:
             return PatternComplexity(PatternComplexity.MEDIUM)
+
+    def _is_all_literal_branches(self, ast: ASTNode) -> Bool:
+        """Check if a node is a pure literal alternation tree (possibly nested
+        binary ORs). Unwraps GROUPs and recurses into nested ORs."""
+        if ast.type == GROUP:
+            if ast.get_children_len() == 1:
+                return self._is_all_literal_branches(ast.get_child(0))
+            # Multi-child group: all must be ELEMENTs
+            for j in range(ast.get_children_len()):
+                if ast.get_child(j).type != ELEMENT:
+                    return False
+            return True
+        if ast.type == OR:
+            for i in range(ast.get_children_len()):
+                if not self._is_all_literal_branches(ast.get_child(i)):
+                    return False
+            return True
+        if ast.type == ELEMENT:
+            return True
+        return False
 
     def _is_multi_char_class_sequence(self, ast: ASTNode) -> Bool:
         """Check if this GROUP represents a multi-character class sequence.
