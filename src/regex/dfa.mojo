@@ -141,9 +141,9 @@ def _expand_character_range(
             return String(DIGITS[byte=start_idx:end_idx])
 
     # Fallback for complex cases - expand all ranges and characters
-    var result = String(
-        capacity=String.INLINE_CAPACITY
-    )  # Pre-allocate for worst case
+    # Estimate capacity: each range a-z adds up to 26 chars, single chars add 1
+    var estimated_capacity = len(inner) * 10  # Generous estimate
+    var result = String(capacity=estimated_capacity)
     var i = 0
     while i < len(inner):
         if i + 2 < len(inner) and Int(inner_ptr[i + 1]) == ord("-"):
