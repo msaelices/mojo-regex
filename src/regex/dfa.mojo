@@ -1700,20 +1700,17 @@ struct DFAEngine(Engine):
                     var char_code = Int(cc_ptr[i])
                     state.add_transition(char_code, to_state)
         else:
-            # Negative logic: [^abc] - add transitions for all characters NOT in char_class
-            # Create a bitmap for fast lookup
-            var char_bitmap = SIMD[DType.uint8, DEFAULT_DFA_TRANSITIONS](0)
-
-            # Mark characters in char_class as 1 in bitmap
+            # Negative logic: [^abc] - add transitions for all characters
+            # NOT in char_class. Set all transitions first, then remove
+            # the excluded ones. Much faster for small exclusion sets.
+            state.transitions = SIMD[DType.int32, DEFAULT_DFA_TRANSITIONS](
+                to_state
+            )
+            # Remove transitions for excluded characters
             for i in range(char_class_len):
                 var char_code = Int(cc_ptr[i])
                 if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
-                    char_bitmap[char_code] = 1
-
-            # Add transitions for all characters NOT in the class
-            for char_code in range(DEFAULT_DFA_TRANSITIONS):
-                if char_bitmap[char_code] == 0:
-                    state.add_transition(char_code, to_state)
+                    state.transitions[char_code] = -1
 
     @always_inline
     def get_pattern(self) -> String:
