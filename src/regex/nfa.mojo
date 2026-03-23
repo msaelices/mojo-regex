@@ -1102,6 +1102,7 @@ struct NFAEngine(Copyable, Engine):
         """
         var pos = str_i
         var matched = 0
+        var str_ptr = str.unsafe_ptr()
 
         while matched < count and pos < len(str):
             # Conservative early termination for match_first_mode only in extreme cases
@@ -1112,7 +1113,7 @@ struct NFAEngine(Copyable, Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match(String(str[byte=pos]), pos, len(str)):
+            if ast.is_match_char(Int(str_ptr[pos]), pos, len(str)):
                 matched += 1
                 pos += 1
             else:
@@ -1186,17 +1187,19 @@ struct NFAEngine(Copyable, Engine):
         # Use regular greedy matching, but with early termination for match_first_mode
         var matches_count = 0
         var current_pos = str_i
+        var str_ptr = str.unsafe_ptr()
+        var str_len = len(str)
 
         # Try to match as many times as possible (greedy)
-        while matches_count < max_matches and current_pos < len(str):
+        while matches_count < max_matches and current_pos < str_len:
             # Early termination for match_first_mode: if we're getting too far from start
             if match_first_mode and required_start_pos >= 0:
                 # Allow reasonable expansion but prevent excessive backtracking
                 if current_pos > required_start_pos + 50:  # Conservative limit
                     break
 
-            if ast.is_match(
-                String(str[byte=current_pos]), current_pos, len(str)
+            if ast.is_match_char(
+                Int(str_ptr[current_pos]), current_pos, str_len
             ):
                 matches_count += 1
                 current_pos += 1

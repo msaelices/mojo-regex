@@ -1,7 +1,15 @@
 from std.memory import Pointer, UnsafePointer, memcpy, alloc
 from std.os import abort
 
-from regex.aliases import CHAR_ZERO, CHAR_NINE, WORD_CHARS
+from regex.aliases import (
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_A,
+    CHAR_Z,
+    CHAR_A_UPPER,
+    CHAR_Z_UPPER,
+    WORD_CHARS,
+)
 
 
 comptime RE = 0
@@ -373,45 +381,102 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     def is_match(self, value: String, str_i: Int = 0, str_len: Int = 0) -> Bool:
         """Check if the node matches a given value."""
-        if self.type == ELEMENT:
+        if self.type == START:
+            return str_i == 0
+        elif self.type == END:
+            return str_i == str_len
+        elif len(value) == 1:
+            return self.is_match_char(ord(value), str_i, str_len)
+        elif self.type == ELEMENT:
             return self.get_value() and (self.get_value().value() == value)
+        return False
+
+    @always_inline
+    def is_match_char(
+        self, ch_code: Int, str_i: Int = 0, str_len: Int = 0
+    ) -> Bool:
+        """Check if the node matches a given character code. Zero-allocation
+        fast path that avoids creating String objects per character."""
+        if self.type == ELEMENT:
+            if self.get_value():
+                ref val = self.get_value().value()
+                return len(val) == 1 and Int(val.unsafe_ptr()[0]) == ch_code
+            return False
         elif self.type == WILDCARD:
-            return value != "\n"
+            return ch_code != ord("\n")
         elif self.type == SPACE:
-            if len(value) == 1:
-                var ch = value
-                return (
-                    ch == " "
-                    or ch == "\t"
-                    or ch == "\n"
-                    or ch == "\r"
-                    or ch == "\f"
-                )
-            return False
+            return (
+                ch_code == ord(" ")
+                or ch_code == ord("\t")
+                or ch_code == ord("\n")
+                or ch_code == ord("\r")
+                or ch_code == ord("\f")
+            )
         elif self.type == DIGIT:
-            if len(value) == 1:
-                var ch_code = ord(value)
-                return CHAR_ZERO <= ch_code <= CHAR_NINE
-            return False
+            return CHAR_ZERO <= ch_code <= CHAR_NINE
         elif self.type == WORD:
-            if len(value) == 1:
-                return value in WORD_CHARS
-            return False
+            return (
+                (CHAR_A <= ch_code <= CHAR_Z)
+                or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+                or ch_code == ord("_")
+            )
         elif self.type == RANGE:
-            # For range elements, use XNOR logic for positive/negative matching
             var ch_found = False
             if self.get_value():
                 ref range_pattern = self.get_value().value()
-                ch_found = self._is_char_in_range(value, range_pattern)
-            return not (
-                ch_found ^ self.positive_logic
-            )  # positive_logic determines if it's [abc] or [^abc]
+                ch_found = self._is_char_in_range_by_code(
+                    ch_code, range_pattern
+                )
+            return not (ch_found ^ self.positive_logic)
         elif self.type == START:
             return str_i == 0
         elif self.type == END:
             return str_i == str_len
         else:
             return False
+
+    def _is_char_in_range_by_code(
+        self,
+        ch_code: Int,
+        range_pattern: StringSlice[origin_of(self.regex_ptr[].pattern)],
+    ) -> Bool:
+        """Check if a character code is in a range pattern. Zero-allocation
+        version of _is_char_in_range."""
+        if range_pattern.startswith("["):
+            var inner_pattern = range_pattern[byte=1:-1]
+            return self._char_code_matches_range(ch_code, inner_pattern)
+        else:
+            # Expanded string, check if char is in it
+            var rp_ptr = range_pattern.unsafe_ptr()
+            for i in range(len(range_pattern)):
+                if Int(rp_ptr[i]) == ch_code:
+                    return True
+            return False
+
+    def _char_code_matches_range(
+        self,
+        ch_code: Int,
+        range_syntax: StringSlice[origin_of(self.regex_ptr[].pattern)],
+    ) -> Bool:
+        """Check if a character code matches range syntax like 'a-z'."""
+        var rs_ptr = range_syntax.unsafe_ptr()
+        var i = 0
+        if len(range_syntax) > 0 and Int(rs_ptr[0]) == ord("^"):
+            i = 1
+
+        while i < len(range_syntax):
+            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == ord("-"):
+                var start_code = Int(rs_ptr[i])
+                var end_code = Int(rs_ptr[i + 2])
+                if start_code <= ch_code <= end_code:
+                    return True
+                i += 3
+            else:
+                if Int(rs_ptr[i]) == ch_code:
+                    return True
+                i += 1
+        return False
 
     def _is_char_in_range(
         self,
