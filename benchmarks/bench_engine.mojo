@@ -129,8 +129,8 @@ def benchmark_match_first(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[byte=:20]
-        + " " * (21 - len(String(time_ms)[byte=:20]))
+        + String(time_ms)[byte=:24]
+        + " " * (25 - len(String(time_ms)[byte=:24]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
@@ -189,8 +189,8 @@ def benchmark_search(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[byte=:20]
-        + " " * (21 - len(String(time_ms)[byte=:20]))
+        + String(time_ms)[byte=:24]
+        + " " * (25 - len(String(time_ms)[byte=:24]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
@@ -243,8 +243,8 @@ def benchmark_findall(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[byte=:20]
-        + " " * (21 - len(String(time_ms)[byte=:20]))
+        + String(time_ms)[byte=:24]
+        + " " * (25 - len(String(time_ms)[byte=:24]))
         + " | "
         + String(total_matches)
         + " " * (6 - len(String(total_matches)))
