@@ -38,26 +38,20 @@ Pre-allocated `String(capacity=...)` before range expansion loops in
 - `single_quantifier_alpha`: 2.0x faster
 - `match_all_digits`: 1.4x faster
 
-### Remaining: Branch text extraction (dfa.mojo:2814-2819, prefilter.mojo:203-211)
-String concatenation in loops extracting literals from AST children.
-Fix: Two-pass (count length, then allocate+fill).
+### ~~Remaining: Branch text extraction~~ (Investigated, not worth it)
+String concatenation in `_extract_branch_text` (dfa.mojo) and
+`_extract_literal_sequence` (prefilter.mojo) runs during pattern compilation,
+not in the matching hot path. Only executed once per pattern, so the allocation
+overhead is negligible.
 
-## High: Negated Character Class Inefficiency
+## ~~High: Negated Character Class Inefficiency~~ (Fixed)
 
-**File:** `src/regex/dfa.mojo` lines 1700-1706
+**File:** `src/regex/dfa.mojo`
 
-For negated classes like `[^aeiou]`, the code creates a 256-byte bitmap, then
-iterates through ALL 256 ASCII values:
-
-```mojo
-for char_code in range(DEFAULT_DFA_TRANSITIONS):  # Always 256 iterations
-    if char_bitmap[char_code] == 0:
-        state.add_transition(char_code, to_state)
-```
-
-For `[^a]` (exclude 1 char), this does 255 `add_transition` calls. Could instead
-add all transitions then remove the excluded ones, or use a different state
-representation.
+For negated classes like `[^aeiou]`, the code used to create a 256-byte bitmap,
+then iterate through ALL 256 ASCII values. Now uses SIMD broadcast to set all
+transitions at once, then removes only the excluded characters. For `[^a]`, this
+is 1 SIMD fill + 1 removal instead of 255 `add_transition` calls.
 
 ## ~~High: SIMD character class matcher silently disabled~~ (Fixed, PR #62)
 
@@ -89,22 +83,19 @@ GROUP wrappers when checking for alternation patterns.
 - large_8_alternations: 0.025ms -> 0.0003ms (80x faster, now 3.7x faster than Python)
 - literal_heavy_alternation: 0.060ms -> 0.0004ms (167x faster)
 
-## Medium: SIMD First-Match Scalar Fallback
+## ~~Medium: SIMD First-Match Scalar Fallback~~ (Investigated, no win)
 
 **File:** `src/regex/simd_ops.mojo` lines 150-160
 
 After finding a SIMD chunk with matches, the code uses a scalar loop to find the
-first set bit:
+first set bit. Investigated replacing with a bitmask + `count_trailing_zeros`
+approach.
 
-```mojo
-if matches.reduce_or():
-    for i in range(SIMD_WIDTH):  # Scalar scan
-        if matches[i]:
-            return pos + i
-```
-
-Could use `countl_zero` or equivalent to find the first true in the SIMD mask
-without looping.
+**Conclusion:** The Mojo compiler already optimizes the early-exit scalar loop
+equally well as the bitmask+CTZ approach. Micro-benchmarks with matches at
+various SIMD positions (0, 4, 8, ..., 28) showed no measurable difference.
+The compiler likely unrolls and optimizes both paths identically for
+SIMD_WIDTH=32.
 
 ## Medium: SIMD Width Gaps
 
@@ -118,18 +109,22 @@ AVX-512 systems (SIMD_WIDTH=64) fall back to scalar paths. ARM NEON has
 SIMD_WIDTH=16 but different shuffle semantics. Worth adding explicit AVX-512
 support and verifying ARM paths.
 
-## Medium: NFA Prefilter Thresholds
+## ~~Medium: NFA Prefilter Thresholds~~ (Investigated, no win)
 
 **File:** `src/regex/nfa.mojo` lines 40-42
 
 ```mojo
-alias MIN_PREFIX_LITERAL_LENGTH = 3
-alias MIN_REQUIRED_LITERAL_LENGTH = 4
+comptime MIN_PREFIX_LITERAL_LENGTH = 3
+comptime MIN_REQUIRED_LITERAL_LENGTH = 4
 ```
 
-These thresholds determine when literal prefiltering kicks in. Patterns with
-2-character literals (like `\d{3}-\d{3}` where `-` is literal) miss the
-optimization. Lowering to 2/3 would enable prefiltering for more patterns.
+These thresholds determine when literal prefiltering kicks in. Investigated
+lowering to 2/3 to enable prefiltering for patterns with short literals
+(like `\d{3}-\d{3}` where `-` is a 1-char literal).
+
+**Conclusion:** Lowering thresholds caused regressions across all NFA benchmarks.
+The overhead of the prefilter setup and scanning is not justified for short
+literals. The current 3/4 thresholds are the right balance.
 
 ## ~~Medium: DFA match_all scanning every position~~ (Fixed, PR #65)
 
