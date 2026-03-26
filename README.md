@@ -195,6 +195,8 @@ The hybrid DFA/NFA architecture provides significant performance benefits:
 
 *Where w = SIMD width (typically 16-32 characters processed per instruction)*
 
+For detailed benchmark results comparing Mojo, Python, and Rust, see [benchmarks/results/comparison.md](benchmarks/results/comparison.md).
+
 ## Building and Testing
 
 ```bash
