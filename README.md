@@ -73,103 +73,35 @@ This software is in an early stage of development. Even though it is functional,
 ```mojo
 from regex import match_first, findall
 
-# Basic literal matching
+# Basic matching
 var result = match_first("hello", "hello world")
 if result:
     print("Match found:", result.value().get_match_text())
 
-# Find all matches
-var matches = findall("a", "banana")
-print("Found", len(matches), "matches:")
-for i in range(len(matches)):
-    print("  Match", i, ":", matches[i].get_match_text(), "at position", matches[i].start_idx)
-
-# Wildcard and quantifiers
-result = match_first(".*@.*", "user@domain.com")
+# Wildcards, quantifiers, and character classes
+result = match_first("[a-z]+\\d+", "item42")
 if result:
-    print("Email found")
+    print("Found:", result.value().get_match_text())
 
-# Find all numbers in text using predefined digit class
-var numbers = findall("\\d+", "Price: $123, Quantity: 456, Total: $579")
-for i in range(len(numbers)):
-    print("Number found:", numbers[i].get_match_text())
-
-# Find all word identifiers
-var words = findall("\\w+", "variable_name123 and another_var")
-for i in range(len(words)):
-    print("Word found:", words[i].get_match_text())
-
-# Character ranges
-result = match_first("[a-z]+", "hello123")
+# Predefined classes and anchors
+result = match_first("^\\w+@\\w+\\.\\w+$", "user@example.com")
 if result:
-    print("Letters:", result.value().get_match_text())
+    print("Valid email format")
 
 # Groups and alternation
 result = match_first("(com|org|net)", "example.com")
 if result:
     print("TLD found:", result.value().get_match_text())
 
-# Find all domains in text
-var domains = findall("(com|org|net)", "Visit example.com or test.org for more info")
-for i in range(len(domains)):
-    print("Domain found:", domains[i].get_match_text())
+# Find all matches
+var numbers = findall("\\d+", "Price: $123, Quantity: 456, Total: $579")
+for i in range(len(numbers)):
+    print("Number found:", numbers[i].get_match_text())
 
-# Anchors
-result = match_first("^https?://", "https://example.com")
-if result:
-    print("Valid URL")
-
-# Complex patterns using predefined character classes
-result = match_first("^\\w+@\\w+\\.\\w+$", "user@example.com")
-if result:
-    print("Valid email format")
-
-# Find all email addresses in text
-var emails = findall("\\w+@\\w+\\.\\w+", "Contact john@example.com or mary@test.org")
-for i in range(len(emails)):
-    print("Email found:", emails[i].get_match_text())
-
-# Validate identifiers (programming variable names)
-result = match_first("^[a-zA-Z_]\\w*$", "_private_var123")
-if result:
-    print("Valid identifier")
-
-# === OPTIMIZATION SHOWCASE EXAMPLES ===
-# These patterns now benefit from DFA optimization!
-
-# Large alternation (8 branches) - DFA-optimized
-var fruit_pattern = "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
-var fruit_text = "I love eating apple and banana for breakfast"
-var fruits = findall(fruit_pattern, fruit_text)
-for i in range(len(fruits)):
-    print("Fruit found:", fruits[i].get_match_text())
-
-# Deep nested alternation (depth 4) - DFA-optimized
-var nested_pattern = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
-var nested_result = match_first(nested_pattern, "Testing with character a")
-if nested_result:
-    print("Deep nested match:", nested_result.value().get_match_text())
-
-# Literal-heavy alternation (80% threshold) - DFA-optimized
-var user_pattern = "(user123|admin456|guest789|root000|test111|demo222)"
-var login_text = "Login attempts: user123 failed, admin456 success"
-var users = findall(user_pattern, login_text)
-for i in range(len(users)):
-    print("User found:", users[i].get_match_text())
-
-# Complex phone patterns - DFA-optimized
-var phone_pattern = "[0-9]{3}-[0-9]{3}-[0-9]{4}"  # DFA-optimized
-var phone_text = "Call us at 555-123-4567 or 800-555-9999"
-var phones = findall(phone_pattern, phone_text)
+# Phone number patterns (DFA-optimized)
+var phones = findall("[0-9]{3}-[0-9]{3}-[0-9]{4}", "Call 555-123-4567 or 800-555-9999")
 for i in range(len(phones)):
     print("Phone found:", phones[i].get_match_text())
-
-# Complex group (5 children) - DFA-optimized
-var complex_pattern = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
-var complex_text = "Found: hello123ab, world456cd, test789ef in data"
-var complex_matches = findall(complex_pattern, complex_text)
-for i in range(len(complex_matches)):
-    print("Complex match:", complex_matches[i].get_match_text())
 ```
 
 ## Performance
