@@ -1052,6 +1052,30 @@ struct NFAEngine(Copyable, Engine):
         if max_matches == -1:
             max_matches = len(str) - str_i
 
+        # Fast path for fixed quantifiers like {3} where min == max
+        if min_matches == max_matches:
+            var consumed = self._try_match_count(
+                quantified_node,
+                str,
+                str_i,
+                min_matches,
+                match_first_mode,
+                required_start_pos,
+            )
+            if consumed >= 0:
+                var result = self._match_sequence(
+                    ast_parent,
+                    remaining_index,
+                    str,
+                    str_i + consumed,
+                    matches,
+                    match_first_mode,
+                    required_start_pos,
+                )
+                if result[0]:
+                    return (True, result[1])
+            return (False, str_i)
+
         # Use regular greedy backtracking but with conservative early termination
         var match_count = max_matches
         while match_count >= min_matches:
