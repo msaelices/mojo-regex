@@ -151,6 +151,29 @@ The vectorize closure calls `matches.append()` which may trigger reallocation
 inside the SIMD loop. A two-pass approach (count matches, pre-allocate, fill)
 would eliminate this.
 
+## ~~Medium: NFA Fixed Quantifier Backtracking~~ (Fixed, PR #68)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/68
+
+For fixed quantifiers like `{3}` where min == max, the backtracking loop
+tried counts 3, 2, 1, 0 when only count=3 is valid. Added a fast path that
+skips the loop and tries exactly once.
+
+- grouped_quantifiers: 1.75ms -> 0.84ms (2.1x faster)
+
+## ~~Medium: NFA chr() Heap Allocations in Range Matching~~ (Fixed, PR #69)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/69
+
+For range patterns that miss the hardcoded fast paths (e.g. `[\\s.-]`,
+`[2-9]`), the code called `chr(ch_code)` (heap allocation) + `ch in inner`
+(O(n) string scan) on every character. Replaced with `_byte_in_string()`
+which does a direct byte pointer scan with zero allocations.
+
+- alternation_quantifiers: 1.61ms -> 0.96ms (1.7x faster)
+- toll_free_complex: 0.62ms -> 0.34ms (1.8x faster)
+- flexible_phone: 4.56ms -> 4.05ms (1.13x faster)
+
 ## ~~Low: NFA String Allocations in is_match~~ (Fixed, PR #63)
 
 **PR:** https://github.com/msaelices/mojo-regex/pull/63
