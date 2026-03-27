@@ -17,6 +17,7 @@ from regex.aliases import (
     CHAR_CIRCUMFLEX,
     CHAR_DASH,
     WORD_CHARS,
+    byte_in_string,
 )
 
 
@@ -380,9 +381,8 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return True
         elif self.type == RANGE and self.get_value():
             # Complex character classes benefit more from SIMD
-            ref range_pattern = String(self.get_value().value())
             return (
-                len(range_pattern) > 8
+                len(self.get_value().value()) > 8
             )  # Complex patterns like [a-zA-Z0-9._%+-]
         else:
             return False  # Simple quantifiers use regular matching
@@ -458,11 +458,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return self._char_code_matches_range(ch_code, inner_pattern)
         else:
             # Expanded string, check if char is in it
-            var rp_ptr = range_pattern.unsafe_ptr()
-            for i in range(len(range_pattern)):
-                if Int(rp_ptr[i]) == ch_code:
-                    return True
-            return False
+            return byte_in_string(ch_code, range_pattern)
 
     def _char_code_matches_range(
         self,

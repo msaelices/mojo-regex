@@ -7,6 +7,7 @@ from regex.aliases import (
     CHAR_NEWLINE,
     SIMD_MATCHER_DIGITS,
     SIMD_MATCHER_WHITESPACE,
+    byte_in_string,
 )
 from regex.engine import Engine
 from regex.matching import Match, MatchList
@@ -459,6 +460,7 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
+    @always_inline
     def _match_contains_literal(
         self, text: String, start: Int, end: Int
     ) -> Bool:
@@ -466,9 +468,11 @@ struct NFAEngine(Copyable, Engine):
         if not self.has_literal_optimization or len(self.literal_prefix) == 0:
             return True
 
-        # Check if the literal appears within the match bounds
-        var match_text = text[byte=start:end]
-        return self.literal_prefix in match_text
+        # Use twoway_search (already imported) with bounded range
+        var pos = twoway_search(
+            self.literal_prefix.as_bytes(), text, start
+        )
+        return pos != -1 and pos + len(self.literal_prefix) <= end
 
     @always_inline
     def _match_node(
@@ -775,16 +779,16 @@ struct NFAEngine(Copyable, Engine):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
-                            ch_found = str[byte=str_i] in inner
+                            ch_found = byte_in_string(ch_code, inner)
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
-                            ast, range_pattern, str[byte=str_i], ch_code
+                            ast, range_pattern, ch_code
                         )
                 else:
                     # Not a bracketed pattern, try SIMD matcher
                     ch_found = self._match_with_simd_or_fallback(
-                        ast, range_pattern, str[byte=str_i], ch_code
+                        ast, range_pattern, ch_code
                     )
 
         if ch_found == ast.positive_logic:
@@ -818,7 +822,6 @@ struct NFAEngine(Copyable, Engine):
         self,
         ast: ASTNode,
         range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
-        ch: StringSlice,
         ch_code: Int,
     ) -> Bool:
         """Try to match with SIMD matcher, fallback to regular matching."""
@@ -826,8 +829,8 @@ struct NFAEngine(Copyable, Engine):
         if simd_matcher:
             return simd_matcher.value().contains(ch_code)
         else:
-            # Fallback to regular range matching
-            return ast._is_char_in_range(ch, range_pattern)
+            # Fallback to zero-allocation range matching
+            return ast._is_char_in_range_by_code(ch_code, range_pattern)
 
     def _match_or(
         self,
@@ -1280,7 +1283,7 @@ struct NFAEngine(Copyable, Engine):
                 word_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
-            ref range_pattern = String(ast.get_value().value())
+            ref range_pattern = ast.get_value().value()
 
             # Check for common patterns that should use RangeBasedMatcher
             if range_pattern == "[a-zA-Z0-9]":
@@ -1438,9 +1441,8 @@ struct NFAEngine(Copyable, Engine):
                         if alnum_matcher.contains(ch_code):
                             is_match = True
                         else:
-                            # Check special characters
-                            var ch = chr(ch_code)
-                            is_match = ch in inner
+                            # Check special characters via direct byte scan
+                            is_match = byte_in_string(ch_code, inner)
 
                         if is_match == ast.positive_logic:
                             match_count += 1
@@ -1508,7 +1510,8 @@ struct NFAEngine(Copyable, Engine):
 
         return (False, str_i)
 
-    def _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
+    @always_inline
+    def _match_char_in_range[O: Origin](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             var inner = range_pattern[byte=1:-1]
@@ -1520,13 +1523,10 @@ struct NFAEngine(Copyable, Engine):
                 var end_char = Int(inner_ptr[2])
                 return ch_code >= start_char and ch_code <= end_char
 
-            # For more complex patterns, fall back to character inclusion
-            var ch = chr(ch_code)
-            return ch in inner
+            # Direct byte scan instead of chr() + string `in`
+            return byte_in_string(ch_code, inner)
         else:
-            # Not a bracketed pattern
-            var ch = chr(ch_code)
-            return ch in range_pattern
+            return byte_in_string(ch_code, range_pattern)
 
 
 def findall(pattern: String, text: String) raises -> MatchList:
