@@ -793,12 +793,12 @@ struct NFAEngine(Copyable, Engine):
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
-                            ast, range_pattern, str[byte=str_i], ch_code
+                            ast, range_pattern, ch_code
                         )
                 else:
                     # Not a bracketed pattern, try SIMD matcher
                     ch_found = self._match_with_simd_or_fallback(
-                        ast, range_pattern, str[byte=str_i], ch_code
+                        ast, range_pattern, ch_code
                     )
 
         if ch_found == ast.positive_logic:
@@ -832,7 +832,6 @@ struct NFAEngine(Copyable, Engine):
         self,
         ast: ASTNode,
         range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
-        ch: StringSlice,
         ch_code: Int,
     ) -> Bool:
         """Try to match with SIMD matcher, fallback to regular matching."""
@@ -840,8 +839,8 @@ struct NFAEngine(Copyable, Engine):
         if simd_matcher:
             return simd_matcher.value().contains(ch_code)
         else:
-            # Fallback to regular range matching
-            return ast._is_char_in_range(ch, range_pattern)
+            # Fallback to zero-allocation range matching
+            return ast._is_char_in_range_by_code(ch_code, range_pattern)
 
     def _match_or(
         self,

@@ -380,9 +380,8 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return True
         elif self.type == RANGE and self.get_value():
             # Complex character classes benefit more from SIMD
-            ref range_pattern = String(self.get_value().value())
             return (
-                len(range_pattern) > 8
+                len(self.get_value().value()) > 8
             )  # Complex patterns like [a-zA-Z0-9._%+-]
         else:
             return False  # Simple quantifiers use regular matching
