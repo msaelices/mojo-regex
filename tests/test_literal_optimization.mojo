@@ -56,9 +56,7 @@ def test_literal_extraction() raises:
     var ast3 = parse("(hello|help|helicopter)")
     var literals3 = extract_literals(ast3)
     # Should find individual literals (common prefix extraction not yet implemented)
-    var found_hello_alt = False
-    var found_help_alt = False
-    var found_helicopter_alt = False
+    var found_prefix = False
     for lit in literals3.literals:
         if lit.get_literal(literals3) == "hel":
             found_prefix = True

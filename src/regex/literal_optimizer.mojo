@@ -87,7 +87,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     def get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
         # Always use the string index approach for consistency and to avoid pointer issues
-        if self.literal_string_idx >= 0 and self.literal_set_ptr:
+        if self.literal_string_idx >= 0:
             # If we have a literal string index, get it from the set
             return literal_set.literal_strings[self.literal_string_idx]
         else:

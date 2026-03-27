@@ -209,23 +209,24 @@ struct CompileTimeMatcher(ImplicitlyCopyable, Movable):
     fn _is_literal_pattern(self) -> Bool:
         """Runtime check if pattern is literal-only."""
         var pattern = self.pattern
+        var ptr = pattern.unsafe_ptr()
         for i in range(len(pattern)):
-            var c = pattern[i]
+            var c = Int(ptr[i])
             if (
-                c == "*"
-                or c == "+"
-                or c == "?"
-                or c == "."
-                or c == "|"
-                or c == "("
-                or c == ")"
-                or c == "["
-                or c == "]"
-                or c == "{"
-                or c == "}"
-                or c == "^"
-                or c == "$"
-                or c == "\\"
+                c == ord("*")
+                or c == ord("+")
+                or c == ord("?")
+                or c == ord(".")
+                or c == ord("|")
+                or c == ord("(")
+                or c == ord(")")
+                or c == ord("[")
+                or c == ord("]")
+                or c == ord("{")
+                or c == ord("}")
+                or c == ord("^")
+                or c == ord("$")
+                or c == ord("\\")
             ):
                 return False
         return True
@@ -253,7 +254,7 @@ struct CompileTimeMatcher(ImplicitlyCopyable, Movable):
             matches.append(Match(0, found_pos, found_pos + pattern_len, text))
             pos = found_pos + pattern_len
 
-        return matches
+        return matches^
 
 
 # ===-----------------------------------------------------------------------===#
