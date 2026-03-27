@@ -17,6 +17,7 @@ from regex.aliases import (
     CHAR_CIRCUMFLEX,
     CHAR_DASH,
     WORD_CHARS,
+    byte_in_string,
 )
 
 
@@ -457,11 +458,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return self._char_code_matches_range(ch_code, inner_pattern)
         else:
             # Expanded string, check if char is in it
-            var rp_ptr = range_pattern.unsafe_ptr()
-            for i in range(len(range_pattern)):
-                if Int(rp_ptr[i]) == ch_code:
-                    return True
-            return False
+            return byte_in_string(ch_code, range_pattern)
 
     def _char_code_matches_range(
         self,

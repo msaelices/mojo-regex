@@ -42,6 +42,17 @@ comptime CHAR_UNDERSCORE = ord("_")
 
 comptime ALL_EXCEPT_NEWLINE = _all_except_newline()
 
+@always_inline
+def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
+    """Check if a byte value exists in a string slice without allocating."""
+    var ptr = s.unsafe_ptr()
+    var target = UInt8(ch_code)
+    for i in range(len(s)):
+        if ptr[i] == target:
+            return True
+    return False
+
+
 comptime EMPTY_SLICE = StringSlice[ImmutAnyOrigin]("")
 comptime EMPTY_STRING = String("")
 

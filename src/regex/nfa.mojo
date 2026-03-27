@@ -7,6 +7,7 @@ from regex.aliases import (
     CHAR_NEWLINE,
     SIMD_MATCHER_DIGITS,
     SIMD_MATCHER_WHITESPACE,
+    byte_in_string,
 )
 from regex.engine import Engine
 from regex.matching import Match, MatchList
@@ -40,17 +41,6 @@ comptime COMPLEX_CHAR_CLASS_THRESHOLD = 10
 comptime MIN_PREFIX_LITERAL_LENGTH = 3
 # Non-prefix literals need even longer length to be worth the overhead
 comptime MIN_REQUIRED_LITERAL_LENGTH = 4
-
-
-@always_inline
-def _byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
-    """Check if a byte value exists in a string slice without allocating."""
-    var ptr = s.unsafe_ptr()
-    var target = UInt8(ch_code)
-    for i in range(len(s)):
-        if ptr[i] == target:
-            return True
-    return False
 
 
 struct NFAEngine(Copyable, Engine):
@@ -789,7 +779,7 @@ struct NFAEngine(Copyable, Engine):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
-                            ch_found = _byte_in_string(ch_code, inner)
+                            ch_found = byte_in_string(ch_code, inner)
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
@@ -1452,7 +1442,7 @@ struct NFAEngine(Copyable, Engine):
                             is_match = True
                         else:
                             # Check special characters via direct byte scan
-                            is_match = _byte_in_string(ch_code, inner)
+                            is_match = byte_in_string(ch_code, inner)
 
                         if is_match == ast.positive_logic:
                             match_count += 1
@@ -1534,9 +1524,9 @@ struct NFAEngine(Copyable, Engine):
                 return ch_code >= start_char and ch_code <= end_char
 
             # Direct byte scan instead of chr() + string `in`
-            return _byte_in_string(ch_code, inner)
+            return byte_in_string(ch_code, inner)
         else:
-            return _byte_in_string(ch_code, range_pattern)
+            return byte_in_string(ch_code, range_pattern)
 
 
 def findall(pattern: String, text: String) raises -> MatchList:
