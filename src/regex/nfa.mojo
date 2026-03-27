@@ -478,21 +478,11 @@ struct NFAEngine(Copyable, Engine):
         if not self.has_literal_optimization or len(self.literal_prefix) == 0:
             return True
 
-        # Search for literal within match bounds using direct byte scan
-        var text_ptr = text.unsafe_ptr()
-        var lit_ptr = self.literal_prefix.unsafe_ptr()
-        var lit_len = len(self.literal_prefix)
-        var search_end = end - lit_len + 1
-
-        for i in range(start, search_end):
-            var found = True
-            for j in range(lit_len):
-                if text_ptr[i + j] != lit_ptr[j]:
-                    found = False
-                    break
-            if found:
-                return True
-        return False
+        # Use twoway_search (already imported) with bounded range
+        var pos = twoway_search(
+            self.literal_prefix.as_bytes(), text, start
+        )
+        return pos != -1 and pos + len(self.literal_prefix) <= end
 
     @always_inline
     def _match_node(
@@ -799,7 +789,7 @@ struct NFAEngine(Copyable, Engine):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
-                            ch_found = str[byte=str_i] in inner
+                            ch_found = _byte_in_string(ch_code, inner)
                     else:
                         # Try to use SIMD matcher for other patterns
                         ch_found = self._match_with_simd_or_fallback(
