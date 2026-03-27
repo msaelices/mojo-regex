@@ -42,6 +42,17 @@ comptime MIN_PREFIX_LITERAL_LENGTH = 3
 comptime MIN_REQUIRED_LITERAL_LENGTH = 4
 
 
+@always_inline
+def _byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
+    """Check if a byte value exists in a string slice without allocating."""
+    var ptr = s.unsafe_ptr()
+    var target = UInt8(ch_code)
+    for i in range(len(s)):
+        if ptr[i] == target:
+            return True
+    return False
+
+
 struct NFAEngine(Copyable, Engine):
     """A regex engine that can match regex patterns against text."""
 
@@ -1438,9 +1449,8 @@ struct NFAEngine(Copyable, Engine):
                         if alnum_matcher.contains(ch_code):
                             is_match = True
                         else:
-                            # Check special characters
-                            var ch = chr(ch_code)
-                            is_match = ch in inner
+                            # Check special characters via direct byte scan
+                            is_match = _byte_in_string(ch_code, inner)
 
                         if is_match == ast.positive_logic:
                             match_count += 1
@@ -1508,6 +1518,7 @@ struct NFAEngine(Copyable, Engine):
 
         return (False, str_i)
 
+    @always_inline
     def _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
@@ -1520,13 +1531,10 @@ struct NFAEngine(Copyable, Engine):
                 var end_char = Int(inner_ptr[2])
                 return ch_code >= start_char and ch_code <= end_char
 
-            # For more complex patterns, fall back to character inclusion
-            var ch = chr(ch_code)
-            return ch in inner
+            # Direct byte scan instead of chr() + string `in`
+            return _byte_in_string(ch_code, inner)
         else:
-            # Not a bracketed pattern
-            var ch = chr(ch_code)
-            return ch in range_pattern
+            return _byte_in_string(ch_code, range_pattern)
 
 
 def findall(pattern: String, text: String) raises -> MatchList:
