@@ -161,14 +161,18 @@ skips the loop and tries exactly once.
 
 - grouped_quantifiers: 1.75ms -> 0.84ms (2.1x faster)
 
-## ~~Medium: NFA chr() Heap Allocations in Range Matching~~ (Fixed, PR #69)
+## ~~Medium: NFA Heap Allocations in Range Matching~~ (Fixed, PR #69)
 
 **PR:** https://github.com/msaelices/mojo-regex/pull/69
 
-For range patterns that miss the hardcoded fast paths (e.g. `[\\s.-]`,
-`[2-9]`), the code called `chr(ch_code)` (heap allocation) + `ch in inner`
-(O(n) string scan) on every character. Replaced with `_byte_in_string()`
-which does a direct byte pointer scan with zero allocations.
+Three allocation sources eliminated from NFA hot paths:
+
+1. `chr(ch_code)` + `ch in inner` per character for unrecognized range patterns.
+   Replaced with `_byte_in_string()` zero-allocation byte pointer scan.
+2. `String(ast.get_value().value())` per RANGE match in `_apply_quantifier_simd`.
+   Changed to `StringSlice` ref to avoid heap copy.
+3. `text[byte=start:end]` per NFA match candidate in `_match_contains_literal`.
+   Replaced with direct byte-level substring search.
 
 - alternation_quantifiers: 1.61ms -> 0.96ms (1.7x faster)
 - toll_free_complex: 0.62ms -> 0.34ms (1.8x faster)
@@ -193,6 +197,46 @@ instead of `ast.is_match(String(str[byte=pos]), ...)`.
 `DEFAULT_RESERVE_SIZE = 8` for initial match list capacity. For `findall` on long
 text, this causes multiple doublings. Could estimate based on text length and
 pattern type.
+
+## Medium: Dict Lookup per Character for SIMD Matchers
+
+**File:** `src/regex/simd_matchers.mojo` lines 447-513, `src/regex/nfa.mojo` lines 632-720
+
+Every call to `get_digit_matcher()`, `get_word_matcher()`, or `get_whitespace_matcher()`
+goes through `_get_range_matchers()` which calls `_RANGE_MATCHERS_GLOBAL.get_or_create_ptr()`
+and then does a `Dict` lookup with a `try/except`. This happens on every character in
+patterns like `\d{4}`, `\w+`, etc.
+
+**Fix:** Hoist matcher lookups out of per-character loops, or inline the range
+checks directly (e.g., `ch >= ord('0') and ch <= ord('9')` for digits, as
+`is_match_char` already does in ast.mojo).
+
+## Medium: SIMD Quantifier Threshold Too Conservative
+
+**File:** `src/regex/ast.mojo` lines 374-388
+
+```mojo
+if max_matches == -1:  # Unlimited quantifiers like *, +
+    return min_matches > 3  # Skips SIMD for \d+, [0-9]+, \w+
+```
+
+Patterns like `[0-9]+` (min=1), `\d+`, `\w+` all skip the SIMD quantifier
+path and fall back to the scalar loop. Lowering to `min_matches >= 1` for
+predefined types (DIGIT, WORD, SPACE) would enable SIMD for these patterns.
+
+## Medium: Prefilter Disabled in match_all
+
+**File:** `src/regex/matcher.mojo` lines 568-571
+
+```mojo
+if self.prefilter and not self.literal_info.has_anchors:
+    # Disabled for now to isolate performance issue
+    pass
+```
+
+The prefilter path that skips text positions in `match_all` (used by `findall`)
+is completely disabled. Re-enabling would avoid NFA evaluation at every text
+position for patterns with required literals.
 
 ## Patterns from Stdlib Docs Applicable Here
 
