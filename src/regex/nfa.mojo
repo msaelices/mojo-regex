@@ -470,6 +470,7 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
+    @always_inline
     def _match_contains_literal(
         self, text: String, start: Int, end: Int
     ) -> Bool:
@@ -477,9 +478,21 @@ struct NFAEngine(Copyable, Engine):
         if not self.has_literal_optimization or len(self.literal_prefix) == 0:
             return True
 
-        # Check if the literal appears within the match bounds
-        var match_text = text[byte=start:end]
-        return self.literal_prefix in match_text
+        # Search for literal within match bounds using direct byte scan
+        var text_ptr = text.unsafe_ptr()
+        var lit_ptr = self.literal_prefix.unsafe_ptr()
+        var lit_len = len(self.literal_prefix)
+        var search_end = end - lit_len + 1
+
+        for i in range(start, search_end):
+            var found = True
+            for j in range(lit_len):
+                if text_ptr[i + j] != lit_ptr[j]:
+                    found = False
+                    break
+            if found:
+                return True
+        return False
 
     @always_inline
     def _match_node(
@@ -1291,7 +1304,7 @@ struct NFAEngine(Copyable, Engine):
                 word_matcher, str, str_i, min_matches, max_matches
             )
         elif ast.type == RANGE and ast.get_value():
-            ref range_pattern = String(ast.get_value().value())
+            ref range_pattern = ast.get_value().value()
 
             # Check for common patterns that should use RangeBasedMatcher
             if range_pattern == "[a-zA-Z0-9]":
@@ -1519,7 +1532,7 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    def _match_char_in_range(self, range_pattern: String, ch_code: Int) -> Bool:
+    def _match_char_in_range[O: Origin](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             var inner = range_pattern[byte=1:-1]
