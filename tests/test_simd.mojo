@@ -29,7 +29,7 @@ def test_character_class_simd_basic() raises:
 
 def test_character_class_simd_range() raises:
     """Test SIMD character class with ranges."""
-    var char_class = CharacterClassSIMD("a", "z")
+    var char_class = CharacterClassSIMD(ord("a"), ord("z"))
 
     # Test range boundaries
     assert_true(char_class.contains(ord("a")))
