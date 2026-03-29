@@ -1,5 +1,4 @@
 //! Library functions for Rust regex benchmarks
-//! Mirrors the structure and functionality of bench_engine.py
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

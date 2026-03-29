@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
-Python benchmark script for comparing performance with Python's re module.
-This mirrors the benchmarks/bench_engine.mojo file for direct comparison.
+Python benchmark script for comparing regex performance with Python's re module.
 """
 
 import re
@@ -37,7 +36,7 @@ def _auto_calibrate(fn, iters: int) -> int:
     for _ in range(iters):
         fn()
     elapsed = time.perf_counter_ns() - start
-    if elapsed < MIN_SAMPLE_NS:
+    if elapsed < MIN_SAMPLE_NS and elapsed > 0:
         multiplier = int(MIN_SAMPLE_NS // elapsed) + 1
         iters = iters * multiplier
     return iters
@@ -59,9 +58,8 @@ def benchmark_search(
     for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.search(text)
 
-    # Auto-calibrate
-    iters = _auto_calibrate(lambda: [compiled_pattern.search(text) for _ in range(internal_iterations)], 1)
-    iters = internal_iterations * iters
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    iters = _auto_calibrate(lambda: compiled_pattern.search(text), internal_iterations)
 
     # Collect per-iteration times
     times = []
@@ -105,9 +103,8 @@ def benchmark_match_first(
     for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.match(text)
 
-    # Auto-calibrate
-    iters = _auto_calibrate(lambda: [compiled_pattern.match(text) for _ in range(internal_iterations)], 1)
-    iters = internal_iterations * iters
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    iters = _auto_calibrate(lambda: compiled_pattern.match(text), internal_iterations)
 
     # Collect per-iteration times
     times = []
@@ -149,9 +146,8 @@ def benchmark_findall(
     for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.findall(text)
 
-    # Auto-calibrate
-    iters = _auto_calibrate(lambda: [compiled_pattern.findall(text) for _ in range(internal_iterations)], 1)
-    iters = internal_iterations * iters
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    iters = _auto_calibrate(lambda: compiled_pattern.findall(text), internal_iterations)
 
     # Collect per-iteration times
     times = []
@@ -162,7 +158,7 @@ def benchmark_findall(
         start_time = time.perf_counter_ns()
 
         for _ in range(iters):
-            results = compiled_pattern.findall(text)
+            compiled_pattern.findall(text)
 
         end_time = time.perf_counter_ns()
         elapsed = end_time - start_time
@@ -219,7 +215,7 @@ def export_json_results(
 
 
 # ===-----------------------------------------------------------------------===#
-# Test Data Generation (Mirroring Mojo Functions)
+# Test Data Generation
 # ===-----------------------------------------------------------------------===
 
 
@@ -296,7 +292,7 @@ def make_complex_pattern_test_data(num_entries: int) -> str:
 
 
 def main():
-    """Run all regex benchmarks with manual timing (mirrors Mojo structure)."""
+    """Run all regex benchmarks."""
     print("=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===")
     print(
         "Target runtime: 500ms per benchmark, reporting median iteration time"
@@ -305,12 +301,10 @@ def main():
 
     # Prepare test data - same as Mojo benchmarks
     text_1000 = make_test_string(1000)
-    text_5000 = make_test_string(5000)
     text_10000 = make_test_string(10000)
     text_range_10000 = make_test_string(10000) + "0123456789"
 
     text_1000 += "hello world"
-    text_5000 += "hello world"
     text_10000 += "hello world"
 
     short_text = "hello world this is a test with hello again and hello there"
