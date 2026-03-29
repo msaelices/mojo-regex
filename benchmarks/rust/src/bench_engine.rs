@@ -252,6 +252,18 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "optimize_extreme_quantifiers", &patterns.optimize_extreme_quantifiers, &("abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR".repeat(20)), 500, BenchType::FindAll);
 
     // ===-----------------------------------------------------------------------===
+    // is_match (Bool-only) Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== is_match (Bool-only) Benchmarks ===");
+
+    let text_digits_10000 = "0123456789".repeat(1000) + "abcdefghijklmnopqrstuvwxyz";
+    run_benchmark(&timer, &mut all_results, "is_match_lowercase", &patterns.range_a_z, &text_range_10000, 1000, BenchType::IsMatchBool);
+    run_benchmark(&timer, &mut all_results, "is_match_digits", &patterns.range_0_9, &text_digits_10000, 1000, BenchType::IsMatchBool);
+    run_benchmark(&timer, &mut all_results, "is_match_alphanumeric", &patterns.range_alnum, &text_range_10000, 1000, BenchType::IsMatchBool);
+    run_benchmark(&timer, &mut all_results, "is_match_predefined_digits", &patterns.predefined_digits, &text_digits_10000, 1000, BenchType::IsMatchBool);
+    run_benchmark(&timer, &mut all_results, "is_match_predefined_word", &patterns.predefined_word, &text_range_10000, 1000, BenchType::IsMatchBool);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -266,6 +278,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Debug)]
 enum BenchType {
     IsMatch,
+    IsMatchBool,
     Search,
     FindAll,
 }
@@ -462,6 +475,15 @@ fn run_benchmark(
 ) {
     let result = match bench_type {
         BenchType::IsMatch => {
+            // Use find() instead of is_match() to compute match boundaries,
+            // matching what Mojo's match_first returns (start + end positions)
+            timer.bench_function(|| {
+                for _ in 0..inner_iterations {
+                    black_box(pattern.find(black_box(text)));
+                }
+            })
+        }
+        BenchType::IsMatchBool => {
             timer.bench_function(|| {
                 for _ in 0..inner_iterations {
                     black_box(pattern.is_match(black_box(text)));

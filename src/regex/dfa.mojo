@@ -1722,6 +1722,40 @@ struct DFAEngine(Engine):
         """
         return self.literal_pattern
 
+    def is_match(self, text: String, start: Int = 0) -> Bool:
+        """Check if pattern matches at the given position without computing
+        match boundaries. Much faster than match_first for simple checks.
+
+        Args:
+            text: Input text to match against.
+            start: Starting position in text.
+
+        Returns:
+            True if pattern matches, False otherwise.
+        """
+        if self.has_start_anchor and start > 0:
+            return False
+
+        # Fast SIMD path: just check if first character matches
+        if self._has_simd_matcher and len(self.states) > 0:
+            var text_len = len(text)
+            if start >= text_len:
+                # Only match empty if start state is accepting
+                return self.states[self.start_state].is_accepting
+            # Check if the character at start matches
+            var ch_code = Int(text.unsafe_ptr()[start])
+            if self._simd_char_matcher.contains(ch_code):
+                return True
+            # No match at start - only valid if start state accepts
+            return self.states[self.start_state].is_accepting
+
+        # Fallback to full match
+        return Bool(
+            self._try_match_at_position(
+                text, start, require_exact_position=True
+            )
+        )
+
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.

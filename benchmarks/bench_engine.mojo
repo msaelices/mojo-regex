@@ -271,6 +271,57 @@ def benchmark_findall(
     _print_result(name, median_ms, actual_iterations * iters)
 
 
+def benchmark_is_match(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark is_match (bool-only) with pre-compiled regex and median timing.
+    """
+
+    var compiled = compile_regex(pattern)
+    var stats = compiled.get_stats()
+    print("[ENGINE] " + name + " -> " + stats)
+
+    # Warmup with compiled regex
+    for _ in range(WARMUP_ITERATIONS):
+        _ = compiled.is_match(text)
+
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = compiled.is_match(text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < MIN_SAMPLE_NS:
+        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    # Collect per-iteration times
+    var times = List[Float64]()
+    var total_time: UInt = 0
+    var actual_iterations = 0
+
+    while (
+        total_time < UInt(TARGET_RUNTIME_NS)
+        and actual_iterations < MAX_ITERATIONS
+    ):
+        var start_time = perf_counter_ns()
+
+        for _ in range(iters):
+            var result = compiled.is_match(text)
+            if not result:
+                print("ERROR: No match in", name, "for pattern:", pattern)
+                return
+
+        var end_time = perf_counter_ns()
+        var elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
+
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
+
+
 # ===-----------------------------------------------------------------------===#
 # Main Benchmark Runner
 # ===-----------------------------------------------------------------------===#
@@ -639,4 +690,18 @@ def main() raises:
         "a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}",
         "abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR" * 20,
         500,
+    )
+
+    # ===== is_match (Bool-only) Benchmarks =====
+    var text_digits_10000 = "0123456789" * 1000 + "abcdefghijklmnopqrstuvwxyz"
+    benchmark_is_match("is_match_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_is_match("is_match_digits", "[0-9]+", text_digits_10000, 1000)
+    benchmark_is_match(
+        "is_match_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
+    )
+    benchmark_is_match(
+        "is_match_predefined_digits", "\\d+", text_digits_10000, 1000
+    )
+    benchmark_is_match(
+        "is_match_predefined_word", "\\w+", text_range_10000, 1000
     )

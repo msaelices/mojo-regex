@@ -175,6 +175,48 @@ def benchmark_findall(
     _store_benchmark_result(name, median_ms, total_matches)
 
 
+def benchmark_is_match(
+    name: str, pattern: str, text: str, internal_iterations: int
+):
+    """Benchmark bool-only match check with pre-compiled regex and median timing.
+    Uses re.match which returns a match object, then checks truthiness (like is_match).
+    """
+
+    compiled_pattern = re.compile(pattern)
+
+    # Warmup
+    for _ in range(WARMUP_ITERATIONS):
+        bool(compiled_pattern.match(text))
+
+    # Auto-calibrate
+    iters = _auto_calibrate(lambda: bool(compiled_pattern.match(text)), internal_iterations)
+
+    # Collect per-iteration times
+    times = []
+    total_time = 0
+    actual_iterations = 0
+
+    while total_time < TARGET_RUNTIME_NS and actual_iterations < MAX_ITERATIONS:
+        start_time = time.perf_counter_ns()
+
+        for _ in range(iters):
+            bool(compiled_pattern.match(text))
+
+        end_time = time.perf_counter_ns()
+        elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(elapsed / iters / 1_000_000.0)
+
+    median_ms = _find_median(times)
+    total_matches = actual_iterations * iters
+
+    padded_name = name + " " * (25 - len(name))
+    print(f"| {padded_name} | {median_ms:>21.17f} | {total_matches:>6} |")
+
+    _store_benchmark_result(name, median_ms, total_matches)
+
+
 # ===-----------------------------------------------------------------------===#
 # Result Collection for JSON Export
 # ===-----------------------------------------------------------------------===#
@@ -615,6 +657,20 @@ def main():
         r"a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}",
         "abcccddddeeeeeffffffggggggghhhhhhhhSEPARATOR" * 20,
         500,
+    )
+
+    # ===== is_match (Bool-only) Benchmarks =====
+    text_digits_10000 = "0123456789" * 1000 + "abcdefghijklmnopqrstuvwxyz"
+    benchmark_is_match("is_match_lowercase", "[a-z]+", text_range_10000, 1000)
+    benchmark_is_match("is_match_digits", "[0-9]+", text_digits_10000, 1000)
+    benchmark_is_match(
+        "is_match_alphanumeric", "[a-zA-Z0-9]+", text_range_10000, 1000
+    )
+    benchmark_is_match(
+        "is_match_predefined_digits", r"\d+", text_digits_10000, 1000
+    )
+    benchmark_is_match(
+        "is_match_predefined_word", r"\w+", text_range_10000, 1000
     )
 
     print()
