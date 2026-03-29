@@ -86,10 +86,8 @@ struct LiteralInfo[node_origin: ImmutOrigin](
 
     def get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
-        if self.node_ptr and self.node_ptr[].get_value():
-            # If we have an AST node, use its value
-            return String(self.node_ptr[].get_value().value())
-        elif self.literal_string_idx >= 0:
+        # Always use the string index approach for consistency and to avoid pointer issues
+        if self.literal_string_idx >= 0:
             # If we have a literal string index, get it from the set
             return literal_set.literal_strings[self.literal_string_idx]
         else:
@@ -496,8 +494,9 @@ def extract_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> String:
     """
     var literals = extract_literals(ast)
 
-    # Look for a prefix literal
-    for lit in literals.literals:
+    # Look for a prefix literal - extract directly to avoid pointer issues
+    for i in range(len(literals.literals)):
+        var lit = literals.literals[i]
         if lit.is_prefix and lit.is_required:
             return lit.get_literal(literals)
 
