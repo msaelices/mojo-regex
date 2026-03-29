@@ -413,7 +413,6 @@ struct NFAEngine(Copyable, Engine):
             Optional SIMD matcher for the pattern.
         """
         # Try to create a SIMD matcher for common patterns
-        var char_class: String
 
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
@@ -449,14 +448,10 @@ struct NFAEngine(Copyable, Engine):
 
                 # Cannot easily convert String to StringSlice with correct origin
                 # Fall back to manual expansion for complex patterns
-                char_class = String()
+                return None
         else:
-            # Already expanded
-            char_class = String(range_pattern)
-
-        # Create SIMD matcher
-        if char_class:
-            return get_character_class_matcher(char_class)
+            # Already expanded - pass directly as StringSlice, no allocation
+            return get_character_class_matcher(range_pattern)
 
         return None
 

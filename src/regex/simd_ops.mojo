@@ -71,11 +71,11 @@ struct CharacterClassSIMD(
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
 
-    def __init__(out self, var char_class: String):
+    def __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
 
         Args:
-            char_class: String containing all characters in the class (e.g., "abcdefg...").
+            char_class: StringSlice containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
         self.size_hint = len(char_class)
@@ -96,27 +96,25 @@ struct CharacterClassSIMD(
             var char_code = Int(cc_ptr[i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
-        # var call_location = __call_location()
-        # print("Init CharacterClassSIMD", call_location)
 
-    def __init__(out self, start_char: String, end_char: String):
-        """Initialize with a character range like 'a'-'z'.
+    def __init__(out self, start_code: Int, end_code: Int):
+        """Initialize with a character code range like ord('a')-ord('z').
 
         Args:
-            start_char: First character in range.
-            end_char: Last character in range.
+            start_code: First character code in range.
+            end_code: Last character code in range.
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
 
-        var start_code = max(ord(start_char), 0)
-        var end_code = min(ord(end_char), 255)
+        var sc = max(start_code, 0)
+        var ec = min(end_code, 255)
 
-        self.size_hint = end_code - start_code + 1
+        self.size_hint = ec - sc + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
         self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
 
-        for char_code in range(start_code, end_code + 1):
+        for char_code in range(sc, ec + 1):
             self.lookup_table[char_code] = 1
         # var call_location = __call_location()
         # print("Init CharacterClassSIMD", call_location)
@@ -340,19 +338,19 @@ struct CharacterClassSIMD(
 @always_inline
 def _create_ascii_lowercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII lowercase letters [a-z]."""
-    return CharacterClassSIMD("a", "z")
+    return CharacterClassSIMD(ord("a"), ord("z"))
 
 
 @always_inline
 def _create_ascii_uppercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII uppercase letters [A-Z]."""
-    return CharacterClassSIMD("A", "Z")
+    return CharacterClassSIMD(ord("A"), ord("Z"))
 
 
 @always_inline
 def _create_ascii_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII digits [0-9]."""
-    return CharacterClassSIMD("0", "9")
+    return CharacterClassSIMD(ord("0"), ord("9"))
 
 
 @always_inline
@@ -596,7 +594,7 @@ def simd_memcmp(
     return True
 
 
-def simd_count_char(text: String, target_char: String) -> Int:
+def simd_count_char(text: String, target_char: StringSlice) -> Int:
     """Count occurrences of a character using SIMD.
 
     Args:
@@ -694,7 +692,7 @@ def get_simd_matcher(matcher_type: Int) -> CharacterClassSIMD:
 
 
 @always_inline
-def get_character_class_matcher(char_class: String) -> CharacterClassSIMD:
+def get_character_class_matcher(char_class: StringSlice) -> CharacterClassSIMD:
     """Get optimal cached matcher for character class string.
 
     This function detects common character class patterns and returns
