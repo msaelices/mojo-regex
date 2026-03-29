@@ -37,6 +37,7 @@ from regex.tokens import (
 )
 from regex.simd_ops import (
     CharacterClassSIMD,
+    SIMD_WIDTH,
     get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
@@ -1721,6 +1722,40 @@ struct DFAEngine(Engine):
         """
         return self.literal_pattern
 
+    def is_match(self, text: String, start: Int = 0) -> Bool:
+        """Check if pattern matches at the given position without computing
+        match boundaries. Much faster than match_first for simple checks.
+
+        Args:
+            text: Input text to match against.
+            start: Starting position in text.
+
+        Returns:
+            True if pattern matches, False otherwise.
+        """
+        if self.has_start_anchor and start > 0:
+            return False
+
+        # Fast SIMD path: just check if first character matches
+        if self._has_simd_matcher and len(self.states) > 0:
+            var text_len = len(text)
+            if start >= text_len:
+                # Only match empty if start state is accepting
+                return self.states[self.start_state].is_accepting
+            # Check if the character at start matches
+            var ch_code = Int(text.unsafe_ptr()[start])
+            if self._simd_char_matcher.contains(ch_code):
+                return True
+            # No match at start - only valid if start state accepts
+            return self.states[self.start_state].is_accepting
+
+        # Fallback to full match
+        return Bool(
+            self._try_match_at_position(
+                text, start, require_exact_position=True
+            )
+        )
+
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
@@ -1996,14 +2031,30 @@ struct DFAEngine(Engine):
                     # Range quantifier like {2,4} - disable SIMD, fall back to DFA
                     return None
 
-        # Use SIMD to count consecutive matching characters
+        # Use SIMD bulk scan to find end of consecutive matching characters
         var pos = start_pos
         var match_count = 0
         var text_ptr = text.unsafe_ptr()
 
+        # Process SIMD_WIDTH characters at a time
+        while pos + SIMD_WIDTH <= text_len:
+            var matches = simd_matcher._check_chunk_simd(text_ptr, pos)
+            if matches.reduce_and():
+                # All characters in chunk match, advance by full width
+                match_count += SIMD_WIDTH
+                pos += SIMD_WIDTH
+            else:
+                # Find first non-match in this chunk
+                for i in range(SIMD_WIDTH):
+                    if not matches[i]:
+                        break
+                    match_count += 1
+                    pos += 1
+                break
+
+        # Handle remaining characters (< SIMD_WIDTH)
         while pos < text_len:
-            var ch_code = Int(text_ptr[pos])
-            if simd_matcher.contains(ch_code):
+            if simd_matcher.contains(Int(text_ptr[pos])):
                 match_count += 1
                 pos += 1
             else:

@@ -151,6 +151,10 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
+    def is_match(self, text: String, start: Int = 0) -> Bool:
+        """Check if pattern matches without computing boundaries."""
+        return self.engine_ptr[].is_match(text, start)
+
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
@@ -450,6 +454,20 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
 
+    def is_match(self, text: String, start: Int = 0) -> Bool:
+        """Check if pattern matches without computing boundaries."""
+        if self.is_wildcard_match_any:
+            return start <= len(text)
+
+        if (
+            self.dfa_matcher
+            and self.complexity.value == PatternComplexity.SIMPLE
+        ):
+            return self.dfa_matcher.is_match(text, start)
+
+        # NFA fallback: use full match
+        return Bool(self.nfa_matcher.match_first(text, start))
+
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -708,6 +726,19 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         var result = self.matcher.match_next(text, 0)
         return result.__bool__()
+
+    def is_match(self, text: String, start: Int = 0) -> Bool:
+        """Check if pattern matches at the given position without computing
+        match boundaries. Much faster than match_first for simple existence checks.
+
+        Args:
+            text: Input text to test.
+            start: Starting position (default 0).
+
+        Returns:
+            True if pattern matches, False otherwise.
+        """
+        return self.matcher.is_match(text, start)
 
     def get_stats(self) -> String:
         """Get performance statistics and engine information.
