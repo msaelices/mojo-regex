@@ -279,6 +279,61 @@ The prefilter path that skips text positions in `match_all` (used by `findall`)
 is completely disabled. Re-enabling would avoid NFA evaluation at every text
 position for patterns with required literals.
 
+## High: DFA Character Class Matching Orders of Magnitude Slower Than Rust
+
+**Benchmarked 2026-03-29** (pre-compiled, median timing)
+
+Simple character class patterns on the DFA engine are 1000-8000x slower than
+Rust's `regex` crate and often slower than Python:
+
+| Benchmark | Mojo (ms) | Python (ms) | Rust (ms) | Mojo/Rust |
+|-----------|----------|------------|----------|-----------|
+| `range_lowercase` (`[a-z]+`) | 0.136 | 0.025 | 0.000017 | 8037x |
+| `range_digits` (`[0-9]+`) | 0.053 | 0.279 | 0.000034 | 1573x |
+| `range_alphanumeric` (`[a-zA-Z0-9]+`) | 0.091 | 0.039 | 0.000028 | 3251x |
+| `predefined_digits` (`\d+`) | 0.051 | 0.287 | 0.000072 | 708x |
+| `predefined_word` (`\w+`) | 0.107 | 0.077 | 0.000016 | 6674x |
+
+**Root cause:** Rust's `is_match` on these patterns short-circuits immediately
+after finding the first match position via a single SIMD scan. Mojo's DFA runs
+the full state machine over the entire text. The DFA engine lacks an early-exit
+`is_match` / `test` mode that stops as soon as any match is confirmed, and the
+SIMD character class matcher is not used to skip non-matching positions in the
+DFA hot loop.
+
+**Fix directions:**
+- Add `is_match` fast path to the DFA engine that returns `True` on first
+  accepting state without computing match boundaries.
+- Use the SIMD character class matcher to find first candidate position before
+  entering the DFA state machine.
+
+## High: NFA Complex Pattern Backtracking Much Slower Than Rust
+
+**Benchmarked 2026-03-29** (pre-compiled, median timing)
+
+Complex NFA patterns with backtracking are 40-200x slower than Rust:
+
+| Benchmark | Mojo (ms) | Python (ms) | Rust (ms) | Mojo/Rust |
+|-----------|----------|------------|----------|-----------|
+| `flexible_phone` | 9.01 | 3.06 | 0.224 | 40x |
+| `multi_format_phone` | 22.38 | 7.27 | 0.232 | 97x |
+| `grouped_quantifiers` | 0.70 | 0.27 | 0.009 | 77x |
+| `dfa_paren_phone` | 1.66 | 0.14 | 0.013 | 133x |
+| `phone_validation` | 0.0018 | 0.0005 | 0.000025 | 72x |
+| `optimize_extreme_quantifiers` | 0.039 | 0.014 | 0.000189 | 209x |
+
+**Root cause:** Rust's `regex` crate uses a lazy DFA (Thompson NFA -> DFA cache)
+that avoids backtracking entirely. Mojo's NFA engine uses explicit backtracking
+which is exponential in the worst case. Additionally, `dfa_paren_phone` being
+0.1x vs Python suggests a possible bug in the DFA compilation for escaped
+parenthesis patterns.
+
+**Fix directions:**
+- Investigate `dfa_paren_phone` regression vs Python (possible DFA compilation
+  bug with `\(` patterns).
+- Consider implementing a Thompson NFA or lazy DFA to avoid backtracking.
+- Short term: improve NFA backtracking pruning and memoization.
+
 ## Patterns from Stdlib Docs Applicable Here
 
 | Stdlib Pattern | mojo-regex Equivalent |
