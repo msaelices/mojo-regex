@@ -37,6 +37,7 @@ from regex.tokens import (
 )
 from regex.simd_ops import (
     CharacterClassSIMD,
+    SIMD_WIDTH,
     get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
@@ -1996,14 +1997,30 @@ struct DFAEngine(Engine):
                     # Range quantifier like {2,4} - disable SIMD, fall back to DFA
                     return None
 
-        # Use SIMD to count consecutive matching characters
+        # Use SIMD bulk scan to find end of consecutive matching characters
         var pos = start_pos
         var match_count = 0
         var text_ptr = text.unsafe_ptr()
 
+        # Process SIMD_WIDTH characters at a time
+        while pos + SIMD_WIDTH <= text_len:
+            var matches = simd_matcher._check_chunk_simd(text_ptr, pos)
+            if matches.reduce_and():
+                # All characters in chunk match, advance by full width
+                match_count += SIMD_WIDTH
+                pos += SIMD_WIDTH
+            else:
+                # Find first non-match in this chunk
+                for i in range(SIMD_WIDTH):
+                    if not matches[i]:
+                        break
+                    match_count += 1
+                    pos += 1
+                break
+
+        # Handle remaining characters (< SIMD_WIDTH)
         while pos < text_len:
-            var ch_code = Int(text_ptr[pos])
-            if simd_matcher.contains(ch_code):
+            if simd_matcher.contains(Int(text_ptr[pos])):
                 match_count += 1
                 pos += 1
             else:
