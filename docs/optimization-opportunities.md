@@ -198,6 +198,56 @@ instead of `ast.is_match(String(str[byte=pos]), ...)`.
 text, this causes multiple doublings. Could estimate based on text length and
 pattern type.
 
+## ~~Medium: String-to-StringSlice in SIMD Character Class APIs~~ (Fixed, PR #70)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/70
+
+`CharacterClassSIMD.__init__`, `get_character_class_matcher`, and `simd_count_char`
+all took `String` parameters but only read from them via `unsafe_ptr()` or `ord()`.
+Changed to `StringSlice` to avoid heap allocations at API boundaries. Also changed
+the range constructor from `(start_char: String, end_char: String)` to
+`(start_code: Int, end_code: Int)` eliminating two allocations per range matcher
+creation. NFA `_create_range_matcher` no longer wraps `StringSlice` in `String`
+just to pass it to `get_character_class_matcher`.
+
+### Remaining: String-to-StringSlice opportunities in other modules
+
+#### High: Prefilter text parameters (matching hot path)
+
+**File:** `src/regex/prefilter.mojo` lines 347-477
+
+The `PrefilterMatcher` trait methods `find_candidates(text: String)` and
+`find_first_candidate(text: String)` and their implementations in `MemchrPrefilter`
+and `ExactLiteralMatcher` take `String` but only call `.find()` and `len()`.
+These are in the matching hot path. Changing to `StringSlice` would avoid
+forcing callers to allocate.
+
+#### Medium: Prefilter literal extraction allocations (compilation path)
+
+**File:** `src/regex/prefilter.mojo` lines 186-213
+
+`_extract_from_node()` creates `String(char_value.value())` per single character
+(line 186). `_extract_literal_sequence()` returns `String` built by repeated
+concatenation (line 210: `result += child_literal`). Could use `StringSlice` for
+single-char returns and pre-allocate capacity for sequence building.
+
+#### Medium: DFA _expand_character_range returns String (compilation path)
+
+**File:** `src/regex/dfa.mojo` lines 69-165
+
+Takes `StringSlice` input but returns `String`. Lines 92, 129, 135, 141 create
+`String` from slices of comptime constants (`LOWERCASE_LETTERS`, `DIGITS`, etc.)
+that already live in static memory. Could return `StringSlice` for those fast
+paths if `compile_character_class_with_logic()` accepted `StringSlice`.
+
+#### Low: Public matcher API text parameters (breaking change)
+
+**Files:** `src/regex/matcher.mojo` lines 99-120, 453-580, 796-826
+
+`match_first`, `match_next`, `match_all`, `search`, `findall` all take
+`text: String` but only read from it. Changing to `StringSlice` would avoid
+caller allocations but is a breaking API change.
+
 ## Medium: Dict Lookup per Character for SIMD Matchers
 
 **File:** `src/regex/simd_matchers.mojo` lines 447-513, `src/regex/nfa.mojo` lines 632-720
