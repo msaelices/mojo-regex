@@ -1,5 +1,4 @@
 //! Library functions for Rust regex benchmarks
-//! Mirrors the structure and functionality of bench_engine.py
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -65,48 +64,71 @@ pub fn make_mixed_content_text(length: usize) -> String {
 pub struct BenchmarkTimer {
     target_runtime_ns: u128,
     max_iterations: u64,
+    min_sample_ns: u128,
+    warmup_iterations: usize,
 }
 
 impl BenchmarkTimer {
     pub fn new() -> Self {
         Self {
-            target_runtime_ns: 100_000_000, // 100ms target runtime
-            max_iterations: 100_000,
+            target_runtime_ns: 500_000_000, // 500ms target runtime
+            max_iterations: 200_000,
+            min_sample_ns: 1_000_000, // 1ms minimum per sample
+            warmup_iterations: 10,
         }
     }
 
-    /// Run a benchmark function and measure its performance
+    /// Run a benchmark function and measure its performance using median timing
     pub fn bench_function<F>(&self, mut f: F) -> BenchmarkResult
     where
         F: FnMut(),
     {
         // Warmup runs
-        for _ in 0..3 {
+        for _ in 0..self.warmup_iterations {
             f();
         }
 
+        // Auto-calibrate: measure one run, scale if needed
+        let cal_start = std::time::Instant::now();
+        f();
+        let cal_elapsed = cal_start.elapsed().as_nanos();
+        let repetitions = if cal_elapsed < self.min_sample_ns {
+            (self.min_sample_ns / cal_elapsed) as usize + 1
+        } else {
+            1
+        };
+
+        let mut times_ns: Vec<f64> = Vec::new();
         let mut total_time_ns = 0u128;
         let mut iterations = 0u64;
 
         while total_time_ns < self.target_runtime_ns && iterations < self.max_iterations {
             let start = std::time::Instant::now();
-            f();
+            for _ in 0..repetitions {
+                f();
+            }
             let duration = start.elapsed();
+            let elapsed = duration.as_nanos();
 
-            total_time_ns += duration.as_nanos();
+            total_time_ns += elapsed;
             iterations += 1;
+            times_ns.push(elapsed as f64 / repetitions as f64);
         }
 
-        let mean_time_ns = if iterations > 0 {
-            total_time_ns as f64 / iterations as f64
-        } else {
+        // Compute median
+        times_ns.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        let median_time_ns = if times_ns.is_empty() {
             0.0
+        } else if times_ns.len() % 2 == 1 {
+            times_ns[times_ns.len() / 2]
+        } else {
+            (times_ns[times_ns.len() / 2 - 1] + times_ns[times_ns.len() / 2]) / 2.0
         };
 
         BenchmarkResult {
-            time_ns: mean_time_ns,
-            time_ms: mean_time_ns / 1_000_000.0,
-            iterations,
+            time_ns: median_time_ns,
+            time_ms: median_time_ns / 1_000_000.0,
+            iterations: iterations * repetitions as u64,
         }
     }
 }

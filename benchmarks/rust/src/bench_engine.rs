@@ -497,7 +497,7 @@ fn run_benchmark(
 }
 
 fn print_results_table(results: &HashMap<String, BenchmarkResult>) {
-    println!("| name                      | met (ms)              | iters  |");
+    println!("| name                      | med (ms)              | iters  |");
     println!("|---------------------------|-----------------------|--------|");
 
     let mut sorted_results: Vec<_> = results.iter().collect();

@@ -1,0 +1,65 @@
+=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===
+Target runtime: 500ms per benchmark, reporting median iteration time
+
+| name                      | med (ms)              | iters  |
+|---------------------------|-----------------------|--------|
+| literal_match_short       |   0.00163229400000000 | 312000 |
+| literal_match_long        |   0.01526160000000000 |  34000 |
+| wildcard_match_any        |   0.00725875600000000 |  67000 |
+| quantifier_zero_or_more   |   0.00054961100000000 | 852000 |
+| quantifier_one_or_more    |   0.00046437950000000 | 990000 |
+| quantifier_zero_or_one    |   0.00027739875000000 | 1608000 |
+| range_lowercase           |   0.02464219900000000 |  17000 |
+| range_digits              |   0.27871029850000001 |   2000 |
+| range_alphanumeric        |   0.03891024200000000 |  13000 |
+| predefined_digits         |   0.28698795300000002 |   2000 |
+| predefined_word           |   0.07691577699999999 |   8000 |
+| anchor_start              |   0.00035196700000000 | 1274000 |
+ERROR: No match in anchor_end for pattern: xyz$
+| alternation_simple        |   0.00031829050000000 | 1386000 |
+| group_alternation         |   0.00029887900000000 | 1545000 |
+| large_8_alternations      |   0.00060427200000000 | 754000 |
+| deep_nested_groups_depth4 |   0.00032300550000000 | 1338000 |
+| literal_heavy_alternation |   0.00078819925000000 | 576000 |
+| complex_group_5_children  |   0.00054784900000000 | 860000 |
+| match_all_simple          |   0.05120186000000000 |   9600 |
+| match_all_digits          |   2.34255250250000024 |    400 |
+| literal_prefix_short      |   0.00077341983695652 | 642528 |
+| literal_prefix_long       |   0.06108904545454545 |   7766 |
+| required_literal_short    |   0.00510173626373626 |  99008 |
+| no_literal_baseline       |   0.00050924210526316 | 1038825 |
+| alternation_common_prefix |   0.00035157872340426 | 1290150 |
+| complex_email             |   0.04376432500000000 |  11640 |
+| complex_number            |   0.22166863800000000 |   2500 |
+| simple_phone              |   2.19120885000000021 |    300 |
+| flexible_phone            |   3.05635930999999994 |    200 |
+| multi_format_phone        |   7.26651153999999977 |    100 |
+| phone_validation          |   0.00051347666666667 | 958500 |
+| dfa_simple_phone          |   2.45637441999999995 |    300 |
+| dfa_paren_phone           |   0.13818211000000000 |   3300 |
+| dfa_dot_phone             |   1.49437984500000010 |    400 |
+| dfa_digits_only           |   1.48771556500000002 |    400 |
+| national_phone_validation |   1.13711810000000013 |    430 |
+| toll_free_simple          |   0.09935140500000000 |   5000 |
+| toll_free_complex         |   0.06634859000000000 |   6700 |
+| single_quantifier_digits  |   0.12394559500000001 |   4000 |
+| single_quantifier_alpha   |   0.18782433499999998 |   2600 |
+| dual_quantifiers          |   0.15407425333333336 |   3300 |
+| triple_quantifiers        |   0.17752182999999999 |   2900 |
+| quad_quantifiers          |   0.23367964999999999 |   2100 |
+| range_quantifiers         |   0.13747773000000002 |   3500 |
+| mixed_range_quantifiers   |   0.12101458666666667 |   3975 |
+| datetime_quantifiers      |   0.14983969000000000 |   2900 |
+| flexible_datetime         |   0.15674350500000001 |   3200 |
+| dense_quantifiers         |   0.30262047000000003 |   1700 |
+| ultra_dense_quantifiers   |   0.43187229999999999 |   1150 |
+| grouped_quantifiers       |   0.26945527000000002 |   1900 |
+| alternation_quantifiers   |   1.04374057333333337 |    525 |
+| optimize_range_quantifier |   0.15837781149999999 |   4000 |
+| optimize_multiple_quantifiers |   0.44985549749999998 |   1200 |
+| optimize_phone_quantifiers |   0.19488948000000000 |   2700 |
+| optimize_large_quantifiers |   0.00755842500000000 |  56400 |
+| optimize_extreme_quantifiers |   0.01446882400000000 |  35500 |
+
+
+Results exported to benchmarks/results/python_results.json
