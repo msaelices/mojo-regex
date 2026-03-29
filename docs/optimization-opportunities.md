@@ -279,33 +279,40 @@ The prefilter path that skips text positions in `match_all` (used by `findall`)
 is completely disabled. Re-enabling would avoid NFA evaluation at every text
 position for patterns with required literals.
 
-## High: DFA Character Class Matching Orders of Magnitude Slower Than Rust
+## ~~High: DFA Character Class Matching Orders of Magnitude Slower Than Rust~~ (Partially fixed, PR #74)
 
-**Benchmarked 2026-03-29** (pre-compiled, median timing)
+**PR:** https://github.com/msaelices/mojo-regex/pull/74
 
-Simple character class patterns on the DFA engine are 1000-8000x slower than
-Rust's `regex` crate and often slower than Python:
+Two fixes applied:
 
-| Benchmark | Mojo (ms) | Python (ms) | Rust (ms) | Mojo/Rust |
-|-----------|----------|------------|----------|-----------|
-| `range_lowercase` (`[a-z]+`) | 0.136 | 0.025 | 0.000017 | 8037x |
-| `range_digits` (`[0-9]+`) | 0.053 | 0.279 | 0.000034 | 1573x |
-| `range_alphanumeric` (`[a-zA-Z0-9]+`) | 0.091 | 0.039 | 0.000028 | 3251x |
-| `predefined_digits` (`\d+`) | 0.051 | 0.287 | 0.000072 | 708x |
-| `predefined_word` (`\w+`) | 0.107 | 0.077 | 0.000016 | 6674x |
+1. **SIMD bulk scan in `_try_match_simd`:** The method was processing characters
+   one at a time via scalar `contains()`. Now processes SIMD_WIDTH (16/32)
+   characters per iteration using `_check_chunk_simd()` with hardware shuffle
+   instructions. Result: 1.5-2.2x faster on `match_first` benchmarks.
 
-**Root cause:** Rust's `is_match` on these patterns short-circuits immediately
-after finding the first match position via a single SIMD scan. Mojo's DFA runs
-the full state machine over the entire text. The DFA engine lacks an early-exit
-`is_match` / `test` mode that stops as soon as any match is confirmed, and the
-SIMD character class matcher is not used to skip non-matching positions in the
-DFA hot loop.
+2. **`is_match` fast path (O(1)):** Added `DFAEngine.is_match()` that checks if
+   the first character matches the SIMD character class without scanning for
+   match boundaries. Wired through `CompiledRegex.is_match()`.
 
-**Fix directions:**
-- Add `is_match` fast path to the DFA engine that returns `True` on first
-  accepting state without computing match boundaries.
-- Use the SIMD character class matcher to find first candidate position before
-  entering the DFA state machine.
+   | Benchmark | Mojo (ns) | Rust (ns) | Mojo/Rust |
+   |-----------|----------|----------|-----------|
+   | `is_match_lowercase` | 9 | 27 | 0.3x |
+   | `is_match_digits` | 7 | 44 | 0.2x |
+   | `is_match_predefined_word` | 8 | 19 | 0.4x |
+
+   Mojo `is_match` is now competitive with Rust (0.2-0.4x) and 2500-8700x
+   faster than `match_first`.
+
+### Remaining: `match_first` still scans full matching run
+
+The `match_first` path (which computes match boundaries) is still much slower
+than Rust's `find()` because Mojo scans the entire matching run to find the
+end position. Rust's lazy DFA can compute boundaries incrementally.
+
+| Benchmark | Mojo (ms) | Rust (ms) | Mojo/Rust |
+|-----------|----------|----------|-----------|
+| `range_lowercase` (`[a-z]+`) | 0.068 | 0.000057 | 1205x |
+| `predefined_digits` (`\d+`) | 0.024 | 0.000084 | 280x |
 
 ## High: NFA Complex Pattern Backtracking Much Slower Than Rust
 
