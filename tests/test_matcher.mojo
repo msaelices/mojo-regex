@@ -1417,5 +1417,92 @@ def test_match_word_quantifier_star() raises:
     assert_equal(matched2.get_match_text(), "")
 
 
+def test_is_match_character_classes() raises:
+    """Test is_match fast path for character class patterns."""
+    # Lowercase matches at start
+    var regex_lower = compile_regex("[a-z]+")
+    assert_true(regex_lower.is_match("abcdef"))
+    assert_true(regex_lower.is_match("z"))
+    assert_false(regex_lower.is_match("123"))
+    assert_false(regex_lower.is_match("ABC"))
+
+    # Digits
+    var regex_digits = compile_regex("[0-9]+")
+    assert_true(regex_digits.is_match("123abc"))
+    assert_true(regex_digits.is_match("0"))
+    assert_false(regex_digits.is_match("abc"))
+
+    # Predefined classes
+    var regex_d = compile_regex("\\d+")
+    assert_true(regex_d.is_match("5hello"))
+    assert_false(regex_d.is_match("hello"))
+
+    var regex_w = compile_regex("\\w+")
+    assert_true(regex_w.is_match("hello"))
+    assert_true(regex_w.is_match("_underscore"))
+    assert_false(regex_w.is_match(" space"))
+
+
+def test_is_match_zero_or_more() raises:
+    """Test is_match with * quantifier (can match zero chars)."""
+    var regex = compile_regex("[a-z]*")
+    # * matches zero chars, so always matches at position 0
+    assert_true(regex.is_match("abc"))
+    assert_true(regex.is_match("123"))  # Zero-length match is valid
+    assert_true(regex.is_match(""))
+
+
+def test_is_match_anchored() raises:
+    """Test is_match with anchored patterns."""
+    var regex_start = compile_regex("^abc")
+    assert_true(regex_start.is_match("abcdef"))
+    assert_false(regex_start.is_match("xabc"))
+    # Start anchor with non-zero start should fail
+    assert_false(regex_start.is_match("abcdef", 1))
+
+
+def test_is_match_literal() raises:
+    """Test is_match with literal patterns."""
+    var regex = compile_regex("hello")
+    assert_true(regex.is_match("hello world"))
+    assert_false(regex.is_match("world"))
+
+
+def test_is_match_empty_text() raises:
+    """Test is_match with empty text."""
+    var regex_plus = compile_regex("[a-z]+")
+    assert_false(regex_plus.is_match(""))
+
+    var regex_star = compile_regex("[a-z]*")
+    assert_true(regex_star.is_match(""))
+
+
+def test_is_match_vs_match_first_consistency() raises:
+    """Test that is_match agrees with match_first on whether a match exists."""
+    var patterns = List[String]()
+    patterns.append("[a-z]+")
+    patterns.append("[0-9]+")
+    patterns.append("\\d+")
+    patterns.append("\\w+")
+    patterns.append("[a-zA-Z0-9]+")
+
+    var texts = List[String]()
+    texts.append("hello")
+    texts.append("12345")
+    texts.append("abc123")
+    texts.append("@#$%")
+    texts.append("")
+
+    for i in range(len(patterns)):
+        var regex = compile_regex(patterns[i])
+        for j in range(len(texts)):
+            var is_m = regex.is_match(texts[j])
+            var mf = regex.match_first(texts[j])
+            assert_equal(
+                is_m,
+                Bool(mf),
+            )
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
