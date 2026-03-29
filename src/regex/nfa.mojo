@@ -446,13 +446,11 @@ struct NFAEngine(Copyable, Engine):
                 ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
-                # Cannot easily convert String to StringSlice with correct origin
-                # Fall back to manual expansion for complex patterns
+                # Complex patterns not supported by SIMD path
                 return None
         else:
             # Already expanded - pass directly as StringSlice, no allocation
             return get_character_class_matcher(range_pattern)
-
         return None
 
     @always_inline
@@ -464,9 +462,7 @@ struct NFAEngine(Copyable, Engine):
             return True
 
         # Use twoway_search (already imported) with bounded range
-        var pos = twoway_search(
-            self.literal_prefix.as_bytes(), text, start
-        )
+        var pos = twoway_search(self.literal_prefix.as_bytes(), text, start)
         return pos != -1 and pos + len(self.literal_prefix) <= end
 
     @always_inline
@@ -1506,7 +1502,9 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    def _match_char_in_range[O: Origin](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
+    def _match_char_in_range[
+        O: Origin
+    ](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             var inner = range_pattern[byte=1:-1]

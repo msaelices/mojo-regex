@@ -34,6 +34,12 @@ from regex.aliases import (
     SIMD_MATCHER_WORD_CHARS,
     DIGITS,
     WORD_CHARS,
+    CHAR_A,
+    CHAR_Z,
+    CHAR_A_UPPER,
+    CHAR_Z_UPPER,
+    CHAR_ZERO,
+    CHAR_NINE,
 )
 from regex.engine import Engine
 from regex.dfa import DFAEngine
@@ -93,9 +99,7 @@ struct CharacterClassSIMD(
         # Set bits for each character in the class
         var cc_ptr = char_class.unsafe_ptr()
         for i in range(len(char_class)):
-            var char_code = Int(cc_ptr[i])
-            if char_code >= 0 and char_code < 256:
-                self.lookup_table[char_code] = 1
+            self.lookup_table[Int(cc_ptr[i])] = 1
 
     def __init__(out self, start_code: Int, end_code: Int):
         """Initialize with a character code range like ord('a')-ord('z').
@@ -106,18 +110,16 @@ struct CharacterClassSIMD(
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
 
-        var sc = max(start_code, 0)
-        var ec = min(end_code, 255)
+        var clamped_start = max(start_code, 0)
+        var clamped_end = min(end_code, 255)
 
-        self.size_hint = ec - sc + 1
+        self.size_hint = clamped_end - clamped_start + 1
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
         self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
 
-        for char_code in range(sc, ec + 1):
+        for char_code in range(clamped_start, clamped_end + 1):
             self.lookup_table[char_code] = 1
-        # var call_location = __call_location()
-        # print("Init CharacterClassSIMD", call_location)
 
     def contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -338,19 +340,19 @@ struct CharacterClassSIMD(
 @always_inline
 def _create_ascii_lowercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII lowercase letters [a-z]."""
-    return CharacterClassSIMD(ord("a"), ord("z"))
+    return CharacterClassSIMD(CHAR_A, CHAR_Z)
 
 
 @always_inline
 def _create_ascii_uppercase() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII uppercase letters [A-Z]."""
-    return CharacterClassSIMD(ord("A"), ord("Z"))
+    return CharacterClassSIMD(CHAR_A_UPPER, CHAR_Z_UPPER)
 
 
 @always_inline
 def _create_ascii_digits() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII digits [0-9]."""
-    return CharacterClassSIMD(ord("0"), ord("9"))
+    return CharacterClassSIMD(CHAR_ZERO, CHAR_NINE)
 
 
 @always_inline
@@ -358,16 +360,11 @@ def _create_ascii_alphanumeric() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII alphanumeric [a-zA-Z0-9]."""
     var result = CharacterClassSIMD("")
 
-    # Add lowercase letters
-    for i in range(ord("a"), ord("z") + 1):
+    for i in range(CHAR_A, CHAR_Z + 1):
         result.lookup_table[i] = 1
-
-    # Add uppercase letters
-    for i in range(ord("A"), ord("Z") + 1):
+    for i in range(CHAR_A_UPPER, CHAR_Z_UPPER + 1):
         result.lookup_table[i] = 1
-
-    # Add digits
-    for i in range(ord("0"), ord("9") + 1):
+    for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
     return result
@@ -385,12 +382,9 @@ def _create_ascii_alpha() -> CharacterClassSIMD:
     """Create SIMD matcher for ASCII letters [a-zA-Z]."""
     var result = CharacterClassSIMD("")
 
-    # Add lowercase letters
-    for i in range(ord("a"), ord("z") + 1):
+    for i in range(CHAR_A, CHAR_Z + 1):
         result.lookup_table[i] = 1
-
-    # Add uppercase letters
-    for i in range(ord("A"), ord("Z") + 1):
+    for i in range(CHAR_A_UPPER, CHAR_Z_UPPER + 1):
         result.lookup_table[i] = 1
 
     return result
@@ -401,12 +395,9 @@ def _create_ascii_alnum_lower() -> CharacterClassSIMD:
     """Create SIMD matcher for lowercase alphanumeric [a-z0-9]."""
     var result = CharacterClassSIMD("")
 
-    # Add lowercase letters
-    for i in range(ord("a"), ord("z") + 1):
+    for i in range(CHAR_A, CHAR_Z + 1):
         result.lookup_table[i] = 1
-
-    # Add digits
-    for i in range(ord("0"), ord("9") + 1):
+    for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
     return result
@@ -417,12 +408,9 @@ def _create_ascii_alnum_upper() -> CharacterClassSIMD:
     """Create SIMD matcher for uppercase alphanumeric [A-Z0-9]."""
     var result = CharacterClassSIMD("")
 
-    # Add uppercase letters
-    for i in range(ord("A"), ord("Z") + 1):
+    for i in range(CHAR_A_UPPER, CHAR_Z_UPPER + 1):
         result.lookup_table[i] = 1
-
-    # Add digits
-    for i in range(ord("0"), ord("9") + 1):
+    for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
     return result
