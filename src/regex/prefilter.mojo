@@ -344,7 +344,7 @@ trait PrefilterMatcher:
     """Interface for prefilter matchers that quickly identify candidate positions.
     """
 
-    def find_candidates(self, text: String) -> List[Int]:
+    def find_candidates(self, text: StringSlice) -> List[Int]:
         """Find candidate positions where the full regex might match.
 
         Args:
@@ -356,7 +356,7 @@ trait PrefilterMatcher:
         ...
 
     def find_first_candidate(
-        self, text: String, start: Int = 0
+        self, text: StringSlice, start: Int = 0
     ) -> Optional[Int]:
         """Find the first candidate position at or after start.
 
@@ -399,7 +399,7 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         self.literal = take.literal^
         self.is_prefix = take.is_prefix
 
-    def find_candidates(self, text: String) -> List[Int]:
+    def find_candidates(self, text: StringSlice) -> List[Int]:
         """Find all candidate positions of the literal in text."""
         var candidates = List[Int]()
         var start = 0
@@ -414,7 +414,7 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         return candidates^
 
     def find_first_candidate(
-        self, text: String, start: Int = 0
+        self, text: StringSlice, start: Int = 0
     ) -> Optional[Int]:
         """Find the first occurrence of the literal at or after start."""
         if start >= len(text):
@@ -440,7 +440,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         """
         self.literals = literals^
 
-    def find_candidates(self, text: String) -> List[Int]:
+    def find_candidates(self, text: StringSlice) -> List[Int]:
         """Find all positions where any of the literals match exactly."""
         var candidates = List[Int]()
 
@@ -459,7 +459,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         return candidates^
 
     def find_first_candidate(
-        self, text: String, start: Int = 0
+        self, text: StringSlice, start: Int = 0
     ) -> Optional[Int]:
         """Find the first exact literal match at or after start."""
         var best_pos: Optional[Int] = None
