@@ -298,8 +298,9 @@ struct CharacterClassSIMD(
         Returns:
             Number of consecutive matching characters from start.
         """
-        # Copy lookup table to a raw pointer for fast sequential indexing.
-        # SIMD[DType.uint8, 256] element access is ~3x slower than pointer indexing.
+        # Allocate and copy lookup table for fast sequential pointer indexing.
+        # SIMD[DType.uint8, 256] element access is ~3x slower than pointer indexing
+        # because TrivialRegisterPassable structs may live in registers.
         var table = alloc[UInt8](256)
         table.store(self.lookup_table)
         var pos = start
