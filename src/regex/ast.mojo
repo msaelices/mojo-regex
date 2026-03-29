@@ -374,8 +374,11 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
         # Only use SIMD for complex patterns or significant repetition
         if max_matches == -1:  # Unlimited quantifiers like *, +
-            # For unlimited quantifiers, only use SIMD if min > 3
-            # Simple patterns like [0-9]+ (min=1) should use regular matching
+            # Predefined types (DIGIT, WORD, SPACE) use cached SIMD matchers
+            # so the overhead is minimal even for small min_matches
+            if self.type == DIGIT or self.type == WORD or self.type == SPACE:
+                return min_matches >= 1
+            # For RANGE and other types, require more repetition to justify SIMD
             return min_matches > 3
         elif max_matches > 8:  # Large bounded quantifiers {9,} or {5,20}
             return True
