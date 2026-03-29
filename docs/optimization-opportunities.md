@@ -42,22 +42,13 @@ Pre-allocated `String(capacity=...)` before range expansion loops in
 String concatenation in loops extracting literals from AST children.
 Fix: Two-pass (count length, then allocate+fill).
 
-## High: Negated Character Class Inefficiency
+## ~~High: Negated Character Class Inefficiency~~ (Fixed)
 
-**File:** `src/regex/dfa.mojo` lines 1700-1706
+**File:** `src/regex/dfa.mojo` lines 1702-1713
 
-For negated classes like `[^aeiou]`, the code creates a 256-byte bitmap, then
-iterates through ALL 256 ASCII values:
-
-```mojo
-for char_code in range(DEFAULT_DFA_TRANSITIONS):  # Always 256 iterations
-    if char_bitmap[char_code] == 0:
-        state.add_transition(char_code, to_state)
-```
-
-For `[^a]` (exclude 1 char), this does 255 `add_transition` calls. Could instead
-add all transitions then remove the excluded ones, or use a different state
-representation.
+The negated character class now sets all transitions to `to_state` in bulk via
+SIMD assignment (`state.transitions = SIMD[...](to_state)`), then removes only
+the excluded characters. For `[^a]`, this is 1 removal instead of 255 additions.
 
 ## ~~High: SIMD character class matcher silently disabled~~ (Fixed, PR #62)
 
