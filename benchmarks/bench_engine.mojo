@@ -1,5 +1,4 @@
 from std.time import perf_counter_ns
-from regex import match_first, findall, search
 from regex.matcher import compile_regex
 
 
@@ -76,94 +75,138 @@ def make_complex_pattern_test_data(num_entries: Int) -> String:
 
 
 # ===-----------------------------------------------------------------------===#
-# Manual Benchmark Infrastructure
+# Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
 
+# Target runtime per benchmark: 500ms for more stable measurements
+comptime TARGET_RUNTIME_NS = 500_000_000
+comptime MAX_ITERATIONS = 200_000
+comptime WARMUP_ITERATIONS = 10
+# Minimum time per sample (1ms) to ensure OS jitter is a small fraction
+comptime MIN_SAMPLE_NS = 1_000_000
 
-def benchmark_match_first(
-    name: String, pattern: String, text: String, internal_iterations: Int
-) raises:
-    """Benchmark match_first with manual timing."""
 
-    # Output engine detection information
-    var compiled_regex = compile_regex(pattern)
-    var stats = compiled_regex.get_stats()
-    print("[ENGINE] " + name + " -> " + stats)
+def _find_median(mut times: List[Float64]) -> Float64:
+    """Find median of a list of times using simple insertion sort."""
+    var n = len(times)
+    if n == 0:
+        return 0.0
+    # Insertion sort (fine for small N)
+    for i in range(1, n):
+        var key = times[i]
+        var j = i - 1
+        while j >= 0 and times[j] > key:
+            times[j + 1] = times[j]
+            j -= 1
+        times[j + 1] = key
+    if n % 2 == 1:
+        return times[n // 2]
+    return (times[n // 2 - 1] + times[n // 2]) / 2.0
 
-    # Warmup (3 iterations like Python)
-    for _ in range(3):
-        _ = match_first(pattern, text)
 
-    # Target runtime: 100ms like Python
-    var target_runtime = 100_000_000  # 100ms in nanoseconds
-    var total_time: UInt = 0
-    var actual_iterations = 0
-
-    # Run until we hit target runtime or max iterations
-    while total_time < target_runtime and actual_iterations < 100_000:
-        var start_time = perf_counter_ns()
-
-        # Internal loop matches Python benchmark structure
-        for _ in range(internal_iterations):
-            var result = match_first(pattern, text)
-            if not result:
-                print("ERROR: No match in", name, "for pattern:", pattern)
-                return
-
-        var end_time = perf_counter_ns()
-        total_time += end_time - start_time
-        actual_iterations += 1
-
-    # Calculate and print results
-    var mean_time_per_match = (
-        Float64(total_time)
-        / Float64(actual_iterations)
-        / Float64(internal_iterations)
-    )
-    var time_ms = mean_time_per_match / 1_000_000.0
-    var total_matches = actual_iterations * internal_iterations
-
-    # Format output to match Mojo's benchmark format
+def _print_result(name: String, median_ms: Float64, total_iters: Int):
+    """Print benchmark result in table format."""
     var padded_name = name + " " * (25 - len(name))
     print(
         "| "
         + padded_name
         + " | "
-        + String(time_ms)[byte=:24]
-        + " " * (25 - len(String(time_ms)[byte=:24]))
+        + String(median_ms)[byte=:24]
+        + " " * (25 - len(String(median_ms)[byte=:24]))
         + " | "
-        + String(total_matches)
-        + " " * (6 - len(String(total_matches)))
+        + String(total_iters)
+        + " " * (6 - len(String(total_iters)))
         + " |"
     )
+
+
+def benchmark_match_first(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark match_first with pre-compiled regex and median timing."""
+
+    # Pre-compile regex outside timing loop
+    var compiled = compile_regex(pattern)
+    var stats = compiled.get_stats()
+    print("[ENGINE] " + name + " -> " + stats)
+
+    # Warmup with compiled regex
+    for _ in range(WARMUP_ITERATIONS):
+        _ = compiled.match_first(text)
+
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = compiled.match_first(text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < MIN_SAMPLE_NS:
+        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    # Collect per-iteration times
+    var times = List[Float64]()
+    var total_time: UInt = 0
+    var actual_iterations = 0
+
+    while (
+        total_time < UInt(TARGET_RUNTIME_NS)
+        and actual_iterations < MAX_ITERATIONS
+    ):
+        var start_time = perf_counter_ns()
+
+        for _ in range(iters):
+            var result = compiled.match_first(text)
+            if not result:
+                print("ERROR: No match in", name, "for pattern:", pattern)
+                return
+
+        var end_time = perf_counter_ns()
+        var elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
+
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
 
 
 def benchmark_search(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
-    """Benchmark search (match_next) with manual timing."""
+    """Benchmark search (match_next) with pre-compiled regex and median timing.
+    """
 
-    # Output engine detection information
-    var compiled_regex = compile_regex(pattern)
-    var stats = compiled_regex.get_stats()
+    var compiled = compile_regex(pattern)
+    var stats = compiled.get_stats()
     print("[ENGINE] " + name + " -> " + stats)
 
-    # Warmup (3 iterations like Python)
-    for _ in range(3):
-        _ = search(pattern, text)
+    # Warmup with compiled regex
+    for _ in range(WARMUP_ITERATIONS):
+        _ = compiled.match_next(text)
 
-    # Target runtime: 100ms like Python
-    var target_runtime = 100_000_000  # 100ms in nanoseconds
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = compiled.match_next(text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < MIN_SAMPLE_NS:
+        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    var times = List[Float64]()
     var total_time: UInt = 0
     var actual_iterations = 0
 
-    # Run until we hit target runtime or max iterations
-    while total_time < target_runtime and actual_iterations < 100_000:
+    while (
+        total_time < UInt(TARGET_RUNTIME_NS)
+        and actual_iterations < MAX_ITERATIONS
+    ):
         var start_time = perf_counter_ns()
 
-        # Internal loop matches Python benchmark structure
-        for _ in range(internal_iterations):
-            var result = search(pattern, text)
+        for _ in range(iters):
+            var result = compiled.match_next(text)
             if not result:
                 print(
                     "ERROR: No search match in", name, "for pattern:", pattern
@@ -171,85 +214,61 @@ def benchmark_search(
                 return
 
         var end_time = perf_counter_ns()
-        total_time += end_time - start_time
+        var elapsed = end_time - start_time
+        total_time += elapsed
         actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
 
-    # Calculate and print results
-    var mean_time_per_match = (
-        Float64(total_time)
-        / Float64(actual_iterations)
-        / Float64(internal_iterations)
-    )
-    var time_ms = mean_time_per_match / 1_000_000.0
-    var total_matches = actual_iterations * internal_iterations
-
-    # Format output to match Mojo's benchmark format
-    var padded_name = name + " " * (25 - len(name))
-    print(
-        "| "
-        + padded_name
-        + " | "
-        + String(time_ms)[byte=:24]
-        + " " * (25 - len(String(time_ms)[byte=:24]))
-        + " | "
-        + String(total_matches)
-        + " " * (6 - len(String(total_matches)))
-        + " |"
-    )
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
 
 
 def benchmark_findall(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
-    """Benchmark findall with manual timing."""
+    """Benchmark findall with pre-compiled regex and median timing."""
 
-    # Output engine detection information
-    var compiled_regex = compile_regex(pattern)
-    var stats = compiled_regex.get_stats()
+    var compiled = compile_regex(pattern)
+    var stats = compiled.get_stats()
     print("[ENGINE] " + name + " -> " + stats)
 
-    # Warmup
-    for _ in range(3):
-        _ = findall(pattern, text)
+    # Warmup with compiled regex
+    for _ in range(WARMUP_ITERATIONS):
+        _ = compiled.match_all(text)
 
-    var target_runtime = 100_000_000
+    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = compiled.match_all(text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < MIN_SAMPLE_NS:
+        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    var times = List[Float64]()
     var total_time: UInt = 0
     var actual_iterations = 0
 
-    while total_time < target_runtime and actual_iterations < 100_000:
+    while (
+        total_time < UInt(TARGET_RUNTIME_NS)
+        and actual_iterations < MAX_ITERATIONS
+    ):
         var start_time = perf_counter_ns()
 
-        for _ in range(internal_iterations):
-            var results = findall(pattern, text)
-            # Touch the result to ensure it's not optimized away
-            if len(results) < 0:  # Always false, but compiler doesn't know
+        for _ in range(iters):
+            var results = compiled.match_all(text)
+            if len(results) < 0:  # Always false, prevents optimization
                 print("ERROR: Unexpected result")
 
         var end_time = perf_counter_ns()
-        total_time += end_time - start_time
+        var elapsed = end_time - start_time
+        total_time += elapsed
         actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
 
-    # Calculate and print results
-    var mean_time_per_match = (
-        Float64(total_time)
-        / Float64(actual_iterations)
-        / Float64(internal_iterations)
-    )
-    var time_ms = mean_time_per_match / 1_000_000.0
-    var total_matches = actual_iterations * internal_iterations
-
-    var padded_name = name + " " * (25 - len(name))
-    print(
-        "| "
-        + padded_name
-        + " | "
-        + String(time_ms)[byte=:24]
-        + " " * (25 - len(String(time_ms)[byte=:24]))
-        + " | "
-        + String(total_matches)
-        + " " * (6 - len(String(total_matches)))
-        + " |"
-    )
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
 
 
 # ===-----------------------------------------------------------------------===#
@@ -259,8 +278,10 @@ def benchmark_findall(
 
 def main() raises:
     """Run all regex benchmarks with manual timing."""
-    print("=== REGEX ENGINE BENCHMARKS (Manual Timing) ===")
-    print("Using Python-compatible time.perf_counter_ns() for fair comparison")
+    print("=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===")
+    print(
+        "Target runtime: 500ms per benchmark, reporting median iteration time"
+    )
     print()
 
     # Prepare test data - same as original benchmarks
@@ -286,7 +307,7 @@ def main() raises:
         * 50
     )
 
-    print("| name                      | met (ms)              | iters  |")
+    print("| name                      | med (ms)              | iters  |")
     print("|---------------------------|-----------------------|--------|")
 
     # ===== Literal Matching Benchmarks =====
@@ -329,7 +350,7 @@ def main() raises:
 
     # ===== NEW: Optimization Showcase Benchmarks =====
 
-    # Test case 1: Large alternation (5+ branches) - benefits from increased branch limit (3→8)
+    # Test case 1: Large alternation (5+ branches) - benefits from increased branch limit (3->8)
     var large_alternation = (
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
     )
@@ -338,7 +359,7 @@ def main() raises:
         "large_8_alternations", large_alternation, fruit_text, 1000
     )
 
-    # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
+    # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3->4)
     var deep_nested = "(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))"
     var nested_text = "Testing deep nested patterns with abcdefgh characters"
     benchmark_search(
@@ -352,7 +373,7 @@ def main() raises:
         "literal_heavy_alternation", literal_heavy, user_text, 1000
     )
 
-    # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
+    # Test case 4: Complex group with 5 children - benefits from increased children limit (3->5)
     var complex_group = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
     var mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
     benchmark_search(
