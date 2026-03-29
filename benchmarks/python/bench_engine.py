@@ -8,13 +8,39 @@ import re
 import time
 import json
 import os
+import statistics
 from datetime import datetime
-from typing import Callable
 
 
 # ===-----------------------------------------------------------------------===#
 # Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
+
+# Target runtime per benchmark: 500ms for more stable measurements
+TARGET_RUNTIME_NS = 500_000_000
+MAX_ITERATIONS = 200_000
+WARMUP_ITERATIONS = 10
+# Minimum time per sample (1ms) to ensure OS jitter is a small fraction
+MIN_SAMPLE_NS = 1_000_000
+
+
+def _find_median(times: list[float]) -> float:
+    """Find median of a list of times."""
+    if not times:
+        return 0.0
+    return statistics.median(times)
+
+
+def _auto_calibrate(fn, iters: int) -> int:
+    """Auto-calibrate iterations so each sample takes >= MIN_SAMPLE_NS."""
+    start = time.perf_counter_ns()
+    for _ in range(iters):
+        fn()
+    elapsed = time.perf_counter_ns() - start
+    if elapsed < MIN_SAMPLE_NS:
+        multiplier = int(MIN_SAMPLE_NS // elapsed) + 1
+        iters = iters * multiplier
+    return iters
 
 
 # ===-----------------------------------------------------------------------===#
@@ -25,26 +51,27 @@ from typing import Callable
 def benchmark_search(
     name: str, pattern: str, text: str, internal_iterations: int
 ):
-    """Benchmark search with manual timing (mirrors Mojo benchmark_search)."""
+    """Benchmark search with pre-compiled regex and median timing."""
 
-    # Compile pattern once for fair comparison
     compiled_pattern = re.compile(pattern)
 
-    # Warmup (3 iterations like Mojo)
-    for _ in range(3):
+    # Warmup
+    for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.search(text)
 
-    # Target runtime: 100ms like Mojo
-    target_runtime = 100_000_000  # 100ms in nanoseconds
+    # Auto-calibrate
+    iters = _auto_calibrate(lambda: [compiled_pattern.search(text) for _ in range(internal_iterations)], 1)
+    iters = internal_iterations * iters
+
+    # Collect per-iteration times
+    times = []
     total_time = 0
     actual_iterations = 0
 
-    # Run until we hit target runtime or max iterations
-    while total_time < target_runtime and actual_iterations < 100_000:
+    while total_time < TARGET_RUNTIME_NS and actual_iterations < MAX_ITERATIONS:
         start_time = time.perf_counter_ns()
 
-        # Internal loop matches Mojo benchmark structure
-        for _ in range(internal_iterations):
+        for _ in range(iters):
             result = compiled_pattern.search(text)
             if not result:
                 print(
@@ -53,114 +80,109 @@ def benchmark_search(
                 return
 
         end_time = time.perf_counter_ns()
-        total_time += end_time - start_time
+        elapsed = end_time - start_time
+        total_time += elapsed
         actual_iterations += 1
+        times.append(elapsed / iters / 1_000_000.0)
 
-    # Calculate and print results (mirrors Mojo format)
-    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
-    time_ms = mean_time_per_match / 1_000_000.0
-    total_matches = actual_iterations * internal_iterations
+    median_ms = _find_median(times)
+    total_matches = actual_iterations * iters
 
-    # Format output to match Mojo's benchmark format
     padded_name = name + " " * (25 - len(name))
-    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+    print(f"| {padded_name} | {median_ms:>21.17f} | {total_matches:>6} |")
 
-    # Store result for JSON export
-    _store_benchmark_result(name, time_ms, total_matches)
+    _store_benchmark_result(name, median_ms, total_matches)
 
 
 def benchmark_match_first(
     name: str, pattern: str, text: str, internal_iterations: int
 ):
-    """Benchmark match_first with manual timing (mirrors Mojo benchmark_match_first).
-    """
+    """Benchmark match_first with pre-compiled regex and median timing."""
 
-    # Compile pattern once for fair comparison
     compiled_pattern = re.compile(pattern)
 
-    # Warmup (3 iterations like Mojo)
-    for _ in range(3):
+    # Warmup
+    for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.match(text)
 
-    # Target runtime: 100ms like Mojo
-    target_runtime = 100_000_000  # 100ms in nanoseconds
+    # Auto-calibrate
+    iters = _auto_calibrate(lambda: [compiled_pattern.match(text) for _ in range(internal_iterations)], 1)
+    iters = internal_iterations * iters
+
+    # Collect per-iteration times
+    times = []
     total_time = 0
     actual_iterations = 0
 
-    # Run until we hit target runtime or max iterations
-    while total_time < target_runtime and actual_iterations < 100_000:
+    while total_time < TARGET_RUNTIME_NS and actual_iterations < MAX_ITERATIONS:
         start_time = time.perf_counter_ns()
 
-        # Internal loop matches Mojo benchmark structure
-        for _ in range(internal_iterations):
+        for _ in range(iters):
             result = compiled_pattern.match(text)
             if not result:
                 print(f"ERROR: No match in {name} for pattern: {pattern}")
                 return
 
         end_time = time.perf_counter_ns()
-        total_time += end_time - start_time
+        elapsed = end_time - start_time
+        total_time += elapsed
         actual_iterations += 1
+        times.append(elapsed / iters / 1_000_000.0)
 
-    # Calculate and print results (mirrors Mojo format)
-    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
-    time_ms = mean_time_per_match / 1_000_000.0
-    total_matches = actual_iterations * internal_iterations
+    median_ms = _find_median(times)
+    total_matches = actual_iterations * iters
 
-    # Format output to match Mojo's benchmark format
     padded_name = name + " " * (25 - len(name))
-    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+    print(f"| {padded_name} | {median_ms:>21.17f} | {total_matches:>6} |")
 
-    # Store result for JSON export
-    _store_benchmark_result(name, time_ms, total_matches)
+    _store_benchmark_result(name, median_ms, total_matches)
 
 
 def benchmark_findall(
     name: str, pattern: str, text: str, internal_iterations: int
 ):
-    """Benchmark findall with manual timing (mirrors Mojo benchmark_findall)."""
+    """Benchmark findall with pre-compiled regex and median timing."""
 
-    # Compile pattern once for fair comparison
     compiled_pattern = re.compile(pattern)
 
     # Warmup
-    for _ in range(3):
+    for _ in range(WARMUP_ITERATIONS):
         compiled_pattern.findall(text)
 
-    target_runtime = 100_000_000
+    # Auto-calibrate
+    iters = _auto_calibrate(lambda: [compiled_pattern.findall(text) for _ in range(internal_iterations)], 1)
+    iters = internal_iterations * iters
+
+    # Collect per-iteration times
+    times = []
     total_time = 0
     actual_iterations = 0
 
-    while total_time < target_runtime and actual_iterations < 100_000:
+    while total_time < TARGET_RUNTIME_NS and actual_iterations < MAX_ITERATIONS:
         start_time = time.perf_counter_ns()
 
-        for _ in range(internal_iterations):
+        for _ in range(iters):
             results = compiled_pattern.findall(text)
-            # Touch the result to ensure it's not optimized away
-            if len(results) < 0:  # Always false, but compiler doesn't know
-                print("ERROR: Unexpected result")
 
         end_time = time.perf_counter_ns()
-        total_time += end_time - start_time
+        elapsed = end_time - start_time
+        total_time += elapsed
         actual_iterations += 1
+        times.append(elapsed / iters / 1_000_000.0)
 
-    # Calculate and print results
-    mean_time_per_match = total_time / (actual_iterations * internal_iterations)
-    time_ms = mean_time_per_match / 1_000_000.0
-    total_matches = actual_iterations * internal_iterations
+    median_ms = _find_median(times)
+    total_matches = actual_iterations * iters
 
     padded_name = name + " " * (25 - len(name))
-    print(f"| {padded_name} | {time_ms:>21.17f} | {total_matches:>6} |")
+    print(f"| {padded_name} | {median_ms:>21.17f} | {total_matches:>6} |")
 
-    # Store result for JSON export
-    _store_benchmark_result(name, time_ms, total_matches)
+    _store_benchmark_result(name, median_ms, total_matches)
 
 
 # ===-----------------------------------------------------------------------===#
 # Result Collection for JSON Export
 # ===-----------------------------------------------------------------------===#
 
-# Global storage for benchmark results (needed for JSON export)
 _benchmark_results = {}
 _benchmark_iterations = {}
 
@@ -175,10 +197,8 @@ def export_json_results(
     filename: str = "benchmarks/results/python_results.json",
 ):
     """Export collected benchmark results to JSON file."""
-    # Ensure directory exists
     os.makedirs(os.path.dirname(filename), exist_ok=True)
 
-    # Convert results to JSON-serializable format
     json_results = {
         "engine": "python",
         "timestamp": datetime.now().isoformat(),
@@ -192,42 +212,10 @@ def export_json_results(
             "iterations": _benchmark_iterations[name],
         }
 
-    # Write to file
     with open(filename, "w") as f:
         json.dump(json_results, f, indent=2)
 
-    print(f"\\nResults exported to {filename}")
-
-
-class Benchmark:
-    """Legacy benchmark infrastructure - now deprecated."""
-
-    def __init__(self, num_repetitions: int = 5):
-        self.num_repetitions = num_repetitions
-        self.results = {}
-        self.iterations = {}
-
-    def bench_function(
-        self, name: str, fn: Callable[[], None], warmup_iterations: int = 3
-    ):
-        """DEPRECATED: Use direct benchmark functions instead."""
-        pass
-
-    def dump_report(self):
-        """DEPRECATED: Results are now printed directly by benchmark functions.
-        """
-        pass
-
-    def export_json(
-        self, filename: str = "benchmarks/results/python_results.json"
-    ):
-        """DEPRECATED: Results are now printed directly by benchmark functions.
-        """
-        print("\nNote: JSON export disabled in new direct benchmark mode.")
-        print(
-            "Results are printed directly to stdout for parsing by comparison"
-            " scripts."
-        )
+    print(f"\nResults exported to {filename}")
 
 
 # ===-----------------------------------------------------------------------===#
@@ -268,7 +256,6 @@ def make_phone_test_data(num_phones: int) -> str:
     result = ""
     for i in range(num_phones):
         result += filler_text
-        # Cycle through different phone patterns
         pattern_idx = i % len(phone_patterns)
         result += phone_patterns[pattern_idx]
         result += extra_text
@@ -279,16 +266,16 @@ def make_phone_test_data(num_phones: int) -> str:
 def make_complex_pattern_test_data(num_entries: int) -> str:
     """Generate test data for US national phone number validation."""
     complex_patterns = [
-        "305200123456",  # Matches first alternation
-        "505601234567",  # Matches first alternation
-        "274212345678",  # Matches second alternation
-        "305912345678",  # Matches second alternation
-        "212345672890",  # Matches third alternation
-        "312345672890",  # Matches third alternation
-        "412345672890",  # Matches third alternation
-        "512345672890",  # Matches third alternation
-        "1234567890",  # Should NOT match
-        "30520",  # Should NOT match (too short)
+        "305200123456",
+        "505601234567",
+        "274212345678",
+        "305912345678",
+        "212345672890",
+        "312345672890",
+        "412345672890",
+        "512345672890",
+        "1234567890",
+        "30520",
     ]
     filler_text = " ID: "
     extra_text = " Status: ACTIVE "
@@ -296,20 +283,11 @@ def make_complex_pattern_test_data(num_entries: int) -> str:
     result = ""
     for i in range(num_entries):
         result += filler_text
-        # Cycle through different patterns (including non-matches)
         pattern_idx = i % len(complex_patterns)
         result += complex_patterns[pattern_idx]
         result += extra_text
 
     return result
-
-
-# ===-----------------------------------------------------------------------===#
-# Legacy Benchmark Functions - DEPRECATED
-# ===-----------------------------------------------------------------------===#
-
-# Note: All previous function-based benchmark generators have been removed.
-# The new architecture uses direct benchmark functions that mirror Mojo's approach.
 
 
 # ===-----------------------------------------------------------------------===#
@@ -319,8 +297,10 @@ def make_complex_pattern_test_data(num_entries: int) -> str:
 
 def main():
     """Run all regex benchmarks with manual timing (mirrors Mojo structure)."""
-    print("=== REGEX ENGINE BENCHMARKS (Manual Timing) ===")
-    print("Using Python-compatible time.perf_counter_ns() for fair comparison")
+    print("=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===")
+    print(
+        "Target runtime: 500ms per benchmark, reporting median iteration time"
+    )
     print()
 
     # Prepare test data - same as Mojo benchmarks
@@ -329,12 +309,10 @@ def main():
     text_10000 = make_test_string(10000)
     text_range_10000 = make_test_string(10000) + "0123456789"
 
-    # Add hello to texts to ensure literal matches
     text_1000 += "hello world"
     text_5000 += "hello world"
     text_10000 += "hello world"
 
-    # Test data for optimization benchmarks
     short_text = "hello world this is a test with hello again and hello there"
     medium_text = short_text * 100
     long_text = short_text * 1000
@@ -344,7 +322,7 @@ def main():
         * 50
     )
 
-    print("| name                      | met (ms)              | iters  |")
+    print("| name                      | med (ms)              | iters  |")
     print("|---------------------------|-----------------------|--------|")
 
     # ===== Literal Matching Benchmarks =====
@@ -376,9 +354,7 @@ def main():
     benchmark_match_first("alternation_simple", "a|b|c", text_10000, 1000)
     benchmark_match_first("group_alternation", "(a|b)", text_10000, 1000)
 
-    # ===== NEW: Optimization Showcase Benchmarks =====
-
-    # Test case 1: Large alternation (8 branches) - benefits from increased branch limit (3→8)
+    # ===== Optimization Showcase Benchmarks =====
     fruit_text = (
         "I love eating apple and banana and cherry and date and elderberry and"
         " fig and grape with honey"
@@ -390,7 +366,6 @@ def main():
         1000,
     )
 
-    # Test case 2: Deeply nested groups (depth 4) - benefits from increased depth tolerance (3→4)
     nested_text = "Testing deep nested patterns with abcdefgh characters"
     benchmark_search(
         "deep_nested_groups_depth4",
@@ -399,7 +374,6 @@ def main():
         1000,
     )
 
-    # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     user_text = (
         "Login attempts: user123 failed, admin456 success, guest789 failed,"
         " root000 success, test111 pending, demo222 active, sample333 inactive,"
@@ -412,7 +386,6 @@ def main():
         1000,
     )
 
-    # Test case 4: Complex group with 5 children - benefits from increased children limit (3→5)
     mixed_text = (
         "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in"
         " the data"
@@ -514,8 +487,6 @@ def main():
     )
 
     # ===== US Toll-Free Numbers Benchmarks =====
-
-    # Generate toll-free test data
     toll_free_text = (
         "Call 8001234567 or 9005551234 for assistance. Try 8775559999 or"
         " 8006667777."
@@ -531,7 +502,6 @@ def main():
     )
 
     # ===== Quantifier Parser Optimization Benchmarks =====
-    # Generate test data for quantifier-intensive patterns
     serial_number_text = (
         "Serial: ABC1234-DEF5678-GHI9012 Model: XYZ123-ABC456-DEF789 "
         "Part: MNO345-PQR678-STU901 Code: VWX234-YZA567-BCD890 "
@@ -551,15 +521,12 @@ def main():
         * 75
     )
 
-    # Single quantifier patterns (baseline)
     benchmark_findall(
         "single_quantifier_digits", "[0-9]{4}", serial_number_text, 200
     )
     benchmark_findall(
         "single_quantifier_alpha", "[A-Z]{3}", serial_number_text, 200
     )
-
-    # Multiple quantifier patterns - these benefit most from the optimization
     benchmark_findall(
         "dual_quantifiers", "[A-Z]{3}[0-9]{4}", serial_number_text, 150
     )
@@ -575,8 +542,6 @@ def main():
         serial_number_text,
         100,
     )
-
-    # Complex quantifier ranges {min,max} - stress test the parser optimization
     benchmark_findall(
         "range_quantifiers", "[A-Z]{2,4}[0-9]{3,5}", serial_number_text, 100
     )
@@ -586,8 +551,6 @@ def main():
         serial_number_text,
         75,
     )
-
-    # DateTime patterns with many quantifiers
     benchmark_findall(
         "datetime_quantifiers",
         "[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\\.[0-9]{3}",
@@ -600,8 +563,6 @@ def main():
         datetime_text,
         100,
     )
-
-    # High quantifier density patterns - maximum parser stress
     benchmark_findall(
         "dense_quantifiers",
         "[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}",
@@ -614,8 +575,6 @@ def main():
         structured_data_text,
         25,
     )
-
-    # Nested quantifiers within groups
     benchmark_findall(
         "grouped_quantifiers",
         "([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})",
@@ -629,7 +588,6 @@ def main():
         75,
     )
 
-    # Optimization test data for quantifier stress testing
     optimization_test_text = (
         "Transaction: TXN12345-DEPT678-LOC90123-ID4567 Status:"
         " ACTIVE12-FLAG890-CODE1234 Reference: REF13579-NUM24680-CHK80246"
@@ -637,7 +595,6 @@ def main():
         * 100
     )
 
-    # Most significant optimization cases from analysis
     benchmark_findall(
         "optimize_range_quantifier", r"a{2,4}", "aaaabbbbccccdddd" * 500, 1000
     )
@@ -666,9 +623,7 @@ def main():
         500,
     )
 
-    print()  # End of benchmarks
-
-    # Export results to JSON for comparison script
+    print()
     export_json_results()
 
 
