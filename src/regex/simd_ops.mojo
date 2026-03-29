@@ -16,6 +16,7 @@ The module automatically adapts to the available SIMD width:
 """
 
 from std.algorithm import vectorize
+from std.memory import alloc
 from std.os import abort
 from std.sys.info import simd_width_of
 from std.ffi import _Global
@@ -280,6 +281,51 @@ struct CharacterClassSIMD(
         vectorize[SIMD_WIDTH](actual_end - pos, closure)
 
         return count
+
+    @always_inline
+    def count_consecutive_matches(
+        self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
+    ) -> Int:
+        """Count consecutive matching characters from start position.
+        Uses a stack-allocated byte array for fast sequential lookup,
+        avoiding the overhead of SIMD[DType.uint8, 256] element access.
+
+        Args:
+            text_ptr: Pointer to text bytes.
+            start: Starting position.
+            text_len: Total length of text.
+
+        Returns:
+            Number of consecutive matching characters from start.
+        """
+        # Copy lookup table to a raw pointer for fast sequential indexing.
+        # SIMD[DType.uint8, 256] element access is ~3x slower than pointer indexing.
+        var table = alloc[UInt8](256)
+        table.store(self.lookup_table)
+        var pos = start
+
+        while pos + 4 <= text_len:
+            if table[Int(text_ptr[pos])] == 0:
+                break
+            if table[Int(text_ptr[pos + 1])] == 0:
+                pos += 1
+                break
+            if table[Int(text_ptr[pos + 2])] == 0:
+                pos += 2
+                break
+            if table[Int(text_ptr[pos + 3])] == 0:
+                pos += 3
+                break
+            pos += 4
+
+        # Handle remaining bytes
+        while pos < text_len:
+            if table[Int(text_ptr[pos])] == 0:
+                break
+            pos += 1
+
+        table.free()
+        return pos - start
 
     def _check_chunk_simd(
         self, text_ptr: UnsafePointer[Byte, _], pos: Int
