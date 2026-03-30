@@ -729,7 +729,13 @@ struct DFAEngine(Engine):
 
             else:
                 # Element with min_matches > 1 (e.g., [a-z]{3,5})
-                # Create required states first
+                if element_idx == 0:
+                    # First element - create start state
+                    var start_state = DFAState()
+                    self.states.append(start_state)
+                    current_state_index = 0
+
+                # Create required states
                 for match_num in range(element.min_matches):
                     var is_accepting = (
                         match_num >= element.min_matches - 1
