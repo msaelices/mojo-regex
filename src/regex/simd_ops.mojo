@@ -313,6 +313,43 @@ struct CharacterClassSIMD(
         return count
 
     @always_inline
+    def find_first_nibble_match(
+        self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
+    ) -> Int:
+        """Find first matching character using nibble-based SIMD scan.
+
+        Args:
+            text_ptr: Pointer to text bytes.
+            start: Starting position.
+            text_len: Total length of text.
+
+        Returns:
+            Position of first matching character, or -1 if not found.
+        """
+        var pos = start
+        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
+
+        while pos + SIMD_WIDTH <= text_len:
+            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+            var lo_res = self.lo_nibble_table._dynamic_shuffle(chunk & mask_0f)
+            var hi_res = self.hi_nibble_table._dynamic_shuffle(
+                (chunk >> 4) & mask_0f
+            )
+            var chunk_matches = (lo_res & hi_res).ne(0)
+            if chunk_matches.reduce_or():
+                for i in range(SIMD_WIDTH):
+                    if chunk_matches[i]:
+                        return pos + i
+            pos += SIMD_WIDTH
+
+        # Scalar tail
+        while pos < text_len:
+            if self.contains(Int(text_ptr[pos])):
+                return pos
+            pos += 1
+
+        return -1
+
     @always_inline
     def count_consecutive_matches(
         self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
