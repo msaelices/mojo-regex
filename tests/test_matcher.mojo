@@ -1541,16 +1541,20 @@ def test_escaped_dot() raises:
 
 
 def test_literal_dash_outside_brackets() raises:
-    """Test that '-' outside brackets is parsed as a literal in the AST."""
-    from regex.parser import parse
-    # Verify the dash appears in the AST (parser fix)
-    var ast = parse("[0-9]{3}-[0-9]{4}")
-    # GROUP node should have 3 children: [0-9]{3}, -, [0-9]{4}
-    ref group = ast.get_child(0)
-    assert_equal(group.get_children_len(), 3)
-    # Middle child should be literal '-'
-    ref dash_node = group.get_child(1)
-    assert_equal(dash_node.get_value().value(), "-")
+    """Test that '-' outside brackets matches as a literal character."""
+    var r = compile_regex("[0-9]{3}-[0-9]{4}")
+    var m = r.match_first("123-4567")
+    assert_true(m)
+    assert_equal(m.value().get_match_text(), "123-4567")
+
+    # Dash is required - no match without it
+    assert_false(r.match_first("1234567"))
+
+    # Multiple dashes
+    var r2 = compile_regex("[0-9]{3}-[0-9]{3}-[0-9]{4}")
+    var m2 = r2.match_first("555-123-4567")
+    assert_true(m2)
+    assert_equal(m2.value().get_match_text(), "555-123-4567")
 
 
 def test_escaped_plus_and_star() raises:
