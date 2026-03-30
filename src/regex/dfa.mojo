@@ -1960,49 +1960,22 @@ struct DFAEngine(Engine):
             if self._simd_scan_eligible:
                 # Nibble-based SIMD scan for unlimited quantifiers
                 ref simd_matcher = self._simd_char_matcher
-                var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
                 while pos < text_len:
-                    # Skip non-matching using nibble SIMD
-                    var found = False
-                    while pos + SIMD_WIDTH <= text_len:
-                        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-                        var lo_res = (
-                            simd_matcher.lo_nibble_table._dynamic_shuffle(
-                                chunk & mask_0f
-                            )
-                        )
-                        var hi_res = (
-                            simd_matcher.hi_nibble_table._dynamic_shuffle(
-                                (chunk >> 4) & mask_0f
-                            )
-                        )
-                        var chunk_matches = (lo_res & hi_res).ne(0)
-                        if chunk_matches.reduce_or():
-                            for i in range(SIMD_WIDTH):
-                                if chunk_matches[i]:
-                                    pos += i
-                                    found = True
-                                    break
-                            break
-                        pos += SIMD_WIDTH
-                    if not found:
-                        # Scalar scan for remainder
-                        while pos < text_len:
-                            if simd_matcher.contains(Int(text_ptr[pos])):
-                                found = True
-                                break
-                            pos += 1
-                    if not found:
-                        break
-                    # Count consecutive matches from this position
-                    var match_len = simd_matcher.count_consecutive_matches(
+                    var match_pos = simd_matcher.find_first_nibble_match(
                         text_ptr, pos, text_len
                     )
+                    if match_pos == -1:
+                        break
+                    var match_len = simd_matcher.count_consecutive_matches(
+                        text_ptr, match_pos, text_len
+                    )
                     if match_len > 0:
-                        matches.append(Match(0, pos, pos + match_len, text))
-                        pos += match_len
+                        matches.append(
+                            Match(0, match_pos, match_pos + match_len, text)
+                        )
+                        pos = match_pos + match_len
                     else:
-                        pos += 1
+                        pos = match_pos + 1
                 return matches^
 
             # General SIMD path: scalar skip + full DFA
@@ -2127,59 +2100,22 @@ struct DFAEngine(Engine):
         # to find first match and its extent in one pass
         if self._simd_scan_eligible:
             while pos < text_len:
-                # Skip non-matching characters using nibble SIMD
-                var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
-                while pos + SIMD_WIDTH <= text_len:
-                    var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-                    var lo_res = simd_matcher.lo_nibble_table._dynamic_shuffle(
-                        chunk & mask_0f
-                    )
-                    var hi_res = simd_matcher.hi_nibble_table._dynamic_shuffle(
-                        (chunk >> 4) & mask_0f
-                    )
-                    var matches = (lo_res & hi_res).ne(0)
-                    if matches.reduce_or():
-                        # Found a matching char in this chunk
-                        for i in range(SIMD_WIDTH):
-                            if matches[i]:
-                                var match_start = pos + i
-                                var match_len = (
-                                    simd_matcher.count_consecutive_matches(
-                                        text_ptr,
-                                        match_start,
-                                        text_len,
-                                    )
-                                )
-                                if match_len > 0:
-                                    var match_end = match_start + match_len
-                                    if (
-                                        self.has_end_anchor
-                                        and match_end != text_len
-                                    ):
-                                        pos = match_end
-                                        break
-                                    return Match(
-                                        0, match_start, match_end, text
-                                    )
-                                pos = match_start + 1
-                                break
+                var match_pos = simd_matcher.find_first_nibble_match(
+                    text_ptr, pos, text_len
+                )
+                if match_pos == -1:
+                    return None
+                var match_len = simd_matcher.count_consecutive_matches(
+                    text_ptr, match_pos, text_len
+                )
+                if match_len > 0:
+                    var match_end = match_pos + match_len
+                    if self.has_end_anchor and match_end != text_len:
+                        pos = match_end
                         continue
-                    pos += SIMD_WIDTH
-
-                # Scalar tail
-                while pos < text_len:
-                    if simd_matcher.contains(Int(text_ptr[pos])):
-                        var match_len = simd_matcher.count_consecutive_matches(
-                            text_ptr, pos, text_len
-                        )
-                        if match_len > 0:
-                            var match_end = pos + match_len
-                            if self.has_end_anchor and match_end != text_len:
-                                pos = match_end
-                                continue
-                            return Match(0, pos, match_end, text)
-                    pos += 1
-                return None
+                    return Match(0, match_pos, match_end, text)
+                pos = match_pos + 1
+            return None
 
         # General path: find candidates and run full DFA
         while pos < text_len:
