@@ -36,11 +36,12 @@ from regex.optimizer import PatternAnalyzer, PatternComplexity
 # use optimized two-phase matching (check alphanumeric first, then special chars)
 comptime COMPLEX_CHAR_CLASS_THRESHOLD = 10
 
-# Minimum literal length thresholds for optimization
-# Prefix literals need to be longer than this to justify optimization overhead
-comptime MIN_PREFIX_LITERAL_LENGTH = 3
-# Non-prefix literals need even longer length to be worth the overhead
-comptime MIN_REQUIRED_LITERAL_LENGTH = 4
+# Minimum literal length thresholds for optimization.
+# Even single-char prefixes (like '8' in '8(?:00|33)...') are valuable
+# for skipping non-matching positions in long text.
+comptime MIN_PREFIX_LITERAL_LENGTH = 1
+# Non-prefix literals need longer length to justify the backward search overhead
+comptime MIN_REQUIRED_LITERAL_LENGTH = 3
 
 
 struct NFAEngine(Copyable, Engine):
@@ -77,34 +78,30 @@ struct NFAEngine(Copyable, Engine):
                 var analyzer = PatternAnalyzer()
                 var complexity = analyzer.classify(ast)
 
-                # Only apply literal optimization for MEDIUM or COMPLEX patterns
-                # SIMPLE patterns use DFA which is already optimized
-                # This has a HUGE impact on performance
-                if complexity.value != PatternComplexity.SIMPLE:
-                    var literal_set = extract_literals(ast)
+                # Extract literals for all complexity levels, not just
+                # MEDIUM/COMPLEX. SIMPLE patterns may fall back to NFA when
+                # the DFA compiler can't handle them (e.g., non-capturing
+                # groups with alternation like 8(?:00|33)[2-9]\d{6}).
+                var literal_set = extract_literals(ast)
 
-                    # Use best literal if available and significant
-                    ref best_literal = literal_set.get_best_literal()
-                    if best_literal:
-                        ref best = best_literal.value()
-                        # Require longer literals to justify overhead
-                        if (
-                            best.is_prefix
-                            and best.get_literal_len(literal_set)
-                            > MIN_PREFIX_LITERAL_LENGTH
-                        ):
-                            # Use prefix literal for optimization
-                            self.literal_prefix = best.get_literal(literal_set)
-                            self.has_literal_optimization = True
-                        elif (
-                            best.is_required
-                            and best.get_literal_len(literal_set)
-                            > MIN_REQUIRED_LITERAL_LENGTH
-                        ):
-                            # Use required literal for prefiltering
-                            # Require even longer literals for non-prefix optimization
-                            self.literal_prefix = best.get_literal(literal_set)
-                            self.has_literal_optimization = True
+                ref best_literal = literal_set.get_best_literal()
+                if best_literal:
+                    ref best = best_literal.value()
+                    if (
+                        best.is_prefix
+                        and best.is_required
+                        and best.get_literal_len(literal_set)
+                        >= MIN_PREFIX_LITERAL_LENGTH
+                    ):
+                        self.literal_prefix = best.get_literal(literal_set)
+                        self.has_literal_optimization = True
+                    elif (
+                        best.is_required
+                        and best.get_literal_len(literal_set)
+                        >= MIN_REQUIRED_LITERAL_LENGTH
+                    ):
+                        self.literal_prefix = best.get_literal(literal_set)
+                        self.has_literal_optimization = True
         except:
             self.regex = None
 
