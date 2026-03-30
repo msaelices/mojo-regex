@@ -1504,5 +1504,65 @@ def test_is_match_vs_match_first_consistency() raises:
             )
 
 
+def test_escaped_parentheses() raises:
+    """Test that escaped parentheses match literal ( and ) characters."""
+    # Basic escaped parens
+    var r1 = compile_regex("\\(hello\\)")
+    var m1 = r1.match_first("(hello)")
+    assert_true(m1)
+    assert_equal(m1.value().get_match_text(), "(hello)")
+
+    assert_false(compile_regex("\\(hello\\)").match_first("hello"))
+
+    # Escaped parens with quantified ranges (the dfa_paren_phone pattern)
+    var r2 = compile_regex("\\([0-9]{3}\\) [0-9]{3}-[0-9]{4}")
+    var m2 = r2.match_first("(555) 123-4567")
+    assert_true(m2)
+    assert_equal(m2.value().get_match_text(), "(555) 123-4567")
+
+    # Search anywhere in text
+    var m3 = r2.match_next("Call (555) 123-4567 now")
+    assert_true(m3)
+    assert_equal(m3.value().get_match_text(), "(555) 123-4567")
+
+    # No match
+    assert_false(r2.match_first("555-123-4567"))
+
+
+def test_escaped_dot() raises:
+    """Test that escaped dot matches literal '.' character."""
+    var r = compile_regex("[0-9]+\\.[0-9]+")
+    var m = r.match_first("3.14")
+    assert_true(m)
+    assert_equal(m.value().get_match_text(), "3.14")
+
+    # Escaped dot should NOT match arbitrary character
+    assert_false(r.match_first("3x14"))
+
+
+def test_literal_dash_outside_brackets() raises:
+    """Test that '-' outside brackets is parsed as a literal in the AST."""
+    from regex.parser import parse
+    # Verify the dash appears in the AST (parser fix)
+    var ast = parse("[0-9]{3}-[0-9]{4}")
+    # GROUP node should have 3 children: [0-9]{3}, -, [0-9]{4}
+    ref group = ast.get_child(0)
+    assert_equal(group.get_children_len(), 3)
+    # Middle child should be literal '-'
+    ref dash_node = group.get_child(1)
+    assert_equal(dash_node.get_value().value(), "-")
+
+
+def test_escaped_plus_and_star() raises:
+    """Test that escaped special characters match literally."""
+    var r1 = compile_regex("a\\+b")
+    assert_true(r1.match_first("a+b"))
+    assert_false(r1.match_first("aab"))
+
+    var r2 = compile_regex("a\\*b")
+    assert_true(r2.match_first("a*b"))
+    assert_false(r2.match_first("ab"))
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
