@@ -1568,5 +1568,36 @@ def test_escaped_plus_and_star() raises:
     assert_false(r2.match_first("ab"))
 
 
+def test_fixed_quantifier_in_sequence() raises:
+    """Test that {N} quantifiers compile correctly in multi-element sequences.
+    Regression test for DFA compiler bug where min_matches > 1 as the first
+    element in a sequence didn't create a start state, causing [0-9]{3} to
+    compile with only 2 digit transitions instead of 3.
+    """
+    # Exact quantifier as first element
+    var r1 = compile_regex("[A-Z]{3}")
+    var m1 = r1.match_first("ABC")
+    assert_true(m1)
+    assert_equal(m1.value().get_match_text(), "ABC")
+    assert_false(r1.match_first("AB"))  # Too short
+
+    # Exact quantifier followed by literal and another quantifier
+    var r2 = compile_regex("[A-Z]{2}-[0-9]{3}")
+    var m2 = r2.match_first("AB-123")
+    assert_true(m2)
+    assert_equal(m2.value().get_match_text(), "AB-123")
+    assert_false(r2.match_first("A-123"))   # First quantifier too short
+    assert_false(r2.match_first("AB123"))   # Missing dash
+    assert_false(r2.match_first("AB-12"))   # Second quantifier too short
+
+    # Multiple fixed quantifiers in sequence
+    var r3 = compile_regex("[A-Z]{3}[0-9]{4}")
+    var m3 = r3.match_first("ABC1234")
+    assert_true(m3)
+    assert_equal(m3.value().get_match_text(), "ABC1234")
+    assert_false(r3.match_first("AB1234"))   # Letters too short
+    assert_false(r3.match_first("ABC123"))   # Digits too short
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
