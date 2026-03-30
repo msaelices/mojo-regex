@@ -72,6 +72,10 @@ struct CharacterClassSIMD(
 
     var lookup_table: SIMD[DType.uint8, 256]
     """Bit vector for each ASCII character, 1 if in class, 0 otherwise."""
+    var lo_nibble_table: SIMD[DType.uint8, 16]
+    """Nibble lookup: lo_nibble_table[lo] = bitmask of valid hi nibbles."""
+    var hi_nibble_table: SIMD[DType.uint8, 16]
+    """Nibble lookup: hi_nibble_table[hi] = bitmask of valid lo nibbles."""
     var size_hint: Int
     """Number of characters in the class for optimization decisions."""
     var use_shuffle: Bool
@@ -101,6 +105,11 @@ struct CharacterClassSIMD(
         for i in range(len(char_class)):
             self.lookup_table[Int(cc_ptr[i])] = 1
 
+        # Build nibble tables for fast SIMD scanning
+        self.lo_nibble_table = SIMD[DType.uint8, 16](0)
+        self.hi_nibble_table = SIMD[DType.uint8, 16](0)
+        self._build_nibble_tables()
+
     def __init__(out self, start_code: Int, end_code: Int):
         """Initialize with a character code range like ord('a')-ord('z').
 
@@ -120,6 +129,28 @@ struct CharacterClassSIMD(
 
         for char_code in range(clamped_start, clamped_end + 1):
             self.lookup_table[char_code] = 1
+
+        # Build nibble tables for fast SIMD scanning
+        self.lo_nibble_table = SIMD[DType.uint8, 16](0)
+        self.hi_nibble_table = SIMD[DType.uint8, 16](0)
+        self._build_nibble_tables()
+
+    def _build_nibble_tables(mut self):
+        """Build 16-byte nibble lookup tables from the 256-byte lookup table.
+        These enable fast SIMD character matching using two _dynamic_shuffle
+        calls on 16-byte tables (native pshufb) instead of one on 256-byte
+        table (emulated with multiple shuffles).
+        """
+        var lo_tbl = SIMD[DType.uint8, 16](0)
+        var hi_tbl = SIMD[DType.uint8, 16](0)
+        for c in range(256):
+            if self.lookup_table[c] != 0:
+                var lo = c & 0xF
+                var hi = (c >> 4) & 0xF
+                lo_tbl[lo] = lo_tbl[lo] | UInt8(1 << hi)
+                hi_tbl[hi] = hi_tbl[hi] | UInt8(1 << lo)
+        self.lo_nibble_table = lo_tbl
+        self.hi_nibble_table = hi_tbl
 
     def contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -298,22 +329,25 @@ struct CharacterClassSIMD(
             Number of consecutive matching characters from start.
         """
         var pos = start
+        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
 
-        while pos + 4 <= text_len:
-            if self.lookup_table[Int(text_ptr[pos])] == 0:
+        # SIMD bulk scan using nibble-based lookup (two native pshufb ops)
+        while pos + SIMD_WIDTH <= text_len:
+            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+            var lo_nibs = chunk & mask_0f
+            var hi_nibs = (chunk >> 4) & mask_0f
+            var lo_res = self.lo_nibble_table._dynamic_shuffle(lo_nibs)
+            var hi_res = self.hi_nibble_table._dynamic_shuffle(hi_nibs)
+            var matches = (lo_res & hi_res).ne(0)
+            if matches.reduce_and():
+                pos += SIMD_WIDTH
+            else:
+                for i in range(SIMD_WIDTH):
+                    if not matches[i]:
+                        return pos + i - start
                 break
-            if self.lookup_table[Int(text_ptr[pos + 1])] == 0:
-                pos += 1
-                break
-            if self.lookup_table[Int(text_ptr[pos + 2])] == 0:
-                pos += 2
-                break
-            if self.lookup_table[Int(text_ptr[pos + 3])] == 0:
-                pos += 3
-                break
-            pos += 4
 
-        # Handle remaining bytes
+        # Handle remaining bytes with scalar lookup
         while pos < text_len:
             if self.lookup_table[Int(text_ptr[pos])] == 0:
                 break
