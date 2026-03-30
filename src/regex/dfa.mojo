@@ -177,6 +177,8 @@ struct SequentialPatternElement(Copyable, Movable):
     """Maximum matches for this element (-1 for unlimited)."""
     var positive_logic: Bool
     """True for [abc], False for [^abc]."""
+    var alternation_branches: List[String]
+    """For alternation groups: list of literal branch strings. Empty for normal elements."""
 
     def __init__(
         out self,
@@ -189,6 +191,7 @@ struct SequentialPatternElement(Copyable, Movable):
         self.min_matches = min_matches
         self.max_matches = max_matches
         self.positive_logic = positive_logic
+        self.alternation_branches = List[String]()
 
 
 struct SequentialPatternInfo(Copyable, Movable):
@@ -614,8 +617,45 @@ struct DFAEngine(Engine):
                     all_remaining_optional = False
                     break
 
-            # For multi-character sequences, SIMD optimization is applied per character class
-            # but not globally since we have multiple different character classes
+            # Handle alternation group elements (e.g., (?:00|33|44))
+            if len(element.alternation_branches) > 0:
+                if element_idx == 0:
+                    var start_state = DFAState()
+                    self.states.append(start_state)
+                    current_state_index = 0
+
+                # All branches converge to a single end state
+                var end_state = DFAState(
+                    is_accepting=is_last_element or all_remaining_optional
+                )
+                self.states.append(end_state)
+                var end_state_index = len(self.states) - 1
+
+                # Build chain of states for each branch
+                for branch_idx in range(len(element.alternation_branches)):
+                    ref branch = element.alternation_branches[branch_idx]
+                    var branch_ptr = branch.unsafe_ptr()
+                    var prev_state = current_state_index
+
+                    for ch_idx in range(len(branch)):
+                        var char_code = Int(branch_ptr[ch_idx])
+                        if ch_idx == len(branch) - 1:
+                            # Last char in branch -> transition to shared end state
+                            self.states[prev_state].add_transition(
+                                char_code, end_state_index
+                            )
+                        else:
+                            # Intermediate char -> create intermediate state
+                            var mid_state = DFAState()
+                            self.states.append(mid_state)
+                            var mid_state_index = len(self.states) - 1
+                            self.states[prev_state].add_transition(
+                                char_code, mid_state_index
+                            )
+                            prev_state = mid_state_index
+
+                current_state_index = end_state_index
+                continue
 
             if element.min_matches == 0:
                 # Optional element (e.g., [a-z]*)
@@ -2568,6 +2608,84 @@ def _extract_sequential_pattern_info(
     return info^
 
 
+def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
+    """Check if a GROUP node contains only OR with fixed-length literal branches.
+
+    Examples: (?:00|33|44|55|66|77|88), (?:abc|def|ghi)
+
+    Each branch must be a GROUP of ELEMENTs with the same length.
+    """
+    from regex.ast import GROUP, OR, ELEMENT
+
+    if node.type != GROUP or node.get_children_len() != 1:
+        return False
+
+    ref child = node.get_child(0)
+    if child.type != OR:
+        return False
+
+    # Walk the OR tree iteratively to verify all branches are literal
+    var branch_len = -1
+    var stack = List[ASTNode[MutAnyOrigin]]()
+    stack.append(child)
+
+    while len(stack) > 0:
+        var current = stack.pop()
+        if current.type == GROUP:
+            for i in range(current.get_children_len()):
+                if current.get_child(i).type != ELEMENT:
+                    return False
+            if branch_len == -1:
+                branch_len = current.get_children_len()
+            elif current.get_children_len() != branch_len:
+                return False
+        elif current.type == OR:
+            if current.get_children_len() != 2:
+                return False
+            stack.append(current.get_child(1))
+            stack.append(current.get_child(0))
+        else:
+            return False
+
+    return branch_len > 0
+
+
+def _collect_alternation_branches(
+    node: ASTNode[MutAnyOrigin],
+) -> List[String]:
+    """Collect all literal branch strings from a literal alternation GROUP."""
+    from regex.ast import GROUP, OR, ELEMENT
+
+    var branches = List[String]()
+    # Walk the OR tree iteratively using a stack
+    var stack = List[Int]()
+    # Store nodes to process: use indices into a flat list
+    var nodes = List[ASTNode[MutAnyOrigin]]()
+    if node.get_children_len() > 0:
+        nodes.append(node.get_child(0))
+        stack.append(0)
+
+    while len(stack) > 0:
+        var idx = stack.pop()
+        ref current = nodes[idx]
+        if current.type == GROUP:
+            var branch = String()
+            for i in range(current.get_children_len()):
+                ref child = current.get_child(i)
+                if child.type == ELEMENT and child.get_value():
+                    branch += String(child.get_value().value())
+            branches.append(branch^)
+        elif current.type == OR:
+            if current.get_children_len() >= 2:
+                nodes.append(current.get_child(1))
+                stack.append(len(nodes) - 1)
+            if current.get_children_len() >= 1:
+                nodes.append(current.get_child(0))
+                stack.append(len(nodes) - 1)
+
+    return branches^
+
+
 def _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if pattern is a sequence of multiple character classes.
 
@@ -2620,6 +2738,9 @@ def _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
         elif element.type == ELEMENT and element.min == 1 and element.max == 1:
             # Single literal characters are OK (like @ and . in email patterns)
             literal_count += 1
+        elif element.type == GROUP and _is_literal_alternation_group(element):
+            # Non-capturing group with literal alternation like (?:00|33|44)
+            literal_count += 1
         else:
             # Other types make it non-sequential
             return False
@@ -2671,6 +2792,20 @@ def _extract_multi_class_sequence_info(
                     char_class = String(
                         element.get_value().value()
                     ) if element.get_value() else ""
+                elif element.type == GROUP and _is_literal_alternation_group(
+                    element
+                ):
+                    # Non-capturing group with literal alternation
+                    var branches = _collect_alternation_branches(element)
+                    var pattern_element = SequentialPatternElement(
+                        "",  # No single char class
+                        1,
+                        1,
+                        True,
+                    )
+                    pattern_element.alternation_branches = branches^
+                    info.elements.append(pattern_element^)
+                    continue
                 else:
                     continue  # Skip unknown elements
 
