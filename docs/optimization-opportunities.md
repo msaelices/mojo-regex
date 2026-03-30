@@ -311,30 +311,36 @@ Four fixes applied:
 
    vs-Rust gap for `[a-z]+` went from 8037x to ~22x.
 
-## High: NFA Complex Pattern Backtracking Much Slower Than Rust
+## ~~High: NFA Complex Pattern Backtracking Much Slower Than Rust~~ (Partially fixed, PRs #76, #77)
 
-**Benchmarked 2026-03-29** (pre-compiled, median timing)
+**PRs:** https://github.com/msaelices/mojo-regex/pull/76, https://github.com/msaelices/mojo-regex/pull/77
 
-Complex NFA patterns with backtracking are 40-200x slower than Rust:
+### Fixed issues:
 
-| Benchmark | Mojo (ms) | Python (ms) | Rust (ms) | Mojo/Rust |
-|-----------|----------|------------|----------|-----------|
-| `flexible_phone` | 9.01 | 3.06 | 0.224 | 40x |
-| `multi_format_phone` | 22.38 | 7.27 | 0.232 | 97x |
-| `grouped_quantifiers` | 0.70 | 0.27 | 0.009 | 77x |
-| `dfa_paren_phone` | 1.66 | 0.14 | 0.013 | 133x |
-| `phone_validation` | 0.0018 | 0.0005 | 0.000025 | 72x |
-| `optimize_extreme_quantifiers` | 0.039 | 0.014 | 0.000189 | 209x |
+1. **NFA dispatch inlining and backward search (PR #76):** Added `@always_inline`
+   to NFAMatcher dispatch chain. Reduced backward search heuristic from 100
+   positions to pattern length. Result: 1.4-3x faster on NFA patterns.
 
-**Root cause:** Rust's `regex` crate uses a lazy DFA (Thompson NFA -> DFA cache)
-that avoids backtracking entirely. Mojo's NFA engine uses explicit backtracking
-which is exponential in the worst case. Additionally, `dfa_paren_phone` being
-0.1x vs Python suggests a possible bug in the DFA compilation for escaped
-parenthesis patterns.
+2. **Parser/DFA bugs causing silent match failures (PR #77):** Three bugs fixed:
+   - Lexer: escaped chars (`\(`, `\.`) stored backslash instead of target char
+   - Parser: `-` outside brackets silently dropped
+   - DFA compiler: missing start state for `min_matches > 1` sequences
+
+   Many benchmarks (`dfa_paren_phone`, `dfa_simple_phone`, `pure_dfa_dot`,
+   `complex_email`) were returning zero matches before these fixes.
+
+### Remaining: NFA backtracking architecture
+
+Complex NFA patterns are still 20-70x slower than Rust due to explicit
+backtracking vs Rust's lazy DFA:
+
+| Benchmark | Mojo (ms) | Rust (ms) | Mojo/Rust |
+|-----------|----------|----------|-----------|
+| `flexible_phone` | 6.0 | 0.30 | 20x |
+| `multi_format_phone` | 15.5 | 0.31 | 50x |
+| `grouped_quantifiers` | 0.72 | 0.018 | 40x |
 
 **Fix directions:**
-- Investigate `dfa_paren_phone` regression vs Python (possible DFA compilation
-  bug with `\(` patterns).
 - Consider implementing a Thompson NFA or lazy DFA to avoid backtracking.
 - Short term: improve NFA backtracking pruning and memoization.
 
