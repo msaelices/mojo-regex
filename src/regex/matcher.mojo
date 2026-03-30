@@ -155,10 +155,12 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Check if pattern matches without computing boundaries."""
         return self.engine_ptr[].is_match(text, start)
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
+    @always_inline
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_next(text, start)
@@ -468,6 +470,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # NFA fallback: use full match
         return Bool(self.nfa_matcher.match_first(text, start))
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -680,6 +683,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     #         call_location,
     #     )
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
 

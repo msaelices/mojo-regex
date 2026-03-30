@@ -272,6 +272,9 @@ struct DFAEngine(Engine):
     (https://github.com/modular/modular/issues/6253).
     TODO: Revert to Optional[CharacterClassSIMD] once upgraded to Mojo 0.26.3+
     where this bug is fixed."""
+    var _simd_scan_eligible: Bool
+    """Whether the SIMD scan path can be used (has unlimited quantifier with
+    self-loop, not a bounded quantifier like {3} or {2,4})."""
     var literal_pattern: String
     """Storage for literal pattern to keep it alive for SIMD string search."""
 
@@ -284,6 +287,7 @@ struct DFAEngine(Engine):
         self.is_pure_literal = False
         self._simd_char_matcher = CharacterClassSIMD("")
         self._has_simd_matcher = False
+        self._simd_scan_eligible = False
         self.literal_pattern = ""
 
     def __moveinit__(out self, deinit take: Self):
@@ -295,6 +299,7 @@ struct DFAEngine(Engine):
         self.is_pure_literal = take.is_pure_literal
         self._simd_char_matcher = take._simd_char_matcher
         self._has_simd_matcher = take._has_simd_matcher
+        self._simd_scan_eligible = take._simd_scan_eligible
         self.literal_pattern = take.literal_pattern^
 
     def compile_pattern(
@@ -376,6 +381,8 @@ struct DFAEngine(Engine):
         if min_matches >= 0 and positive_logic:
             self._simd_char_matcher = get_character_class_matcher(char_class)
             self._has_simd_matcher = True
+            # Unlimited quantifiers (+ or *) are eligible for SIMD scan
+            self._simd_scan_eligible = max_matches == -1
 
         if min_matches == 0:
             # Pattern like [a-z]* - can match zero characters
@@ -1639,6 +1646,9 @@ struct DFAEngine(Engine):
         ):
             self._simd_char_matcher = get_character_class_matcher(DIGITS)
             self._has_simd_matcher = True
+            self._simd_scan_eligible = (
+                True  # Digit sequence patterns use unlimited scan
+            )
 
     @always_inline
     def _add_character_class_transitions(
@@ -1756,6 +1766,7 @@ struct DFAEngine(Engine):
             )
         )
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
@@ -1804,6 +1815,7 @@ struct DFAEngine(Engine):
                 return match_result
         return None
 
+    @always_inline
     def _try_match_at_position(
         self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
@@ -1975,6 +1987,7 @@ struct DFAEngine(Engine):
 
         return matches^
 
+    @always_inline
     def _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 
@@ -2000,65 +2013,16 @@ struct DFAEngine(Engine):
         # Check if start state is accepting (for patterns like [a-z]*)
         var start_accepting = self.states[self.start_state].is_accepting
 
-        # Disable SIMD for exact quantifier patterns to ensure correctness
-        if len(self.states) > 1 and not start_accepting:
-            # Check if this looks like an exact quantifier pattern
-            var accepting_states = 0
-            var min_length = -1
-            var max_length = -1
+        # Bounded quantifiers like {3} or {2,4} can't use SIMD scan because
+        # the match length is constrained. This flag is computed at compile time.
+        if not start_accepting and not self._simd_scan_eligible:
+            return None
 
-            for i in range(len(self.states)):
-                if self.states[i].is_accepting:
-                    accepting_states += 1
-                    if self.states[i].match_length > 0:
-                        if (
-                            min_length == -1
-                            or self.states[i].match_length < min_length
-                        ):
-                            min_length = self.states[i].match_length
-                        if (
-                            max_length == -1
-                            or self.states[i].match_length > max_length
-                        ):
-                            max_length = self.states[i].match_length
-
-            # If we have specific length constraints, this indicates quantifiers like {3} or {2,4}
-            if min_length > 0:
-                if accepting_states == 1:
-                    # Exact quantifier like {3} - disable SIMD, fall back to DFA
-                    return None
-                elif max_length > min_length:
-                    # Range quantifier like {2,4} - disable SIMD, fall back to DFA
-                    return None
-
-        # Use SIMD bulk scan to find end of consecutive matching characters
-        var pos = start_pos
-        var match_count = 0
+        # Count consecutive matching characters using fast lookup table scan
         var text_ptr = text.unsafe_ptr()
-
-        # Process SIMD_WIDTH characters at a time
-        while pos + SIMD_WIDTH <= text_len:
-            var matches = simd_matcher._check_chunk_simd(text_ptr, pos)
-            if matches.reduce_and():
-                # All characters in chunk match, advance by full width
-                match_count += SIMD_WIDTH
-                pos += SIMD_WIDTH
-            else:
-                # Find first non-match in this chunk
-                for i in range(SIMD_WIDTH):
-                    if not matches[i]:
-                        break
-                    match_count += 1
-                    pos += 1
-                break
-
-        # Handle remaining characters (< SIMD_WIDTH)
-        while pos < text_len:
-            if simd_matcher.contains(Int(text_ptr[pos])):
-                match_count += 1
-                pos += 1
-            else:
-                break
+        var match_count = simd_matcher.count_consecutive_matches(
+            text_ptr, start_pos, text_len
+        )
 
         # Restore original fast SIMD logic (from before commit 0f5804a3e8df649030ee7cfaa8b3a87fc9c4ad68)
         # This provides maximum performance for the common case
