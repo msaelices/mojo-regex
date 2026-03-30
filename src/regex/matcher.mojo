@@ -198,14 +198,17 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = take.engine^
         self.ast = take.ast^
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_first(text, start)
 
+    @always_inline
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Find first match using NFA execution."""
         return self.engine.match_next(text, start)
 
+    @always_inline
     def match_all(self, text: String) raises -> MatchList:
         """Find all matches using NFA execution."""
         return self.engine.match_all(text)
