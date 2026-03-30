@@ -2626,7 +2626,7 @@ def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
 
     # Walk the OR tree iteratively to verify all branches are literal
     var branch_len = -1
-    var stack = List[ASTNode[MutAnyOrigin]]()
+    var stack = List[ASTNode[MutAnyOrigin]](capacity=16)
     stack.append(child)
 
     while len(stack) > 0:
@@ -2656,11 +2656,10 @@ def _collect_alternation_branches(
     """Collect all literal branch strings from a literal alternation GROUP."""
     from regex.ast import GROUP, OR, ELEMENT
 
-    var branches = List[String]()
+    var branches = List[String](capacity=16)
     # Walk the OR tree iteratively using a stack
-    var stack = List[Int]()
-    # Store nodes to process: use indices into a flat list
-    var nodes = List[ASTNode[MutAnyOrigin]]()
+    var stack = List[Int](capacity=16)
+    var nodes = List[ASTNode[MutAnyOrigin]](capacity=16)
     if node.get_children_len() > 0:
         nodes.append(node.get_child(0))
         stack.append(0)
@@ -2669,7 +2668,7 @@ def _collect_alternation_branches(
         var idx = stack.pop()
         ref current = nodes[idx]
         if current.type == GROUP:
-            var branch = String()
+            var branch = String(capacity=current.get_children_len())
             for i in range(current.get_children_len()):
                 ref child = current.get_child(i)
                 if child.type == ELEMENT and child.get_value():
