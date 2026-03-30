@@ -94,7 +94,9 @@ def scan(regex: String) raises -> List[Token]:
                 tokens.append(token)
             else:
                 var token = ElementToken(char=ch_codepoint)
-                token.start_pos = i - 1  # -1 because escape char is at i-1
+                token.start_pos = (
+                    i  # Point to the escaped char, not the backslash
+                )
                 tokens.append(token)
         elif ch_codepoint == CHAR_SLASH:
             escape_found = True

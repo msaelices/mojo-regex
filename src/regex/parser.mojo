@@ -348,6 +348,16 @@ def parse_token_list[
             if i + 1 < len(tokens):
                 check_for_quantifiers[ImmutAnyOrigin](i, range_elem, tokens)
             elements.append(range_elem^)
+        elif token.type == Token.DASH:
+            # Dash outside brackets is a literal '-' character
+            var elem = Element[regex_origin](
+                regex=regex,
+                start_idx=token.start_pos,
+                end_idx=token.start_pos + 1,
+            )
+            if i + 1 < len(tokens):
+                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+            elements.append(elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
             var paren_start_pos = token.start_pos
