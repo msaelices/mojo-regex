@@ -1,4 +1,5 @@
-    Finished `release` profile [optimized] target(s) in 0.05s
+   Compiling mojo-regex-rust-bench v0.1.0 (/home/msaelices/src/my-repos/mojo-regex/benchmarks/rust)
+    Finished `release` profile [optimized] target(s) in 21.12s
      Running `target/release/bench_engine`
 === RUST REGEX BENCHMARKS ===
 
@@ -81,73 +82,84 @@
 ✓ optimize_phone_quantifiers
 ✓ optimize_large_quantifiers
 ✓ optimize_extreme_quantifiers
+=== is_match (Bool-only) Benchmarks ===
+✓ is_match_lowercase
+✓ is_match_digits
+✓ is_match_alphanumeric
+✓ is_match_predefined_digits
+✓ is_match_predefined_word
 
 === Benchmark Results ===
 | name                      | med (ms)              | iters  |
 |---------------------------|-----------------------|--------|
-| alternation_common_prefix |   0.00268906590909091 | 157960 |
-| alternation_quantifiers   |   0.11986977333333333 |   4125 |
-| alternation_simple        |   0.00001987790909091 | 23991000 |
-| alternation_words         |   0.00001973873333333 | 23220000 |
-| anchor_end                |   0.00003101022222222 | 14832000 |
-| anchor_start              |   0.00002658386842105 | 18658000 |
-| complex_email_extraction  |   0.00049892450980392 | 952680 |
-| complex_group_5_children  |   0.00012987566666667 | 3648000 |
-| complex_number_extraction |   0.08719419200000000 |   5500 |
-| datetime_quantifiers      |   0.07944262000000001 |   6100 |
-| deep_nested_groups_depth4 |   0.00002536629629630 | 19737000 |
-| dense_quantifiers         |   0.03040705000000000 |  17000 |
-| dfa_digits_only           |   0.10256846000000000 |   5500 |
-| dfa_dot_phone             |   0.05226354000000000 |   9400 |
-| dfa_paren_phone           |   0.01251988000000000 |  38200 |
-| dfa_simple_phone          |   0.10324749999999999 |   4800 |
-| dual_quantifiers          |   0.03840894666666667 |  17400 |
-| flexible_datetime         |   0.05807999000000000 |   8600 |
-| flexible_phone            |   0.22426876000000001 |   1900 |
-| group_alternation         |   0.00008668720000000 | 6500000 |
-| group_quantified          |   0.09105676600000000 |   6000 |
-| grouped_quantifiers       |   0.00906137000000000 |  46900 |
-| large_8_alternations      |   0.00007576637500000 | 6128000 |
-| literal_heavy_alternation |   0.00011719930000000 | 4170000 |
-| literal_match_long        |   0.00358099450000000 | 114000 |
-| literal_match_short       |   0.00059825200000000 | 924000 |
-| literal_prefix_long       |   0.03530271428571428 |  13062 |
-| literal_prefix_medium     |   0.00255772000000000 | 165600 |
-| literal_prefix_short      |   0.00047306683971447 | 1060208 |
-| match_all_pattern         |   0.07846343250000000 |   6400 |
-| match_all_simple          |   0.00655191500000000 |  62200 |
-| mixed_range_quantifiers   |   0.00489270666666667 |  85200 |
-| multi_format_phone        |   0.23188064000000000 |   1750 |
-| national_phone_validation |   0.07436250000000000 |   6460 |
-| no_literal_baseline       |   0.00858447666666667 |  49500 |
-| optimize_extreme_quantifiers |   0.00018867620000000 | 2120000 |
-| optimize_large_quantifiers |   0.01044376000000000 |  39300 |
-| optimize_multiple_quantifiers |   0.03324231000000000 |  15200 |
-| optimize_phone_quantifiers |   0.06298575333333334 |   7800 |
-| optimize_range_quantifier |   0.03368189600000000 |  15000 |
-| phone_validation          |   0.00002450523076923 | 20514000 |
-| predefined_digits         |   0.00007222316666667 | 6984000 |
-| predefined_word           |   0.00001600497368421 | 29146000 |
-| quad_quantifiers          |   0.01115343000000000 |  41500 |
-| quantifier_one_or_more    |   0.00004131036000000 | 11350000 |
-| quantifier_zero_or_more   |   0.00003428690000000 | 16600000 |
-| quantifier_zero_or_one    |   0.00002603080000000 | 16480000 |
-| range_alphanumeric        |   0.00002796317500000 | 17880000 |
-| range_digits              |   0.00003350892307692 | 15054000 |
-| range_lowercase           |   0.00001686251515152 | 28380000 |
-| range_quantifiers         |   0.06748757999999999 |   7400 |
-| required_literal_long     |   0.00206958723404255 | 274010 |
-| required_literal_short    |   0.00049525332650972 | 1031712 |
-| simd_alphanumeric_large   |   0.00002467073529412 | 19624800 |
-| simd_alphanumeric_xlarge  |   0.00001923795138889 | 22723200 |
-| simd_multi_char_class     |   0.00002170186090226 | 21652400 |
-| simd_negated_alphanumeric |   0.00002258971910112 | 19508800 |
-| simple_phone              |   0.24537351999999998 |   2100 |
-| single_quantifier_alpha   |   0.05827406000000000 |   9200 |
-| single_quantifier_digits  |   0.02573733500000000 |  21200 |
-| triple_quantifiers        |   0.00946528000000000 |  42800 |
-| ultra_dense_quantifiers   |   0.05204151999999999 |   8450 |
-| wildcard_match_any        |   0.00001856782222222 | 24300000 |
+| alternation_common_prefix |   0.00315655390334573 | 163014 |
+| alternation_quantifiers   |   0.11614854666666666 |   4125 |
+| alternation_simple        |   0.00004200646428571 | 11368000 |
+| alternation_words         |   0.00002527742857143 | 17325000 |
+| anchor_end                |   0.00004438450000000 | 11550000 |
+| anchor_start              |   0.00004170751315789 | 12388000 |
+| complex_email_extraction  |   0.00066597142857143 | 746760 |
+| complex_group_5_children  |   0.00011734271428571 | 4207000 |
+| complex_number_extraction |   0.06919435400000000 |   7000 |
+| datetime_quantifiers      |   0.09802756000000000 |   5200 |
+| deep_nested_groups_depth4 |   0.00002298123863636 | 19888000 |
+| dense_quantifiers         |   0.01831457000000000 |  24900 |
+| dfa_digits_only           |   0.06148075000000000 |   8100 |
+| dfa_dot_phone             |   0.03851074000000000 |  11700 |
+| dfa_paren_phone           |   0.01975682500000000 |  25400 |
+| dfa_simple_phone          |   0.09354129999999999 |   5300 |
+| dual_quantifiers          |   0.02940810000000000 |  16950 |
+| flexible_datetime         |   0.03580081000000000 |  14100 |
+| flexible_phone            |   0.30129871000000003 |   1700 |
+| group_alternation         |   0.00008920833333333 | 5448000 |
+| group_quantified          |   0.07298292499999999 |   8000 |
+| grouped_quantifiers       |   0.01768859000000000 |  27500 |
+| is_match_alphanumeric     |   0.00002240893589744 | 21606000 |
+| is_match_digits           |   0.00006520021052632 | 6764000 |
+| is_match_lowercase        |   0.00002001045833333 | 24336000 |
+| is_match_predefined_digits |   0.00002235010714286 | 22512000 |
+| is_match_predefined_word  |   0.00001927409259259 | 23220000 |
+| large_8_alternations      |   0.00005873171875000 | 8320000 |
+| literal_heavy_alternation |   0.00009887983333333 | 4776000 |
+| literal_match_long        |   0.00479461525000000 | 104000 |
+| literal_match_short       |   0.00068212750000000 | 720000 |
+| literal_prefix_long       |   0.04597252941176470 |  10302 |
+| literal_prefix_medium     |   0.00610474750000000 |  84000 |
+| literal_prefix_short      |   0.00036998224568138 | 1381692 |
+| match_all_pattern         |   0.06033222000000001 |   9000 |
+| match_all_simple          |   0.00659428000000000 |  68800 |
+| mixed_range_quantifiers   |   0.00909656888888889 |  52875 |
+| multi_format_phone        |   0.30681680000000000 |   1650 |
+| national_phone_validation |   0.09603589999999999 |   5400 |
+| no_literal_baseline       |   0.01058200000000000 |  45144 |
+| optimize_extreme_quantifiers |   0.00031049300000000 | 1572000 |
+| optimize_large_quantifiers |   0.01975654000000000 |  24700 |
+| optimize_multiple_quantifiers |   0.03337722000000000 |  14400 |
+| optimize_phone_quantifiers |   0.07236940000000000 |   6900 |
+| optimize_range_quantifier |   0.05555828800000000 |  10000 |
+| phone_validation          |   0.00002155024444444 | 22815000 |
+| predefined_digits         |   0.00004649068181818 | 8734000 |
+| predefined_word           |   0.05023677800000000 |  10000 |
+| quad_quantifiers          |   0.01151987500000000 |  37000 |
+| quantifier_one_or_more    |   0.00008813918750000 | 5888000 |
+| quantifier_zero_or_more   |   0.00005894250000000 | 8556000 |
+| quantifier_zero_or_one    |   0.00008505490909091 | 5709000 |
+| range_alphanumeric        |   0.04983775000000000 |  11000 |
+| range_digits              |   0.00006080600000000 | 7584000 |
+| range_lowercase           |   0.00006005696428571 | 7224000 |
+| range_quantifiers         |   0.03818834000000000 |  13200 |
+| required_literal_long     |   0.00111972502378687 | 415145 |
+| required_literal_short    |   0.00023596923076923 | 2021760 |
+| simd_alphanumeric_large   |   0.00007264818584071 | 6870400 |
+| simd_alphanumeric_xlarge  |   0.00010145180000000 | 4990000 |
+| simd_multi_char_class     |   0.00004911908163265 | 9937200 |
+| simd_negated_alphanumeric |   0.00005053545454545 | 8962800 |
+| simple_phone              |   0.13196408999999998 |   3900 |
+| single_quantifier_alpha   |   0.05774665250000000 |   8800 |
+| single_quantifier_digits  |   0.02972562500000000 |  17400 |
+| triple_quantifiers        |   0.01656374000000000 |  29800 |
+| ultra_dense_quantifiers   |   0.07290064000000000 |   6300 |
+| wildcard_match_any        |   0.04566895000000000 |  11000 |
 
 === BENCHMARK COMPLETE ===
 Results exported to: ../results/rust_results.json
