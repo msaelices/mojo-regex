@@ -2785,6 +2785,32 @@ def _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
     return char_class_count >= 2
 
 
+@always_inline
+def _element_to_char_class(element: ASTNode[MutAnyOrigin]) -> String:
+    """Convert an AST element node to its character class string.
+
+    Returns empty string if the element type is not recognized.
+    """
+    from regex.ast import DIGIT, WORD, RANGE, SPACE, WILDCARD, ELEMENT
+
+    if element.type == DIGIT:
+        return "0123456789"
+    elif element.type == WORD:
+        return WORD_CHARS
+    elif element.type == RANGE:
+        return _expand_character_range(
+            element.type, element.get_value().value()
+        )
+    elif element.type == SPACE:
+        return " \t\n\r\f"
+    elif element.type == WILDCARD:
+        return ALL_EXCEPT_NEWLINE
+    elif element.type == ELEMENT:
+        if element.get_value():
+            return String(element.get_value().value())
+    return ""
+
+
 def _extract_multi_class_sequence_info(
     ast: ASTNode[MutAnyOrigin],
 ) -> SequentialPatternInfo:
@@ -2804,86 +2830,45 @@ def _extract_multi_class_sequence_info(
     if ast.type == RE and ast.get_children_len() == 1:
         ref child = ast.get_child(0)
         if child.type == GROUP:
-            # Extract each character class element
+            # Extract each element into the sequence
             for i in range(child.get_children_len()):
                 ref element = child.get_child(i)
-                var char_class: String
 
-                if element.type == DIGIT:
-                    char_class = "0123456789"
-                elif element.type == WORD:
-                    char_class = WORD_CHARS
-                elif element.type == RANGE:
-                    char_class = _expand_character_range(
-                        element.type, element.get_value().value()
-                    )
-                elif element.type == SPACE:
-                    char_class = " \t\n\r\f"
-                elif element.type == WILDCARD:
-                    # Wildcard matches any character except newline
-                    char_class = ALL_EXCEPT_NEWLINE
-                elif element.type == ELEMENT:
-                    # Single literal character (like @ or .)
-                    char_class = String(
-                        element.get_value().value()
-                    ) if element.get_value() else ""
-                elif element.type == GROUP and _is_literal_alternation_group(
+                if element.type == GROUP and _is_literal_alternation_group(
                     element
                 ):
-                    # Non-capturing group with literal alternation
                     var branches = _collect_alternation_branches(element)
                     var pattern_element = SequentialPatternElement(
-                        "",  # No single char class
-                        1,
-                        1,
-                        True,
+                        "", 1, 1, True
                     )
                     pattern_element.alternation_branches = branches^
                     info.elements.append(pattern_element^)
-                    continue
                 elif element.type == GROUP and _is_char_class_group(element):
-                    # Capturing group - flatten its children into the sequence.
-                    # Safe because match_first/match_next/match_all don't
-                    # return sub-group captures. Route to NFA for captures().
+                    # Flatten capturing group children into the sequence.
+                    # Safe because current API doesn't return sub-group captures.
                     for j in range(element.get_children_len()):
                         ref sub = element.get_child(j)
-                        var sub_class: String
-                        if sub.type == DIGIT:
-                            sub_class = "0123456789"
-                        elif sub.type == WORD:
-                            sub_class = WORD_CHARS
-                        elif sub.type == RANGE:
-                            sub_class = _expand_character_range(
-                                sub.type, sub.get_value().value()
+                        var sub_class = _element_to_char_class(sub)
+                        if sub_class:
+                            info.elements.append(
+                                SequentialPatternElement(
+                                    sub_class^,
+                                    sub.min,
+                                    sub.max,
+                                    sub.positive_logic,
+                                )
                             )
-                        elif sub.type == SPACE:
-                            sub_class = " \t\n\r\f"
-                        elif sub.type == WILDCARD:
-                            sub_class = ALL_EXCEPT_NEWLINE
-                        elif sub.type == ELEMENT:
-                            sub_class = String(
-                                sub.get_value().value()
-                            ) if sub.get_value() else ""
-                        else:
-                            continue
-                        var sub_elem = SequentialPatternElement(
-                            sub_class^,
-                            sub.min,
-                            sub.max,
-                            sub.positive_logic,
-                        )
-                        info.elements.append(sub_elem^)
-                    continue
                 else:
-                    continue  # Skip unknown elements
-
-                var pattern_element = SequentialPatternElement(
-                    char_class^,
-                    element.min,
-                    element.max,
-                    element.positive_logic,
-                )
-                info.elements.append(pattern_element^)
+                    var char_class = _element_to_char_class(element)
+                    if char_class:
+                        info.elements.append(
+                            SequentialPatternElement(
+                                char_class^,
+                                element.min,
+                                element.max,
+                                element.positive_logic,
+                            )
+                        )
 
     return info^
 
