@@ -1586,17 +1586,17 @@ def test_fixed_quantifier_in_sequence() raises:
     var m2 = r2.match_first("AB-123")
     assert_true(m2)
     assert_equal(m2.value().get_match_text(), "AB-123")
-    assert_false(r2.match_first("A-123"))   # First quantifier too short
-    assert_false(r2.match_first("AB123"))   # Missing dash
-    assert_false(r2.match_first("AB-12"))   # Second quantifier too short
+    assert_false(r2.match_first("A-123"))  # First quantifier too short
+    assert_false(r2.match_first("AB123"))  # Missing dash
+    assert_false(r2.match_first("AB-12"))  # Second quantifier too short
 
     # Multiple fixed quantifiers in sequence
     var r3 = compile_regex("[A-Z]{3}[0-9]{4}")
     var m3 = r3.match_first("ABC1234")
     assert_true(m3)
     assert_equal(m3.value().get_match_text(), "ABC1234")
-    assert_false(r3.match_first("AB1234"))   # Letters too short
-    assert_false(r3.match_first("ABC123"))   # Digits too short
+    assert_false(r3.match_first("AB1234"))  # Letters too short
+    assert_false(r3.match_first("ABC123"))  # Digits too short
 
 
 def main() raises:
