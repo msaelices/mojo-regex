@@ -346,11 +346,10 @@ struct NFAEngine(Copyable, Engine):
                 # (unless the literal is a prefix, then start at literal position)
                 var try_pos = literal_pos
                 if self.literal_prefix and not self._is_prefix_literal():
-                    # For non-prefix literals, we need to search backwards
-                    # to find where the pattern might start
-                    try_pos = max(
-                        0, literal_pos - 100
-                    )  # Conservative backward search
+                    # For non-prefix literals, search backwards by at most
+                    # the pattern length (the match can't start further back
+                    # than one full pattern length before the literal)
+                    try_pos = max(0, literal_pos - len(self.pattern))
 
                 # Try matching from positions around the literal
                 var end_pos = min(
