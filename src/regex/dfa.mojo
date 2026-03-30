@@ -1766,6 +1766,7 @@ struct DFAEngine(Engine):
             )
         )
 
+    @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
@@ -1814,6 +1815,7 @@ struct DFAEngine(Engine):
                 return match_result
         return None
 
+    @always_inline
     def _try_match_at_position(
         self, text: String, start_pos: Int, require_exact_position: Bool = False
     ) -> Optional[Match]:
@@ -1985,6 +1987,7 @@ struct DFAEngine(Engine):
 
         return matches^
 
+    @always_inline
     def _try_match_simd(self, text: String, start_pos: Int) -> Optional[Match]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 

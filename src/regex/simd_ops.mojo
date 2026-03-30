@@ -313,6 +313,7 @@ struct CharacterClassSIMD(
         return count
 
     @always_inline
+    @always_inline
     def count_consecutive_matches(
         self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
     ) -> Int:
