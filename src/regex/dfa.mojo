@@ -2608,6 +2608,38 @@ def _extract_sequential_pattern_info(
     return info^
 
 
+def _is_char_class_group(node: ASTNode[MutAnyOrigin]) -> Bool:
+    """Check if a GROUP node contains only character classes and literals.
+
+    This allows capturing groups like ([A-Z]{3}[0-9]{4}) to be flattened
+    into DFA sequences. Safe because match_first/match_next/match_all don't
+    return sub-group captures. When captures() is implemented, these patterns
+    should route to NFA instead.
+    """
+    from regex.ast import GROUP, RANGE, DIGIT, WORD, SPACE, WILDCARD, ELEMENT
+
+    if node.type != GROUP:
+        return False
+
+    # Must contain at least one char class element
+    var has_char_class = False
+    for i in range(node.get_children_len()):
+        ref child = node.get_child(i)
+        if (
+            child.type == RANGE
+            or child.type == DIGIT
+            or child.type == WORD
+            or child.type == SPACE
+            or child.type == WILDCARD
+        ):
+            has_char_class = True
+        elif child.type == ELEMENT:
+            pass  # Literals OK
+        else:
+            return False  # Nested groups or other complex types
+    return has_char_class
+
+
 def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
     """Check if a GROUP node contains only OR with fixed-length literal branches.
 
@@ -2740,6 +2772,10 @@ def _is_multi_character_class_sequence(ast: ASTNode[MutAnyOrigin]) -> Bool:
         elif element.type == GROUP and _is_literal_alternation_group(element):
             # Non-capturing group with literal alternation like (?:00|33|44)
             literal_count += 1
+        elif element.type == GROUP and _is_char_class_group(element):
+            # Capturing group containing only char classes, e.g., ([A-Z]{3}[0-9]{4})
+            # Safe to flatten into DFA since we don't track sub-group captures yet
+            char_class_count += 1
         else:
             # Other types make it non-sequential
             return False
@@ -2804,6 +2840,39 @@ def _extract_multi_class_sequence_info(
                     )
                     pattern_element.alternation_branches = branches^
                     info.elements.append(pattern_element^)
+                    continue
+                elif element.type == GROUP and _is_char_class_group(element):
+                    # Capturing group - flatten its children into the sequence.
+                    # Safe because match_first/match_next/match_all don't
+                    # return sub-group captures. Route to NFA for captures().
+                    for j in range(element.get_children_len()):
+                        ref sub = element.get_child(j)
+                        var sub_class: String
+                        if sub.type == DIGIT:
+                            sub_class = "0123456789"
+                        elif sub.type == WORD:
+                            sub_class = WORD_CHARS
+                        elif sub.type == RANGE:
+                            sub_class = _expand_character_range(
+                                sub.type, sub.get_value().value()
+                            )
+                        elif sub.type == SPACE:
+                            sub_class = " \t\n\r\f"
+                        elif sub.type == WILDCARD:
+                            sub_class = ALL_EXCEPT_NEWLINE
+                        elif sub.type == ELEMENT:
+                            sub_class = String(
+                                sub.get_value().value()
+                            ) if sub.get_value() else ""
+                        else:
+                            continue
+                        var sub_elem = SequentialPatternElement(
+                            sub_class^,
+                            sub.min,
+                            sub.max,
+                            sub.positive_logic,
+                        )
+                        info.elements.append(sub_elem^)
                     continue
                 else:
                     continue  # Skip unknown elements
