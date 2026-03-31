@@ -161,6 +161,24 @@ struct NFAEngine(Copyable, Engine):
         # Smaller temp capacity since we clear frequently
         var temp_matches = List[Match](capacity=3)
 
+        # Fast path for .* prefix patterns in findall
+        if self._starts_with_dotstar() and self.has_literal_optimization:
+            var literal = self.literal_prefix
+            var literal_bytes = literal.as_bytes()
+            var last_pos = -1
+            var search = current_pos
+            while True:
+                var pos = twoway_search(literal_bytes, text, search)
+                if pos == -1:
+                    break
+                last_pos = pos
+                search = pos + 1
+            if last_pos >= 0:
+                matches.append(
+                    Match(0, current_pos, last_pos + len(literal), text)
+                )
+            return matches^
+
         # Use literal prefiltering if available
         if self.has_literal_optimization:
             while current_pos <= len(text):
@@ -327,6 +345,26 @@ struct NFAEngine(Copyable, Engine):
         var search_pos = start
 
         # Use literal prefiltering if available
+        # Fast path: .* prefix with literal suffix. Since .* matches any
+        # character (except newline) zero or more times, find the last
+        # occurrence of the literal and return [start, end_of_literal].
+        # This avoids greedy .* backtracking through the entire text.
+        if self._starts_with_dotstar() and self.has_literal_optimization:
+            var literal = self.literal_prefix
+            var literal_bytes = literal.as_bytes()
+            # Find last occurrence (greedy .* goes as far as possible)
+            var last_pos = -1
+            var search = start
+            while True:
+                var pos = twoway_search(literal_bytes, text, search)
+                if pos == -1:
+                    break
+                last_pos = pos
+                search = pos + 1
+            if last_pos >= 0:
+                return Match(0, start, last_pos + len(literal), text)
+            return None
+
         if self.has_literal_optimization:
             while search_pos <= len(text):
                 # Find next occurrence of literal
@@ -336,19 +374,12 @@ struct NFAEngine(Copyable, Engine):
                     search_pos,
                 )
                 if literal_pos == -1:
-                    # No more occurrences of required literal
                     return None
 
-                # Try to match the full pattern starting from before the literal
-                # (unless the literal is a prefix, then start at literal position)
                 var try_pos = literal_pos
                 if self.literal_prefix and not self._is_prefix_literal():
-                    # For non-prefix literals, search backwards by at most
-                    # the pattern length (the match can't start further back
-                    # than one full pattern length before the literal)
                     try_pos = max(0, literal_pos - len(self.pattern))
 
-                # Try matching from positions around the literal
                 var end_pos = min(
                     len(text), literal_pos + len(self.literal_prefix)
                 )
@@ -391,6 +422,11 @@ struct NFAEngine(Copyable, Engine):
                 search_pos += 1
 
         return None
+
+    @always_inline
+    def _starts_with_dotstar(self) -> Bool:
+        """Check if the pattern starts with .* (greedy wildcard)."""
+        return self.pattern.startswith(".*")
 
     def _is_prefix_literal(self) -> Bool:
         """Check if the extracted literal is a prefix literal."""
