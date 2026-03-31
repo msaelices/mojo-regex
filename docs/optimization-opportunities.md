@@ -329,6 +329,31 @@ Four fixes applied:
    Many benchmarks (`dfa_paren_phone`, `dfa_simple_phone`, `pure_dfa_dot`,
    `complex_email`) were returning zero matches before these fixes.
 
+### Additional fixes (PRs #78, #79, direct commits):
+
+3. **Nibble-based SIMD scan for search/findall (PR #78):** Applied the
+   nibble-based `count_consecutive_matches` and `find_first_nibble_match`
+   to `_optimized_simd_search` and `match_all` paths. Result: 90-169x
+   faster on character class search/findall (`predefined_digits`, `range_digits`,
+   `match_all_digits`).
+
+4. **DFA non-capturing alternation groups (PR #79):** Extended the DFA compiler
+   to handle `(?:00|33|44|...)` alternation within sequences. Patterns like
+   `8(?:00|33|44|55|66|77|88)[2-9]\d{6}` now use DFA instead of NFA.
+   Result: `toll_free_complex` 8.6x faster, now 1.4x faster than Python.
+
+5. **Capturing group flattening:** Patterns with `(...)` capturing groups
+   containing only char classes are flattened into DFA sequences since
+   `match_first`/`match_next`/`match_all` don't return sub-group captures.
+   Result: `grouped_quantifiers` 24x faster, now 5x faster than Python.
+
+6. **First-element SIMD prefilter:** Multi-element DFA sequences now use
+   the first element's character class as a SIMD prefilter to skip
+   positions in `match_all` and `match_next`.
+
+7. **NFA literal prefiltering for all patterns:** Removed complexity gate
+   on literal extraction. Even single-char prefixes help skip positions.
+
 ### Remaining: NFA backtracking architecture
 
 Complex NFA patterns are still 20-70x slower than Rust due to explicit
@@ -336,13 +361,39 @@ backtracking vs Rust's lazy DFA:
 
 | Benchmark | Mojo (ms) | Rust (ms) | Mojo/Rust |
 |-----------|----------|----------|-----------|
-| `flexible_phone` | 6.0 | 0.30 | 20x |
-| `multi_format_phone` | 15.5 | 0.31 | 50x |
-| `grouped_quantifiers` | 0.72 | 0.018 | 40x |
+| `flexible_phone` | 5.7 | 0.30 | 19x |
+| `multi_format_phone` | 16.0 | 0.19 | 83x |
 
 **Fix directions:**
 - Consider implementing a Thompson NFA or lazy DFA to avoid backtracking.
 - Short term: improve NFA backtracking pruning and memoization.
+
+## Medium: `dfa_paren_phone` Still Slower Than Python
+
+**Benchmarked 2026-03-31**
+
+`\([0-9]{3}\) [0-9]{3}-[0-9]{4}` findall is ~4x slower than Python despite
+using DFA. The 14-state DFA must try from many positions. The first character
+`(` is uncommon in normal text but the benchmark text has many phone numbers.
+
+**Fix directions:**
+- Use SIMD prefilter for the literal `(` first character.
+- Consider compiling common multi-element literal+range patterns into a
+  more efficient trie-like DFA structure.
+
+## Medium: `required_literal_short` 20x Slower Than Python
+
+**Benchmarked 2026-03-31**
+
+`.*@example\.com` findall is ~20x slower than Python. The `.*` prefix forces
+the NFA to scan the entire text greedily before backtracking to find
+`@example.com`. Python's C bytecode handles `.*` as a single instruction
+that jumps to end-of-line then backtracks efficiently.
+
+**Fix directions:**
+- Add a `.*` fast path that scans from the end of the text backwards.
+- Use the literal `@example.com` to anchor the search and avoid full-text
+  greedy scan.
 
 ## Patterns from Stdlib Docs Applicable Here
 
