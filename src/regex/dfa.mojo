@@ -2644,11 +2644,10 @@ def _is_char_class_group(node: ASTNode[MutAnyOrigin]) -> Bool:
 
 
 def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
-    """Check if a GROUP node contains only OR with fixed-length literal branches.
+    """Check if a GROUP node contains only OR with literal branches.
 
-    Examples: (?:00|33|44|55|66|77|88), (?:abc|def|ghi)
-
-    Each branch must be a GROUP of ELEMENTs with the same length.
+    Examples: (?:00|33|44|55|66|77|88), (?:hello|world|test)
+    Branches can have different lengths.
     """
     from regex.ast import GROUP, OR, ELEMENT
 
@@ -2660,7 +2659,7 @@ def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
         return False
 
     # Walk the OR tree iteratively to verify all branches are literal
-    var branch_len = -1
+    var has_branch = False
     var stack = List[ASTNode[MutAnyOrigin]](capacity=16)
     stack.append(child)
 
@@ -2670,10 +2669,7 @@ def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
             for i in range(current.get_children_len()):
                 if current.get_child(i).type != ELEMENT:
                     return False
-            if branch_len == -1:
-                branch_len = current.get_children_len()
-            elif current.get_children_len() != branch_len:
-                return False
+            has_branch = True
         elif current.type == OR:
             if current.get_children_len() != 2:
                 return False
@@ -2682,7 +2678,7 @@ def _is_literal_alternation_group(node: ASTNode[MutAnyOrigin]) -> Bool:
         else:
             return False
 
-    return branch_len > 0
+    return has_branch
 
 
 def _collect_alternation_branches(
