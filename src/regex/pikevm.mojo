@@ -55,8 +55,9 @@ comptime OP_END_ANCHOR = 8
 """Match only at end of text."""
 
 
-struct Instruction(Copyable, Movable):
-    """A single PikeVM bytecode instruction."""
+struct Instruction(Copyable, Movable, TrivialRegisterPassable):
+    """A single PikeVM bytecode instruction. Register-passable for
+    zero-overhead access in the hot matching loop."""
 
     var opcode: Int
     """Instruction opcode (OP_BYTE, OP_SPLIT, etc.)."""
@@ -77,24 +78,32 @@ struct Instruction(Copyable, Movable):
 
 
 struct Program(Copyable, Movable, Sized):
-    """Compiled NFA bytecode program."""
+    """Compiled NFA bytecode program. Instructions stored inline for
+    cache-friendly access in the hot matching loop."""
 
-    var instructions: List[Instruction]
-    """Flat instruction array."""
+    var instructions: InlineArray[Instruction, MAX_STATES]
+    """Fixed-size instruction array, accessed on every state transition."""
+    var inst_count: Int
+    """Number of valid instructions."""
     var class_tables: List[SIMD[DType.uint8, 256]]
     """Lookup tables for OP_CLASS instructions."""
 
     def __init__(out self):
-        self.instructions = List[Instruction]()
+        self.instructions = InlineArray[Instruction, MAX_STATES](
+            fill=Instruction(0)
+        )
+        self.inst_count = 0
         self.class_tables = List[SIMD[DType.uint8, 256]]()
 
     def __len__(self) -> Int:
-        return len(self.instructions)
+        return self.inst_count
 
     def emit(mut self, opcode: Int, arg0: Int = 0, arg1: Int = 0) -> Int:
         """Emit an instruction and return its index."""
-        var idx = len(self.instructions)
-        self.instructions.append(Instruction(opcode, arg0, arg1))
+        var idx = self.inst_count
+        if idx < MAX_STATES:
+            self.instructions[idx] = Instruction(opcode, arg0, arg1)
+            self.inst_count += 1
         return idx
 
     def add_class_table(mut self, table: SIMD[DType.uint8, 256]) -> Int:
@@ -110,9 +119,13 @@ struct Program(Copyable, Movable, Sized):
     def patch(mut self, idx: Int, arg0: Int = -1, arg1: Int = -1):
         """Patch an instruction's arguments (for forward references)."""
         if arg0 >= 0:
-            self.instructions[idx].arg0 = arg0
+            self.instructions[idx] = Instruction(
+                self.instructions[idx].opcode, arg0, self.instructions[idx].arg1
+            )
         if arg1 >= 0:
-            self.instructions[idx].arg1 = arg1
+            self.instructions[idx] = Instruction(
+                self.instructions[idx].opcode, self.instructions[idx].arg0, arg1
+            )
 
 
 # ===-----------------------------------------------------------------------===#
