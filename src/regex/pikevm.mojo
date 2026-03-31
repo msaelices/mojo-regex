@@ -340,10 +340,15 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
 # PikeVM Executor
 # ===-----------------------------------------------------------------------===#
 
+# Maximum program size for PikeVM. Uses fixed-size SIMD for state tracking.
+# Patterns compiling to > MAX_STATES instructions fall back to NFA.
+comptime MAX_STATES = 128
+
 
 struct PikeVMEngine:
     """Thompson NFA simulation engine. Tracks all active states simultaneously
-    for guaranteed O(n*m) matching time."""
+    using fixed-size SIMD vectors for zero per-step allocations.
+    Limited to programs with <= MAX_STATES instructions."""
 
     var program: Program
     """Compiled bytecode program."""
@@ -351,15 +356,19 @@ struct PikeVMEngine:
     def __init__(out self, var program: Program):
         self.program = program^
 
+    def is_supported(self) -> Bool:
+        """Check if program fits within MAX_STATES limit."""
+        return len(self.program) <= MAX_STATES
+
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Match pattern at the given position (like re.match)."""
-        return self._run(text, start, anchored=True)
+        return self._run(text, start)
 
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)
         for try_pos in range(start, text_len + 1):
-            var result = self._run(text, try_pos, anchored=False)
+            var result = self._run(text, try_pos)
             if result:
                 return result
         return None
@@ -371,7 +380,7 @@ struct PikeVMEngine:
         var text_len = len(text)
 
         while pos <= text_len:
-            var result = self._run(text, pos, anchored=False)
+            var result = self._run(text, pos)
             if result:
                 ref m = result.value()
                 matches.append(m)
@@ -384,63 +393,81 @@ struct PikeVMEngine:
 
         return matches^
 
-    def _run(self, text: String, start: Int, anchored: Bool) -> Optional[Match]:
-        """Run the PikeVM from a given start position.
-
-        Args:
-            text: Input text.
-            start: Position to start matching.
-            anchored: If True, only match at start position.
-
-        Returns:
-            Match if found, None otherwise.
-        """
+    def _run(self, text: String, start: Int) -> Optional[Match]:
+        """Run PikeVM with fixed-size SIMD state tracking.
+        Zero heap allocations per step."""
         var text_ptr = text.unsafe_ptr()
         var text_len = len(text)
         var prog_len = len(self.program)
 
-        # Two state lists: current and next
-        var current = List[Int](capacity=prog_len)
-        var next_states = List[Int](capacity=prog_len)
+        if prog_len > MAX_STATES:
+            return None
 
-        # Track which PCs are already in a list (avoid duplicates)
-        var in_current = List[Bool](length=prog_len, fill=False)
-        var in_next = List[Bool](length=prog_len, fill=False)
+        # Fixed-size state arrays on stack - zero allocation per step
+        var cur_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var cur_count = 0
+        var nxt_count = 0
 
-        # Track the best (longest) match found
+        # SIMD dedup vectors: byte per state, 0=unseen, 1=seen
+        var cur_seen = SIMD[DType.uint8, MAX_STATES](0)
+        var nxt_seen = SIMD[DType.uint8, MAX_STATES](0)
+
         var match_end = -1
 
-        # Add start state with epsilon closure
-        self._add_state(current, in_current, 0, text_ptr, start, text_len)
+        # Seed with epsilon closure of start state
+        self._add_state(
+            cur_pcs, cur_count, cur_seen, 0, text_ptr, start, text_len
+        )
 
-        # Process each byte
         var pos = start
         while pos <= text_len:
-            if len(current) == 0:
+            if cur_count == 0:
                 break
 
-            # Check for match states in current before consuming byte
-            for i in range(len(current)):
-                var pc = current[i]
-                if self.program.instructions[pc].opcode == OP_MATCH:
+            # Check for match states
+            for i in range(cur_count):
+                if self.program.instructions[cur_pcs[i]].opcode == OP_MATCH:
                     match_end = pos
 
-            # If we're past the end, don't consume another byte
             if pos == text_len:
                 break
 
             var ch = Int(text_ptr[pos])
 
             # Process all current states
-            for i in range(len(current)):
-                var pc = current[i]
+            for i in range(cur_count):
+                var pc = cur_pcs[i]
                 ref inst = self.program.instructions[pc]
 
                 if inst.opcode == OP_BYTE:
                     if ch == inst.arg0:
                         self._add_state(
-                            next_states,
-                            in_next,
+                            nxt_pcs,
+                            nxt_count,
+                            nxt_seen,
+                            pc + 1,
+                            text_ptr,
+                            pos + 1,
+                            text_len,
+                        )
+                elif inst.opcode == OP_CLASS:
+                    if self.program.class_tables[inst.arg0][ch] != 0:
+                        self._add_state(
+                            nxt_pcs,
+                            nxt_count,
+                            nxt_seen,
+                            pc + 1,
+                            text_ptr,
+                            pos + 1,
+                            text_len,
+                        )
+                elif inst.opcode == OP_ANY:
+                    if ch != 10:
+                        self._add_state(
+                            nxt_pcs,
+                            nxt_count,
+                            nxt_seen,
                             pc + 1,
                             text_ptr,
                             pos + 1,
@@ -449,41 +476,22 @@ struct PikeVMEngine:
                 elif inst.opcode == OP_RANGE:
                     if ch >= inst.arg0 and ch <= inst.arg1:
                         self._add_state(
-                            next_states,
-                            in_next,
+                            nxt_pcs,
+                            nxt_count,
+                            nxt_seen,
                             pc + 1,
                             text_ptr,
                             pos + 1,
                             text_len,
                         )
-                elif inst.opcode == OP_CLASS:
-                    ref table = self.program.class_tables[inst.arg0]
-                    if table[ch] != 0:
-                        self._add_state(
-                            next_states,
-                            in_next,
-                            pc + 1,
-                            text_ptr,
-                            pos + 1,
-                            text_len,
-                        )
-                elif inst.opcode == OP_ANY:
-                    if ch != ord("\n"):
-                        self._add_state(
-                            next_states,
-                            in_next,
-                            pc + 1,
-                            text_ptr,
-                            pos + 1,
-                            text_len,
-                        )
-                # OP_SPLIT, OP_JUMP, OP_MATCH handled in epsilon closure
 
-            # Swap current and next
-            current = next_states^
-            in_current = in_next^
-            next_states = List[Int](capacity=prog_len)
-            in_next = List[Bool](length=prog_len, fill=False)
+            # Swap: copy next -> current, zero next
+            for i in range(nxt_count):
+                cur_pcs[i] = nxt_pcs[i]
+            cur_count = nxt_count
+            cur_seen = nxt_seen
+            nxt_count = 0
+            nxt_seen = SIMD[DType.uint8, MAX_STATES](0)
             pos += 1
 
         if match_end >= 0:
@@ -492,41 +500,46 @@ struct PikeVMEngine:
 
     def _add_state(
         self,
-        mut states: List[Int],
-        mut in_list: List[Bool],
+        mut pcs: InlineArray[Int, MAX_STATES],
+        mut count: Int,
+        mut seen: SIMD[DType.uint8, MAX_STATES],
         pc: Int,
         text_ptr: UnsafePointer[UInt8, _],
         pos: Int,
         text_len: Int,
     ):
-        """Add a state with epsilon closure (follow SPLIT/JUMP without consuming input).
-        """
-        if pc >= len(self.program) or in_list[pc]:
+        """Add state with epsilon closure using fixed arrays and SIMD dedup."""
+        if pc >= len(self.program) or seen[pc] != 0:
             return
 
         ref inst = self.program.instructions[pc]
 
         if inst.opcode == OP_SPLIT:
-            # Fork: add both targets
-            in_list[pc] = True
-            self._add_state(states, in_list, inst.arg0, text_ptr, pos, text_len)
-            self._add_state(states, in_list, inst.arg1, text_ptr, pos, text_len)
+            seen[pc] = 1
+            self._add_state(
+                pcs, count, seen, inst.arg0, text_ptr, pos, text_len
+            )
+            self._add_state(
+                pcs, count, seen, inst.arg1, text_ptr, pos, text_len
+            )
         elif inst.opcode == OP_JUMP:
-            in_list[pc] = True
-            self._add_state(states, in_list, inst.arg0, text_ptr, pos, text_len)
+            seen[pc] = 1
+            self._add_state(
+                pcs, count, seen, inst.arg0, text_ptr, pos, text_len
+            )
         elif inst.opcode == OP_START_ANCHOR:
             if pos == 0:
-                in_list[pc] = True
+                seen[pc] = 1
                 self._add_state(
-                    states, in_list, pc + 1, text_ptr, pos, text_len
+                    pcs, count, seen, pc + 1, text_ptr, pos, text_len
                 )
         elif inst.opcode == OP_END_ANCHOR:
             if pos == text_len:
-                in_list[pc] = True
+                seen[pc] = 1
                 self._add_state(
-                    states, in_list, pc + 1, text_ptr, pos, text_len
+                    pcs, count, seen, pc + 1, text_ptr, pos, text_len
                 )
         else:
-            # Non-epsilon instruction: add to state list
-            in_list[pc] = True
-            states.append(pc)
+            seen[pc] = 1
+            pcs[count] = pc
+            count += 1
