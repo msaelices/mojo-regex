@@ -161,21 +161,22 @@ struct NFAEngine(Copyable, Engine):
         # Smaller temp capacity since we clear frequently
         var temp_matches = List[Match](capacity=3)
 
-        # Fast path for .* prefix patterns in findall
-        if self._starts_with_dotstar() and self.has_literal_optimization:
-            var literal = self.literal_prefix
-            var literal_bytes = literal.as_bytes()
-            var last_pos = -1
-            var search = current_pos
-            while True:
-                var pos = twoway_search(literal_bytes, text, search)
-                if pos == -1:
-                    break
-                last_pos = pos
-                search = pos + 1
+        # Fast path for .* prefix patterns in findall.
+        # Only safe when no newlines in text (since .* doesn't match \n).
+        if (
+            self._starts_with_dotstar()
+            and self.has_literal_optimization
+            and text.find("\n") == -1
+        ):
+            var last_pos = self._find_last_literal(text, current_pos)
             if last_pos >= 0:
                 matches.append(
-                    Match(0, current_pos, last_pos + len(literal), text)
+                    Match(
+                        0,
+                        current_pos,
+                        last_pos + len(self.literal_prefix),
+                        text,
+                    )
                 )
             return matches^
 
@@ -344,27 +345,20 @@ struct NFAEngine(Copyable, Engine):
 
         var search_pos = start
 
-        # Use literal prefiltering if available
-        # Fast path: .* prefix with literal suffix. Since .* matches any
-        # character (except newline) zero or more times, find the last
-        # occurrence of the literal and return [start, end_of_literal].
-        # This avoids greedy .* backtracking through the entire text.
-        if self._starts_with_dotstar() and self.has_literal_optimization:
-            var literal = self.literal_prefix
-            var literal_bytes = literal.as_bytes()
-            # Find last occurrence (greedy .* goes as far as possible)
-            var last_pos = -1
-            var search = start
-            while True:
-                var pos = twoway_search(literal_bytes, text, search)
-                if pos == -1:
-                    break
-                last_pos = pos
-                search = pos + 1
+        # Fast path: .* prefix with literal suffix. Only safe without newlines.
+        if (
+            self._starts_with_dotstar()
+            and self.has_literal_optimization
+            and text.find("\n") == -1
+        ):
+            var last_pos = self._find_last_literal(text, start)
             if last_pos >= 0:
-                return Match(0, start, last_pos + len(literal), text)
+                return Match(
+                    0, start, last_pos + len(self.literal_prefix), text
+                )
             return None
 
+        # Use literal prefiltering if available
         if self.has_literal_optimization:
             while search_pos <= len(text):
                 # Find next occurrence of literal
@@ -424,9 +418,30 @@ struct NFAEngine(Copyable, Engine):
         return None
 
     @always_inline
+    def _find_last_literal(self, text: String, start: Int) -> Int:
+        """Find the last occurrence of the literal prefix in text from start."""
+        var literal_bytes = self.literal_prefix.as_bytes()
+        var last_pos = -1
+        var search = start
+        while True:
+            var pos = twoway_search(literal_bytes, text, search)
+            if pos == -1:
+                break
+            last_pos = pos
+            search = pos + 1
+        return last_pos
+
+    @always_inline
     def _starts_with_dotstar(self) -> Bool:
-        """Check if the pattern starts with .* (greedy wildcard)."""
-        return self.pattern.startswith(".*")
+        """Check if the pattern starts with greedy .* (not lazy .*?)."""
+        if not self.pattern.startswith(".*"):
+            return False
+        # Exclude .*? (lazy) and .** (double quantifier)
+        if len(self.pattern) > 2:
+            var third = self.pattern[byte=2]
+            if third == "?" or third == "*" or third == "+":
+                return False
+        return True
 
     def _is_prefix_literal(self) -> Bool:
         """Check if the extracted literal is a prefix literal."""
