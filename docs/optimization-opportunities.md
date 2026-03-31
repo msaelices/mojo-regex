@@ -386,6 +386,15 @@ suffix via `twoway_search` instead of greedy `.*` backtracking. Skips the
 NFA entirely for `.*LITERAL` patterns when text has no newlines.
 Result: `match_next` 9x faster, `match_all` 6.4x faster.
 
+## ~~Medium: `literal_prefix_short/long` Slower Than Python~~ (Fixed, PR #83)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/83
+
+Added `LITERAL.*` suffix fast path. For patterns like `hello.*`, find the
+first occurrence of the literal prefix, then match extends to end of text.
+Skips the NFA entirely when text has no newlines.
+Result: `literal_prefix_long` 91x faster, now 19.5x faster than Python.
+
 ## Patterns from Stdlib Docs Applicable Here
 
 | Stdlib Pattern | mojo-regex Equivalent |
