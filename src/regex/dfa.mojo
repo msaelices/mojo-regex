@@ -602,8 +602,7 @@ struct DFAEngine(Engine):
         # This lets match_all and match_next skip positions where the first
         # character can't match, without affecting the DFA state machine.
         if (
-            len(sequence_info.elements) > 0
-            and len(sequence_info.elements[0].alternation_branches) == 0
+            len(sequence_info.elements[0].alternation_branches) == 0
             and len(sequence_info.elements[0].char_class) > 0
         ):
             self._simd_char_matcher = get_character_class_matcher(
@@ -2626,27 +2625,20 @@ def _is_char_class_group(node: ASTNode[MutAnyOrigin]) -> Bool:
     return sub-group captures. When captures() is implemented, these patterns
     should route to NFA instead.
     """
-    from regex.ast import GROUP, RANGE, DIGIT, WORD, SPACE, WILDCARD, ELEMENT
+    from regex.ast import GROUP
 
     if node.type != GROUP:
         return False
 
-    # Must contain at least one char class element
+    from regex.ast import ELEMENT
+
     var has_char_class = False
     for i in range(node.get_children_len()):
         ref child = node.get_child(i)
-        if (
-            child.type == RANGE
-            or child.type == DIGIT
-            or child.type == WORD
-            or child.type == SPACE
-            or child.type == WILDCARD
-        ):
+        if not _element_to_char_class(child):
+            return False  # Nested groups or other unrecognized types
+        if child.type != ELEMENT:
             has_char_class = True
-        elif child.type == ELEMENT:
-            pass  # Literals OK
-        else:
-            return False  # Nested groups or other complex types
     return has_char_class
 
 
