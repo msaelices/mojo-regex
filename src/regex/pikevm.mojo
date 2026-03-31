@@ -55,7 +55,7 @@ comptime OP_END_ANCHOR = 8
 """Match only at end of text."""
 
 
-struct Instruction(Copyable, Movable):
+struct Instruction(Copyable, Movable, TrivialRegisterPassable):
     """A single PikeVM bytecode instruction."""
 
     var opcode: Int
@@ -80,13 +80,13 @@ struct Program(Copyable, Movable, Sized):
     """Compiled NFA bytecode program."""
 
     var instructions: List[Instruction]
-    """Flat instruction array."""
+    """Flat instruction array, pre-allocated to avoid reallocs during compilation."""
     var class_tables: List[SIMD[DType.uint8, 256]]
     """Lookup tables for OP_CLASS instructions."""
 
     def __init__(out self):
-        self.instructions = List[Instruction]()
-        self.class_tables = List[SIMD[DType.uint8, 256]]()
+        self.instructions = List[Instruction](capacity=MAX_STATES)
+        self.class_tables = List[SIMD[DType.uint8, 256]](capacity=8)
 
     def __len__(self) -> Int:
         return len(self.instructions)
