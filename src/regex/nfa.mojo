@@ -180,6 +180,25 @@ struct NFAEngine(Copyable, Engine):
                 )
             return matches^
 
+        # Fast path for LITERAL.* suffix patterns in findall.
+        # Find the first literal, then match extends to end of text.
+        if (
+            self._ends_with_dotstar()
+            and self.has_literal_optimization
+            and self._is_prefix_literal()
+            and text.find("\n") == -1
+        ):
+            var literal_bytes = self.literal_prefix.as_bytes()
+            var search = current_pos
+            while search < len(text):
+                var pos = twoway_search(literal_bytes, text, search)
+                if pos == -1:
+                    break
+                matches.append(Match(0, pos, len(text), text))
+                # Only one match since .* consumes everything to end
+                break
+            return matches^
+
         # Use literal prefiltering if available
         if self.has_literal_optimization:
             while current_pos <= len(text):
@@ -358,6 +377,19 @@ struct NFAEngine(Copyable, Engine):
                 )
             return None
 
+        # Fast path: LITERAL.* suffix. Find first literal, match to end.
+        if (
+            self._ends_with_dotstar()
+            and self.has_literal_optimization
+            and self._is_prefix_literal()
+            and text.find("\n") == -1
+        ):
+            var literal_bytes = self.literal_prefix.as_bytes()
+            var pos = twoway_search(literal_bytes, text, start)
+            if pos >= 0:
+                return Match(0, pos, len(text), text)
+            return None
+
         # Use literal prefiltering if available
         if self.has_literal_optimization:
             while search_pos <= len(text):
@@ -430,6 +462,11 @@ struct NFAEngine(Copyable, Engine):
             last_pos = pos
             search = pos + 1
         return last_pos
+
+    @always_inline
+    def _ends_with_dotstar(self) -> Bool:
+        """Check if the pattern ends with greedy .* (not lazy .*?)."""
+        return self.pattern.endswith(".*") and not self.pattern.endswith("\\.*")
 
     @always_inline
     def _starts_with_dotstar(self) -> Bool:
