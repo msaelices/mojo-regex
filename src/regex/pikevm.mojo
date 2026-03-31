@@ -394,13 +394,12 @@ struct PikeVMEngine(Copyable, Movable):
                     matching_bytes += 1
             elif inst.opcode == OP_ANY:
                 # Matches everything except newline - filter won't help
-                self.first_byte_filter = SIMD[DType.uint8, 256](1)
-                self.first_byte_filter[10] = 0  # \n
-                matching_bytes = 255
+                self.has_filter = False
+                return
             elif inst.opcode == OP_MATCH:
                 # Empty match possible - filter won't help
-                self.first_byte_filter = SIMD[DType.uint8, 256](1)
-                matching_bytes = 256
+                self.has_filter = False
+                return
             elif inst.opcode == OP_SPLIT:
                 stack.append(inst.arg0)
                 stack.append(inst.arg1)
