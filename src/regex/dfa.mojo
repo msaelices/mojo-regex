@@ -2973,9 +2973,18 @@ def _is_simple_alternation_branches(ast: ASTNode[MutAnyOrigin]) -> Bool:
 
         # Each branch should be a group containing literal elements, single element, or nested OR
         if branch.type == GROUP:
-            # Check that the group contains only literal elements
+            # Check that the group contains only literal elements,
+            # or is a nested alternation group like (?:a|b)
             if not _group_contains_only_literals(branch):
-                return False
+                # Unwrap nested GROUP -> OR for patterns like (?:(?:a|b)|(?:c|d))
+                var inner = branch
+                while inner.type == GROUP and inner.get_children_len() == 1:
+                    inner = inner.get_child(0)
+                if inner.type == OR:
+                    if not _is_simple_alternation_branches(inner):
+                        return False
+                else:
+                    return False
         elif branch.type == ELEMENT:
             # Single literal element - good
             continue
@@ -3178,8 +3187,20 @@ def _collect_all_alternation_branches(
             ref nested_branches = _collect_all_alternation_branches(branch)
             for j in range(len(nested_branches)):
                 branches.append(nested_branches[j])
+        elif branch.type == GROUP:
+            # Unwrap nested GROUPs to find OR or literal content
+            var inner = branch
+            while inner.type == GROUP and inner.get_children_len() == 1:
+                inner = inner.get_child(0)
+            if inner.type == OR:
+                ref nested = _collect_all_alternation_branches(inner)
+                for j in range(len(nested)):
+                    branches.append(nested[j])
+            else:
+                ref branch_text = _extract_branch_text(branch)
+                if len(branch_text) > 0:
+                    branches.append(branch_text)
         else:
-            # Leaf branch (ELEMENT or GROUP) - extract its text
             ref branch_text = _extract_branch_text(branch)
             if len(branch_text) > 0:
                 branches.append(branch_text)
