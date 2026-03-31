@@ -368,32 +368,23 @@ backtracking vs Rust's lazy DFA:
 - Consider implementing a Thompson NFA or lazy DFA to avoid backtracking.
 - Short term: improve NFA backtracking pruning and memoization.
 
-## Medium: `dfa_paren_phone` Still Slower Than Python
+## ~~Medium: `dfa_paren_phone` Still Slower Than Python~~ (Fixed, PR #81)
 
-**Benchmarked 2026-03-31**
+**PR:** https://github.com/msaelices/mojo-regex/pull/81
 
-`\([0-9]{3}\) [0-9]{3}-[0-9]{4}` findall is ~4x slower than Python despite
-using DFA. The 14-state DFA must try from many positions. The first character
-`(` is uncommon in normal text but the benchmark text has many phone numbers.
+Fixed nibble table overflow bug that prevented SIMD skip for `(` (lo nibble
+= 8). Changed to bucket-based encoding. Also applied nibble SIMD skip to
+the general DFA `match_all` and `_optimized_simd_search` paths.
+Result: `dfa_paren_phone` now 2x faster than Python (was 4x slower).
 
-**Fix directions:**
-- Use SIMD prefilter for the literal `(` first character.
-- Consider compiling common multi-element literal+range patterns into a
-  more efficient trie-like DFA structure.
+## ~~Medium: `required_literal_short` 20x Slower Than Python~~ (Fixed, PR #82)
 
-## Medium: `required_literal_short` 20x Slower Than Python
+**PR:** https://github.com/msaelices/mojo-regex/pull/82
 
-**Benchmarked 2026-03-31**
-
-`.*@example\.com` findall is ~20x slower than Python. The `.*` prefix forces
-the NFA to scan the entire text greedily before backtracking to find
-`@example.com`. Python's C bytecode handles `.*` as a single instruction
-that jumps to end-of-line then backtracks efficiently.
-
-**Fix directions:**
-- Add a `.*` fast path that scans from the end of the text backwards.
-- Use the literal `@example.com` to anchor the search and avoid full-text
-  greedy scan.
+Added `.*` prefix fast path that finds the last occurrence of the literal
+suffix via `twoway_search` instead of greedy `.*` backtracking. Skips the
+NFA entirely for `.*LITERAL` patterns when text has no newlines.
+Result: `match_next` 9x faster, `match_all` 6.4x faster.
 
 ## Patterns from Stdlib Docs Applicable Here
 
