@@ -395,6 +395,17 @@ first occurrence of the literal prefix, then match extends to end of text.
 Skips the NFA entirely when text has no newlines.
 Result: `literal_prefix_long` 91x faster, now 19.5x faster than Python.
 
+## ~~Medium: `complex_group_5_children` 14.7x Slower Than Python~~ (Fixed, PR #84)
+
+**PR:** https://github.com/msaelices/mojo-regex/pull/84
+
+`_is_literal_alternation_group` required all branches to have the same
+length, rejecting `(hello|world|test|demo|sample)` (branches 4-6 chars).
+Removed the constraint since the DFA compiler already handles variable-length
+branches. This lets patterns like `(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}`
+route to DFA.
+Result: `complex_group_5_children` 86x faster, now 5.9x faster than Python.
+
 ## Patterns from Stdlib Docs Applicable Here
 
 | Stdlib Pattern | mojo-regex Equivalent |
