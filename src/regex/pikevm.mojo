@@ -98,7 +98,11 @@ struct Program(Copyable, Movable, Sized):
         return idx
 
     def add_class_table(mut self, table: SIMD[DType.uint8, 256]) -> Int:
-        """Add a character class lookup table and return its index."""
+        """Add a character class lookup table, deduplicating identical tables.
+        """
+        for i in range(len(self.class_tables)):
+            if self.class_tables[i].eq(table).reduce_and():
+                return i
         var idx = len(self.class_tables)
         self.class_tables.append(table)
         return idx
@@ -130,7 +134,7 @@ def compile_ast(ast: ASTNode) -> Program:
     if ast.type == RE and ast.get_children_len() > 0:
         _compile_node(ast.get_child(0), program)
 
-    program.emit(OP_MATCH)
+    _ = program.emit(OP_MATCH)
     return program^
 
 
@@ -154,9 +158,9 @@ def _compile_node(node: ASTNode, mut program: Program):
     elif node.type == WILDCARD:
         _compile_wildcard(node, program)
     elif node.type == START:
-        program.emit(OP_START_ANCHOR)
+        _ = program.emit(OP_START_ANCHOR)
     elif node.type == END:
-        program.emit(OP_END_ANCHOR)
+        _ = program.emit(OP_END_ANCHOR)
 
 
 def _compile_group(node: ASTNode, mut program: Program):
@@ -218,7 +222,7 @@ def _compile_quantified(node: ASTNode, mut program: Program):
         var split_pc = program.emit(OP_SPLIT, 0, 0)
         var body_start = len(program)
         _compile_node(node, program)
-        program.emit(OP_JUMP, split_pc)
+        _ = program.emit(OP_JUMP, split_pc)
         var after = len(program)
         program.patch(split_pc, arg0=body_start, arg1=after)
         return
@@ -255,12 +259,12 @@ def _compile_element(node: ASTNode, mut program: Program):
     if val:
         var ch = val.value()
         if len(ch) > 0:
-            program.emit(OP_BYTE, Int(ch.unsafe_ptr()[0]))
+            _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[0]))
 
 
 def _compile_wildcard(node: ASTNode, mut program: Program):
     """Compile a WILDCARD node (. matches any except newline)."""
-    program.emit(OP_ANY)
+    _ = program.emit(OP_ANY)
 
 
 def _compile_char_class_node(node: ASTNode, mut program: Program):
@@ -268,23 +272,12 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
     256-byte lookup table for O(1) membership testing."""
     var table = SIMD[DType.uint8, 256](0)
 
-    if node.type == DIGIT:
-        for c in range(ord("0"), ord("9") + 1):
-            table[c] = 1
-    elif node.type == WORD:
-        for c in range(ord("a"), ord("z") + 1):
-            table[c] = 1
-        for c in range(ord("A"), ord("Z") + 1):
-            table[c] = 1
-        for c in range(ord("0"), ord("9") + 1):
-            table[c] = 1
-        table[ord("_")] = 1
-    elif node.type == SPACE:
-        table[ord(" ")] = 1
-        table[ord("\t")] = 1
-        table[ord("\n")] = 1
-        table[ord("\r")] = 1
-        table[12] = 1  # \f
+    if node.type == DIGIT or node.type == WORD or node.type == SPACE:
+        # Use _expand_character_range which handles these via fast paths
+        var expanded = _expand_character_range(node.type, "")
+        var ptr = expanded.unsafe_ptr()
+        for i in range(len(expanded)):
+            table[Int(ptr[i])] = 1
     elif node.type == RANGE and node.get_value():
         var raw = node.get_value().value()
         # Strip brackets if present
@@ -333,7 +326,7 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
             table[c] = 1 - table[c]
 
     var class_idx = program.add_class_table(table)
-    program.emit(OP_CLASS, class_idx)
+    _ = program.emit(OP_CLASS, class_idx)
 
 
 # ===-----------------------------------------------------------------------===#
