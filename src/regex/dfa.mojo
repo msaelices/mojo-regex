@@ -2027,14 +2027,15 @@ struct DFAEngine(Engine):
                         pos = match_pos + 1
                 return matches^
 
-            # General SIMD path: scalar skip + full DFA
+            # General SIMD path: nibble skip + full DFA
+            ref skip_matcher = self._simd_char_matcher
             while pos < text_len:
-                while pos < text_len and not self._simd_char_matcher.contains(
-                    Int(text_ptr[pos])
-                ):
-                    pos += 1
-                if pos >= text_len:
+                var next_pos = skip_matcher.find_first_nibble_match(
+                    text_ptr, pos, text_len
+                )
+                if next_pos == -1:
                     break
+                pos = next_pos
                 var match_result = self._try_match_at_position(text, pos)
                 if match_result:
                     ref match_obj = match_result.value()
@@ -2166,10 +2167,10 @@ struct DFAEngine(Engine):
                 pos = match_pos + 1
             return None
 
-        # General path: find candidates and run full DFA
+        # General path: nibble skip + full DFA
         while pos < text_len:
-            var found_pos = self._find_next_matching_char(
-                text, pos, simd_matcher
+            var found_pos = simd_matcher.find_first_nibble_match(
+                text_ptr, pos, text_len
             )
             if found_pos == -1:
                 return None

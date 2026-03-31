@@ -143,12 +143,17 @@ struct CharacterClassSIMD(
         """
         var lo_tbl = SIMD[DType.uint8, 16](0)
         var hi_tbl = SIMD[DType.uint8, 16](0)
+        # Assign each character to a bucket (0-7). Both lo and hi tables
+        # use the same bucket bit so AND produces correct results.
+        var bucket = 0
         for c in range(256):
             if self.lookup_table[c] != 0:
                 var lo = c & 0xF
                 var hi = (c >> 4) & 0xF
-                lo_tbl[lo] = lo_tbl[lo] | UInt8(1 << hi)
-                hi_tbl[hi] = hi_tbl[hi] | UInt8(1 << lo)
+                var bit = UInt8(1 << (bucket & 7))
+                lo_tbl[lo] = lo_tbl[lo] | bit
+                hi_tbl[hi] = hi_tbl[hi] | bit
+                bucket += 1
         self.lo_nibble_table = lo_tbl
         self.hi_nibble_table = hi_tbl
 
@@ -366,26 +371,24 @@ struct CharacterClassSIMD(
         Returns:
             Number of consecutive matching characters from start.
         """
+        # Use direct lookup_table indexing (not nibble tables which can
+        # have false positives due to 8-bit bitmask overflow for nibbles >= 8).
         var pos = start
-        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
 
-        # SIMD bulk scan using nibble-based lookup (two native pshufb ops)
-        while pos + SIMD_WIDTH <= text_len:
-            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-            var lo_nibs = chunk & mask_0f
-            var hi_nibs = (chunk >> 4) & mask_0f
-            var lo_res = self.lo_nibble_table._dynamic_shuffle(lo_nibs)
-            var hi_res = self.hi_nibble_table._dynamic_shuffle(hi_nibs)
-            var matches = (lo_res & hi_res).ne(0)
-            if matches.reduce_and():
-                pos += SIMD_WIDTH
-            else:
-                for i in range(SIMD_WIDTH):
-                    if not matches[i]:
-                        return pos + i - start
+        while pos + 4 <= text_len:
+            if self.lookup_table[Int(text_ptr[pos])] == 0:
                 break
+            if self.lookup_table[Int(text_ptr[pos + 1])] == 0:
+                pos += 1
+                break
+            if self.lookup_table[Int(text_ptr[pos + 2])] == 0:
+                pos += 2
+                break
+            if self.lookup_table[Int(text_ptr[pos + 3])] == 0:
+                pos += 3
+                break
+            pos += 4
 
-        # Handle remaining bytes with scalar lookup
         while pos < text_len:
             if self.lookup_table[Int(text_ptr[pos])] == 0:
                 break

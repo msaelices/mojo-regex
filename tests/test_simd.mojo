@@ -286,5 +286,39 @@ def test_simd_edge_cases() raises:
     assert_equal(len(empty_class.find_all_matches("hello")), 0)
 
 
+def test_nibble_table_high_nibble_chars() raises:
+    """Regression test for nibble table overflow with chars having nibble >= 8.
+
+    Characters like '8' (0x38, lo=8), '9' (0x39, lo=9), '(' (0x28, lo=8)
+    had their nibble table bits overflow UInt8 when using (1 << nibble),
+    causing find_first_nibble_match to miss them entirely.
+    """
+    # [89] - both chars have lo nibble >= 8
+    var matcher_89 = CharacterClassSIMD("89")
+    var text_89 = String("Call 8001234567")
+    var pos_89 = matcher_89.find_first_nibble_match(
+        text_89.unsafe_ptr(), 0, len(text_89)
+    )
+    assert_equal(pos_89, 5)  # '8' at position 5
+
+    # Single '(' - lo nibble = 8
+    var matcher_paren = CharacterClassSIMD("(")
+    var text_paren = String("hello (world)")
+    var pos_paren = matcher_paren.find_first_nibble_match(
+        text_paren.unsafe_ptr(), 0, len(text_paren)
+    )
+    assert_equal(pos_paren, 6)  # '(' at position 6
+
+    # [89] findall via matcher - verifies the full pipeline
+    from regex.matcher import compile_regex
+
+    var compiled = compile_regex("[89]00[0-9]+")
+    var text = "Call 8001234567 or 9005551234"
+    var matches = compiled.match_all(text)
+    assert_equal(len(matches), 2)
+    assert_equal(matches[0].get_match_text(), "8001234567")
+    assert_equal(matches[1].get_match_text(), "9005551234")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
