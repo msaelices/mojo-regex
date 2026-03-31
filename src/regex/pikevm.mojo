@@ -345,7 +345,7 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
 comptime MAX_STATES = 128
 
 
-struct PikeVMEngine:
+struct PikeVMEngine(Copyable, Movable):
     """Thompson NFA simulation engine. Tracks all active states simultaneously
     using fixed-size SIMD vectors for zero per-step allocations.
     Limited to programs with <= MAX_STATES instructions."""

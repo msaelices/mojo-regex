@@ -14,6 +14,7 @@ from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
+from regex.pikevm import compile_ast, PikeVMEngine
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
 from regex.prefilter import (
@@ -171,15 +172,17 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
 
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
-    """NFA-based matcher using the existing regex engine."""
+    """NFA-based matcher with optional PikeVM acceleration."""
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
+    var pikevm: Optional[PikeVMEngine]
+    """PikeVM engine for patterns that fit within 128 instructions."""
 
     def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
-        """Initialize NFA matcher with the existing engine.
+        """Initialize NFA matcher with optional PikeVM.
 
         Args:
             ast: AST representing the regex pattern.
@@ -187,30 +190,40 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """
         self.engine = NFAEngine(pattern)
         self.ast = ast
+        # Try to compile PikeVM bytecode
+        var vm = PikeVMEngine(compile_ast(ast))
+        if vm.is_supported():
+            self.pikevm = vm^
+        else:
+            self.pikevm = None
 
     def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
+        self.pikevm = copy.pikevm.copy()
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.engine = take.engine^
         self.ast = take.ast^
+        self.pikevm = take.pikevm^
 
     @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Find first match using NFA execution."""
+        """Find first match. Uses PikeVM if available."""
+        if self.pikevm:
+            return self.pikevm.value().match_first(text, start)
         return self.engine.match_first(text, start)
 
     @always_inline
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Find first match using NFA execution."""
+        """Search for match. NFA has literal prefilter that PikeVM lacks."""
         return self.engine.match_next(text, start)
 
     @always_inline
     def match_all(self, text: String) raises -> MatchList:
-        """Find all matches using NFA execution."""
+        """Find all matches. NFA has literal prefilter that PikeVM lacks."""
         return self.engine.match_all(text)
 
 
