@@ -217,13 +217,28 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_first(text, start)
 
     @always_inline
+    def _use_pikevm_for_search(self) -> Bool:
+        """Use PikeVM when NFA has no fast paths (no literal prefilter,
+        no .* fast paths). PikeVM has its own first-byte prefilter."""
+        return (
+            Bool(self.pikevm)
+            and not self.engine.has_literal_optimization
+            and not self.engine._starts_with_dotstar()
+            and not self.engine._ends_with_dotstar()
+        )
+
+    @always_inline
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Search for match. NFA has literal prefilter that PikeVM lacks."""
+        """Search for match."""
+        if self._use_pikevm_for_search():
+            return self.pikevm.value().match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
     def match_all(self, text: String) raises -> MatchList:
-        """Find all matches. NFA has literal prefilter that PikeVM lacks."""
+        """Find all matches."""
+        if self._use_pikevm_for_search():
+            return self.pikevm.value().match_all(text)
         return self.engine.match_all(text)
 
 

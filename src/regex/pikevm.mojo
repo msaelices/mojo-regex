@@ -345,13 +345,71 @@ struct PikeVMEngine(Copyable, Movable):
 
     var program: Program
     """Compiled bytecode program."""
+    var first_byte_filter: SIMD[DType.uint8, 256]
+    """Lookup table: which bytes can start a match (from epsilon closure of state 0)."""
+    var has_filter: Bool
+    """True if first_byte_filter is selective (not all-ones)."""
 
     def __init__(out self, var program: Program):
         self.program = program^
+        self.first_byte_filter = SIMD[DType.uint8, 256](0)
+        self.has_filter = False
+        self._build_first_byte_filter()
 
     def is_supported(self) -> Bool:
         """Check if program fits within MAX_STATES limit."""
         return len(self.program) <= MAX_STATES
+
+    def _build_first_byte_filter(mut self):
+        """Extract which bytes can start a match from the epsilon closure
+        of state 0. Used to skip positions in search/findall."""
+        if len(self.program) == 0 or len(self.program) > MAX_STATES:
+            return
+
+        # Compute epsilon closure of state 0
+        var seen = SIMD[DType.uint8, MAX_STATES](0)
+        var stack = List[Int](capacity=MAX_STATES)
+        stack.append(0)
+
+        var matching_bytes = 0
+        while len(stack) > 0:
+            var pc = stack.pop()
+            if pc >= len(self.program) or seen[pc] != 0:
+                continue
+            seen[pc] = 1
+            ref inst = self.program.instructions[pc]
+
+            if inst.opcode == OP_BYTE:
+                self.first_byte_filter[inst.arg0] = 1
+                matching_bytes += 1
+            elif inst.opcode == OP_CLASS:
+                ref table = self.program.class_tables[inst.arg0]
+                for c in range(256):
+                    if table[c] != 0:
+                        self.first_byte_filter[c] = 1
+                        matching_bytes += 1
+            elif inst.opcode == OP_RANGE:
+                for c in range(inst.arg0, inst.arg1 + 1):
+                    self.first_byte_filter[c] = 1
+                    matching_bytes += 1
+            elif inst.opcode == OP_ANY:
+                # Matches everything except newline - filter won't help
+                self.has_filter = False
+                return
+            elif inst.opcode == OP_MATCH:
+                # Empty match possible - filter won't help
+                self.has_filter = False
+                return
+            elif inst.opcode == OP_SPLIT:
+                stack.append(inst.arg0)
+                stack.append(inst.arg1)
+            elif inst.opcode == OP_JUMP:
+                stack.append(inst.arg0)
+            elif inst.opcode == OP_START_ANCHOR or inst.opcode == OP_END_ANCHOR:
+                stack.append(pc + 1)
+
+        # Filter is useful if it excludes at least half the byte values
+        self.has_filter = matching_bytes < 128
 
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
         """Match pattern at the given position (like re.match)."""
@@ -360,6 +418,21 @@ struct PikeVMEngine(Copyable, Movable):
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)
+        if self.has_filter:
+            var text_ptr = text.unsafe_ptr()
+            var pos = start
+            while pos < text_len:
+                # Skip positions where first byte can't match
+                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                    pos += 1
+                    continue
+                var result = self._run(text, pos)
+                if result:
+                    return result
+                pos += 1
+            # Try at text_len for empty/anchor matches
+            return self._run(text, text_len)
+
         for try_pos in range(start, text_len + 1):
             var result = self._run(text, try_pos)
             if result:
@@ -371,6 +444,24 @@ struct PikeVMEngine(Copyable, Movable):
         var matches = MatchList()
         var pos = 0
         var text_len = len(text)
+
+        if self.has_filter:
+            var text_ptr = text.unsafe_ptr()
+            while pos < text_len:
+                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                    pos += 1
+                    continue
+                var result = self._run(text, pos)
+                if result:
+                    ref m = result.value()
+                    matches.append(m)
+                    if m.end_idx == m.start_idx:
+                        pos += 1
+                    else:
+                        pos = m.end_idx
+                else:
+                    pos += 1
+            return matches^
 
         while pos <= text_len:
             var result = self._run(text, pos)
