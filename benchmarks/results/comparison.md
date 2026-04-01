@@ -95,9 +95,17 @@ Comparison of mojo-regex v0.8.0, Python `re` module, and Rust `regex` crate.
 
 ### Where Mojo needs improvement
 
-- **`required_literal_short`** (`.*@example\.com`): ~2-3x slower than Python.
+- **`required_literal_short`** (`.*@example\.com`): ~2-4x slower than Python.
   The `.*` prefix fast path helps but Python's C bytecode is still faster for
   greedy-then-backtrack on long text.
+- **`range_lowercase`**, **`range_alphanumeric`**: 1.5-2.5x slower on some runs.
+  These DFA patterns are at the noise boundary and flip between wins and losses
+  depending on system load.
+- **`phone_validation`**, **`alternation_quantifiers`**: ~1.5x slower on some runs.
+  PikeVM match_first is close to parity with Python; system noise determines winner.
+
+Note: Win rate fluctuates between 86-98% across runs due to system load.
+On a quiet system, only `required_literal_short` is consistently slower.
 
 ### Notes
 
