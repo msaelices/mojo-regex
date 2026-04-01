@@ -450,7 +450,6 @@ struct NFAEngine(Copyable, Engine):
         return None
 
     @always_inline
-    @always_inline
     def _find_last_literal(self, text: String, start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
         # Use rfind for O(n) reverse search instead of repeated forward search
