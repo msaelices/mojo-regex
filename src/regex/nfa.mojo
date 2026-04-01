@@ -452,16 +452,11 @@ struct NFAEngine(Copyable, Engine):
     @always_inline
     def _find_last_literal(self, text: String, start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
-        var literal_bytes = self.literal_prefix.as_bytes()
-        var last_pos = -1
-        var search = start
-        while True:
-            var pos = twoway_search(literal_bytes, text, search)
-            if pos == -1:
-                break
-            last_pos = pos
-            search = pos + 1
-        return last_pos
+        # Use rfind for O(n) reverse search instead of repeated forward search
+        var pos = text.rfind(self.literal_prefix)
+        if pos >= start:
+            return pos
+        return -1
 
     @always_inline
     def _ends_with_dotstar(self) -> Bool:
