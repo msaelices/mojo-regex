@@ -2,463 +2,463 @@
   "summary": {
     "baseline_engine": "rust",
     "test_engine": "mojo",
-    "baseline_timestamp": "2026-04-02T19:00:18.405367654+00:00",
-    "test_timestamp": "2026-04-02T21:01:02.470519",
+    "baseline_timestamp": "2026-04-02T20:05:34.403489292+00:00",
+    "test_timestamp": "2026-04-02T22:06:14.057744",
     "baseline_name": "Rust",
     "test_name": "Mojo",
     "total_benchmarks": 56,
-    "test_faster_count": 29,
-    "baseline_faster_count": 27,
-    "average_speedup": 1205.873099758137,
-    "geometric_mean_speedup": 1.4640683463977282
+    "test_faster_count": 32,
+    "baseline_faster_count": 24,
+    "average_speedup": 878.4819766553917,
+    "geometric_mean_speedup": 1.6126428926960756
   },
   "benchmarks": {
     "alternation_common_prefix": {
-      "rust_time_ms": 0.004434136150234742,
-      "mojo_time_ms": 3.715021119324182e-05,
-      "speedup": 119.3569567389533,
-      "rust_iterations": 121197,
-      "mojo_iterations": 13674680,
+      "rust_time_ms": 0.0027629442970822284,
+      "mojo_time_ms": 1.878713649462929e-05,
+      "speedup": 147.06574883682117,
+      "rust_iterations": 182468,
+      "mojo_iterations": 26398372,
       "engine": "DFA,"
     },
     "alternation_quantifiers": {
-      "rust_time_ms": 0.12970706666666668,
-      "mojo_time_ms": 0.04828192,
-      "speedup": 2.686452126731221,
-      "rust_iterations": 3825,
-      "mojo_iterations": 9675,
+      "rust_time_ms": 0.07793847333333333,
+      "mojo_time_ms": 0.033850946666666666,
+      "speedup": 2.3024015871934256,
+      "rust_iterations": 6150,
+      "mojo_iterations": 14175,
       "engine": "NFA,"
     },
     "alternation_simple": {
-      "rust_time_ms": 3.256558064516129e-05,
-      "mojo_time_ms": 1.1718055762081786e-05,
-      "speedup": 2.7790941864724332,
-      "rust_iterations": 15004000,
-      "mojo_iterations": 43040000,
+      "rust_time_ms": 2.1703348837209304e-05,
+      "mojo_time_ms": 5.809572739187418e-06,
+      "speedup": 3.7357908768080836,
+      "rust_iterations": 23521000,
+      "mojo_iterations": 82404000,
       "engine": "DFA,"
     },
     "anchor_start": {
-      "rust_time_ms": 5.605578125e-05,
-      "mojo_time_ms": 1.655989193548387e-05,
-      "speedup": 3.3850330345384636,
-      "rust_iterations": 8576000,
-      "mojo_iterations": 29760000,
+      "rust_time_ms": 4.7816222222222216e-05,
+      "mojo_time_ms": 1.00647375e-05,
+      "speedup": 4.750866301502867,
+      "rust_iterations": 10440000,
+      "mojo_iterations": 47520000,
       "engine": "DFA,"
     },
     "complex_group_5_children": {
-      "rust_time_ms": 0.0001678995,
-      "mojo_time_ms": 0.00019268199999999998,
-      "speedup": 0.8713813433532973,
-      "rust_iterations": 3144000,
-      "mojo_iterations": 2572000,
+      "rust_time_ms": 8.014191666666668e-05,
+      "mojo_time_ms": 9.364668750000001e-05,
+      "speedup": 0.8557901919025878,
+      "rust_iterations": 6180000,
+      "mojo_iterations": 5008000,
       "engine": "DFA,"
     },
     "datetime_quantifiers": {
-      "rust_time_ms": 0.09325581,
-      "mojo_time_ms": 0.08402453,
-      "speedup": 1.1098641075409763,
-      "rust_iterations": 5300,
-      "mojo_iterations": 5700,
+      "rust_time_ms": 0.06363563,
+      "mojo_time_ms": 0.04159489,
+      "speedup": 1.529890570692698,
+      "rust_iterations": 8200,
+      "mojo_iterations": 11500,
       "engine": "DFA,"
     },
     "deep_nested_groups_depth4": {
-      "rust_time_ms": 4.907823809523809e-05,
-      "mojo_time_ms": 6.745238461538462e-05,
-      "speedup": 0.7275982661707748,
-      "rust_iterations": 10941000,
-      "mojo_iterations": 7033000,
+      "rust_time_ms": 2.170997142857143e-05,
+      "mojo_time_ms": 4.70738e-05,
+      "speedup": 0.4611901191017387,
+      "rust_iterations": 22680000,
+      "mojo_iterations": 10920000,
       "engine": "DFA,"
     },
     "dense_quantifiers": {
-      "rust_time_ms": 0.03315301,
-      "mojo_time_ms": 0.10096405,
-      "speedup": 0.3283645020182926,
-      "rust_iterations": 14900,
-      "mojo_iterations": 4800,
-      "engine": "DFA,"
-    },
-    "dfa_digits_only": {
-      "rust_time_ms": 0.10903710999999999,
-      "mojo_time_ms": 0.19492354,
-      "speedup": 0.5593840025683916,
-      "rust_iterations": 5000,
-      "mojo_iterations": 2600,
-      "engine": "DFA,"
-    },
-    "dfa_dot_phone": {
-      "rust_time_ms": 0.068493235,
-      "mojo_time_ms": 0.23890125,
-      "speedup": 0.2867010323303038,
-      "rust_iterations": 7600,
-      "mojo_iterations": 2100,
-      "engine": "DFA,"
-    },
-    "dfa_paren_phone": {
-      "rust_time_ms": 0.020631689999999998,
-      "mojo_time_ms": 0.04107293,
-      "speedup": 0.5023184369851383,
-      "rust_iterations": 25200,
-      "mojo_iterations": 12600,
-      "engine": "DFA,"
-    },
-    "dfa_simple_phone": {
-      "rust_time_ms": 0.12912110999999998,
-      "mojo_time_ms": 0.21574953,
-      "speedup": 0.5984769005058782,
-      "rust_iterations": 4000,
-      "mojo_iterations": 2600,
-      "engine": "DFA,"
-    },
-    "dual_quantifiers": {
-      "rust_time_ms": 0.0345235,
-      "mojo_time_ms": 0.08330250666666666,
-      "speedup": 0.4144353079091017,
-      "rust_iterations": 13650,
-      "mojo_iterations": 4650,
-      "engine": "DFA,"
-    },
-    "flexible_datetime": {
-      "rust_time_ms": 0.07498853,
-      "mojo_time_ms": 0.09958275999999999,
-      "speedup": 0.7530272308178645,
-      "rust_iterations": 7200,
-      "mojo_iterations": 4500,
-      "engine": "DFA,"
-    },
-    "flexible_phone": {
-      "rust_time_ms": 0.34471463,
-      "mojo_time_ms": 0.2049091,
-      "speedup": 1.6822807283815115,
-      "rust_iterations": 1400,
-      "mojo_iterations": 2600,
-      "engine": "NFA,"
-    },
-    "group_alternation": {
-      "rust_time_ms": 9.461083333333332e-05,
-      "mojo_time_ms": 1.0925264492753624e-05,
-      "speedup": 8.659820857983405,
-      "rust_iterations": 5220000,
-      "mojo_iterations": 44712000,
-      "engine": "DFA,"
-    },
-    "grouped_quantifiers": {
-      "rust_time_ms": 0.015249829999999999,
-      "mojo_time_ms": 0.05394876,
-      "speedup": 0.28267248403855805,
-      "rust_iterations": 33400,
-      "mojo_iterations": 9400,
-      "engine": "DFA,"
-    },
-    "is_match_alphanumeric": {
-      "rust_time_ms": 2.803652380952381e-05,
-      "mojo_time_ms": 6.952343558282209e-06,
-      "speedup": 4.032672375076225,
-      "rust_iterations": 17493000,
-      "mojo_iterations": 72698000,
-      "engine": "DFA,"
-    },
-    "is_match_digits": {
-      "rust_time_ms": 4.359021153846153e-05,
-      "mojo_time_ms": 7.361092592592593e-06,
-      "speedup": 5.921704012027509,
-      "rust_iterations": 10348000,
-      "mojo_iterations": 69930000,
-      "engine": "DFA,"
-    },
-    "is_match_lowercase": {
-      "rust_time_ms": 2.6059012195121953e-05,
-      "mojo_time_ms": 7.603505882352941e-06,
-      "speedup": 3.4272364088785143,
-      "rust_iterations": 20008000,
-      "mojo_iterations": 65705000,
-      "engine": "DFA,"
-    },
-    "is_match_predefined_digits": {
-      "rust_time_ms": 2.2963822222222223e-05,
-      "mojo_time_ms": 8.606999999999999e-06,
-      "speedup": 2.66804022565612,
-      "rust_iterations": 21555000,
-      "mojo_iterations": 57585000,
-      "engine": "DFA,"
-    },
-    "is_match_predefined_word": {
-      "rust_time_ms": 2.6022692307692306e-05,
-      "mojo_time_ms": 7.919304e-06,
-      "speedup": 3.2859822413298323,
-      "rust_iterations": 20358000,
-      "mojo_iterations": 59625000,
-      "engine": "DFA,"
-    },
-    "large_8_alternations": {
-      "rust_time_ms": 9.357209090909092e-05,
-      "mojo_time_ms": 0.000241627,
-      "speedup": 0.38725842273045197,
-      "rust_iterations": 5225000,
-      "mojo_iterations": 2084000,
-      "engine": "DFA,"
-    },
-    "literal_heavy_alternation": {
-      "rust_time_ms": 0.00010848769999999999,
-      "mojo_time_ms": 0.0002726285,
-      "speedup": 0.39793235116651415,
-      "rust_iterations": 4510000,
-      "mojo_iterations": 1792000,
-      "engine": "DFA,"
-    },
-    "literal_match_long": {
-      "rust_time_ms": 0.008011878,
-      "mojo_time_ms": 0.0157225665,
-      "speedup": 0.5095782549242199,
-      "rust_iterations": 64000,
-      "mojo_iterations": 34000,
-      "engine": "DFA,"
-    },
-    "literal_match_short": {
-      "rust_time_ms": 0.000786041,
-      "mojo_time_ms": 0.0015419955,
-      "speedup": 0.509755702918718,
-      "rust_iterations": 626000,
-      "mojo_iterations": 338000,
-      "engine": "DFA,"
-    },
-    "literal_prefix_long": {
-      "rust_time_ms": 0.044484631578947366,
-      "mojo_time_ms": 0.0034166347826086957,
-      "speedup": 13.020013671166256,
-      "rust_iterations": 11647,
-      "mojo_iterations": 153180,
-      "engine": "NFA,"
-    },
-    "literal_prefix_short": {
-      "rust_time_ms": 0.0005340339830084957,
-      "mojo_time_ms": 0.0002857808541440463,
-      "speedup": 1.8686835568743831,
-      "rust_iterations": 1014507,
-      "mojo_iterations": 1679904,
-      "engine": "NFA,"
-    },
-    "match_all_simple": {
-      "rust_time_ms": 0.010317715,
-      "mojo_time_ms": 0.0114349625,
-      "speedup": 0.9022954819484541,
-      "rust_iterations": 46200,
-      "mojo_iterations": 42000,
-      "engine": "DFA,"
-    },
-    "mixed_range_quantifiers": {
-      "rust_time_ms": 0.007903273333333334,
-      "mojo_time_ms": 0.04657364,
-      "speedup": 0.16969413027054217,
-      "rust_iterations": 64200,
+      "rust_time_ms": 0.0201861,
+      "mojo_time_ms": 0.049088679999999996,
+      "speedup": 0.4112170056314409,
+      "rust_iterations": 25300,
       "mojo_iterations": 10200,
       "engine": "DFA,"
     },
+    "dfa_digits_only": {
+      "rust_time_ms": 0.06595357,
+      "mojo_time_ms": 0.14115561,
+      "speedup": 0.4672401614076834,
+      "rust_iterations": 7600,
+      "mojo_iterations": 3600,
+      "engine": "DFA,"
+    },
+    "dfa_dot_phone": {
+      "rust_time_ms": 0.038331685000000004,
+      "mojo_time_ms": 0.13411003,
+      "speedup": 0.28582265621743586,
+      "rust_iterations": 12200,
+      "mojo_iterations": 3700,
+      "engine": "DFA,"
+    },
+    "dfa_paren_phone": {
+      "rust_time_ms": 0.012261349999999999,
+      "mojo_time_ms": 0.017243335000000002,
+      "speedup": 0.7110776424630153,
+      "rust_iterations": 32400,
+      "mojo_iterations": 28200,
+      "engine": "DFA,"
+    },
+    "dfa_simple_phone": {
+      "rust_time_ms": 0.062035204999999996,
+      "mojo_time_ms": 0.11157605999999999,
+      "speedup": 0.5559902814277543,
+      "rust_iterations": 8000,
+      "mojo_iterations": 4300,
+      "engine": "DFA,"
+    },
+    "dual_quantifiers": {
+      "rust_time_ms": 0.01810742666666667,
+      "mojo_time_ms": 0.03462212,
+      "speedup": 0.5230016725338215,
+      "rust_iterations": 26250,
+      "mojo_iterations": 14850,
+      "engine": "DFA,"
+    },
+    "flexible_datetime": {
+      "rust_time_ms": 0.03441877,
+      "mojo_time_ms": 0.07261803,
+      "speedup": 0.4739700319603823,
+      "rust_iterations": 13900,
+      "mojo_iterations": 6400,
+      "engine": "DFA,"
+    },
+    "flexible_phone": {
+      "rust_time_ms": 0.16509282,
+      "mojo_time_ms": 0.085224535,
+      "speedup": 1.9371513144659573,
+      "rust_iterations": 3100,
+      "mojo_iterations": 6000,
+      "engine": "NFA,"
+    },
+    "group_alternation": {
+      "rust_time_ms": 6.196038095238095e-05,
+      "mojo_time_ms": 6.005379603399433e-06,
+      "speedup": 10.317479500764177,
+      "rust_iterations": 8274000,
+      "mojo_iterations": 74483000,
+      "engine": "DFA,"
+    },
+    "grouped_quantifiers": {
+      "rust_time_ms": 0.01615261,
+      "mojo_time_ms": 0.038188355,
+      "speedup": 0.42297213378266757,
+      "rust_iterations": 30900,
+      "mojo_iterations": 12600,
+      "engine": "DFA,"
+    },
+    "is_match_alphanumeric": {
+      "rust_time_ms": 1.2882514285714285e-05,
+      "mojo_time_ms": 4.154841004184101e-06,
+      "speedup": 3.100603434100378,
+      "rust_iterations": 38850000,
+      "mojo_iterations": 120456000,
+      "engine": "DFA,"
+    },
+    "is_match_digits": {
+      "rust_time_ms": 2.7753108108108108e-05,
+      "mojo_time_ms": 4.13846335078534e-06,
+      "speedup": 6.706138427646462,
+      "rust_iterations": 17501000,
+      "mojo_iterations": 120330000,
+      "engine": "DFA,"
+    },
+    "is_match_lowercase": {
+      "rust_time_ms": 1.567374324324324e-05,
+      "mojo_time_ms": 6.350757668711656e-06,
+      "speedup": 2.4680115445851816,
+      "rust_iterations": 31894000,
+      "mojo_iterations": 78240000,
+      "engine": "DFA,"
+    },
+    "is_match_predefined_digits": {
+      "rust_time_ms": 1.4234382716049381e-05,
+      "mojo_time_ms": 4.147223175965666e-06,
+      "speedup": 3.432268318363397,
+      "rust_iterations": 34344000,
+      "mojo_iterations": 118597000,
+      "engine": "DFA,"
+    },
+    "is_match_predefined_word": {
+      "rust_time_ms": 1.8220402777777776e-05,
+      "mojo_time_ms": 6.517265432098766e-06,
+      "speedup": 2.795712859574331,
+      "rust_iterations": 28512000,
+      "mojo_iterations": 77274000,
+      "engine": "DFA,"
+    },
+    "large_8_alternations": {
+      "rust_time_ms": 5.950683333333334e-05,
+      "mojo_time_ms": 0.00013781590909090909,
+      "speedup": 0.4317849348878885,
+      "rust_iterations": 8442000,
+      "mojo_iterations": 3421000,
+      "engine": "DFA,"
+    },
+    "literal_heavy_alternation": {
+      "rust_time_ms": 6.948444444444444e-05,
+      "mojo_time_ms": 0.00013077275,
+      "speedup": 0.5313373347615954,
+      "rust_iterations": 7128000,
+      "mojo_iterations": 3672000,
+      "engine": "DFA,"
+    },
+    "literal_match_long": {
+      "rust_time_ms": 0.0030997094999999997,
+      "mojo_time_ms": 0.00876498175,
+      "speedup": 0.3536469998924983,
+      "rust_iterations": 134000,
+      "mojo_iterations": 56000,
+      "engine": "DFA,"
+    },
+    "literal_match_short": {
+      "rust_time_ms": 0.00030858999999999997,
+      "mojo_time_ms": 0.0006110995,
+      "speedup": 0.5049750490713869,
+      "rust_iterations": 1512000,
+      "mojo_iterations": 798000,
+      "engine": "DFA,"
+    },
+    "literal_prefix_long": {
+      "rust_time_ms": 0.03222369696969697,
+      "mojo_time_ms": 0.0013549481481481482,
+      "speedup": 23.78223625290617,
+      "rust_iterations": 15939,
+      "mojo_iterations": 338985,
+      "engine": "NFA,"
+    },
+    "literal_prefix_short": {
+      "rust_time_ms": 0.0002481121431028552,
+      "mojo_time_ms": 0.00016211507936507934,
+      "speedup": 1.530469244900485,
+      "rust_iterations": 1962225,
+      "mojo_iterations": 3236940,
+      "engine": "NFA,"
+    },
+    "match_all_simple": {
+      "rust_time_ms": 0.006089560000000001,
+      "mojo_time_ms": 0.0068187275,
+      "speedup": 0.8930639917785248,
+      "rust_iterations": 79800,
+      "mojo_iterations": 71200,
+      "engine": "DFA,"
+    },
+    "mixed_range_quantifiers": {
+      "rust_time_ms": 0.004233598333333333,
+      "mojo_time_ms": 0.03145609333333334,
+      "speedup": 0.13458754361105232,
+      "rust_iterations": 117600,
+      "mojo_iterations": 16575,
+      "engine": "DFA,"
+    },
     "multi_format_phone": {
-      "rust_time_ms": 0.28180637999999997,
-      "mojo_time_ms": 0.19979873999999997,
-      "speedup": 1.4104512370798734,
-      "rust_iterations": 1650,
-      "mojo_iterations": 2500,
+      "rust_time_ms": 0.30414359999999996,
+      "mojo_time_ms": 0.0728968,
+      "speedup": 4.172248987609881,
+      "rust_iterations": 1750,
+      "mojo_iterations": 6650,
       "engine": "NFA,"
     },
     "national_phone_validation": {
-      "rust_time_ms": 0.0827616,
-      "mojo_time_ms": 0.08615705,
-      "speedup": 0.960589992345374,
-      "rust_iterations": 5410,
-      "mojo_iterations": 5980,
+      "rust_time_ms": 0.067209025,
+      "mojo_time_ms": 0.0452829,
+      "speedup": 1.4842031981167285,
+      "rust_iterations": 7520,
+      "mojo_iterations": 11100,
       "engine": "DFA,"
     },
     "no_literal_baseline": {
-      "rust_time_ms": 0.01396821875,
-      "mojo_time_ms": 1.858382779080999e-05,
-      "speedup": 751.6330277720027,
-      "rust_iterations": 35968,
-      "mojo_iterations": 26408068,
+      "rust_time_ms": 0.00752744262295082,
+      "mojo_time_ms": 7.06819517930629e-06,
+      "speedup": 1064.9737920352113,
+      "rust_iterations": 64050,
+      "mojo_iterations": 71452206,
       "engine": "DFA,"
     },
     "optimize_extreme_quantifiers": {
-      "rust_time_ms": 0.0003106336,
-      "mojo_time_ms": 0.004605083,
-      "speedup": 0.06745450624885588,
-      "rust_iterations": 1472500,
-      "mojo_iterations": 116000,
+      "rust_time_ms": 0.00018707523076923077,
+      "mojo_time_ms": 0.0018566849999999998,
+      "speedup": 0.10075765720584309,
+      "rust_iterations": 2632500,
+      "mojo_iterations": 265000,
       "engine": "NFA,"
     },
     "optimize_large_quantifiers": {
-      "rust_time_ms": 0.021000684999999998,
-      "mojo_time_ms": 0.009482754999999999,
-      "speedup": 2.214618536490714,
-      "rust_iterations": 21000,
-      "mojo_iterations": 46800,
+      "rust_time_ms": 0.0088536,
+      "mojo_time_ms": 0.004482805,
+      "speedup": 1.9750134123612335,
+      "rust_iterations": 55800,
+      "mojo_iterations": 108400,
       "engine": "DFA,"
     },
     "optimize_multiple_quantifiers": {
-      "rust_time_ms": 0.025753349999999998,
-      "mojo_time_ms": 0.15377639499999998,
-      "speedup": 0.16747271257074273,
-      "rust_iterations": 18200,
-      "mojo_iterations": 3400,
-      "engine": "DFA,"
-    },
-    "optimize_phone_quantifiers": {
-      "rust_time_ms": 0.07179075333333333,
-      "mojo_time_ms": 0.07865789,
-      "speedup": 0.9126961495322763,
-      "rust_iterations": 6900,
-      "mojo_iterations": 6300,
-      "engine": "DFA,"
-    },
-    "optimize_range_quantifier": {
-      "rust_time_ms": 0.0680411145,
-      "mojo_time_ms": 0.023121686000000002,
-      "speedup": 2.9427401833932003,
-      "rust_iterations": 8000,
-      "mojo_iterations": 22000,
-      "engine": "NFA,"
-    },
-    "phone_validation": {
-      "rust_time_ms": 4.8796958333333335e-05,
-      "mojo_time_ms": 3.963554838709677e-05,
-      "speedup": 1.2311412436321691,
-      "rust_iterations": 10632000,
-      "mojo_iterations": 13330000,
-      "engine": "NFA,"
-    },
-    "predefined_digits": {
-      "rust_time_ms": 8.82243e-05,
-      "mojo_time_ms": 0.0007018895,
-      "speedup": 0.12569542641683626,
-      "rust_iterations": 5720000,
-      "mojo_iterations": 694000,
-      "engine": "DFA,"
-    },
-    "predefined_word": {
-      "rust_time_ms": 0.125807193,
-      "mojo_time_ms": 0.0315610695,
-      "speedup": 3.9861511347072702,
-      "rust_iterations": 5000,
-      "mojo_iterations": 16000,
-      "engine": "DFA,"
-    },
-    "quad_quantifiers": {
-      "rust_time_ms": 0.018382795,
-      "mojo_time_ms": 0.05170232,
-      "speedup": 0.3555506793505591,
-      "rust_iterations": 26000,
-      "mojo_iterations": 9500,
-      "engine": "DFA,"
-    },
-    "quantifier_one_or_more": {
-      "rust_time_ms": 7.561246428571429e-05,
-      "mojo_time_ms": 1.15745522875817e-05,
-      "speedup": 6.53264700068258,
-      "rust_iterations": 6440000,
-      "mojo_iterations": 44370000,
-      "engine": "DFA,"
-    },
-    "quantifier_zero_or_more": {
-      "rust_time_ms": 8.387735000000001e-05,
-      "mojo_time_ms": 9.359811557788944e-06,
-      "speedup": 8.9614357599112,
-      "rust_iterations": 5420000,
-      "mojo_iterations": 56914000,
-      "engine": "DFA,"
-    },
-    "quantifier_zero_or_one": {
-      "rust_time_ms": 0.00010209135,
-      "mojo_time_ms": 1.2498019736842106e-05,
-      "speedup": 8.168602078539811,
-      "rust_iterations": 4660000,
-      "mojo_iterations": 41952000,
-      "engine": "DFA,"
-    },
-    "range_alphanumeric": {
-      "rust_time_ms": 0.101193116,
-      "mojo_time_ms": 0.034717829,
-      "speedup": 2.914730526496919,
-      "rust_iterations": 5000,
-      "mojo_iterations": 15000,
-      "engine": "DFA,"
-    },
-    "range_digits": {
-      "rust_time_ms": 9.6599e-05,
-      "mojo_time_ms": 0.000616204,
-      "speedup": 0.15676464287800795,
-      "rust_iterations": 5076000,
-      "mojo_iterations": 830000,
-      "engine": "DFA,"
-    },
-    "range_lowercase": {
-      "rust_time_ms": 9.878718181818184e-05,
-      "mojo_time_ms": 0.0315436665,
-      "speedup": 0.0031317596455751853,
-      "rust_iterations": 5203000,
-      "mojo_iterations": 16000,
-      "engine": "DFA,"
-    },
-    "range_quantifiers": {
-      "rust_time_ms": 0.07315529,
-      "mojo_time_ms": 0.052744895,
-      "speedup": 1.3869643687791966,
-      "rust_iterations": 6700,
-      "mojo_iterations": 9400,
-      "engine": "DFA,"
-    },
-    "required_literal_short": {
-      "rust_time_ms": 0.0004063666197843413,
-      "mojo_time_ms": 0.0003184934030937216,
-      "speedup": 1.2759027842870632,
-      "rust_iterations": 1094229,
-      "mojo_iterations": 1582560,
-      "engine": "NFA+Prefilter,"
-    },
-    "simple_phone": {
-      "rust_time_ms": 0.27462420000000004,
-      "mojo_time_ms": 0.20431165499999998,
-      "speedup": 1.3441435829982389,
-      "rust_iterations": 1900,
-      "mojo_iterations": 2600,
-      "engine": "DFA,"
-    },
-    "single_quantifier_alpha": {
-      "rust_time_ms": 0.0807067425,
-      "mojo_time_ms": 0.04360849,
-      "speedup": 1.8507116962774908,
-      "rust_iterations": 6000,
-      "mojo_iterations": 10600,
-      "engine": "DFA,"
-    },
-    "single_quantifier_digits": {
-      "rust_time_ms": 0.02769854,
-      "mojo_time_ms": 0.037271660000000005,
-      "speedup": 0.7431528405227993,
-      "rust_iterations": 17000,
-      "mojo_iterations": 13800,
-      "engine": "DFA,"
-    },
-    "triple_quantifiers": {
-      "rust_time_ms": 0.01461492,
-      "mojo_time_ms": 0.05782712,
-      "speedup": 0.252734703025155,
-      "rust_iterations": 33900,
-      "mojo_iterations": 8100,
-      "engine": "DFA,"
-    },
-    "ultra_dense_quantifiers": {
-      "rust_time_ms": 0.07012260000000001,
-      "mojo_time_ms": 0.09800638,
-      "speedup": 0.7154901548246145,
-      "rust_iterations": 6950,
+      "rust_time_ms": 0.018045375,
+      "mojo_time_ms": 0.094061715,
+      "speedup": 0.1918461193270822,
+      "rust_iterations": 27400,
       "mojo_iterations": 5200,
       "engine": "DFA,"
     },
+    "optimize_phone_quantifiers": {
+      "rust_time_ms": 0.04588049833333333,
+      "mojo_time_ms": 0.03395533,
+      "speedup": 1.3512016621052816,
+      "rust_iterations": 10800,
+      "mojo_iterations": 14100,
+      "engine": "DFA,"
+    },
+    "optimize_range_quantifier": {
+      "rust_time_ms": 0.027580766,
+      "mojo_time_ms": 0.010033724,
+      "speedup": 2.7488065248755094,
+      "rust_iterations": 18000,
+      "mojo_iterations": 51000,
+      "engine": "NFA,"
+    },
+    "phone_validation": {
+      "rust_time_ms": 2.431792e-05,
+      "mojo_time_ms": 1.875094214876033e-05,
+      "speedup": 1.2968905672618545,
+      "rust_iterations": 17650000,
+      "mojo_iterations": 26317500,
+      "engine": "NFA,"
+    },
+    "predefined_digits": {
+      "rust_time_ms": 4.7073791666666665e-05,
+      "mojo_time_ms": 0.00032895725000000003,
+      "speedup": 0.14310002794182727,
+      "rust_iterations": 10656000,
+      "mojo_iterations": 1400000,
+      "engine": "DFA,"
+    },
+    "predefined_word": {
+      "rust_time_ms": 0.046293045,
+      "mojo_time_ms": 0.0157307905,
+      "speedup": 2.942830177542571,
+      "rust_iterations": 10000,
+      "mojo_iterations": 30000,
+      "engine": "DFA,"
+    },
+    "quad_quantifiers": {
+      "rust_time_ms": 0.010803555,
+      "mojo_time_ms": 0.032846440000000005,
+      "speedup": 0.32891098700498433,
+      "rust_iterations": 43400,
+      "mojo_iterations": 14700,
+      "engine": "DFA,"
+    },
+    "quantifier_one_or_more": {
+      "rust_time_ms": 5.0309568181818186e-05,
+      "mojo_time_ms": 5.590077727952168e-06,
+      "speedup": 8.999797611087647,
+      "rust_iterations": 8844000,
+      "mojo_iterations": 87639000,
+      "engine": "DFA,"
+    },
+    "quantifier_zero_or_more": {
+      "rust_time_ms": 4.744778260869566e-05,
+      "mojo_time_ms": 6.7115754716981134e-06,
+      "speedup": 7.069544670811959,
+      "rust_iterations": 10465000,
+      "mojo_iterations": 71868000,
+      "engine": "DFA,"
+    },
+    "quantifier_zero_or_one": {
+      "rust_time_ms": 4.7489550000000003e-05,
+      "mojo_time_ms": 7.43743520782396e-06,
+      "speedup": 6.385205204886009,
+      "rust_iterations": 10420000,
+      "mojo_iterations": 65031000,
+      "engine": "DFA,"
+    },
+    "range_alphanumeric": {
+      "rust_time_ms": 0.047641155,
+      "mojo_time_ms": 0.0159309475,
+      "speedup": 2.990478438272425,
+      "rust_iterations": 11000,
+      "mojo_iterations": 30000,
+      "engine": "DFA,"
+    },
+    "range_digits": {
+      "rust_time_ms": 5.6901736842105265e-05,
+      "mojo_time_ms": 0.0003499,
+      "speedup": 0.16262285465020082,
+      "rust_iterations": 8683000,
+      "mojo_iterations": 1431000,
+      "engine": "DFA,"
+    },
+    "range_lowercase": {
+      "rust_time_ms": 4.9516749999999996e-05,
+      "mojo_time_ms": 0.001835604,
+      "speedup": 0.02697572570118609,
+      "rust_iterations": 9820000,
+      "mojo_iterations": 273000,
+      "engine": "DFA,"
+    },
+    "range_quantifiers": {
+      "rust_time_ms": 0.03665435,
+      "mojo_time_ms": 0.02361297,
+      "speedup": 1.552297317957038,
+      "rust_iterations": 13500,
+      "mojo_iterations": 20900,
+      "engine": "DFA,"
+    },
+    "required_literal_short": {
+      "rust_time_ms": 0.00022676156116759595,
+      "mojo_time_ms": 0.00019026455301455303,
+      "speedup": 1.191822426062995,
+      "rust_iterations": 2204427,
+      "mojo_iterations": 2474264,
+      "engine": "NFA+Prefilter,"
+    },
+    "simple_phone": {
+      "rust_time_ms": 0.16066251999999998,
+      "mojo_time_ms": 0.15205971,
+      "speedup": 1.0565752098304013,
+      "rust_iterations": 3100,
+      "mojo_iterations": 3300,
+      "engine": "DFA,"
+    },
+    "single_quantifier_alpha": {
+      "rust_time_ms": 0.037164039999999995,
+      "mojo_time_ms": 0.01533411,
+      "speedup": 2.4236189775604844,
+      "rust_iterations": 13400,
+      "mojo_iterations": 31200,
+      "engine": "DFA,"
+    },
+    "single_quantifier_digits": {
+      "rust_time_ms": 0.021230492500000003,
+      "mojo_time_ms": 0.019651215,
+      "speedup": 1.0803653870765753,
+      "rust_iterations": 23600,
+      "mojo_iterations": 25200,
+      "engine": "DFA,"
+    },
+    "triple_quantifiers": {
+      "rust_time_ms": 0.008678017500000001,
+      "mojo_time_ms": 0.02860646,
+      "speedup": 0.30335866444152826,
+      "rust_iterations": 55200,
+      "mojo_iterations": 16700,
+      "engine": "DFA,"
+    },
+    "ultra_dense_quantifiers": {
+      "rust_time_ms": 0.04050242,
+      "mojo_time_ms": 0.09372148,
+      "speedup": 0.43215728134041415,
+      "rust_iterations": 12050,
+      "mojo_iterations": 5325,
+      "engine": "DFA,"
+    },
     "wildcard_match_any": {
-      "rust_time_ms": 0.10351819799999999,
-      "mojo_time_ms": 1.5555770171149144e-06,
-      "speedup": 66546.49487686076,
-      "rust_iterations": 5000,
-      "mojo_iterations": 328836000,
+      "rust_time_ms": 0.05133607,
+      "mojo_time_ms": 1.0727166172106824e-06,
+      "speedup": 47856.13383475493,
+      "rust_iterations": 10000,
+      "mojo_iterations": 458994000,
       "engine": "NFA,"
     }
   }
