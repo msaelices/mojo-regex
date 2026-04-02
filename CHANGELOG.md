@@ -2,8 +2,8 @@
 
 ## v0.9.0 (2026-04-02)
 
-PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 96%
-(59 wins, 2 losses out of 61 benchmarks). Mojo vs Rust improved from 41% to 53%.
+PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 97%
+(59 wins, 2 losses out of 61 benchmarks). Mojo vs Rust improved from 41% to 57%.
 
 ### PikeVM engine (PRs #86, #88, #89)
 
@@ -32,6 +32,21 @@ PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 96%
   - `flexible_phone`: **22.5x faster** than Python, **0.6x vs Rust**
   - `multi_format_phone`: **76.4x faster** than Python, **0.6x vs Rust**
   - `phone_validation`: **14.6x faster** than Python
+
+### Lazy DFA hot path inlining (PR #92)
+
+- **`@always_inline` on hot path**: Added `@always_inline` to `LazyDFA.match_first`,
+  `match_next`, `match_all`, and `_run_lazy`. Eliminates function call overhead
+  that dominated short-input benchmarks.
+- **Unchecked state access**: Use `unsafe_ptr()` for direct state array access in
+  `_run_lazy` inner loop, bypassing List bounds checking.
+- Key results:
+  - `phone_validation`: was 1.2x slower than Python, now **14.3x faster**. Now **1.2x faster than Rust**.
+  - `flexible_phone` vs Rust: was 4.4x slower, now **1.7x faster**.
+  - `multi_format_phone` vs Rust: was 8.1x slower, now **1.4x faster**.
+  - Overall vs Python: 91% -> **97% win rate**. vs Rust: 41% -> **57% win rate**.
+- **Benchmark parser fix**: `parse_mojo_output.py` regex now handles scientific
+  notation (e.g., `3.97e-05`), previously silently dropping sub-microsecond results.
 
 ### `.*` last-literal optimization (PR #90)
 
