@@ -14,7 +14,7 @@ from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
-from regex.pikevm import compile_ast, PikeVMEngine
+from regex.pikevm import compile_ast, PikeVMEngine, LazyDFA
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
 from regex.prefilter import (
@@ -172,56 +172,63 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
 
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
-    """NFA-based matcher with optional PikeVM acceleration."""
+    """NFA-based matcher with lazy DFA acceleration.
+    Uses UnsafePointer for the lazy DFA to allow cache mutation
+    through non-mut self (required by RegexMatcher trait)."""
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
-    var pikevm: Optional[PikeVMEngine]
-    """PikeVM engine for patterns that fit within 128 instructions."""
+    var _lazy_dfa_ptr: UnsafePointer[LazyDFA, MutAnyOrigin]
+    """Heap-allocated lazy DFA (allows mutation through shared ref)."""
+    var _has_lazy_dfa: Bool
+    """Whether the lazy DFA is available."""
 
     def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
-        """Initialize NFA matcher with optional PikeVM.
-
-        Args:
-            ast: AST representing the regex pattern.
-            pattern: Original pattern string.
-        """
+        """Initialize NFA matcher with optional lazy DFA."""
         self.engine = NFAEngine(pattern)
         self.ast = ast
-        # Try to compile PikeVM bytecode
         var vm = PikeVMEngine(compile_ast(ast))
         if vm.is_supported():
-            self.pikevm = vm^
+            self._lazy_dfa_ptr = alloc[LazyDFA](1)
+            self._lazy_dfa_ptr[] = LazyDFA(vm^)
+            self._has_lazy_dfa = True
         else:
-            self.pikevm = None
+            self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+            self._has_lazy_dfa = False
 
     def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
-        self.pikevm = copy.pikevm.copy()
+        if copy._has_lazy_dfa:
+            self._lazy_dfa_ptr = alloc[LazyDFA](1)
+            self._lazy_dfa_ptr[] = copy._lazy_dfa_ptr[].copy()
+            self._has_lazy_dfa = True
+        else:
+            self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+            self._has_lazy_dfa = False
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.engine = take.engine^
         self.ast = take.ast^
-        self.pikevm = take.pikevm^
+        self._lazy_dfa_ptr = take._lazy_dfa_ptr
+        self._has_lazy_dfa = take._has_lazy_dfa
 
     @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
-        """Find first match. Uses PikeVM if available."""
-        if self.pikevm:
-            return self.pikevm.value().match_first(text, start)
+        """Find first match. Uses lazy DFA if available."""
+        if self._has_lazy_dfa:
+            return self._lazy_dfa_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
 
     @always_inline
-    def _use_pikevm_for_search(self) -> Bool:
-        """Use PikeVM when NFA has no fast paths (no literal prefilter,
-        no .* fast paths). PikeVM has its own first-byte prefilter."""
+    def _use_lazy_dfa_for_search(self) -> Bool:
+        """Use lazy DFA when NFA has no fast paths."""
         return (
-            Bool(self.pikevm)
+            self._has_lazy_dfa
             and not self.engine.has_literal_optimization
             and not self.engine._starts_with_dotstar()
             and not self.engine._ends_with_dotstar()
@@ -230,15 +237,15 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
         """Search for match."""
-        if self._use_pikevm_for_search():
-            return self.pikevm.value().match_next(text, start)
+        if self._use_lazy_dfa_for_search():
+            return self._lazy_dfa_ptr[].match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
     def match_all(self, text: String) raises -> MatchList:
         """Find all matches."""
-        if self._use_pikevm_for_search():
-            return self.pikevm.value().match_all(text)
+        if self._use_lazy_dfa_for_search():
+            return self._lazy_dfa_ptr[].match_all(text)
         return self.engine.match_all(text)
 
 
