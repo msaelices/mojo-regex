@@ -2,8 +2,8 @@
 
 ## v0.9.0 (2026-04-02)
 
-PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 97%
-(59 wins, 2 losses out of 61 benchmarks). Mojo vs Rust improved from 41% to 57%.
+PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 100%
+(61 wins, 0 losses out of 61 benchmarks). Mojo vs Rust improved from 41% to 57%.
 
 ### PikeVM engine (PRs #86, #88, #89)
 
@@ -47,6 +47,18 @@ PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 97%
   - Overall vs Python: 91% -> **97% win rate**. vs Rust: 41% -> **57% win rate**.
 - **Benchmark parser fix**: `parse_mojo_output.py` regex now handles scientific
   notation (e.g., `3.97e-05`), previously silently dropping sub-microsecond results.
+
+### SIMD range comparison for character classes (PR #93)
+
+- **Contiguous range fast path**: `count_consecutive_matches` now uses SIMD unsigned
+  subtraction + `min` + `eq` to check SIMD_WIDTH (32) bytes per iteration for
+  contiguous byte ranges (e.g., `[a-z]`, `[0-9]`, `[A-Z]`).
+- **`range_start`/`range_end` fields**: `CharacterClassSIMD` tracks whether the
+  character class is a contiguous range, enabling the SIMD fast path at construction.
+- Non-contiguous classes keep the scalar 4-way unrolled lookup table path.
+- Key results:
+  - `range_lowercase`: was 2x slower than Python, now **9.4x faster** (8x absolute speedup).
+  - Overall vs Python: 97% -> **100% win rate** (61/0).
 
 ### `.*` last-literal optimization (PR #90)
 
