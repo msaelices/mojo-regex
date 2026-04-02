@@ -627,3 +627,270 @@ struct PikeVMEngine(Copyable, Movable):
             seen[pc] = 1
             pcs[count] = pc
             count += 1
+
+
+# ===-----------------------------------------------------------------------===#
+# Lazy DFA: caches PikeVM state-set transitions for near-full-DFA speed
+# ===-----------------------------------------------------------------------===#
+
+# Special state IDs
+comptime LAZY_DFA_DEAD = -1
+"""Dead state: no NFA states active, no match possible."""
+comptime LAZY_DFA_UNKNOWN = -2
+"""Transition not yet cached."""
+comptime LAZY_DFA_MAX_STATES = 256
+"""Maximum cached DFA states before eviction."""
+
+
+struct CachedState(Copyable, Movable):
+    """A cached DFA state = a set of NFA PCs after epsilon closure."""
+
+    var nfa_set: SIMD[DType.uint8, MAX_STATES]
+    """Which NFA PCs are active (byte per PC, 0/1)."""
+    var is_match: Bool
+    """Whether this state set contains the MATCH instruction."""
+    var transitions: InlineArray[Int, 256]
+    """Next DFA state ID per input byte. LAZY_DFA_UNKNOWN = not cached."""
+
+    def __init__(
+        out self, nfa_set: SIMD[DType.uint8, MAX_STATES], is_match: Bool
+    ):
+        self.nfa_set = nfa_set
+        self.is_match = is_match
+        self.transitions = InlineArray[Int, 256](fill=LAZY_DFA_UNKNOWN)
+
+
+struct LazyDFA(Copyable, Movable):
+    """Lazy DFA built on top of PikeVM bytecode.
+    Caches NFA state-set transitions as DFA states for O(1) per-byte
+    matching after warmup."""
+
+    var pikevm: PikeVMEngine
+    """Underlying PikeVM for cache misses."""
+    var states: List[CachedState]
+    """Cached DFA states. Index = DFA state ID."""
+    var start_state_id: Int
+    """DFA state ID for the start state."""
+
+    def __init__(out self, var pikevm: PikeVMEngine):
+        self.pikevm = pikevm^
+        self.states = List[CachedState](capacity=64)
+        self.start_state_id = LAZY_DFA_DEAD
+        # Build start state from epsilon closure of PC 0
+        self.start_state_id = self._get_or_create_state_for_pos(0, 0)
+
+    def is_supported(self) -> Bool:
+        """Check if the underlying PikeVM program fits."""
+        return self.pikevm.is_supported()
+
+    def match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+        """Match at position using cached DFA transitions."""
+        return self._run_lazy(text, start)
+
+    def match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+        """Search using cached DFA with first-byte prefilter."""
+        var text_len = len(text)
+        if self.pikevm.has_filter:
+            var text_ptr = text.unsafe_ptr()
+            var pos = start
+            while pos < text_len:
+                if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
+                    pos += 1
+                    continue
+                var result = self._run_lazy(text, pos)
+                if result:
+                    return result
+                pos += 1
+            return self._run_lazy(text, text_len)
+
+        for try_pos in range(start, text_len + 1):
+            var result = self._run_lazy(text, try_pos)
+            if result:
+                return result
+        return None
+
+    def match_all(mut self, text: String) -> MatchList:
+        """Find all matches using cached DFA."""
+        var matches = MatchList()
+        var pos = 0
+        var text_len = len(text)
+
+        if self.pikevm.has_filter:
+            var text_ptr = text.unsafe_ptr()
+            while pos < text_len:
+                if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
+                    pos += 1
+                    continue
+                var result = self._run_lazy(text, pos)
+                if result:
+                    ref m = result.value()
+                    matches.append(m)
+                    pos = max(pos + 1, m.end_idx)
+                else:
+                    pos += 1
+            return matches^
+
+        while pos <= text_len:
+            var result = self._run_lazy(text, pos)
+            if result:
+                ref m = result.value()
+                matches.append(m)
+                pos = max(pos + 1, m.end_idx)
+            else:
+                pos += 1
+        return matches^
+
+    def _run_lazy(mut self, text: String, start: Int) -> Optional[Match]:
+        """Run the lazy DFA from a start position."""
+        var text_ptr = text.unsafe_ptr()
+        var text_len = len(text)
+        var state_id = self.start_state_id
+        var match_end = -1
+
+        if state_id == LAZY_DFA_DEAD:
+            return None
+
+        var pos = start
+        while pos <= text_len:
+            # Check if current state is a match
+            if self.states[state_id].is_match:
+                match_end = pos
+
+            if pos == text_len:
+                break
+
+            var ch = Int(text_ptr[pos])
+
+            # Look up cached transition
+            var next_id = self.states[state_id].transitions[ch]
+
+            if next_id == LAZY_DFA_UNKNOWN:
+                # Cache miss: compute via PikeVM one-step simulation
+                next_id = self._compute_transition(
+                    state_id, ch, text_ptr, pos, text_len
+                )
+                self.states[state_id].transitions[ch] = next_id
+
+            if next_id == LAZY_DFA_DEAD:
+                break
+
+            state_id = next_id
+            pos += 1
+
+        if match_end >= 0:
+            return Match(0, start, match_end, text)
+        return None
+
+    def _compute_transition(
+        mut self,
+        state_id: Int,
+        ch: Int,
+        text_ptr: UnsafePointer[UInt8, _],
+        pos: Int,
+        text_len: Int,
+    ) -> Int:
+        """Compute the next DFA state for (state_id, ch) by running one
+        PikeVM step. Caches the result."""
+        ref state = self.states[state_id]
+        var prog_len = len(self.pikevm.program)
+
+        # Collect active PCs from the NFA set
+        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var nxt_count = 0
+        var nxt_seen = SIMD[DType.uint8, MAX_STATES](0)
+
+        for pc in range(prog_len):
+            if state.nfa_set[pc] == 0:
+                continue
+            ref inst = self.pikevm.program.instructions[pc]
+
+            if inst.opcode == OP_BYTE:
+                if ch == inst.arg0:
+                    self.pikevm._add_state(
+                        nxt_pcs,
+                        nxt_count,
+                        nxt_seen,
+                        pc + 1,
+                        text_ptr,
+                        pos + 1,
+                        text_len,
+                    )
+            elif inst.opcode == OP_CLASS:
+                if self.pikevm.program.class_tables[inst.arg0][ch] != 0:
+                    self.pikevm._add_state(
+                        nxt_pcs,
+                        nxt_count,
+                        nxt_seen,
+                        pc + 1,
+                        text_ptr,
+                        pos + 1,
+                        text_len,
+                    )
+            elif inst.opcode == OP_ANY:
+                if ch != 10:
+                    self.pikevm._add_state(
+                        nxt_pcs,
+                        nxt_count,
+                        nxt_seen,
+                        pc + 1,
+                        text_ptr,
+                        pos + 1,
+                        text_len,
+                    )
+            elif inst.opcode == OP_RANGE:
+                if ch >= inst.arg0 and ch <= inst.arg1:
+                    self.pikevm._add_state(
+                        nxt_pcs,
+                        nxt_count,
+                        nxt_seen,
+                        pc + 1,
+                        text_ptr,
+                        pos + 1,
+                        text_len,
+                    )
+
+        if nxt_count == 0:
+            return LAZY_DFA_DEAD
+
+        # Find or create cached state for this NFA set
+        return self._find_or_create_state(nxt_seen)
+
+    def _get_or_create_state_for_pos(mut self, pc: Int, pos: Int) -> Int:
+        """Create a DFA state from the epsilon closure of a given PC."""
+        var pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var count = 0
+        var seen = SIMD[DType.uint8, MAX_STATES](0)
+        # Use a dummy text_ptr for epsilon closure (no bytes consumed)
+        var dummy = UnsafePointer[UInt8, MutAnyOrigin]()
+        self.pikevm._add_state(pcs, count, seen, pc, dummy, pos, 0)
+
+        if count == 0 and not self._has_match_in_set(seen):
+            return LAZY_DFA_DEAD
+
+        return self._find_or_create_state(seen)
+
+    def _find_or_create_state(
+        mut self, nfa_set: SIMD[DType.uint8, MAX_STATES]
+    ) -> Int:
+        """Find existing cached state or create a new one."""
+        # Linear scan for matching state (fine for < 256 states)
+        for i in range(len(self.states)):
+            if self.states[i].nfa_set.eq(nfa_set).reduce_and():
+                return i
+
+        # Note: no eviction. The list grows up to the number of reachable
+        # DFA states (typically 10-50). For pathological patterns it could
+        # grow larger, but each state is ~2KB so even 256 states = 512KB.
+
+        var is_match = self._has_match_in_set(nfa_set)
+        var new_id = len(self.states)
+        self.states.append(CachedState(nfa_set, is_match))
+        return new_id
+
+    def _has_match_in_set(self, nfa_set: SIMD[DType.uint8, MAX_STATES]) -> Bool:
+        """Check if any PC in the NFA set is a MATCH instruction."""
+        for pc in range(len(self.pikevm.program)):
+            if nfa_set[pc] != 0:
+                if self.pikevm.program.instructions[pc].opcode == OP_MATCH:
+                    return True
+        return False
