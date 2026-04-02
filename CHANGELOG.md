@@ -1,5 +1,56 @@
 # Changelog
 
+## v0.9.0 (2026-04-02)
+
+PikeVM and lazy DFA release. Mojo vs Python win rate improved from 85% to 96%
+(59 wins, 2 losses out of 61 benchmarks). Mojo vs Rust improved from 41% to 53%.
+
+### PikeVM engine (PRs #86, #88, #89)
+
+- **Thompson NFA simulation**: New PikeVM engine tracks all NFA states simultaneously
+  instead of backtracking. Compiles AST to flat bytecode (BYTE, CLASS, SPLIT, JUMP,
+  MATCH, etc.) and simulates using fixed-size `InlineArray[Int, 128]` state lists
+  and `SIMD[DType.uint8, 128]` dedup vectors. Zero per-step heap allocations.
+- **First-byte prefilter**: Extracts which bytes can start a match from the epsilon
+  closure of state 0. Skips ~95% of positions for patterns like `\(?\d{3}\)?`.
+- **Integration**: `NFAMatcher` routes `match_first` through PikeVM when available
+  (programs <= 128 instructions). Search/findall use PikeVM with prefilter when
+  NFA has no literal optimization or `.*` fast paths.
+- **`\s`/`\d`/`\w` in bracket ranges**: PikeVM correctly expands escape sequences
+  inside `[...]` (e.g., `[\s.-]`), which `_expand_character_range` doesn't handle.
+
+### Lazy DFA (PR #91)
+
+- **Cached state transitions**: Builds DFA states on-the-fly from PikeVM bytecode.
+  Each unique NFA state set becomes a cached DFA state with a 256-entry transition
+  table. After warmup (~20 bytes), most transitions hit cache for O(1) per byte.
+- **Interior mutability**: Uses `UnsafePointer[LazyDFA]` for cache mutation through
+  non-mut `self` (required by `RegexMatcher` trait). Proper `__del__` for cleanup.
+- **No eviction**: State list grows freely (typically 10-50 states, ~2KB each).
+  Avoids unsafe mid-match eviction that could invalidate live state IDs.
+- Key results:
+  - `flexible_phone`: **22.5x faster** than Python, **0.6x vs Rust**
+  - `multi_format_phone`: **76.4x faster** than Python, **0.6x vs Rust**
+  - `phone_validation`: **14.6x faster** than Python
+
+### `.*` last-literal optimization (PR #90)
+
+- **`rfind` for last-literal search**: `_find_last_literal` used repeated forward
+  `twoway_search` (O(N * occurrences)). Replaced with `String.rfind` for single-pass
+  O(n) reverse scan.
+- `required_literal_short` (`.*@example\.com`): **39x faster**, now 10.7x faster
+  than Python (was the last consistent loss).
+
+### Code quality
+
+- `Instruction` marked `TrivialRegisterPassable` for zero-overhead access.
+- Pre-allocated `List` capacity for instructions (128) and class tables (8).
+- Class table deduplication via SIMD `eq()` check.
+- Extracted `_use_pikevm_for_search` helper to deduplicate routing condition.
+- Early return in `_build_first_byte_filter` for OP_ANY/OP_MATCH.
+- Suppressed unused `emit()` return warnings.
+- Reused `_expand_character_range` for DIGIT/WORD/SPACE in PikeVM compiler.
+
 ## v0.8.0 (2026-03-31)
 
 Major performance release. Mojo vs Python win rate improved from 53% to 85% (52 wins, 9 losses out of 61 benchmarks).

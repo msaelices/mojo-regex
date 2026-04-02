@@ -1,6 +1,6 @@
 # Benchmark Results
 
-Comparison of mojo-regex v0.8.0, Python `re` module, and Rust `regex` crate.
+Comparison of mojo-regex v0.9.0, Python `re` module, and Rust `regex` crate.
 
 - **Mojo**: 0.26.2 stable, compiled with default optimization
 - **Python**: CPython (system), `re` module (C implementation)
