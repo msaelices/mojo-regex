@@ -216,6 +216,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.ast = take.ast^
         self._lazy_dfa_ptr = take._lazy_dfa_ptr
         self._has_lazy_dfa = take._has_lazy_dfa
+        take._has_lazy_dfa = False  # Prevent double-free
+
+    def __del__(deinit self):
+        """Free the heap-allocated lazy DFA."""
+        if self._has_lazy_dfa:
+            self._lazy_dfa_ptr.destroy_pointee()
+            self._lazy_dfa_ptr.free()
 
     @always_inline
     def match_first(self, text: String, start: Int = 0) -> Optional[Match]:

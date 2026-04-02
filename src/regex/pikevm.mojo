@@ -878,23 +878,9 @@ struct LazyDFA(Copyable, Movable):
             if self.states[i].nfa_set.eq(nfa_set).reduce_and():
                 return i
 
-        # Evict all if too many states
-        if len(self.states) >= LAZY_DFA_MAX_STATES:
-            self.states.clear()
-            # Rebuild start state
-            var start_pcs = InlineArray[Int, MAX_STATES](fill=0)
-            var start_count = 0
-            var start_seen = SIMD[DType.uint8, MAX_STATES](0)
-            var dummy = UnsafePointer[UInt8, MutAnyOrigin]()
-            self.pikevm._add_state(
-                start_pcs, start_count, start_seen, 0, dummy, 0, 0
-            )
-            var start_match = self._has_match_in_set(start_seen)
-            self.states.append(CachedState(start_seen, start_match))
-            self.start_state_id = 0
-            # The new state might be the one we're looking for
-            if start_seen.eq(nfa_set).reduce_and():
-                return 0
+        # Note: no eviction. The list grows up to the number of reachable
+        # DFA states (typically 10-50). For pathological patterns it could
+        # grow larger, but each state is ~2KB so even 256 states = 512KB.
 
         var is_match = self._has_match_in_set(nfa_set)
         var new_id = len(self.states)
