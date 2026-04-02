@@ -29,7 +29,7 @@ def parse_mojo_benchmark_output(output: str) -> dict:
 
     # Pattern to match benchmark result lines:
     # | literal_match_short       |   0.00001621246337890 |   8300 |
-    result_pattern = r"\|\s*(\S+)\s*\|\s*([\d.]+)\s*\|\s*(\d+)\s*\|"
+    result_pattern = r"\|\s*(\S+)\s*\|\s*([\d.eE+-]+)\s*\|\s*(\d+)\s*\|"
 
     # First pass: extract engine information
     for line in output.split("\n"):

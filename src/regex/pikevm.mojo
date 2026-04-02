@@ -683,10 +683,12 @@ struct LazyDFA(Copyable, Movable):
         """Check if the underlying PikeVM program fits."""
         return self.pikevm.is_supported()
 
+    @always_inline
     def match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Match at position using cached DFA transitions."""
         return self._run_lazy(text, start)
 
+    @always_inline
     def match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
         """Search using cached DFA with first-byte prefilter."""
         var text_len = len(text)
@@ -709,6 +711,7 @@ struct LazyDFA(Copyable, Movable):
                 return result
         return None
 
+    @always_inline
     def match_all(mut self, text: String) -> MatchList:
         """Find all matches using cached DFA."""
         var matches = MatchList()
@@ -740,6 +743,7 @@ struct LazyDFA(Copyable, Movable):
                 pos += 1
         return matches^
 
+    @always_inline
     def _run_lazy(mut self, text: String, start: Int) -> Optional[Match]:
         """Run the lazy DFA from a start position."""
         var text_ptr = text.unsafe_ptr()
@@ -750,32 +754,38 @@ struct LazyDFA(Copyable, Movable):
         if state_id == LAZY_DFA_DEAD:
             return None
 
-        var pos = start
-        while pos <= text_len:
-            # Check if current state is a match
-            if self.states[state_id].is_match:
-                match_end = pos
+        # Get direct pointer to states data for unchecked access in hot loop
+        var states_ptr = self.states.unsafe_ptr()
 
-            if pos == text_len:
-                break
+        var pos = start
+        while pos < text_len:
+            # Check if current state is a match
+            if states_ptr[state_id].is_match:
+                match_end = pos
 
             var ch = Int(text_ptr[pos])
 
             # Look up cached transition
-            var next_id = self.states[state_id].transitions[ch]
+            var next_id = states_ptr[state_id].transitions[ch]
 
             if next_id == LAZY_DFA_UNKNOWN:
                 # Cache miss: compute via PikeVM one-step simulation
                 next_id = self._compute_transition(
                     state_id, ch, text_ptr, pos, text_len
                 )
-                self.states[state_id].transitions[ch] = next_id
+                # Re-fetch pointer in case _compute_transition grew the list
+                states_ptr = self.states.unsafe_ptr()
+                states_ptr[state_id].transitions[ch] = next_id
 
             if next_id == LAZY_DFA_DEAD:
                 break
 
             state_id = next_id
             pos += 1
+
+        # Check final state at text_len (handles $ anchor)
+        if states_ptr[state_id].is_match:
+            match_end = pos
 
         if match_end >= 0:
             return Match(0, start, match_end, text)
