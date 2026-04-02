@@ -80,6 +80,10 @@ struct CharacterClassSIMD(
     """Number of characters in the class for optimization decisions."""
     var use_shuffle: Bool
     """Whether to use shuffle optimization based on pattern characteristics."""
+    var range_start: Int
+    """Start of contiguous byte range (-1 if not a contiguous range)."""
+    var range_end: Int
+    """End of contiguous byte range (-1 if not a contiguous range)."""
 
     def __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
@@ -99,6 +103,8 @@ struct CharacterClassSIMD(
             and self.size_hint <= SHUFFLE_MAX_SIZE
             and USE_SHUFFLE
         )
+        self.range_start = -1
+        self.range_end = -1
 
         # Set bits for each character in the class
         var cc_ptr = char_class.unsafe_ptr()
@@ -126,6 +132,8 @@ struct CharacterClassSIMD(
         # Character ranges typically benefit from shuffle optimization
         # Supports both SSE (16-byte) and AVX2 (32-byte) SIMD widths
         self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
+        self.range_start = clamped_start
+        self.range_end = clamped_end
 
         for char_code in range(clamped_start, clamped_end + 1):
             self.lookup_table[char_code] = 1
@@ -360,8 +368,10 @@ struct CharacterClassSIMD(
         self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
     ) -> Int:
         """Count consecutive matching characters from start position.
-        Uses a stack-allocated byte array for fast sequential lookup,
-        avoiding the overhead of SIMD[DType.uint8, 256] element access.
+
+        For contiguous byte ranges (e.g. [a-z], [0-9]), uses SIMD range
+        comparison to process SIMD_WIDTH bytes per iteration. Falls back
+        to 4-way unrolled scalar loop for non-contiguous character classes.
 
         Args:
             text_ptr: Pointer to text bytes.
@@ -371,24 +381,45 @@ struct CharacterClassSIMD(
         Returns:
             Number of consecutive matching characters from start.
         """
-        # Use direct lookup_table indexing (not nibble tables which can
-        # have false positives due to 8-bit bitmask overflow for nibbles >= 8).
         var pos = start
 
-        while pos + 4 <= text_len:
-            if self.lookup_table[Int(text_ptr[pos])] == 0:
-                break
-            if self.lookup_table[Int(text_ptr[pos + 1])] == 0:
-                pos += 1
-                break
-            if self.lookup_table[Int(text_ptr[pos + 2])] == 0:
-                pos += 2
-                break
-            if self.lookup_table[Int(text_ptr[pos + 3])] == 0:
-                pos += 3
-                break
-            pos += 4
+        # SIMD fast path for contiguous byte ranges (e.g. [a-z], [0-9]).
+        # Uses unsigned subtraction + min + eq: 3 SIMD ops per SIMD_WIDTH bytes.
+        if self.range_start >= 0:
+            var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                # (chunk - lo) wraps for values < lo. In-range values
+                # produce [0, span]; out-of-range produce > span.
+                # min clamps to span, so eq detects out-of-range.
+                var shifted = chunk - lo
+                var in_range = shifted.eq(min(shifted, span))
+                if in_range.reduce_and():
+                    pos += SIMD_WIDTH
+                else:
+                    for i in range(SIMD_WIDTH):
+                        if not in_range[i]:
+                            return pos + i - start
+        else:
+            # Scalar 4-way unroll for non-contiguous character classes
+            while pos + 4 <= text_len:
+                if self.lookup_table[Int(text_ptr[pos])] == 0:
+                    break
+                if self.lookup_table[Int(text_ptr[pos + 1])] == 0:
+                    pos += 1
+                    break
+                if self.lookup_table[Int(text_ptr[pos + 2])] == 0:
+                    pos += 2
+                    break
+                if self.lookup_table[Int(text_ptr[pos + 3])] == 0:
+                    pos += 3
+                    break
+                pos += 4
 
+        # Scalar tail
         while pos < text_len:
             if self.lookup_table[Int(text_ptr[pos])] == 0:
                 break
