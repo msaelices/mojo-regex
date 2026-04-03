@@ -240,7 +240,6 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
             self.transitions[char_code] = Int32(target_state)
 
     @always_inline
-    @always_inline
     def get_transition(self, char_code: Int) -> Int:
         """Get the target state for a given character.
 
