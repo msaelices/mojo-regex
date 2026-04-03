@@ -244,14 +244,12 @@ struct DFAState(ImplicitlyCopyable, Movable, RegisterPassable):
         """Get the target state for a given character.
 
         Args:
-            char_code: ASCII code of the character.
+            char_code: ASCII code of the character (0-255).
 
         Returns:
             Target state index, or -1 if no transition exists.
         """
-        if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
-            return Int(self.transitions[char_code])
-        return -1
+        return Int(self.transitions[char_code])
 
 
 struct DFAEngine(Engine):
@@ -1932,43 +1930,35 @@ struct DFAEngine(Engine):
         var last_accepting_pos = -1
         var text_ptr = text.unsafe_ptr()
         var text_len = len(text)
+        var num_states = len(self.states)
+
+        # Direct pointer to states for unchecked access in hot loop
+        var states_ptr = self.states.unsafe_ptr()
 
         # Check if start state is accepting (for patterns like a*)
-        if (
-            current_state < len(self.states)
-            and self.states[current_state].is_accepting
-        ):
+        if current_state < num_states and states_ptr[current_state].is_accepting:
             last_accepting_pos = pos
 
         while pos < text_len:
-            var char_code = Int(text_ptr[pos])
-
-            if current_state >= len(self.states):
-                break
-
-            var next_state = self.states[current_state].get_transition(
-                char_code
+            var next_state = states_ptr[current_state].get_transition(
+                Int(text_ptr[pos])
             )
 
             if next_state == -1:
-                # No transition available
                 break
 
             current_state = next_state
             pos += 1
 
             # Check if current state is accepting
-            if (
-                current_state < len(self.states)
-                and self.states[current_state].is_accepting
-            ):
+            if states_ptr[current_state].is_accepting:
                 last_accepting_pos = pos
 
-        # Check if we ended in an accepting state (important for exact matches)
+        # Check final state at text end
         if (
             pos == text_len
-            and current_state < len(self.states)
-            and self.states[current_state].is_accepting
+            and current_state < num_states
+            and states_ptr[current_state].is_accepting
         ):
             last_accepting_pos = pos
 
