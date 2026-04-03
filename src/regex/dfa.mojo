@@ -1936,7 +1936,10 @@ struct DFAEngine(Engine):
         var states_ptr = self.states.unsafe_ptr()
 
         # Check if start state is accepting (for patterns like a*)
-        if current_state < num_states and states_ptr[current_state].is_accepting:
+        if (
+            current_state < num_states
+            and states_ptr[current_state].is_accepting
+        ):
             last_accepting_pos = pos
 
         while pos < text_len:
