@@ -57,6 +57,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         BenchType::Search
     );
 
+    // Compile-time specialization benchmark (Rust equivalent)
+    run_benchmark(
+        &timer,
+        &mut all_results,
+        "compile_time_literal",
+        &patterns.hello,
+        &format!("{} hello world {}", text_100000, text_10000),
+        2000,
+        BenchType::Search
+    );
+
     // ===-----------------------------------------------------------------------===
     // Wildcard and Quantifier Benchmarks
     // ===-----------------------------------------------------------------------===
