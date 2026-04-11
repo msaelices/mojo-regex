@@ -55,7 +55,7 @@ This software is in an early stage of development. Even though it is functional,
 - ✅ **SIMD Optimization** - Vectorized character class matching
 - ✅ **Pattern Compilation Caching** - Pre-compiled patterns for reuse
 - ✅ **Match Position Tracking** - Precise start_idx, end_idx reporting
-- ✅ **Simple API**: `match_first(pattern, text) -> Optional[Match]`
+- ✅ **Simple API**: `match_first`, `search`, `findall`, `sub`
 
 
 ## Installation
@@ -71,7 +71,7 @@ This software is in an early stage of development. Even though it is functional,
 ## Example Usage
 
 ```mojo
-from regex import match_first, findall
+from regex import match_first, findall, sub
 
 # Basic matching
 var result = match_first("hello", "hello world")
@@ -102,6 +102,17 @@ for i in range(len(numbers)):
 var phones = findall("[0-9]{3}-[0-9]{3}-[0-9]{4}", "Call 555-123-4567 or 800-555-9999")
 for i in range(len(phones)):
     print("Phone found:", phones[i].get_match_text())
+
+# Pattern substitution (re.sub equivalent)
+var cleaned = sub("\\s+", " ", "hello   world")
+print(cleaned)  # "hello world"
+
+var redacted = sub("[0-9]{3}-[0-9]{4}", "***-****", "Call 555-123-4567")
+print(redacted)  # "Call 555-***-****"
+
+# Limit replacements with count
+var result2 = sub("o", "0", "hello world", count=1)
+print(result2)  # "hell0 world"
 ```
 
 ## Performance
@@ -164,7 +175,7 @@ mojo test -I src/ tests/test_simd_integration.mojo
 - [ ] Non-capturing groups (`(?:...)`)
 - [ ] Named groups (`(?<name>...)` or `(?P<name>...)`)
 - [ ] Case insensitive matching options
-- [ ] Match replacement (`sub()`, `gsub()`)
+- [x] Match replacement (`sub()`)
 - [ ] String splitting (`split()`)
 
 ### Medium Priority
