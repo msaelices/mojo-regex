@@ -1785,6 +1785,7 @@ struct DFAEngine(Engine):
         """
         return self.literal_pattern
 
+    @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches at the given position without computing
         match boundaries. Much faster than match_first for simple checks.

@@ -153,6 +153,7 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
+    @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         return self.engine_ptr[].is_match(text, start)
@@ -502,6 +503,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
 
+    @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         if self.is_wildcard_match_any:
@@ -777,6 +779,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         var result = self.matcher.match_next(text, 0)
         return result.__bool__()
 
+    @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches at the given position without computing
         match boundaries. Much faster than match_first for simple existence checks.
