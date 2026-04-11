@@ -4,43 +4,24 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
-### `StringSlice` pattern in the public API (PRs #98, #99)
+### `StringSlice` pattern in the public API (PR #99)
 
-- **`compile_regex`, `match_first`, `search`, `findall` now take `pattern: ImmSlice`** instead of `String`, matching the `text: ImmSlice` signatures from PR #95. Callers passing a string literal or existing slice no longer allocate a `String` to probe the regex cache.
-- **Hash-keyed regex cache**: cache type is now `Dict[UInt64, CompiledRegex]` keyed on `hash(pattern)`. Cache hits hash the slice, probe the dict, verify `cached.pattern == pattern` byte-for-byte, and return. Zero `String` allocations on the hit path. On a miss, the `String` is allocated once when constructing `CompiledRegex` (which owns `pattern: String` for `get_stats` and engine init). The byte-compare on hit defends against the astronomically rare (`P ~ 10⁻¹⁶` for realistic cache sizes) 64-bit hash collision by falling through to a fresh compile.
-- **`NFAMatcher` lazy DFA allocation fix (PR #98)**: `__init__` and `__copyinit__` now use `init_pointee_move` instead of `self._lazy_dfa_ptr[] = LazyDFA(...)`. The old form ran a move-assignment into uninitialized storage returned by `alloc`, destructing garbage memory and causing a nondeterministic crash at process exit. Collapsed the `(ptr, _has_lazy_dfa: Bool)` pair into a single nullable `_lazy_dfa_ptr` to avoid a dead-store warning that masked the real issue.
-- **`@always_inline` on `is_match` trampoline**: `CompiledRegex` -> `HybridMatcher` -> `DFAMatcher` -> `DFAEngine` is now inlined end-to-end, so passing a 16-byte `ImmSlice` through four call levels folds into the single-byte-read fast path.
-- **Debug info on CI test task (PR #98)**: switched `pixi run test` from `mojo run` to `mojo build -debug-level=line-tables` + execute, so future crashes come with a symbolicated stack trace instead of an unmapped address.
+- `compile_regex`, `match_first`, `search`, `findall` now take `pattern: ImmSlice`, matching the `text: ImmSlice` signatures from PR #95.
+- Regex cache rekeyed from `Dict[String, CompiledRegex]` to `Dict[UInt64, CompiledRegex]` on `hash(pattern)`. Cache hits allocate zero Strings (hash + probe + byte-compare against `cached.pattern`). On the astronomically rare 64-bit hash collision we fall through to a fresh compile.
 
-### `StringSlice` in the matcher chain (PR #95)
+### `NFAMatcher` lazy DFA initialization fix (PR #98)
 
-- **No more `String` allocation at the call site**: `match_first`, `search`,
-  `findall`, `CompiledRegex`, `HybridMatcher`, `DFAMatcher`/`NFAMatcher`, and
-  their underlying engines (`DFAEngine`, `NFAEngine`, `PikeVMEngine`,
-  `LazyDFA`) now take `ImmSlice` (`StringSlice[ImmutAnyOrigin]`) for the
-  `text` parameter. Callers passing a string literal or an existing slice no
-  longer allocate a backing `String` just to hand it to the matcher. Shared
-  SIMD helpers (`verify_match`, `simd_search`, `twoway_search`,
-  `apply_quantifier_simd_generic`) take the same type.
-- **Match stays 32 bytes**: `Match` stores just the base byte pointer
-  (`UnsafePointer[Byte, ImmutAnyOrigin]`) and rebuilds the matched slice from
-  `start_idx`/`end_idx` on demand, keeping the struct at its original
-  footprint so `MatchList` iteration stays cache-friendly.
-- **`@always_inline` on the `is_match` chain**: The four-level trampoline
-  (`CompiledRegex` -> `HybridMatcher` -> `DFAMatcher` -> `DFAEngine`) now
-  inlines end-to-end. Without it, each level was copying a 16-byte
-  `StringSlice` by value for a fast path whose real work is a single byte
-  read plus a lookup-table test.
-- **Cleanup**: Removed redundant `__str__`/`__repr__` methods on `Regex`,
-  `ASTNode`, and `PatternComplexity` that are already covered by `Writable`.
-- Key results (best-of-3 on each branch, 65 engine benchmarks, 39 faster
-  >5%, 4 slower >5%, average **-11.49%**):
-  - `is_match_*` (5 benchmarks): **-65% to -68%** (~4 µs -> ~1.3 µs)
-  - `quad_quantifiers`: **-38.3%**
-  - `range_quantifiers`: **-23.8%**
-  - `dfa_dot_phone`: **-21.7%**
-  - `flexible_datetime`: **-20.6%**
-  - `ultra_dense_quantifiers`: **-19.5%**
+- `NFAMatcher.__init__`/`__copyinit__` now use `init_pointee_move` instead of `self._lazy_dfa_ptr[] = LazyDFA(...)`, which was move-assigning into uninitialized `alloc` storage and crashing nondeterministically at process exit. Collapsed the `(ptr, _has_lazy_dfa: Bool)` pair into a single nullable `_lazy_dfa_ptr`.
+- `@always_inline` on the `is_match` trampoline (`CompiledRegex` -> `HybridMatcher` -> `DFAMatcher` -> `DFAEngine`), so a 16-byte `ImmSlice` through four call levels folds into the one-byte fast path.
+- `pixi run test` switched from `mojo run` to `mojo build -debug-level=line-tables` + execute for symbolicated stack traces on CI crashes.
+
+### `StringSlice` text parameter in the matcher chain (PR #95)
+
+- The whole matcher chain (`match_first`/`search`/`findall`, `CompiledRegex`, `HybridMatcher`, `DFAMatcher`/`NFAMatcher`, `DFAEngine`/`NFAEngine`/`PikeVMEngine`/`LazyDFA`, and shared SIMD helpers) now takes `text: ImmSlice` instead of `String`. Callers no longer allocate to hand over a literal or slice.
+- `Match` stores a single byte pointer instead of `UnsafePointer[String]`, keeping the struct at 32 bytes so `MatchList` iteration stays cache-friendly.
+- `is_match` is `@always_inline` end-to-end through the four-level trampoline, so the 16-byte slice folds into the one-byte-read fast path.
+- Removed redundant `__str__`/`__repr__` on `Regex`, `ASTNode`, `PatternComplexity` (covered by `Writable`).
+- Results (best-of-3, 65 engine benchmarks, 39 faster >5%, 4 slower >5%, average **-11.49%**): `is_match_*` -65%/-68% (~4 µs -> ~1.3 µs), `quad_quantifiers` -38%, `range_quantifiers` -24%, `dfa_dot_phone` -22%, `flexible_datetime` -21%, `ultra_dense_quantifiers` -20%.
 
 ### DFA inner loop optimization (PR #94)
 
