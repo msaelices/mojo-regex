@@ -2,9 +2,18 @@ from std.memory import UnsafePointer
 
 from regex.ast import ASTNode, DIGIT, WORD, SPACE
 from regex.aliases import (
-    CHAR_ZERO,
-    CHAR_NINE,
+    CHAR_A,
+    CHAR_A_UPPER,
+    CHAR_CR,
+    CHAR_FF,
     CHAR_NEWLINE,
+    CHAR_NINE,
+    CHAR_SPACE,
+    CHAR_TAB_CHAR,
+    CHAR_UNDERSCORE,
+    CHAR_Z,
+    CHAR_Z_UPPER,
+    CHAR_ZERO,
     ImmSlice,
     SIMD_MATCHER_DIGITS,
     SIMD_MATCHER_WHITESPACE,
@@ -703,11 +712,17 @@ struct NFAEngine(Copyable, Engine):
         if str_i >= len(str):
             return (False, str_i)
 
-        # Use specialized SIMD whitespace matcher for better performance
-        var whitespace_matcher = get_whitespace_matcher()
+        # Inline range check avoids a per-character Dict lookup through
+        # `get_whitespace_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
         var ch_code = Int(str_ptr[str_i])
-        if whitespace_matcher.contains(ch_code):
+        if (
+            ch_code == CHAR_SPACE
+            or ch_code == CHAR_TAB_CHAR
+            or ch_code == CHAR_NEWLINE
+            or ch_code == CHAR_CR
+            or ch_code == CHAR_FF
+        ):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -735,11 +750,11 @@ struct NFAEngine(Copyable, Engine):
             else:
                 return (False, str_i)
 
-        # Use specialized SIMD digit matcher for better performance
-        var digit_matcher = get_digit_matcher()
+        # Inline range check avoids a per-character Dict lookup through
+        # `get_digit_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
         var ch_code = Int(str_ptr[str_i])
-        if digit_matcher.contains(ch_code):
+        if CHAR_ZERO <= ch_code <= CHAR_NINE:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -775,11 +790,16 @@ struct NFAEngine(Copyable, Engine):
             else:
                 return (False, str_i)
 
-        # Use specialized SIMD word matcher for better performance
-        var word_matcher = get_word_matcher()
+        # Inline range check avoids a per-character Dict lookup through
+        # `get_word_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
         var ch_code = Int(str_ptr[str_i])
-        if word_matcher.contains(ch_code):
+        if (
+            (CHAR_A <= ch_code <= CHAR_Z)
+            or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+            or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+            or ch_code == CHAR_UNDERSCORE
+        ):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
             )
@@ -814,23 +834,24 @@ struct NFAEngine(Copyable, Engine):
         if ast.get_value():
             ref range_pattern = ast.get_value().value()
 
-            # Check for common patterns with specialized matchers
+            # Common patterns use inline range checks to avoid a per-character
+            # Dict lookup through `get_alnum_matcher()`/`get_alpha_matcher()`.
             if range_pattern == "[a-zA-Z0-9]":
-                var alnum_matcher = get_alnum_matcher()
-                ch_found = alnum_matcher.contains(ch_code)
+                ch_found = (
+                    (CHAR_A <= ch_code <= CHAR_Z)
+                    or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                    or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+                )
             elif range_pattern == "[a-z]":
-                # Use RangeBasedMatcher for simple lowercase range
-                ch_found = ch_code >= ord("a") and ch_code <= ord("z")
+                ch_found = CHAR_A <= ch_code <= CHAR_Z
             elif range_pattern == "[A-Z]":
-                # Use RangeBasedMatcher for simple uppercase range
-                ch_found = ch_code >= ord("A") and ch_code <= ord("Z")
+                ch_found = CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
             elif range_pattern == "[0-9]":
-                # Use RangeBasedMatcher for digit range
-                ch_found = ch_code >= ord("0") and ch_code <= ord("9")
+                ch_found = CHAR_ZERO <= ch_code <= CHAR_NINE
             elif range_pattern == "[a-zA-Z]":
-                # Use RangeBasedMatcher for alphabetic range
-                var alpha_matcher = get_alpha_matcher()
-                ch_found = alpha_matcher.contains(ch_code)
+                ch_found = (CHAR_A <= ch_code <= CHAR_Z) or (
+                    CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
+                )
             else:
                 # Check if it's a complex pattern with alphanumeric + special chars
                 if range_pattern.startswith("[") and range_pattern.endswith(
@@ -844,9 +865,14 @@ struct NFAEngine(Copyable, Engine):
 
                     if has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD:
                         # Complex pattern like [a-zA-Z0-9._%+-]
-                        # Check alphanumeric first (common case)
-                        var alnum_matcher = get_alnum_matcher()
-                        if alnum_matcher.contains(ch_code):
+                        # Check alphanumeric first (common case) via inline
+                        # range check, then fall back to the special-char
+                        # byte scan.
+                        if (
+                            (CHAR_A <= ch_code <= CHAR_Z)
+                            or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                            or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+                        ):
                             ch_found = True
                         else:
                             # Not alphanumeric, check special chars
