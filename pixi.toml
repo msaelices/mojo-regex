@@ -22,7 +22,7 @@ backend = { name = "pixi-build-rattler-build", version = "*" }
 mojo = ">=0.26.1,<0.27"
 
 [tasks]
-test = "bash -c 'status=0; for f in tests/test_*.mojo; do echo \"Running $f...\"; mojo run -I ./src $f || status=1; done; exit $status'"
+test = "bash -c 'status=0; for f in tests/test_*.mojo; do echo \"Running $f...\"; out=$(mktemp -d); mojo build -I ./src -debug-level=line-tables \"$f\" -o \"$out/exe\" && \"$out/exe\" || status=1; rm -rf \"$out\"; done; exit $status'"
 format = "mojo format benchmarks/ src/regex/ tests/"
 
 [feature.mojopkg.dependencies]
