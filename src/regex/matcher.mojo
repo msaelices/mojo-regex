@@ -175,17 +175,24 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """NFA-based matcher with lazy DFA acceleration.
-    Uses UnsafePointer for the lazy DFA to allow cache mutation
-    through non-mut self (required by RegexMatcher trait)."""
+
+    Owns an optional heap-allocated `LazyDFA`. The lazy DFA is stored
+    behind a nullable `UnsafePointer` rather than an `Optional[LazyDFA]`
+    inline so that calling `mut self` methods on it (the lazy DFA caches
+    transitions as it runs) is possible through the read-only `self` that
+    the `RegexMatcher` trait demands. A null pointer means no lazy DFA is
+    available; this collapses the previous `(ptr, has_dfa_bool)` pair into
+    a single source of truth and avoids the dead-store-elimination pitfall
+    that would fire when the bool was zeroed in `__moveinit__`.
+    """
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
     var _lazy_dfa_ptr: UnsafePointer[LazyDFA, MutAnyOrigin]
-    """Heap-allocated lazy DFA (allows mutation through shared ref)."""
-    var _has_lazy_dfa: Bool
-    """Whether the lazy DFA is available."""
+    """Heap-allocated lazy DFA. Null when the pattern is not eligible for
+    lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES)."""
 
     def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
         """Initialize NFA matcher with optional lazy DFA."""
@@ -194,42 +201,46 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         var vm = PikeVMEngine(compile_ast(ast))
         if vm.is_supported():
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
-            self._lazy_dfa_ptr[] = LazyDFA(vm^)
-            self._has_lazy_dfa = True
+            # `init_pointee_move` constructs into uninitialized memory.
+            # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
+            # move-assignment into garbage storage, which was the source
+            # of the flaky double-free at process exit (issue #97).
+            self._lazy_dfa_ptr.init_pointee_move(LazyDFA(vm^))
         else:
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
-            self._has_lazy_dfa = False
 
     def __copyinit__(out self, copy: Self):
-        """Copy constructor."""
+        """Copy constructor. Deep-copies the lazy DFA so each matcher
+        owns an independent cache."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
-        if copy._has_lazy_dfa:
+        if copy._lazy_dfa_ptr:
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
-            self._lazy_dfa_ptr[] = copy._lazy_dfa_ptr[].copy()
-            self._has_lazy_dfa = True
+            self._lazy_dfa_ptr.init_pointee_move(copy._lazy_dfa_ptr[].copy())
         else:
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
-            self._has_lazy_dfa = False
 
     def __moveinit__(out self, deinit take: Self):
-        """Move constructor."""
+        """Move constructor. Transfers ownership of the heap-allocated
+        lazy DFA from `take` to `self`. No need to clear `take`'s pointer:
+        Mojo's `deinit take` semantics guarantee `take.__del__` is not
+        called after this function returns (the compiler will warn if a
+        field write is interpreted as a dead store, confirming `take` is
+        fully consumed)."""
         self.engine = take.engine^
         self.ast = take.ast^
         self._lazy_dfa_ptr = take._lazy_dfa_ptr
-        self._has_lazy_dfa = take._has_lazy_dfa
-        take._has_lazy_dfa = False  # Prevent double-free
 
     def __del__(deinit self):
-        """Free the heap-allocated lazy DFA."""
-        if self._has_lazy_dfa:
+        """Free the heap-allocated lazy DFA if we still own one."""
+        if self._lazy_dfa_ptr:
             self._lazy_dfa_ptr.destroy_pointee()
             self._lazy_dfa_ptr.free()
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match. Uses lazy DFA if available."""
-        if self._has_lazy_dfa:
+        if self._lazy_dfa_ptr:
             return self._lazy_dfa_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
 
@@ -237,7 +248,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     def _use_lazy_dfa_for_search(self) -> Bool:
         """Use lazy DFA when NFA has no fast paths."""
         return (
-            self._has_lazy_dfa
+            Bool(self._lazy_dfa_ptr)
             and not self.engine.has_literal_optimization
             and not self.engine._starts_with_dotstar()
             and not self.engine._ends_with_dotstar()
