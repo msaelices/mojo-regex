@@ -10,6 +10,7 @@ from std.os import abort
 from std.ffi import _Global
 from std.time import monotonic
 
+from regex.aliases import ImmSlice
 from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
@@ -97,7 +98,7 @@ def check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
 trait RegexMatcher:
     """Interface for different regex matching engines."""
 
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find the first match in text starting from the given position.
 
         Args:
@@ -109,7 +110,7 @@ trait RegexMatcher:
         """
         ...
 
-    def match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all non-overlapping matches in text.
 
         Args:
@@ -152,21 +153,22 @@ struct DFAMatcher(Copyable, Movable, RegexMatcher):
         """Check if DFA matcher is valid (compiled)."""
         return Bool(self.engine_ptr)
 
-    def is_match(self, text: String, start: Int = 0) -> Bool:
+    @always_inline
+    def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         return self.engine_ptr[].is_match(text, start)
 
     @always_inline
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_first(text, start)
 
     @always_inline
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
         return self.engine_ptr[].match_next(text, start)
 
-    def match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches using DFA execution."""
         return self.engine_ptr[].match_all(text)
 
@@ -225,7 +227,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             self._lazy_dfa_ptr.free()
 
     @always_inline
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match. Uses lazy DFA if available."""
         if self._has_lazy_dfa:
             return self._lazy_dfa_ptr[].match_first(text, start)
@@ -242,14 +244,14 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         )
 
     @always_inline
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for match."""
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
-    def match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches."""
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_all(text)
@@ -501,7 +503,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
 
-    def is_match(self, text: String, start: Int = 0) -> Bool:
+    @always_inline
+    def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         if self.is_wildcard_match_any:
             return start <= len(text)
@@ -516,7 +519,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         return Bool(self.nfa_matcher.match_first(text, start))
 
     @always_inline
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
 
@@ -538,7 +541,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
 
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
@@ -590,7 +593,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         else:
             return self.nfa_matcher.match_next(text, start)
 
-    def match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
@@ -729,7 +732,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     #     )
 
     @always_inline
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.match in Python.
 
         Args:
@@ -741,7 +744,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_first(text, start)
 
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
 
         Args:
@@ -753,7 +756,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_next(text, start)
 
-    def match_all(self, text: String) raises -> MatchList:
+    def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches in text.
 
         Args:
@@ -764,7 +767,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_all(text)
 
-    def test(mut self, text: String) -> Bool:
+    def test(mut self, text: ImmSlice) -> Bool:
         """Test if pattern matches anywhere in text.
 
         Args:
@@ -776,7 +779,8 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         var result = self.matcher.match_next(text, 0)
         return result.__bool__()
 
-    def is_match(self, text: String, start: Int = 0) -> Bool:
+    @always_inline
+    def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches at the given position without computing
         match boundaries. Much faster than match_first for simple existence checks.
 
@@ -873,7 +877,7 @@ def clear_regex_cache():
 
 
 # High-level convenience functions that match Python's re module interface
-def search(pattern: String, text: String) raises -> Optional[Match]:
+def search(pattern: String, text: ImmSlice) raises -> Optional[Match]:
     """Search for pattern in text (equivalent to re.search in Python).
 
     Args:
@@ -889,7 +893,7 @@ def search(pattern: String, text: String) raises -> Optional[Match]:
     return compiled.match_next(text)
 
 
-def findall(pattern: String, text: String) raises -> MatchList:
+def findall(pattern: String, text: ImmSlice) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -903,7 +907,7 @@ def findall(pattern: String, text: String) raises -> MatchList:
     return compiled.match_all(text)
 
 
-def match_first(pattern: String, text: String) raises -> Optional[Match]:
+def match_first(pattern: String, text: ImmSlice) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
