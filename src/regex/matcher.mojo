@@ -5,6 +5,7 @@ This module provides the unified interface for different regex matching engines
 and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
+from std.hashlib import hash
 from std.memory import UnsafePointer, alloc
 from std.os import abort
 from std.ffi import _Global
@@ -831,11 +832,15 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         )
 
 
-# TODO: Disable cache for errors found while running tests:
-#  - Attempted to free corrupted pointer
-#  - Possible double free detected
-# Global pattern cache for improved performance
-comptime RegexCache = Dict[String, CompiledRegex]
+# Global pattern cache for improved performance.
+#
+# Keyed on `hash(pattern) -> UInt64` rather than `String` so that cache
+# lookups from a `StringSlice` caller do not require allocating a new
+# `String` just to probe the map. On a cache hit we verify that the
+# stored `CompiledRegex.pattern` byte-equals the caller's pattern, which
+# handles (astronomically unlikely) 64-bit hash collisions by falling
+# through to a fresh compile. See the collision analysis on issue #97.
+comptime RegexCache = Dict[UInt64, CompiledRegex]
 
 comptime _CACHE_GLOBAL = _Global["RegexCache", _init_regex_cache]
 
@@ -853,31 +858,29 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
         abort[prefix="ERROR:"](String(e))
 
 
-def compile_regex(pattern: String) raises -> CompiledRegex:
+def compile_regex(pattern: ImmSlice) raises -> CompiledRegex:
     """Compile a regex pattern with caching for repeated use.
 
     Args:
-        pattern: Regex pattern string.
+        pattern: Regex pattern.
 
     Returns:
         Compiled regex object ready for matching.
     """
-    # Caching approach: Cache CompiledRegex objects with HybridMatcher instances
-    # This provides optimal performance for repeated pattern usage
-
     var regex_cache_ptr = _get_regex_cache()
+    var key = hash(pattern)
     var compiled: CompiledRegex
 
-    if pattern in regex_cache_ptr[]:
-        # Return cached compiled regex for optimal performance
-        compiled = regex_cache_ptr[][pattern]
-        return compiled
-    else:
-        # Not in cache, compile new regex
-        compiled = CompiledRegex(pattern)
+    if key in regex_cache_ptr[]:
+        compiled = regex_cache_ptr[][key]
+        if compiled.pattern == pattern:
+            return compiled
+        # Hash collision: fall through to a fresh compile and overwrite.
 
-    # Add to cache for future reuse
-    regex_cache_ptr[][pattern] = compiled
+    # Cache miss: allocate the pattern String once for CompiledRegex to
+    # own. `get_stats` and engine construction both need a real String.
+    compiled = CompiledRegex(String(pattern))
+    regex_cache_ptr[][key] = compiled
     return compiled
 
 
@@ -888,11 +891,11 @@ def clear_regex_cache():
 
 
 # High-level convenience functions that match Python's re module interface
-def search(pattern: String, text: ImmSlice) raises -> Optional[Match]:
+def search(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
     """Search for pattern in text (equivalent to re.search in Python).
 
     Args:
-        pattern: Regex pattern string.
+        pattern: Regex pattern.
         text: Text to search in.
 
     Returns:
@@ -904,11 +907,11 @@ def search(pattern: String, text: ImmSlice) raises -> Optional[Match]:
     return compiled.match_next(text)
 
 
-def findall(pattern: String, text: ImmSlice) raises -> MatchList:
+def findall(pattern: ImmSlice, text: ImmSlice) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
-        pattern: Regex pattern string.
+        pattern: Regex pattern.
         text: Text to search in.
 
     Returns:
@@ -918,11 +921,11 @@ def findall(pattern: String, text: ImmSlice) raises -> MatchList:
     return compiled.match_all(text)
 
 
-def match_first(pattern: String, text: ImmSlice) raises -> Optional[Match]:
+def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:
-        pattern: Regex pattern string.
+        pattern: Regex pattern.
         text: Text to match against.
 
     Returns:
