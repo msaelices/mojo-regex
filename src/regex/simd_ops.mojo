@@ -21,6 +21,7 @@ from std.sys.info import simd_width_of
 from std.ffi import _Global
 
 from regex.aliases import (
+    ImmSlice,
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_WHITESPACE,
     SIMD_MATCHER_DIGITS,
@@ -569,7 +570,7 @@ def _create_word_chars() -> CharacterClassSIMD:
 
 
 def _search_short_pattern(
-    pattern: Span[Byte, _], text: String, start: Int
+    pattern: Span[Byte, _], text: ImmSlice, start: Int
 ) -> Int:
     """Optimized search for very short patterns (1-2 characters).
 
@@ -605,7 +606,7 @@ def _search_short_pattern(
     return -1
 
 
-def verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
+def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
     Args:
@@ -631,7 +632,7 @@ def verify_match(pattern: Span[Byte, _], text: String, pos: Int) -> Bool:
 
 def simd_search(
     pattern: Span[Byte, _],
-    text: String,
+    text: ImmSlice,
     start: Int = 0,
 ) -> Int:
     """Search for pattern in text using SIMD acceleration.
@@ -913,7 +914,7 @@ def apply_quantifier_simd_generic[
     T: SIMDMatcher
 ](
     matcher: T,
-    text: String,
+    text: ImmSlice,
     start_pos: Int,
     min_matches: Int,
     max_matches: Int,
@@ -1003,7 +1004,7 @@ def find_in_text_simd[
 
 def twoway_search(
     pattern: Span[Byte, _],
-    text: String,
+    text: ImmSlice,
     start: Int = 0,
 ) -> Int:
     """Search for pattern in text using Two-Way algorithm with SIMD.

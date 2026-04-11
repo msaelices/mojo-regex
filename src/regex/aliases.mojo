@@ -57,6 +57,11 @@ def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
 comptime EMPTY_SLICE = StringSlice[ImmutAnyOrigin]("")
 comptime EMPTY_STRING = String("")
 
+comptime ImmSlice = StringSlice[ImmutAnyOrigin]
+"""Short alias for an immutable string slice with erased origin, used across
+the matcher/engine chain so callers can pass string literals or views
+without allocating a `String`."""
+
 # SIMD matcher type constants
 comptime SIMD_MATCHER_NONE = 0
 comptime SIMD_MATCHER_WHITESPACE = 1

@@ -5,6 +5,7 @@ from regex.aliases import (
     CHAR_ZERO,
     CHAR_NINE,
     CHAR_NEWLINE,
+    ImmSlice,
     SIMD_MATCHER_DIGITS,
     SIMD_MATCHER_WHITESPACE,
     byte_in_string,
@@ -118,7 +119,7 @@ struct NFAEngine(Copyable, Engine):
 
     def match_all(
         self,
-        text: String,
+        text: ImmSlice,
     ) -> MatchList:
         """Searches a regex in a test string.
 
@@ -296,7 +297,7 @@ struct NFAEngine(Copyable, Engine):
 
         return matches^
 
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
 
@@ -338,7 +339,7 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.
 
@@ -450,7 +451,7 @@ struct NFAEngine(Copyable, Engine):
         return None
 
     @always_inline
-    def _find_last_literal(self, text: String, start: Int) -> Int:
+    def _find_last_literal(self, text: ImmSlice, start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
         # Use rfind for O(n) reverse search instead of repeated forward search
         var pos = text.rfind(self.literal_prefix)
@@ -534,7 +535,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_contains_literal(
-        self, text: String, start: Int, end: Int
+        self, text: ImmSlice, start: Int, end: Int
     ) -> Bool:
         """Verify that a match contains the required literal."""
         if not self.has_literal_optimization or len(self.literal_prefix) == 0:
@@ -548,7 +549,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_node(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool = False,
@@ -646,7 +647,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_element(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -671,7 +672,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_wildcard(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -693,7 +694,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_space(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -717,7 +718,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_digit(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -757,7 +758,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_word(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -797,7 +798,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_range(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -880,7 +881,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_end(
-        self, ast: ASTNode, str: String, str_i: Int
+        self, ast: ASTNode, str: ImmSlice, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match end anchor ($)."""
         if str_i == len(str):
@@ -905,7 +906,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_or(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -941,7 +942,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_group(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -987,7 +988,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_group_with_quantifier(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -1039,7 +1040,7 @@ struct NFAEngine(Copyable, Engine):
         self,
         ast_parent: ASTNode,
         child_index: Int,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -1111,7 +1112,7 @@ struct NFAEngine(Copyable, Engine):
         quantified_node: ASTNode,
         ast_parent: ASTNode,
         remaining_index: Int,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -1189,7 +1190,7 @@ struct NFAEngine(Copyable, Engine):
     def _try_match_count(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         count: Int,
         match_first_mode: Bool,
@@ -1225,7 +1226,7 @@ struct NFAEngine(Copyable, Engine):
     def _match_re(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         mut matches: List[Match],
         match_first_mode: Bool,
@@ -1247,7 +1248,7 @@ struct NFAEngine(Copyable, Engine):
     def _apply_quantifier(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         char_consumed: Int,
         match_first_mode: Bool,
@@ -1315,7 +1316,7 @@ struct NFAEngine(Copyable, Engine):
     def _apply_quantifier_simd(
         self,
         ast: ASTNode,
-        str: String,
+        str: ImmSlice,
         str_i: Int,
         min_matches: Int,
         max_matches: Int,
@@ -1601,7 +1602,7 @@ struct NFAEngine(Copyable, Engine):
             return byte_in_string(ch_code, range_pattern)
 
 
-def findall(pattern: String, text: String) raises -> MatchList:
+def findall(pattern: String, text: ImmSlice) raises -> MatchList:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1615,7 +1616,7 @@ def findall(pattern: String, text: String) raises -> MatchList:
     return engine.match_all(text)
 
 
-def match_first(pattern: String, text: String) raises -> Optional[Match]:
+def match_first(pattern: String, text: ImmSlice) raises -> Optional[Match]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

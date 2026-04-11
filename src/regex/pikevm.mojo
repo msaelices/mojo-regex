@@ -26,7 +26,7 @@ from regex.ast import (
     END,
 )
 from regex.matching import Match, MatchList
-from regex.aliases import WORD_CHARS
+from regex.aliases import ImmSlice, WORD_CHARS
 from regex.dfa import _expand_character_range
 
 
@@ -411,11 +411,11 @@ struct PikeVMEngine(Copyable, Movable):
         # Filter is useful if it excludes at least half the byte values
         self.has_filter = matching_bytes < 128
 
-    def match_first(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Match pattern at the given position (like re.match)."""
         return self._run(text, start)
 
-    def match_next(self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)
         if self.has_filter:
@@ -439,7 +439,7 @@ struct PikeVMEngine(Copyable, Movable):
                 return result
         return None
 
-    def match_all(self, text: String) -> MatchList:
+    def match_all(self, text: ImmSlice) -> MatchList:
         """Find all non-overlapping matches (like re.findall)."""
         var matches = MatchList()
         var pos = 0
@@ -477,7 +477,7 @@ struct PikeVMEngine(Copyable, Movable):
 
         return matches^
 
-    def _run(self, text: String, start: Int) -> Optional[Match]:
+    def _run(self, text: ImmSlice, start: Int) -> Optional[Match]:
         """Run PikeVM with fixed-size SIMD state tracking.
         Zero heap allocations per step."""
         var text_ptr = text.unsafe_ptr()
@@ -684,12 +684,12 @@ struct LazyDFA(Copyable, Movable):
         return self.pikevm.is_supported()
 
     @always_inline
-    def match_first(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_first(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Match at position using cached DFA transitions."""
         return self._run_lazy(text, start)
 
     @always_inline
-    def match_next(mut self, text: String, start: Int = 0) -> Optional[Match]:
+    def match_next(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search using cached DFA with first-byte prefilter."""
         var text_len = len(text)
         if self.pikevm.has_filter:
@@ -712,7 +712,7 @@ struct LazyDFA(Copyable, Movable):
         return None
 
     @always_inline
-    def match_all(mut self, text: String) -> MatchList:
+    def match_all(mut self, text: ImmSlice) -> MatchList:
         """Find all matches using cached DFA."""
         var matches = MatchList()
         var pos = 0
@@ -744,7 +744,7 @@ struct LazyDFA(Copyable, Movable):
         return matches^
 
     @always_inline
-    def _run_lazy(mut self, text: String, start: Int) -> Optional[Match]:
+    def _run_lazy(mut self, text: ImmSlice, start: Int) -> Optional[Match]:
         """Run the lazy DFA from a start position."""
         var text_ptr = text.unsafe_ptr()
         var text_len = len(text)
