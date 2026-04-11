@@ -79,14 +79,6 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
             len(pattern) * 2
         )  # Allocate enough space for children
 
-    def __str__(self) -> String:
-        """Return a string representation of the Regex."""
-        return String("Regex(pattern=", self.pattern, ")")
-
-    def __repr__(self) -> String:
-        """Return a string representation of the Regex."""
-        return String("Regex(pattern=", self.pattern, ")")
-
     @always_inline
     def __eq__[o: Origin](self, other: Regex[origin=o]) -> Bool:
         """Check if two Regex instances are equal."""
@@ -313,22 +305,6 @@ struct ASTNode[regex_origin: ImmutOrigin](
     def __ne__(self, other: ASTNode[Self.regex_origin]) -> Bool:
         """Check if two AST nodes are not equal."""
         return not self.__eq__(other)
-
-    def __repr__(self) -> String:
-        """Return a string representation of the PhoneNumberDesc."""
-        return String(
-            "ASTNode(type=",
-            self.type,
-            ", value=",
-            String(self.get_value().value()) if self.get_value() else "None",
-            ")",
-            sep="",
-        )
-
-    def __str__(self) -> String:
-        """Returns a user-friendly string representation of the PhoneNumberDesc.
-        """
-        return String.write(self)
 
     @no_inline
     def write_to[W: Writer, //](self, mut writer: W):

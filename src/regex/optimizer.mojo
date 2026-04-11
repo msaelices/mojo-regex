@@ -49,29 +49,9 @@ struct PatternComplexity(Copyable, TrivialRegisterPassable, Writable):
     def __ne__(self, other: Self) -> Bool:
         return self.value != other.value
 
-    def __repr__(self) -> String:
-        if self.value == PatternComplexity.SIMPLE:
-            return "PatternComplexity(SIMPLE)"
-        elif self.value == PatternComplexity.MEDIUM:
-            return "PatternComplexity(MEDIUM)"
-        elif self.value == PatternComplexity.COMPLEX:
-            return "PatternComplexity(COMPLEX)"
-        else:
-            return String("PatternComplexity(UNKNOWN:", self.value, ")")
-
-    def __str__(self) -> String:
-        if self.value == PatternComplexity.SIMPLE:
-            return "SIMPLE"
-        elif self.value == PatternComplexity.MEDIUM:
-            return "MEDIUM"
-        elif self.value == PatternComplexity.COMPLEX:
-            return "COMPLEX"
-        else:
-            return String("UNKNOWN:", self.value)
-
     @no_inline
     def write_to[W: Writer, //](self, mut writer: W):
-        """Writes a string representation of the PhoneNumberDesc to the writer.
+        """Writes a string representation of the PatternComplexity to the writer.
 
         Parameters:
             W: The type of the writer, conforming to the `Writer` trait.
@@ -79,7 +59,14 @@ struct PatternComplexity(Copyable, TrivialRegisterPassable, Writable):
         Args:
             writer: The writer instance to output the representation to.
         """
-        writer.write(self.__str__())
+        if self.value == PatternComplexity.SIMPLE:
+            writer.write("SIMPLE")
+        elif self.value == PatternComplexity.MEDIUM:
+            writer.write("MEDIUM")
+        elif self.value == PatternComplexity.COMPLEX:
+            writer.write("COMPLEX")
+        else:
+            writer.write("UNKNOWN:", self.value)
 
 
 struct OptimizationInfo(Movable):
