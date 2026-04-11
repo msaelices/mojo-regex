@@ -1,8 +1,38 @@
 # Changelog
 
-## v0.10.0 (unreleased)
+## v0.10.0 (2026-04-11)
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
+
+### `StringSlice` in the matcher chain (PR #95)
+
+- **No more `String` allocation at the call site**: `match_first`, `search`,
+  `findall`, `CompiledRegex`, `HybridMatcher`, `DFAMatcher`/`NFAMatcher`, and
+  their underlying engines (`DFAEngine`, `NFAEngine`, `PikeVMEngine`,
+  `LazyDFA`) now take `ImmSlice` (`StringSlice[ImmutAnyOrigin]`) for the
+  `text` parameter. Callers passing a string literal or an existing slice no
+  longer allocate a backing `String` just to hand it to the matcher. Shared
+  SIMD helpers (`verify_match`, `simd_search`, `twoway_search`,
+  `apply_quantifier_simd_generic`) take the same type.
+- **Match stays 32 bytes**: `Match` stores just the base byte pointer
+  (`UnsafePointer[Byte, ImmutAnyOrigin]`) and rebuilds the matched slice from
+  `start_idx`/`end_idx` on demand, keeping the struct at its original
+  footprint so `MatchList` iteration stays cache-friendly.
+- **`@always_inline` on the `is_match` chain**: The four-level trampoline
+  (`CompiledRegex` -> `HybridMatcher` -> `DFAMatcher` -> `DFAEngine`) now
+  inlines end-to-end. Without it, each level was copying a 16-byte
+  `StringSlice` by value for a fast path whose real work is a single byte
+  read plus a lookup-table test.
+- **Cleanup**: Removed redundant `__str__`/`__repr__` methods on `Regex`,
+  `ASTNode`, and `PatternComplexity` that are already covered by `Writable`.
+- Key results (best-of-3 on each branch, 65 engine benchmarks, 39 faster
+  >5%, 4 slower >5%, average **-11.49%**):
+  - `is_match_*` (5 benchmarks): **-65% to -68%** (~4 µs -> ~1.3 µs)
+  - `quad_quantifiers`: **-38.3%**
+  - `range_quantifiers`: **-23.8%**
+  - `dfa_dot_phone`: **-21.7%**
+  - `flexible_datetime`: **-20.6%**
+  - `ultra_dense_quantifiers`: **-19.5%**
 
 ### DFA inner loop optimization (PR #94)
 
