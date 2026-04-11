@@ -4,6 +4,14 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### `StringSlice` pattern in the public API (PRs #98, #99)
+
+- **`compile_regex`, `match_first`, `search`, `findall` now take `pattern: ImmSlice`** instead of `String`, matching the `text: ImmSlice` signatures from PR #95. Callers passing a string literal or existing slice no longer allocate a `String` to probe the regex cache.
+- **Hash-keyed regex cache**: cache type is now `Dict[UInt64, CompiledRegex]` keyed on `hash(pattern)`. Cache hits hash the slice, probe the dict, verify `cached.pattern == pattern` byte-for-byte, and return. Zero `String` allocations on the hit path. On a miss, the `String` is allocated once when constructing `CompiledRegex` (which owns `pattern: String` for `get_stats` and engine init). The byte-compare on hit defends against the astronomically rare (`P ~ 10⁻¹⁶` for realistic cache sizes) 64-bit hash collision by falling through to a fresh compile.
+- **`NFAMatcher` lazy DFA allocation fix (PR #98)**: `__init__` and `__copyinit__` now use `init_pointee_move` instead of `self._lazy_dfa_ptr[] = LazyDFA(...)`. The old form ran a move-assignment into uninitialized storage returned by `alloc`, destructing garbage memory and causing a nondeterministic crash at process exit. Collapsed the `(ptr, _has_lazy_dfa: Bool)` pair into a single nullable `_lazy_dfa_ptr` to avoid a dead-store warning that masked the real issue.
+- **`@always_inline` on `is_match` trampoline**: `CompiledRegex` -> `HybridMatcher` -> `DFAMatcher` -> `DFAEngine` is now inlined end-to-end, so passing a 16-byte `ImmSlice` through four call levels folds into the single-byte-read fast path.
+- **Debug info on CI test task (PR #98)**: switched `pixi run test` from `mojo run` to `mojo build -debug-level=line-tables` + execute, so future crashes come with a symbolicated stack trace instead of an unmapped address.
+
 ### `StringSlice` in the matcher chain (PR #95)
 
 - **No more `String` allocation at the call site**: `match_first`, `search`,
