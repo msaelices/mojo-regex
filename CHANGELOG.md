@@ -4,6 +4,10 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Inline NFA per-character range checks (PR #102)
+
+- Replaced per-character `get_digit_matcher()`/`get_word_matcher()`/`get_whitespace_matcher()`/`get_alnum_matcher()`/`get_alpha_matcher()` Dict lookups in `_match_digit`, `_match_word`, `_match_space`, and `_match_range` with direct O(1) comptime `CHAR_*` constant comparisons, matching the pattern already used by `ast.is_match_char`.
+
 ### `StringSlice` pattern in the public API (PR #99)
 
 - `compile_regex`, `match_first`, `search`, `findall` now take `pattern: ImmSlice`, matching the `text: ImmSlice` signatures from PR #95.
