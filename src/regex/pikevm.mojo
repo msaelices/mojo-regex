@@ -684,7 +684,9 @@ struct LazyDFA(Copyable, Movable):
         return self.pikevm.is_supported()
 
     @always_inline
-    def match_first(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_first(
+        mut self, text: ImmSlice, start: Int = 0
+    ) -> Optional[Match]:
         """Match at position using cached DFA transitions."""
         return self._run_lazy(text, start)
 
