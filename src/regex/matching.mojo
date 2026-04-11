@@ -15,10 +15,11 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
     """Starting position of the match in the text."""
     var end_idx: Int
     """Ending position of the match in the text (exclusive)."""
-    var text: ImmSlice
-    """View of the original text being matched. Does not own memory; the
-    caller must keep the backing storage alive for the lifetime of the match.
-    """
+    var text_ptr: UnsafePointer[Byte, ImmutAnyOrigin]
+    """Pointer to the start of the backing text bytes. Does not own memory;
+    the caller must keep the backing storage alive for the lifetime of the
+    match. We only store the base pointer (not a full slice) to keep Match
+    at the same 32-byte footprint as before the StringSlice refactor."""
 
     def __init__(
         out self,
@@ -30,11 +31,14 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
         self.group_id = group_id
         self.start_idx = start_idx
         self.end_idx = end_idx
-        self.text = text
+        self.text_ptr = text.unsafe_ptr()
 
     def get_match_text(self) -> ImmSlice:
         """Returns the text that was matched."""
-        return self.text[byte = self.start_idx : self.end_idx]
+        return ImmSlice(
+            ptr=self.text_ptr + self.start_idx,
+            length=self.end_idx - self.start_idx,
+        )
 
 
 struct MatchList(Copyable, Movable, Sized):
