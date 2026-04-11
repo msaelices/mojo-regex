@@ -109,18 +109,31 @@ AVX-512 systems (SIMD_WIDTH=64) fall back to scalar paths. ARM NEON has
 SIMD_WIDTH=16 but different shuffle semantics. Worth adding explicit AVX-512
 support and verifying ARM paths.
 
-## Medium: NFA Prefilter Thresholds
+## ~~Medium: NFA Prefilter Thresholds~~ (Already lowered, commit e85442a; re-evaluation needed post-lazy-DFA)
 
-**File:** `src/regex/nfa.mojo` lines 40-42
+**File:** `src/regex/nfa.mojo` lines 40-45
 
+Current values:
 ```mojo
-alias MIN_PREFIX_LITERAL_LENGTH = 3
-alias MIN_REQUIRED_LITERAL_LENGTH = 4
+comptime MIN_PREFIX_LITERAL_LENGTH = 1
+comptime MIN_REQUIRED_LITERAL_LENGTH = 3
 ```
 
-These thresholds determine when literal prefiltering kicks in. Patterns with
-2-character literals (like `\d{3}-\d{3}` where `-` is literal) miss the
-optimization. Lowering to 2/3 would enable prefiltering for more patterns.
+Commit e85442a (2026-03-30, "Enable NFA literal prefiltering for all
+complexity levels") already lowered `MIN_PREFIX_LITERAL_LENGTH` from 3 to 1
+and `MIN_REQUIRED_LITERAL_LENGTH` from 4 to 3, and removed the complexity
+gate on literal extraction. Further lowering is questionable:
+
+**Post-lazy-DFA trade-off:** When `has_literal_optimization=False`,
+`NFAMatcher.match_all` routes to the lazy DFA (`_use_lazy_dfa_for_search`
+at `matcher.mojo:249`), which is very fast (see PRs #91/#92). When
+`has_literal_optimization=True`, it routes to the backtracking `NFAEngine`
+with its literal prefilter. For short, non-selective literals (1-2 chars)
+the prefilter may not save enough to beat the lazy DFA's single-pass scan,
+so lowering `MIN_REQUIRED_LITERAL_LENGTH` from 3 to 2 could actually be a
+regression now. The landscape changed after the lazy DFA landed and these
+thresholds may even need *raising* to route more patterns to the lazy DFA.
+Needs measurement with a stable benchmark environment before touching.
 
 ## ~~Medium: DFA match_all scanning every position~~ (Fixed, PR #65)
 
@@ -239,18 +252,23 @@ paths if `compile_character_class_with_logic()` accepted `StringSlice`.
 `text: String` but only read from it. Changing to `StringSlice` would avoid
 caller allocations but is a breaking API change.
 
-## Medium: Dict Lookup per Character for SIMD Matchers
+## ~~Medium: Dict Lookup per Character for SIMD Matchers~~ (Fixed)
 
-**File:** `src/regex/simd_matchers.mojo` lines 447-513, `src/regex/nfa.mojo` lines 632-720
+**File:** `src/regex/nfa.mojo` `_match_digit`, `_match_word`, `_match_space`, `_match_range`
 
-Every call to `get_digit_matcher()`, `get_word_matcher()`, or `get_whitespace_matcher()`
-goes through `_get_range_matchers()` which calls `_RANGE_MATCHERS_GLOBAL.get_or_create_ptr()`
-and then does a `Dict` lookup with a `try/except`. This happens on every character in
-patterns like `\d{4}`, `\w+`, etc.
+Replaced per-character `get_digit_matcher()`/`get_word_matcher()`/
+`get_whitespace_matcher()`/`get_alnum_matcher()`/`get_alpha_matcher()`
+calls in `_match_digit` (line 739), `_match_word` (line 779),
+`_match_space` (line 707), and `_match_range` (lines 819-870) with
+inline range checks matching `ast.is_match_char` (ast.mojo:394-411).
+Each call went through `_get_range_matchers()` ->
+`_RANGE_MATCHERS_GLOBAL.get_or_create_ptr()` -> `Dict.__getitem__` ->
+`try/except` on every character. Now uses direct comptime CHAR_*
+constant comparisons.
 
-**Fix:** Hoist matcher lookups out of per-character loops, or inline the range
-checks directly (e.g., `ch >= ord('0') and ch <= ord('9')` for digits, as
-`is_match_char` already does in ast.mojo).
+Note: the `_apply_quantifier_simd` path (lines 1367-1525) still uses
+`get_*_matcher()` but calls them once per quantifier evaluation (not per
+character), so the Dict lookup is amortized. No change needed there.
 
 ## Medium: SIMD Quantifier Threshold Too Conservative
 
@@ -265,9 +283,9 @@ Patterns like `[0-9]+` (min=1), `\d+`, `\w+` all skip the SIMD quantifier
 path and fall back to the scalar loop. Lowering to `min_matches >= 1` for
 predefined types (DIGIT, WORD, SPACE) would enable SIMD for these patterns.
 
-## Medium: Prefilter Disabled in match_all
+## ~~Medium: Prefilter Disabled in match_all~~ (Investigated, no gap in practice)
 
-**File:** `src/regex/matcher.mojo` lines 568-571
+**File:** `src/regex/matcher.mojo` lines 648-652
 
 ```mojo
 if self.prefilter and not self.literal_info.has_anchors:
@@ -275,9 +293,27 @@ if self.prefilter and not self.literal_info.has_anchors:
     pass
 ```
 
-The prefilter path that skips text positions in `match_all` (used by `findall`)
-is completely disabled. Re-enabling would avoid NFA evaluation at every text
-position for patterns with required literals.
+**Investigated:** Added a gated re-enable that ran the prefilter scan only
+for patterns that (a) are not SIMPLE (DFA `match_all` already has its own
+nibble-based SIMD prefilter), and (b) where `NFAEngine.has_literal_optimization`
+is false (the NFA's internal prefilter at `nfa.mojo:204-268` is *more*
+sophisticated: it retries matching at positions *before* the literal within
+a 10-char window, so it handles non-prefix required literals correctly
+where a naive `engine.match_next(text, literal_pos)` call would miss them).
+Instrumented the gate with a debug print and ran all 65 benchmarks: **zero
+firings**.
+
+The remaining gap is patterns with a required literal of length exactly
+2 or a prefix literal of length 2. `HybridMatcher.create_prefilter`
+accepts literals >= 2 chars; NFA's thresholds are `MIN_PREFIX_LITERAL_LENGTH=3`
+and `MIN_REQUIRED_LITERAL_LENGTH=4`. No benchmark pattern has that shape.
+
+**Conclusion:** The right way to widen literal-prefiltering coverage for
+`findall` is to lower the NFA thresholds (see next item), which expands
+NFA's smarter internal prefilter rather than bolting a dumber one on at
+the HybridMatcher level. This item can be removed once the NFA threshold
+change lands and the `pass` stub can simply be deleted, since the NFA
+engine will handle the same cases end-to-end.
 
 ## ~~High: DFA Character Class Matching Orders of Magnitude Slower Than Rust~~ (Fixed, PR #74, #75)
 
@@ -311,9 +347,9 @@ Four fixes applied:
 
    vs-Rust gap for `[a-z]+` went from 8037x to ~22x.
 
-## ~~High: NFA Complex Pattern Backtracking Much Slower Than Rust~~ (Partially fixed, PRs #76, #77)
+## ~~High: NFA Complex Pattern Backtracking Much Slower Than Rust~~ (Fixed, PRs #76, #77, #91, #92)
 
-**PRs:** https://github.com/msaelices/mojo-regex/pull/76, https://github.com/msaelices/mojo-regex/pull/77
+**PRs:** https://github.com/msaelices/mojo-regex/pull/76, https://github.com/msaelices/mojo-regex/pull/77, https://github.com/msaelices/mojo-regex/pull/91, https://github.com/msaelices/mojo-regex/pull/92
 
 ### Fixed issues:
 
@@ -354,19 +390,40 @@ Four fixes applied:
 7. **NFA literal prefiltering for all patterns:** Removed complexity gate
    on literal extraction. Even single-char prefixes help skip positions.
 
-### Remaining: NFA backtracking architecture
+### Additional fixes (PRs #91, #92):
 
-Complex NFA patterns are still 20-70x slower than Rust due to explicit
-backtracking vs Rust's lazy DFA:
+8. **Lazy DFA caching PikeVM transitions (PR #91):** Added a lazy DFA that
+   caches PikeVM NFA state-set transitions as DFA states, converging to
+   full-DFA speed after ~20 bytes of warmup. Each unique NFA state set
+   becomes a cached DFA state; transitions are cached per `(state_id, byte)`
+   pair in a 256-entry `InlineArray`. On cache hit the lookup is O(1); on
+   miss it runs one PikeVM step and caches the result. Evicts all states
+   when the cache exceeds 256 entries. `NFAMatcher` uses
+   `UnsafePointer[LazyDFA]` for interior mutability through the non-mut
+   `self` required by the `RegexMatcher` trait. Used for `match_first`,
+   `match_next`, and `match_all` when no fast paths apply. For
+   `flexible_phone` only 13-15 unique DFA states are created, and after
+   the first match all transitions are cached.
 
-| Benchmark | Mojo (ms) | Rust (ms) | Mojo/Rust |
-|-----------|----------|----------|-----------|
-| `flexible_phone` | 5.7 | 0.30 | 19x |
-| `multi_format_phone` | 16.0 | 0.19 | 83x |
+   - `multi_format_phone`: 1.660ms -> 0.114ms (14.5x faster)
+   - `phone_validation`: 14.1x faster
+   - `alternation_quantifiers`: 0.499ms -> 0.049ms (10.1x faster)
+   - `flexible_phone`: 0.857ms -> 0.115ms (7.5x faster)
+   - Mojo vs Rust win rate: 41% -> 50%
 
-**Fix directions:**
-- Consider implementing a Thompson NFA or lazy DFA to avoid backtracking.
-- Short term: improve NFA backtracking pruning and memoization.
+9. **Inline lazy DFA hot path (PR #92):** Added `@always_inline` to
+   `LazyDFA.match_first`, `match_next`, `match_all`, and `_run_lazy`, and
+   switched `_run_lazy` to `unsafe_ptr()` for direct state array access,
+   bypassing bounds checks in the inner loop.
+
+   | Benchmark | vs Rust (before) | vs Rust (after) |
+   |-----------|------------------|-----------------|
+   | `phone_validation` | 24.9x slower | **1.2x faster** |
+   | `flexible_phone` | 4.4x slower | **1.7x faster** |
+   | `multi_format_phone` | 8.1x slower | **1.4x faster** |
+   | `alternation_quantifiers` | 6.5x slower | **2.7x faster** |
+
+   Mojo vs Rust win rate: 41% -> 57%. Mojo vs Python: 97% win rate.
 
 ## ~~Medium: `dfa_paren_phone` Still Slower Than Python~~ (Fixed, PR #81)
 
