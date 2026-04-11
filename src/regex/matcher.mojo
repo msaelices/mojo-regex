@@ -939,3 +939,59 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
         return result
     else:
         return None
+
+
+def sub(
+    pattern: ImmSlice,
+    repl: ImmSlice,
+    text: ImmSlice,
+    count: Int = 0,
+) raises -> String:
+    """Replace occurrences of pattern in text with repl (equivalent to re.sub in Python).
+
+    Args:
+        pattern: Regex pattern to search for.
+        repl: Replacement string.
+        text: Text to search and replace in.
+        count: Maximum number of replacements (0 means replace all).
+
+    Returns:
+        New string with replacements applied.
+    """
+    var compiled = compile_regex(pattern)
+    var text_len = len(text)
+    var text_ptr = text.unsafe_ptr()
+    var result = String()
+    var pos = 0
+    var replacements = 0
+
+    while pos <= text_len:
+        var m = compiled.match_next(text, pos)
+        if not m:
+            break
+
+        var match_obj = m.value()
+        var match_start = match_obj.start_idx
+        var match_end = match_obj.end_idx
+
+        if match_start > pos:
+            result += ImmSlice(ptr=text_ptr + pos, length=match_start - pos)
+
+        result += repl
+        replacements += 1
+
+        # For zero-length matches, advance by one byte to avoid infinite loops.
+        if match_end == match_start:
+            if pos < text_len:
+                result += ImmSlice(ptr=text_ptr + pos, length=1)
+            pos = match_end + 1
+        else:
+            pos = match_end
+
+        if count > 0 and replacements >= count:
+            break
+
+    if pos < text_len:
+        result += ImmSlice(ptr=text_ptr + pos, length=text_len - pos)
+
+    return result

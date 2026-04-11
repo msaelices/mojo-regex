@@ -7,6 +7,7 @@ from regex.matcher import (
     search,
     findall,
     match_first,
+    sub,
     clear_regex_cache,
 )
 from regex.optimizer import PatternComplexity
@@ -1597,6 +1598,63 @@ def test_fixed_quantifier_in_sequence() raises:
     assert_equal(m3.value().get_match_text(), "ABC1234")
     assert_false(r3.match_first("AB1234"))  # Letters too short
     assert_false(r3.match_first("ABC123"))  # Digits too short
+
+
+def test_sub_basic_replacement() raises:
+    """Test basic string replacement."""
+    assert_equal(sub("world", "mojo", "hello world"), "hello mojo")
+
+
+def test_sub_multiple_replacements() raises:
+    """Test replacing multiple occurrences."""
+    assert_equal(sub("o", "0", "hello world"), "hell0 w0rld")
+
+
+def test_sub_no_match() raises:
+    """Test that no match returns the original string."""
+    assert_equal(sub("xyz", "abc", "hello"), "hello")
+
+
+def test_sub_count_parameter() raises:
+    """Test limiting replacements with count."""
+    assert_equal(sub("o", "0", "hello world", count=1), "hell0 world")
+
+
+def test_sub_regex_pattern() raises:
+    """Test replacement with regex patterns."""
+    assert_equal(sub("[0-9]+", "NUM", "abc 123 def 456"), "abc NUM def NUM")
+
+
+def test_sub_regex_with_count() raises:
+    """Test regex replacement with count limit."""
+    assert_equal(
+        sub("[0-9]+", "NUM", "abc 123 def 456", count=1), "abc NUM def 456"
+    )
+
+
+def test_sub_pattern_at_start() raises:
+    """Test replacing pattern anchored at start."""
+    assert_equal(sub("^hello", "hi", "hello world"), "hi world")
+
+
+def test_sub_pattern_at_end() raises:
+    """Test replacing pattern anchored at end."""
+    assert_equal(sub("world$", "mojo", "hello world"), "hello mojo")
+
+
+def test_sub_replace_with_empty() raises:
+    """Test replacing with empty string removes matches."""
+    assert_equal(sub("[0-9]", "", "a1b2c3"), "abc")
+
+
+def test_sub_whitespace_collapse() raises:
+    """Test collapsing whitespace with character classes."""
+    assert_equal(sub("\\s+", " ", "hello   world"), "hello world")
+
+
+def test_sub_empty_text() raises:
+    """Test sub with empty text returns empty string."""
+    assert_equal(sub("abc", "x", ""), "")
 
 
 def main() raises:
