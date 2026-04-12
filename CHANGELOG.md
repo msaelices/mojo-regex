@@ -4,6 +4,11 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Capture group extraction and group-reference interpolation in sub() (PR #108)
+
+- `sub()` now supports `\1`..\`\9` backreferences in replacement strings, matching Python's `re.sub` behavior. Parser assigns 1-based `group_id` to capturing groups. NFA `_match_group` tags `Match` objects with group IDs. New `match_next_with_groups()` returns group captures. `_interpolate_groups()` uses `InlineArray` indexed lookup for O(1) per backreference.
+- Optimized `sub()`: split into two loop paths (group-aware vs fast) to avoid group machinery when no backreferences are used. `match_next_with_groups` uses literal prefiltering. Early return for empty text.
+
 ### sub() comparison benchmarks and pre-allocation fix (PR #106)
 
 - Added 5 `sub()` benchmarks with equivalent logic across Mojo, Python, and Rust (`sub_literal`, `sub_digits`, `sub_char_class`, `sub_whitespace`, `sub_limited_count`). vs Python: 5/5 wins (1.2x-8.4x faster). vs Rust: 2 wins, 3 losses.
