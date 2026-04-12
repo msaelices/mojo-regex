@@ -1,6 +1,18 @@
 from std.memory import UnsafePointer
 
-from regex.ast import ASTNode, DIGIT, WORD, SPACE
+from regex.ast import (
+    ASTNode,
+    DIGIT,
+    WORD,
+    SPACE,
+    RANGE_KIND_LOWERCASE,
+    RANGE_KIND_UPPERCASE,
+    RANGE_KIND_DIGITS,
+    RANGE_KIND_ALNUM,
+    RANGE_KIND_ALPHA,
+    RANGE_KIND_COMPLEX_ALNUM,
+    RANGE_KIND_OTHER,
+)
 from regex.aliases import (
     CHAR_A,
     CHAR_A_UPPER,
@@ -831,62 +843,45 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = Int(str_ptr[str_i])
         var ch_found = False
 
-        if ast.get_value():
-            ref range_pattern = ast.get_value().value()
-
-            # Common patterns use inline range checks to avoid a per-character
-            # Dict lookup through `get_alnum_matcher()`/`get_alpha_matcher()`.
-            if range_pattern == "[a-zA-Z0-9]":
-                ch_found = (
-                    (CHAR_A <= ch_code <= CHAR_Z)
-                    or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
-                    or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+        # Switch on the precomputed range_kind tag instead of doing
+        # per-character string comparisons. The tag was set at AST
+        # build time by classify_range_kind() in ast.mojo.
+        var kind = ast.range_kind
+        if kind == RANGE_KIND_ALNUM:
+            ch_found = (
+                (CHAR_A <= ch_code <= CHAR_Z)
+                or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+            )
+        elif kind == RANGE_KIND_LOWERCASE:
+            ch_found = CHAR_A <= ch_code <= CHAR_Z
+        elif kind == RANGE_KIND_UPPERCASE:
+            ch_found = CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
+        elif kind == RANGE_KIND_DIGITS:
+            ch_found = CHAR_ZERO <= ch_code <= CHAR_NINE
+        elif kind == RANGE_KIND_ALPHA:
+            ch_found = (CHAR_A <= ch_code <= CHAR_Z) or (
+                CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
+            )
+        elif kind == RANGE_KIND_COMPLEX_ALNUM:
+            # Check alphanumeric first (common case), then special chars
+            if (
+                (CHAR_A <= ch_code <= CHAR_Z)
+                or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+            ):
+                ch_found = True
+            elif ast.get_value():
+                ref range_pattern = ast.get_value().value()
+                var inner = range_pattern[byte=1:-1]
+                ch_found = byte_in_string(ch_code, inner)
+        else:
+            # RANGE_KIND_OTHER: fall back to SIMD or general matcher
+            if ast.get_value():
+                ref range_pattern = ast.get_value().value()
+                ch_found = self._match_with_simd_or_fallback(
+                    ast, range_pattern, ch_code
                 )
-            elif range_pattern == "[a-z]":
-                ch_found = CHAR_A <= ch_code <= CHAR_Z
-            elif range_pattern == "[A-Z]":
-                ch_found = CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
-            elif range_pattern == "[0-9]":
-                ch_found = CHAR_ZERO <= ch_code <= CHAR_NINE
-            elif range_pattern == "[a-zA-Z]":
-                ch_found = (CHAR_A <= ch_code <= CHAR_Z) or (
-                    CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER
-                )
-            else:
-                # Check if it's a complex pattern with alphanumeric + special chars
-                if range_pattern.startswith("[") and range_pattern.endswith(
-                    "]"
-                ):
-                    var inner = range_pattern[byte=1:-1]
-                    var has_lower = "a-z" in inner
-                    var has_upper = "A-Z" in inner
-                    var has_digits = "0-9" in inner
-                    var has_alnum = has_lower and has_upper and has_digits
-
-                    if has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD:
-                        # Complex pattern like [a-zA-Z0-9._%+-]
-                        # Check alphanumeric first (common case) via inline
-                        # range check, then fall back to the special-char
-                        # byte scan.
-                        if (
-                            (CHAR_A <= ch_code <= CHAR_Z)
-                            or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
-                            or (CHAR_ZERO <= ch_code <= CHAR_NINE)
-                        ):
-                            ch_found = True
-                        else:
-                            # Not alphanumeric, check special chars
-                            ch_found = byte_in_string(ch_code, inner)
-                    else:
-                        # Try to use SIMD matcher for other patterns
-                        ch_found = self._match_with_simd_or_fallback(
-                            ast, range_pattern, ch_code
-                        )
-                else:
-                    # Not a bracketed pattern, try SIMD matcher
-                    ch_found = self._match_with_simd_or_fallback(
-                        ast, range_pattern, ch_code
-                    )
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -1382,207 +1377,109 @@ struct NFAEngine(Copyable, Engine):
         elif ast.type == RANGE and ast.get_value():
             ref range_pattern = ast.get_value().value()
 
-            # Check for common patterns that should use RangeBasedMatcher
-            if range_pattern == "[a-zA-Z0-9]":
+            # Switch on precomputed range_kind tag instead of per-invocation
+            # string comparisons. Classification done at AST build time.
+            var kind = ast.range_kind
+            if kind == RANGE_KIND_ALNUM:
                 var alnum_matcher = get_alnum_matcher()
                 if ast.positive_logic:
                     return apply_quantifier_simd_generic(
                         alnum_matcher, str, str_i, min_matches, max_matches
                     )
                 else:
-                    # For negated alphanumeric, use custom logic
-                    var pos = str_i
-                    var match_count = 0
-                    var actual_max = max_matches
-                    if actual_max == -1:
-                        actual_max = len(str) - str_i
-
-                    while pos < len(str) and match_count < actual_max:
-                        var ch_code = Int(str_ptr[pos])
-                        if not alnum_matcher.contains(ch_code):  # Negated
-                            match_count += 1
-                            pos += 1
-                        else:
-                            break
-
-                    if match_count >= min_matches:
-                        return (True, pos)
-                    else:
-                        return (False, str_i)
-            elif range_pattern == "[a-z]":
-                # Use optimized path for simple lowercase range
-                var pos = str_i
-                var match_count = 0
-                var actual_max = max_matches
-                if actual_max == -1:
-                    actual_max = len(str) - str_i
-
-                while pos < len(str) and match_count < actual_max:
-                    var ch_code = Int(str_ptr[pos])
-                    var is_match = ch_code >= ord("a") and ch_code <= ord("z")
-                    if is_match == ast.positive_logic:
-                        match_count += 1
-                        pos += 1
-                    else:
-                        break
-
-                if match_count >= min_matches:
-                    return (True, pos)
-                else:
-                    return (False, str_i)
-            elif range_pattern == "[A-Z]":
-                # Use optimized path for simple uppercase range
-                var pos = str_i
-                var match_count = 0
-                var actual_max = max_matches
-                if actual_max == -1:
-                    actual_max = len(str) - str_i
-
-                while pos < len(str) and match_count < actual_max:
-                    var ch_code = Int(str_ptr[pos])
-                    var is_match = ch_code >= ord("A") and ch_code <= ord("Z")
-                    if is_match == ast.positive_logic:
-                        match_count += 1
-                        pos += 1
-                    else:
-                        break
-
-                if match_count >= min_matches:
-                    return (True, pos)
-                else:
-                    return (False, str_i)
-            elif range_pattern == "[0-9]":
-                # Use digit matcher for digit range
+                    return self._quantifier_negated_loop(
+                        alnum_matcher, str_ptr, str, str_i, min_matches, max_matches
+                    )
+            elif kind == RANGE_KIND_LOWERCASE:
+                return self._quantifier_range_loop(
+                    CHAR_A, CHAR_Z, ast.positive_logic,
+                    str_ptr, str, str_i, min_matches, max_matches,
+                )
+            elif kind == RANGE_KIND_UPPERCASE:
+                return self._quantifier_range_loop(
+                    CHAR_A_UPPER, CHAR_Z_UPPER, ast.positive_logic,
+                    str_ptr, str, str_i, min_matches, max_matches,
+                )
+            elif kind == RANGE_KIND_DIGITS:
                 var digit_matcher = get_digit_matcher()
                 if ast.positive_logic:
                     return apply_quantifier_simd_generic(
                         digit_matcher, str, str_i, min_matches, max_matches
                     )
                 else:
-                    # For negated digits, use custom logic
-                    var pos = str_i
-                    var match_count = 0
-                    var actual_max = max_matches
-                    if actual_max == -1:
-                        actual_max = len(str) - str_i
-
-                    while pos < len(str) and match_count < actual_max:
-                        var ch_code = Int(str_ptr[pos])
-                        if not digit_matcher.contains(ch_code):  # Negated
-                            match_count += 1
-                            pos += 1
-                        else:
-                            break
-
-                    if match_count >= min_matches:
-                        return (True, pos)
-                    else:
-                        return (False, str_i)
-            elif range_pattern == "[a-zA-Z]":
-                # Use alpha matcher for alphabetic range
+                    return self._quantifier_negated_loop(
+                        digit_matcher, str_ptr, str, str_i, min_matches, max_matches
+                    )
+            elif kind == RANGE_KIND_ALPHA:
                 var alpha_matcher = get_alpha_matcher()
                 if ast.positive_logic:
                     return apply_quantifier_simd_generic(
                         alpha_matcher, str, str_i, min_matches, max_matches
                     )
                 else:
-                    # For negated alpha, use custom logic
-                    var pos = str_i
-                    var match_count = 0
-                    var actual_max = max_matches
-                    if actual_max == -1:
-                        actual_max = len(str) - str_i
-
-                    while pos < len(str) and match_count < actual_max:
-                        var ch_code = Int(str_ptr[pos])
-                        if not alpha_matcher.contains(ch_code):  # Negated
-                            match_count += 1
-                            pos += 1
-                        else:
-                            break
-
-                    if match_count >= min_matches:
-                        return (True, pos)
-                    else:
-                        return (False, str_i)
-            else:
-                # Check if it's a complex pattern with alphanumeric + special chars
-                var is_complex_pattern = False
-                if range_pattern.startswith("[") and range_pattern.endswith(
-                    "]"
-                ):
-                    var inner = range_pattern[byte=1:-1]
-                    var has_lower = "a-z" in inner
-                    var has_upper = "A-Z" in inner
-                    var has_digits = "0-9" in inner
-                    var has_alnum = has_lower and has_upper and has_digits
-                    is_complex_pattern = (
-                        has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                    return self._quantifier_negated_loop(
+                        alpha_matcher, str_ptr, str, str_i, min_matches, max_matches
                     )
+            elif kind == RANGE_KIND_COMPLEX_ALNUM:
+                var inner = range_pattern[byte=1:-1]
+                var pos = str_i
+                var match_count = 0
+                var actual_max = max_matches
+                if actual_max == -1:
+                    actual_max = len(str) - str_i
 
-                if is_complex_pattern:
-                    # Handle complex patterns like [a-zA-Z0-9._%+-] efficiently
-                    var alnum_matcher = get_alnum_matcher()
-                    var inner = range_pattern[byte=1:-1]
-                    var pos = str_i
-                    var match_count = 0
-                    var actual_max = max_matches
-                    if actual_max == -1:
-                        actual_max = len(str) - str_i
-
-                    while pos < len(str) and match_count < actual_max:
-                        var ch_code = Int(str_ptr[pos])
-                        var is_match: Bool
-
-                        # Check alphanumeric first (common case)
-                        if alnum_matcher.contains(ch_code):
-                            is_match = True
-                        else:
-                            # Check special characters via direct byte scan
-                            is_match = byte_in_string(ch_code, inner)
-
-                        if is_match == ast.positive_logic:
-                            match_count += 1
-                            pos += 1
-                        else:
-                            break
-
-                    if match_count >= min_matches:
-                        return (True, pos)
+                while pos < len(str) and match_count < actual_max:
+                    var ch_code = Int(str_ptr[pos])
+                    var is_match: Bool
+                    if (
+                        (CHAR_A <= ch_code <= CHAR_Z)
+                        or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
+                        or (CHAR_ZERO <= ch_code <= CHAR_NINE)
+                    ):
+                        is_match = True
                     else:
-                        return (False, str_i)
+                        is_match = byte_in_string(ch_code, inner)
 
+                    if is_match == ast.positive_logic:
+                        match_count += 1
+                        pos += 1
+                    else:
+                        break
+
+                if match_count >= min_matches:
+                    return (True, pos)
+                else:
+                    return (False, str_i)
+            else:
+                # RANGE_KIND_OTHER: try SIMD matcher, then general fallback
                 var range_matcher = self._create_range_matcher(range_pattern)
                 if range_matcher:
                     ref matcher = range_matcher.value()
-                    # Handle negated logic
                     if ast.positive_logic:
                         return apply_quantifier_simd_generic(
                             matcher, str, str_i, min_matches, max_matches
                         )
                     else:
-                        # For negated ranges, we need custom logic
+                        # CharacterClassSIMD negated loop (can't use
+                        # _quantifier_negated_loop which takes RangeBasedMatcher)
                         var pos = str_i
                         var match_count = 0
                         var actual_max = max_matches
                         if actual_max == -1:
                             actual_max = len(str) - str_i
-
                         while pos < len(str) and match_count < actual_max:
                             var ch_code = Int(str_ptr[pos])
-                            if not matcher.contains(ch_code):  # Negated
+                            if not matcher.contains(ch_code):
                                 match_count += 1
                                 pos += 1
                             else:
                                 break
-
                         if match_count >= min_matches:
                             return (True, pos)
                         else:
                             return (False, str_i)
 
-                # Fallback for simple ranges like [c-n] that don't use SIMD
-                # Use character-by-character matching
+                # Scalar fallback for ranges without SIMD matchers
                 var pos = str_i
                 var match_count = 0
                 var actual_max = max_matches
@@ -1626,6 +1523,63 @@ struct NFAEngine(Copyable, Engine):
             return byte_in_string(ch_code, inner)
         else:
             return byte_in_string(ch_code, range_pattern)
+
+    @always_inline
+    def _quantifier_negated_loop(
+        self,
+        matcher: RangeBasedMatcher,
+        str_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+        str: ImmSlice,
+        str_i: Int,
+        min_matches: Int,
+        max_matches: Int,
+    ) -> Tuple[Bool, Int]:
+        """Run a quantifier loop for negated character classes."""
+        var pos = str_i
+        var match_count = 0
+        var actual_max = max_matches
+        if actual_max == -1:
+            actual_max = len(str) - str_i
+        while pos < len(str) and match_count < actual_max:
+            var ch_code = Int(str_ptr[pos])
+            if not matcher.contains(ch_code):
+                match_count += 1
+                pos += 1
+            else:
+                break
+        if match_count >= min_matches:
+            return (True, pos)
+        return (False, str_i)
+
+    @always_inline
+    def _quantifier_range_loop(
+        self,
+        range_start: Int,
+        range_end: Int,
+        positive_logic: Bool,
+        str_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+        str: ImmSlice,
+        str_i: Int,
+        min_matches: Int,
+        max_matches: Int,
+    ) -> Tuple[Bool, Int]:
+        """Run a quantifier loop for a single contiguous range."""
+        var pos = str_i
+        var match_count = 0
+        var actual_max = max_matches
+        if actual_max == -1:
+            actual_max = len(str) - str_i
+        while pos < len(str) and match_count < actual_max:
+            var ch_code = Int(str_ptr[pos])
+            var is_match = range_start <= ch_code <= range_end
+            if is_match == positive_logic:
+                match_count += 1
+                pos += 1
+            else:
+                break
+        if match_count >= min_matches:
+            return (True, pos)
+        return (False, str_i)
 
 
 def findall(pattern: String, text: ImmSlice) raises -> MatchList:

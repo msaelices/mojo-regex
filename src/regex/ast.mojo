@@ -34,6 +34,18 @@ comptime OR = 9
 comptime NOT = 10
 comptime GROUP = 11
 
+# Range classification tags, precomputed at AST build time so that
+# _match_range / _apply_quantifier_simd can switch on an Int instead
+# of doing per-character string comparisons.
+comptime RANGE_KIND_NONE = 0  # not a RANGE node
+comptime RANGE_KIND_LOWERCASE = 1  # [a-z]
+comptime RANGE_KIND_UPPERCASE = 2  # [A-Z]
+comptime RANGE_KIND_DIGITS = 3  # [0-9]
+comptime RANGE_KIND_ALNUM = 4  # [a-zA-Z0-9]
+comptime RANGE_KIND_ALPHA = 5  # [a-zA-Z]
+comptime RANGE_KIND_COMPLEX_ALNUM = 6  # [a-zA-Z0-9...] with extra chars
+comptime RANGE_KIND_OTHER = 7  # anything else
+
 comptime LEAF_ELEMS: SIMD[DType.int8, 8] = [
     Int8(ELEMENT),
     Int8(WILDCARD),
@@ -181,6 +193,9 @@ struct ASTNode[regex_origin: ImmutOrigin](
     """Maximum number of matches for quantifiers (-1 for unlimited)."""
     var positive_logic: Bool
     """For character ranges: True for [abc], False for [^abc]."""
+    var range_kind: Int
+    """Precomputed RANGE_KIND_* tag for RANGE nodes. Eliminates per-character
+    string comparisons in _match_range / _apply_quantifier_simd."""
 
     @always_inline
     def __init__(
@@ -193,6 +208,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        range_kind: Int = RANGE_KIND_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.type = type
@@ -203,6 +219,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.range_kind = range_kind
         self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
@@ -219,6 +236,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        range_kind: Int = RANGE_KIND_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -229,6 +247,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.range_kind = range_kind
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
@@ -244,6 +263,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         min: Int = 0,
         max: Int = 0,
         positive_logic: Bool = True,
+        range_kind: Int = RANGE_KIND_NONE,
     ):
         """Initialize an ASTNode with a specific type and match string."""
         self.regex_ptr = regex_ptr
@@ -254,6 +274,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.min = min
         self.max = max
         self.positive_logic = positive_logic
+        self.range_kind = range_kind
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
@@ -276,6 +297,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.min = copy.min
         self.max = copy.max
         self.positive_logic = copy.positive_logic
+        self.range_kind = copy.range_kind
         self.children_indexes = copy.children_indexes
         self.children_len = copy.children_len
         # var call_location = __call_location()
@@ -613,6 +635,33 @@ def WordElement[
 
 
 @always_inline
+def classify_range_kind(pattern: StringSlice) -> Int:
+    """Classify a RANGE pattern into a RANGE_KIND_* tag at build time.
+
+    This runs once when the AST is constructed so that per-character matching
+    can switch on an Int instead of doing string comparisons.
+    """
+    if pattern == "[a-z]":
+        return RANGE_KIND_LOWERCASE
+    if pattern == "[A-Z]":
+        return RANGE_KIND_UPPERCASE
+    if pattern == "[0-9]":
+        return RANGE_KIND_DIGITS
+    if pattern == "[a-zA-Z0-9]" or pattern == "[0-9a-zA-Z]":
+        return RANGE_KIND_ALNUM
+    if pattern == "[a-zA-Z]":
+        return RANGE_KIND_ALPHA
+    # Check for complex alphanumeric patterns like [a-zA-Z0-9._%+-]
+    if pattern.startswith("[") and pattern.endswith("]"):
+        var inner = pattern[byte=1:-1]
+        if "a-z" in inner and "A-Z" in inner and "0-9" in inner and len(
+            inner
+        ) > 10:
+            return RANGE_KIND_COMPLEX_ALNUM
+    return RANGE_KIND_OTHER
+
+
+@always_inline
 def RangeElement[
     regex_origin: ImmutOrigin,
 ](
@@ -623,6 +672,16 @@ def RangeElement[
 ) -> ASTNode[regex_origin]:
     """Create a RangeElement node."""
     var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    # Classify the range pattern once at build time.
+    var kind = RANGE_KIND_OTHER
+    if start_idx < end_idx:
+        var pat = StringSlice(
+            unsafe_from_utf8=Span[Byte, origin_of(regex.pattern)](
+                ptr=regex.pattern.unsafe_ptr() + start_idx,
+                length=end_idx - start_idx,
+            )
+        )
+        kind = classify_range_kind(pat)
     return ASTNode[regex_origin](
         type=RANGE,
         regex_ptr=regex_ptr,
@@ -631,6 +690,7 @@ def RangeElement[
         min=1,
         max=1,
         positive_logic=is_positive_logic,
+        range_kind=kind,
     )
 
 
