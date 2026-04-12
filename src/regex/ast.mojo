@@ -200,6 +200,8 @@ struct ASTNode[regex_origin: ImmutOrigin](
     var range_kind: Int
     """Precomputed RANGE_KIND_* tag for RANGE nodes. Eliminates per-character
     string comparisons in _match_range / _apply_quantifier_simd."""
+    var group_id: Int
+    """1-based capturing group ID for GROUP nodes (-1 if non-capturing)."""
 
     @always_inline
     def __init__(
@@ -224,6 +226,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.range_kind = range_kind
+        self.group_id = -1
         self.children_indexes = SIMD[DType.uint8, Self.max_children](
             0
         )  # Initialize with all bits set to 0
@@ -252,6 +255,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.range_kind = range_kind
+        self.group_id = -1
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
@@ -279,6 +283,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.max = max
         self.positive_logic = positive_logic
         self.range_kind = range_kind
+        self.group_id = -1
         self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
@@ -302,6 +307,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.max = copy.max
         self.positive_logic = copy.positive_logic
         self.range_kind = copy.range_kind
+        self.group_id = copy.group_id
         self.children_indexes = copy.children_indexes
         self.children_len = copy.children_len
         # var call_location = __call_location()
@@ -799,7 +805,7 @@ def GroupNode[
 ) -> ASTNode[regex_origin]:
     """Create a GroupNode with children."""
     var regex_ptr = UnsafePointer(to=regex).as_any_origin()
-    return ASTNode[regex_origin](
+    var node = ASTNode[regex_origin](
         type=GROUP,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -809,3 +815,5 @@ def GroupNode[
         min=1,
         max=1,
     )
+    node.group_id = group_id
+    return node

@@ -1657,5 +1657,142 @@ def test_sub_empty_text() raises:
     assert_equal(sub("abc", "x", ""), "")
 
 
+# ===== Capture Group Sub Tests =====
+
+
+def test_sub_group_phone_format() raises:
+    """Test sub with capture groups for phone number formatting."""
+    var result = sub(
+        "(\\d{3})(\\d{3})(\\d{4})",
+        "\\1-\\2-\\3",
+        "6502530000",
+    )
+    assert_equal(result, "650-253-0000")
+
+
+def test_sub_group_reorder() raises:
+    """Test sub with group references reordering captures."""
+    var result = sub(
+        "(\\w+) (\\w+)",
+        "\\2 \\1",
+        "hello world",
+    )
+    assert_equal(result, "world hello")
+
+
+def test_sub_group_duplicate_ref() raises:
+    """Test sub with repeated group reference."""
+    var result = sub(
+        "(\\d+)",
+        "[\\1,\\1]",
+        "42 and 99",
+    )
+    assert_equal(result, "[42,42] and [99,99]")
+
+
+def test_sub_group_no_match() raises:
+    """Test sub with group refs but literal repl (no backslash-digit)."""
+    var result = sub(
+        "(hello)",
+        "HI",
+        "hello world",
+    )
+    assert_equal(result, "HI world")
+
+
+def test_sub_group_multiple_matches() raises:
+    """Test sub with groups across multiple matches."""
+    var result = sub(
+        "(\\d{3})(\\d{4})",
+        "\\1-\\2",
+        "5551234 and 9876543",
+    )
+    assert_equal(result, "555-1234 and 987-6543")
+
+
+def test_sub_group_with_count() raises:
+    """Test sub with group refs and count limit."""
+    var result = sub(
+        "(\\d{3})(\\d{3})(\\d{4})",
+        "\\1-\\2-\\3",
+        "6502530000 and 4155551234",
+        count=1,
+    )
+    assert_equal(result, "650-253-0000 and 4155551234")
+
+
+def test_sub_group_single_group() raises:
+    """Test sub with a single capture group."""
+    var result = sub(
+        "(\\d+)",
+        "[\\1]",
+        "abc 123 def 456",
+    )
+    assert_equal(result, "abc [123] def [456]")
+
+
+def test_sub_group_literal_backslash() raises:
+    """Test that \\0 and \\n (non-digit after backslash) are passed through."""
+    # \\a is not a group ref (not 1-9), should be kept as-is
+    var result = sub(
+        "hello",
+        "\\0hi",
+        "hello world",
+    )
+    # \\0 is not a valid group ref (1-9 only), kept as literal
+    assert_equal(result, "\\0hi world")
+
+
+def test_sub_group_adjacent_refs() raises:
+    """Test sub with adjacent group references \\1\\2."""
+    var result = sub(
+        "(\\d{2})(\\d{2})",
+        "\\2\\1",
+        "1234",
+    )
+    assert_equal(result, "3412")
+
+
+def test_sub_group_no_groups_in_pattern() raises:
+    """Test sub with \\1 in repl but no groups in pattern."""
+    var result = sub(
+        "\\d+",
+        "\\1",
+        "abc 123 def",
+    )
+    # No group 1 exists, \\1 resolves to empty string
+    assert_equal(result, "abc  def")
+
+
+def test_sub_group_three_groups_phone() raises:
+    """Test the exact smith-phonenums use case: format phone number."""
+    var result = sub(
+        "(\\d{3})(\\d{3})(\\d{4})",
+        "\\1 \\2 \\3",
+        "6502530000",
+    )
+    assert_equal(result, "650 253 0000")
+
+
+def test_sub_group_non_capturing_skipped() raises:
+    """Test that non-capturing groups (?:...) don't get group IDs."""
+    var result = sub(
+        "(?:hello) (\\w+)",
+        "\\1",
+        "hello world",
+    )
+    assert_equal(result, "world")
+
+
+def test_sub_group_with_text_around() raises:
+    """Test sub with groups preserves surrounding text correctly."""
+    var result = sub(
+        "(\\d{4})-(\\d{2})-(\\d{2})",
+        "\\2/\\3/\\1",
+        "Date: 2026-04-12 is today",
+    )
+    assert_equal(result, "Date: 04/12/2026 is today")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

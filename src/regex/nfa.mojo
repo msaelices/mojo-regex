@@ -482,6 +482,87 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
+    def match_next_with_groups(
+        self, text: ImmSlice, start: Int = 0
+    ) -> Tuple[Optional[Match], List[Match]]:
+        """Like match_next but also returns capture group matches.
+
+        Uses literal prefiltering when available to skip non-matching
+        positions, then runs _match_node to extract group captures.
+
+        Returns:
+            Tuple of (overall_match, group_matches). group_matches contains
+            Match objects with group_id set to the 1-based capture group index.
+        """
+        var empty_groups = List[Match]()
+        var ast: ASTNode[MutAnyOrigin]
+        if self.prev_ast:
+            ast = self.prev_ast.value()
+        elif self.regex:
+            ast = self.regex.value()
+        else:
+            try:
+                ast = parse(self.pattern)
+            except:
+                return (None, empty_groups^)
+
+        var search_pos = start
+        var matches = List[Match](capacity=8)
+
+        # Use literal prefiltering to skip positions when available
+        if self.has_literal_optimization:
+            while search_pos <= len(text):
+                var literal_pos = twoway_search(
+                    self._get_search_literal_bytes(),
+                    text,
+                    search_pos,
+                )
+                if literal_pos == -1:
+                    return (None, empty_groups^)
+
+                var try_pos = literal_pos
+                if self.literal_prefix and not self._is_prefix_literal():
+                    try_pos = max(0, literal_pos - len(self.pattern))
+
+                while try_pos <= literal_pos:
+                    matches.clear()
+                    var result = self._match_node(
+                        ast,
+                        text,
+                        try_pos,
+                        matches,
+                        match_first_mode=False,
+                        required_start_pos=-1,
+                    )
+                    if result[0]:
+                        ref match_end = result[1]
+                        if self._match_contains_literal(
+                            text, try_pos, match_end
+                        ):
+                            var overall = Match(0, try_pos, match_end, text)
+                            return (overall, matches^)
+                    try_pos += 1
+
+                search_pos = literal_pos + 1
+        else:
+            while search_pos <= len(text):
+                matches.clear()
+                var result = self._match_node(
+                    ast,
+                    text,
+                    search_pos,
+                    matches,
+                    match_first_mode=False,
+                    required_start_pos=-1,
+                )
+                if result[0]:
+                    ref end_idx = result[1]
+                    var overall = Match(0, search_pos, end_idx, text)
+                    return (overall, matches^)
+                search_pos += 1
+
+        return (None, empty_groups^)
+
     @always_inline
     def _find_last_literal(self, text: ImmSlice, start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
@@ -1007,9 +1088,10 @@ struct NFAEngine(Copyable, Engine):
         if not result[0]:
             return (False, str_i)
 
-        # If this is a capturing group, add the match
+        # If this is a capturing group, add the match with its group ID
         if ast.is_capturing():
-            var matched = Match(0, start_pos, result[1], str)
+            var gid = ast.group_id if ast.group_id >= 0 else 0
+            var matched = Match(gid, start_pos, result[1], str)
             matches.append(matched)
 
         return result
@@ -1054,7 +1136,8 @@ struct NFAEngine(Copyable, Engine):
                 ):
                     break
                 if ast.is_capturing():
-                    var matched = Match(0, str_i, current_pos, str)
+                    var gid = ast.group_id if ast.group_id >= 0 else 0
+                    var matched = Match(gid, str_i, current_pos, str)
                     matches.append(matched)
             else:
                 break

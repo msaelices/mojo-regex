@@ -941,55 +941,132 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
         return None
 
 
+def _has_group_refs(repl: ImmSlice) -> Bool:
+    """Check if repl contains \\1..\\9 backreferences."""
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    for i in range(repl_len - 1):
+        if Int(repl_ptr[i]) == ord("\\"):
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= ord("1") and next_ch <= ord("9"):
+                return True
+    return False
+
+
+def _interpolate_groups(
+    repl: ImmSlice,
+    text: ImmSlice,
+    groups: List[Match],
+) -> String:
+    """Replace \\1..\\9 in repl with the corresponding capture group text."""
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    var out = String(capacity=repl_len + 32)
+
+    # Build an indexed lookup: group_spans[N] = index into groups list
+    # for group_id == N. -1 means no match. O(1) per \N reference.
+    var group_idx = InlineArray[Int, 10](fill=-1)
+    for gi in range(len(groups)):
+        var gid = groups[gi].group_id
+        if 1 <= gid <= 9:
+            group_idx[gid] = gi
+
+    var i = 0
+    while i < repl_len:
+        if Int(repl_ptr[i]) == ord("\\") and i + 1 < repl_len:
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= ord("1") and next_ch <= ord("9"):
+                var group_num = next_ch - ord("0")
+                var idx = group_idx[group_num]
+                if idx >= 0:
+                    out += groups[idx].get_match_text()
+                i += 2
+                continue
+        out += ImmSlice(ptr=repl_ptr + i, length=1)
+        i += 1
+    return out
+
+
 def sub(
     pattern: ImmSlice,
     repl: ImmSlice,
     text: ImmSlice,
     count: Int = 0,
 ) raises -> String:
-    """Replace occurrences of pattern in text with repl (equivalent to re.sub in Python).
+    """Replace occurrences of pattern in text with repl (equivalent to re.sub).
+
+    If repl contains \\1..\\9 backreferences, they are replaced with the
+    corresponding capture group text from each match.
 
     Args:
         pattern: Regex pattern to search for.
-        repl: Replacement string.
+        repl: Replacement string (may contain \\1..\\9 group references).
         text: Text to search and replace in.
         count: Maximum number of replacements (0 means replace all).
 
     Returns:
         New string with replacements applied.
     """
-    var compiled = compile_regex(pattern)
     var text_len = len(text)
+    if text_len == 0:
+        return String(text)
+
+    var compiled = compile_regex(pattern)
     var text_ptr = text.unsafe_ptr()
     var result = String(capacity=text_len + 64)
     var pos = 0
     var replacements = 0
+    var use_groups = _has_group_refs(repl)
 
-    while pos <= text_len:
-        var m = compiled.match_next(text, pos)
-        if not m:
-            break
+    if use_groups:
+        # Group-aware path: uses NFA engine to extract capture groups
+        while pos <= text_len:
+            var mg = compiled.matcher.nfa_matcher.engine.match_next_with_groups(
+                text, pos
+            )
+            if not mg[0]:
+                break
+            var m = mg[0].value()
 
-        var match_obj = m.value()
-        var match_start = match_obj.start_idx
-        var match_end = match_obj.end_idx
+            if m.start_idx > pos:
+                result += ImmSlice(ptr=text_ptr + pos, length=m.start_idx - pos)
 
-        if match_start > pos:
-            result += ImmSlice(ptr=text_ptr + pos, length=match_start - pos)
+            result += _interpolate_groups(repl, text, mg[1])
+            replacements += 1
 
-        result += repl
-        replacements += 1
+            if m.end_idx == m.start_idx:
+                if pos < text_len:
+                    result += ImmSlice(ptr=text_ptr + pos, length=1)
+                pos = m.end_idx + 1
+            else:
+                pos = m.end_idx
 
-        # For zero-length matches, advance by one byte to avoid infinite loops.
-        if match_end == match_start:
-            if pos < text_len:
-                result += ImmSlice(ptr=text_ptr + pos, length=1)
-            pos = match_end + 1
-        else:
-            pos = match_end
+            if count > 0 and replacements >= count:
+                break
+    else:
+        # Fast path: no group refs, use the optimized matcher chain
+        while pos <= text_len:
+            var m = compiled.match_next(text, pos)
+            if not m:
+                break
+            var match_start = m.value().start_idx
+            var match_end = m.value().end_idx
 
-        if count > 0 and replacements >= count:
-            break
+            if match_start > pos:
+                result += ImmSlice(ptr=text_ptr + pos, length=match_start - pos)
+
+            result += repl
+            replacements += 1
+
+            if match_end == match_start:
+                if pos < text_len:
+                    result += ImmSlice(ptr=text_ptr + pos, length=1)
+                pos = match_end + 1
+            else:
+                pos = match_end
+
+            if count > 0 and replacements >= count:
+                break
 
     if pos < text_len:
         result += ImmSlice(ptr=text_ptr + pos, length=text_len - pos)
