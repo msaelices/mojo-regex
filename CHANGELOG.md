@@ -13,6 +13,10 @@ Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
 - Added `range_kind: Int` field to `ASTNode` with 8 classification constants, computed once at AST build time by `classify_range_kind()`. Replaces per-character string comparison chains in `_match_range` and `_apply_quantifier_simd` (up to 5 equality checks + `startswith`/`endswith`/`in` per char) with a single integer switch. Extracted `_quantifier_negated_loop` and `_quantifier_range_loop` helpers (net -14% code in nfa.mojo). Moved `COMPLEX_CHAR_CLASS_THRESHOLD` to ast.mojo as shared constant.
 
+### `re.sub()` pattern substitution (PR #103)
+
+- Added `sub(pattern, repl, text, count=0)` function equivalent to Python's `re.sub()`. Replaces all non-overlapping matches of `pattern` in `text` with `repl`. Optional `count` parameter limits the number of replacements. Handles zero-length matches by advancing one byte to avoid infinite loops.
+
 ### Inline NFA per-character range checks (PR #102)
 
 - Replaced per-character `get_digit_matcher()`/`get_word_matcher()`/`get_whitespace_matcher()`/`get_alnum_matcher()`/`get_alpha_matcher()` Dict lookups in `_match_digit`, `_match_word`, `_match_space`, and `_match_range` with direct O(1) comptime `CHAR_*` constant comparisons, matching the pattern already used by `ast.is_match_char`.
