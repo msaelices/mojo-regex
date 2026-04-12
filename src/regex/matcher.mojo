@@ -820,6 +820,27 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.is_match(text, start)
 
+    def sub(
+        self,
+        repl: ImmSlice,
+        text: ImmSlice,
+        count: Int = 0,
+    ) raises -> String:
+        """Replace matches with repl, bypassing the regex cache lookup.
+
+        This is faster than the module-level sub() when you already have a
+        CompiledRegex (e.g., compiled once and reused across many calls).
+
+        Args:
+            repl: Replacement string (may contain \\1..\\9 group references).
+            text: Text to search and replace in.
+            count: Maximum number of replacements (0 means replace all).
+
+        Returns:
+            New string with replacements applied.
+        """
+        return _sub_impl(self, repl, text, count)
+
     def get_stats(self) -> String:
         """Get performance statistics and engine information.
 
@@ -956,6 +977,60 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
         return None
 
 
+struct _ReplSegment(Copyable, Movable, TrivialRegisterPassable):
+    """A segment of a pre-parsed replacement template.
+    group_ref > 0: group reference \\N.
+    group_ref == 0: literal bytes at [start, start+length) in repl.
+    """
+
+    comptime __copy_ctor_is_trivial = True
+    var group_ref: Int
+    var start: Int
+    var length: Int
+
+    @always_inline
+    def __init__(out self, group_ref: Int, start: Int, length: Int):
+        self.group_ref = group_ref
+        self.start = start
+        self.length = length
+
+
+@always_inline
+def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
+    """Pre-parse replacement string into template segments.
+
+    Returns a list of _ReplSegment. Literal runs are batched into single
+    segments. Group references (\\1..\\9) are individual segments.
+    This runs once per sub() call so the per-match interpolation just
+    walks the pre-parsed template without re-scanning repl.
+    """
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    var segments = List[_ReplSegment](capacity=8)
+    var i = 0
+    var literal_start = 0
+
+    while i < repl_len:
+        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
+                if i > literal_start:
+                    segments.append(
+                        _ReplSegment(0, literal_start, i - literal_start)
+                    )
+                segments.append(_ReplSegment(next_ch - CHAR_ZERO, 0, 0))
+                i += 2
+                literal_start = i
+                continue
+        i += 1
+
+    if literal_start < repl_len:
+        segments.append(
+            _ReplSegment(0, literal_start, repl_len - literal_start)
+        )
+    return segments^
+
+
 @always_inline
 def _has_group_refs(repl: ImmSlice) -> Bool:
     """Check if repl contains \\1..\\9 backreferences."""
@@ -1062,120 +1137,85 @@ def _detect_fixed_width_groups(
         return None
     return segments^
 
-
-@always_inline
-def _interpolate_groups(
-    repl: ImmSlice,
-    text: ImmSlice,
-    groups: List[Match],
-) -> String:
-    """Replace \\1..\\9 in repl with the corresponding capture group text."""
-    var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
-    var out = String(capacity=repl_len + 32)
-
-    var group_idx = InlineArray[Int, 10](fill=-1)
-    for gi in range(len(groups)):
-        var gid = groups[gi].group_id
-        if 1 <= gid <= 9:
-            group_idx[gid] = gi
-
-    var i = 0
-    var literal_start = 0  # batch literal runs instead of one-byte appends
-    while i < repl_len:
-        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
-            var next_ch = Int(repl_ptr[i + 1])
-            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
-                # Flush pending literal run
-                if i > literal_start:
-                    out += ImmSlice(
-                        ptr=repl_ptr + literal_start, length=i - literal_start
-                    )
-                var group_num = next_ch - CHAR_ZERO
-                var idx = group_idx[group_num]
-                if idx >= 0:
-                    out += groups[idx].get_match_text()
-                i += 2
-                literal_start = i
-                continue
-        i += 1
-    # Flush trailing literal
-    if literal_start < repl_len:
-        out += ImmSlice(
-            ptr=repl_ptr + literal_start, length=repl_len - literal_start
-        )
-    return out
+    # _interpolate_groups removed: replaced by _apply_template_groups
+    # which uses the pre-parsed template instead of re-scanning repl.
 
 
 @always_inline
-def _interpolate_fixed_groups(
-    repl: ImmSlice,
+def _apply_template_fixed(
+    template: List[_ReplSegment],
+    repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     match_start: Int,
     group_offsets: InlineArray[Int, 10],
     group_widths: InlineArray[Int, 10],
     num_groups: Int,
+    output_estimate: Int,
 ) -> String:
-    """Interpolate \\1..\\9 using precomputed fixed-width group offsets.
+    """Apply pre-parsed template using precomputed fixed-width group offsets.
 
-    group_offsets[N] is the cumulative byte offset from 0 for group N.
-    The actual position in text is match_start + group_offsets[N].
+    No repl scanning. Walks the template list and emits slices.
     """
-    var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
-    var out = String(capacity=repl_len + 32)
+    var out = String(capacity=output_estimate + 4)
+    var tpl_ptr = template.unsafe_ptr()
+    var tpl_len = len(template)
 
-    var i = 0
-    var literal_start = 0
-    while i < repl_len:
-        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
-            var next_ch = Int(repl_ptr[i + 1])
-            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
-                if i > literal_start:
-                    out += ImmSlice(
-                        ptr=repl_ptr + literal_start, length=i - literal_start
-                    )
-                var group_num = next_ch - CHAR_ZERO
-                if group_num <= num_groups:
-                    var gs = match_start + group_offsets[group_num]
-                    var gw = group_widths[group_num]
-                    out += ImmSlice(ptr=text_ptr + gs, length=gw)
-                i += 2
-                literal_start = i
-                continue
-        i += 1
-    if literal_start < repl_len:
-        out += ImmSlice(
-            ptr=repl_ptr + literal_start, length=repl_len - literal_start
-        )
+    for ti in range(tpl_len):
+        ref seg = tpl_ptr[ti]
+        if seg.group_ref > 0 and seg.group_ref <= num_groups:
+            var gs = match_start + group_offsets[seg.group_ref]
+            var gw = group_widths[seg.group_ref]
+            out += ImmSlice(ptr=text_ptr + gs, length=gw)
+        else:
+            out += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
     return out
 
 
-def sub(
-    pattern: ImmSlice,
+@always_inline
+def _apply_template_groups(
+    template: List[_ReplSegment],
+    repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+    groups: List[Match],
+    group_idx: InlineArray[Int, 10],
+) -> String:
+    """Apply pre-parsed template using NFA-extracted group matches."""
+    var out = String(capacity=32)
+    var tpl_ptr = template.unsafe_ptr()
+    var tpl_len = len(template)
+
+    for ti in range(tpl_len):
+        ref seg = tpl_ptr[ti]
+        if seg.group_ref > 0:
+            var idx = group_idx[seg.group_ref]
+            if idx >= 0:
+                out += groups[idx].get_match_text()
+        else:
+            out += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
+    return out
+
+
+def _sub_impl(
+    compiled: CompiledRegex,
     repl: ImmSlice,
     text: ImmSlice,
     count: Int = 0,
 ) raises -> String:
-    """Replace occurrences of pattern in text with repl (equivalent to re.sub).
+    """Core sub() implementation operating on an already-compiled regex.
 
-    If repl contains \\1..\\9 backreferences, they are replaced with the
-    corresponding capture group text from each match.
+    Bypasses the regex cache lookup. Three fast paths:
+    1. No group refs: literal replacement via optimized matcher chain.
+    2. Fixed-width \\d{N} groups + len(text)==total_width: skip match entirely,
+       slice at precomputed offsets.
+    3. Fixed-width groups + search needed: DFA match_next + offset slicing.
+    4. General: NFA match_next_with_groups for complex patterns.
 
-    Args:
-        pattern: Regex pattern to search for.
-        repl: Replacement string (may contain \\1..\\9 group references).
-        text: Text to search and replace in.
-        count: Maximum number of replacements (0 means replace all).
-
-    Returns:
-        New string with replacements applied.
+    All paths use a pre-parsed replacement template so the per-match
+    interpolation never re-scans the repl string.
     """
     var text_len = len(text)
     if text_len == 0:
         return String(text)
 
-    var compiled = compile_regex(pattern)
     var text_ptr = text.unsafe_ptr()
     var result = String(capacity=text_len + 64)
     var pos = 0
@@ -1183,16 +1223,19 @@ def sub(
     var use_groups = _has_group_refs(repl)
 
     if use_groups:
-        # Check for fixed-width groups fast path: if all groups are \d{N},
-        # we can compute group boundaries from match position + widths
-        # without running the NFA at all.
-        var fixed_widths = _detect_fixed_width_groups(pattern)
+        # Pre-parse replacement template once (not per match)
+        var template = _parse_repl_template(repl)
+        var repl_ptr = repl.unsafe_ptr()
+
+        var pat_slice = rebind[ImmSlice](compiled.pattern.as_string_slice())
+        var fixed_widths = _detect_fixed_width_groups(pat_slice)
         if fixed_widths:
             var segments = fixed_widths.value().copy()
-            # Precompute group offsets and widths once (hoisted out of loop)
+            # Precompute group offsets and widths once
             var group_offsets = InlineArray[Int, 10](fill=0)
             var group_widths = InlineArray[Int, 10](fill=0)
             var num_groups = 0
+            var total_width = 0
             var seg_offset = 0
             for si in range(len(segments)):
                 var seg = segments[si]
@@ -1203,8 +1246,33 @@ def sub(
                     seg_offset += seg
                 else:
                     seg_offset += -seg
-            # Fixed-width fast path: use optimized matcher for finding
-            # matches, compute groups from offsets (no NFA needed)
+            total_width = seg_offset
+
+            # Estimate output size from template
+            var output_est = 0
+            for ti in range(len(template)):
+                ref tseg = template[ti]
+                if tseg.group_ref > 0 and tseg.group_ref <= num_groups:
+                    output_est += group_widths[tseg.group_ref]
+                else:
+                    output_est += tseg.length
+
+            # FAST PATH: if text length == total match width, the match
+            # is trivially at position 0. Skip DFA execution entirely.
+            if text_len == total_width and count != 1 or count == 0:
+                if text_len == total_width:
+                    return _apply_template_fixed(
+                        template,
+                        repl_ptr,
+                        text_ptr,
+                        0,
+                        group_offsets,
+                        group_widths,
+                        num_groups,
+                        output_est,
+                    )
+
+            # DFA fast path: match_next + offset slicing
             while pos <= text_len:
                 var m = compiled.match_next(text, pos)
                 if not m:
@@ -1217,13 +1285,15 @@ def sub(
                         ptr=text_ptr + pos, length=match_start - pos
                     )
 
-                result += _interpolate_fixed_groups(
-                    repl,
+                result += _apply_template_fixed(
+                    template,
+                    repl_ptr,
                     text_ptr,
                     match_start,
                     group_offsets,
                     group_widths,
                     num_groups,
+                    output_est,
                 )
                 replacements += 1
 
@@ -1237,7 +1307,7 @@ def sub(
                 if count > 0 and replacements >= count:
                     break
         else:
-            # General group path: uses NFA engine to extract captures
+            # General group path: NFA with pre-parsed template
             while pos <= text_len:
                 var mg = (
                     compiled.matcher.nfa_matcher.engine.match_next_with_groups(
@@ -1253,7 +1323,16 @@ def sub(
                         ptr=text_ptr + pos, length=m.start_idx - pos
                     )
 
-                result += _interpolate_groups(repl, text, mg[1])
+                # Build group index for this match
+                var group_idx = InlineArray[Int, 10](fill=-1)
+                for gi in range(len(mg[1])):
+                    var gid = mg[1][gi].group_id
+                    if 1 <= gid <= 9:
+                        group_idx[gid] = gi
+
+                result += _apply_template_groups(
+                    template, repl_ptr, mg[1], group_idx
+                )
                 replacements += 1
 
                 if m.end_idx == m.start_idx:
@@ -1266,7 +1345,7 @@ def sub(
                 if count > 0 and replacements >= count:
                     break
     else:
-        # Fast path: no group refs, use the optimized matcher chain
+        # No group refs: literal replacement
         while pos <= text_len:
             var m = compiled.match_next(text, pos)
             if not m:
@@ -1294,3 +1373,27 @@ def sub(
         result += ImmSlice(ptr=text_ptr + pos, length=text_len - pos)
 
     return result
+
+
+def sub(
+    pattern: ImmSlice,
+    repl: ImmSlice,
+    text: ImmSlice,
+    count: Int = 0,
+) raises -> String:
+    """Replace occurrences of pattern in text with repl (equivalent to re.sub).
+
+    If repl contains \\1..\\9 backreferences, they are replaced with the
+    corresponding capture group text from each match.
+
+    Args:
+        pattern: Regex pattern to search for.
+        repl: Replacement string (may contain \\1..\\9 group references).
+        text: Text to search and replace in.
+        count: Maximum number of replacements (0 means replace all).
+
+    Returns:
+        New string with replacements applied.
+    """
+    var compiled = compile_regex(pattern)
+    return _sub_impl(compiled, repl, text, count)
