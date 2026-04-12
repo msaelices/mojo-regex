@@ -823,3 +823,42 @@ def main() raises:
         "hello world foo bar baz qux " * 50,
         20,
     )
+
+    # ===== Sparse Match Benchmarks (long text, rare matches) =====
+    # These exercise the first-byte prefilter skip on long non-matching spans.
+    # ~1 match per 2KB of filler text.
+    var filler = (
+        "The quick brown fox jumps over the lazy dog. " * 40
+    )  # ~1800 bytes
+    var sparse_phone_text = String()
+    for _ in range(20):
+        sparse_phone_text += filler + "Call 555-123-4567 now. "
+
+    benchmark_findall(
+        "sparse_phone_findall",
+        "\\d{3}-\\d{3}-\\d{4}",
+        sparse_phone_text,
+        5,
+    )
+    benchmark_search(
+        "sparse_phone_search",
+        "\\(\\d{3}\\)\\s\\d{3}-\\d{4}",
+        filler * 50 + "(555) 123-4567" + filler * 50,
+        5,
+    )
+    benchmark_findall(
+        "sparse_email_findall",
+        "[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}",
+        (filler + "Contact admin@example.com for details. ") * 10,
+        5,
+    )
+    # Sparse match with NFA/lazy-DFA pattern (flexible phone with optional parens)
+    var sparse_flex_text = String()
+    for _ in range(10):
+        sparse_flex_text += filler + "Reach us at (555) 123-4567 today. "
+    benchmark_findall(
+        "sparse_flex_phone_findall",
+        "\\(?\\d{3}\\)?[\\s.-]?\\d{3}[\\s.-]?\\d{4}",
+        sparse_flex_text,
+        2,
+    )
