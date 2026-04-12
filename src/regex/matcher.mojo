@@ -11,7 +11,22 @@ from std.os import abort
 from std.ffi import _Global
 from std.time import monotonic
 
-from regex.aliases import ImmSlice
+from regex.aliases import (
+    ImmSlice,
+    CHAR_SLASH,
+    CHAR_ZERO,
+    CHAR_NINE,
+    CHAR_LEFT_PAREN,
+    CHAR_RIGHT_PAREN,
+    CHAR_LEFT_CURLY,
+    CHAR_RIGHT_CURLY,
+    CHAR_VERTICAL_BAR,
+    CHAR_LEFT_BRACKET,
+    CHAR_QUESTION_MARK,
+    CHAR_DIGIT,
+)
+
+comptime CHAR_ONE = ord("1")
 from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
@@ -941,18 +956,20 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
         return None
 
 
+@always_inline
 def _has_group_refs(repl: ImmSlice) -> Bool:
     """Check if repl contains \\1..\\9 backreferences."""
     var repl_ptr = repl.unsafe_ptr()
     var repl_len = len(repl)
     for i in range(repl_len - 1):
-        if Int(repl_ptr[i]) == ord("\\"):
+        if Int(repl_ptr[i]) == CHAR_SLASH:
             var next_ch = Int(repl_ptr[i + 1])
-            if next_ch >= ord("1") and next_ch <= ord("9"):
+            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
                 return True
     return False
 
 
+@always_inline
 def _detect_fixed_width_groups(
     pattern: ImmSlice,
 ) -> Optional[List[Int]]:
@@ -974,14 +991,14 @@ def _detect_fixed_width_groups(
     var literal_run = 0  # track bytes of literal content between groups
 
     while i < plen:
-        if Int(p[i]) == ord("("):
+        if Int(p[i]) == CHAR_LEFT_PAREN:
             # Flush any literal run
             if literal_run > 0:
                 segments.append(-literal_run)
                 literal_run = 0
 
             # Check for non-capturing (?:...)
-            if i + 1 < plen and Int(p[i + 1]) == ord("?"):
+            if i + 1 < plen and Int(p[i + 1]) == CHAR_QUESTION_MARK:
                 return None
 
             i += 1  # skip (
@@ -989,42 +1006,44 @@ def _detect_fixed_width_groups(
             # Expect \d or \d{N}
             if (
                 i + 1 >= plen
-                or Int(p[i]) != ord("\\")
-                or Int(p[i + 1]) != ord("d")
+                or Int(p[i]) != CHAR_SLASH
+                or Int(p[i + 1]) != CHAR_DIGIT
             ):
                 return None
             i += 2  # skip \d
 
             # Check for {N}
-            if i < plen and Int(p[i]) == ord("{"):
+            if i < plen and Int(p[i]) == CHAR_LEFT_CURLY:
                 i += 1  # skip {
                 var num_start = i
                 while (
-                    i < plen and Int(p[i]) >= ord("0") and Int(p[i]) <= ord("9")
+                    i < plen
+                    and Int(p[i]) >= CHAR_ZERO
+                    and Int(p[i]) <= CHAR_NINE
                 ):
                     i += 1
-                if i == num_start or i >= plen or Int(p[i]) != ord("}"):
+                if i == num_start or i >= plen or Int(p[i]) != CHAR_RIGHT_CURLY:
                     return None
                 var width = 0
                 for j in range(num_start, i):
-                    width = width * 10 + (Int(p[j]) - ord("0"))
+                    width = width * 10 + (Int(p[j]) - CHAR_ZERO)
                 i += 1  # skip }
                 segments.append(width)
-            elif i < plen and Int(p[i]) == ord(")"):
+            elif i < plen and Int(p[i]) == CHAR_RIGHT_PAREN:
                 # Bare \d: width 1
                 segments.append(1)
             else:
                 return None  # Variable quantifier
 
             # Expect closing )
-            if i >= plen or Int(p[i]) != ord(")"):
+            if i >= plen or Int(p[i]) != CHAR_RIGHT_PAREN:
                 return None
             i += 1  # skip )
-        elif Int(p[i]) == ord("|") or Int(p[i]) == ord("["):
+        elif Int(p[i]) == CHAR_VERTICAL_BAR or Int(p[i]) == CHAR_LEFT_BRACKET:
             return None
         else:
             # Literal or escape between groups
-            if Int(p[i]) == ord("\\") and i + 1 < plen:
+            if Int(p[i]) == CHAR_SLASH and i + 1 < plen:
                 literal_run += (
                     1  # the escaped char takes 1 byte in matched text
                 )
@@ -1044,6 +1063,7 @@ def _detect_fixed_width_groups(
     return segments^
 
 
+@always_inline
 def _interpolate_groups(
     repl: ImmSlice,
     text: ImmSlice,
@@ -1054,8 +1074,6 @@ def _interpolate_groups(
     var repl_len = len(repl)
     var out = String(capacity=repl_len + 32)
 
-    # Build an indexed lookup: group_spans[N] = index into groups list
-    # for group_id == N. -1 means no match. O(1) per \N reference.
     var group_idx = InlineArray[Int, 10](fill=-1)
     for gi in range(len(groups)):
         var gid = groups[gi].group_id
@@ -1063,18 +1081,29 @@ def _interpolate_groups(
             group_idx[gid] = gi
 
     var i = 0
+    var literal_start = 0  # batch literal runs instead of one-byte appends
     while i < repl_len:
-        if Int(repl_ptr[i]) == ord("\\") and i + 1 < repl_len:
+        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
             var next_ch = Int(repl_ptr[i + 1])
-            if next_ch >= ord("1") and next_ch <= ord("9"):
-                var group_num = next_ch - ord("0")
+            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
+                # Flush pending literal run
+                if i > literal_start:
+                    out += ImmSlice(
+                        ptr=repl_ptr + literal_start, length=i - literal_start
+                    )
+                var group_num = next_ch - CHAR_ZERO
                 var idx = group_idx[group_num]
                 if idx >= 0:
                     out += groups[idx].get_match_text()
                 i += 2
+                literal_start = i
                 continue
-        out += ImmSlice(ptr=repl_ptr + i, length=1)
         i += 1
+    # Flush trailing literal
+    if literal_start < repl_len:
+        out += ImmSlice(
+            ptr=repl_ptr + literal_start, length=repl_len - literal_start
+        )
     return out
 
 
@@ -1083,50 +1112,42 @@ def _interpolate_fixed_groups(
     repl: ImmSlice,
     text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     match_start: Int,
-    segments: List[Int],
+    group_offsets: InlineArray[Int, 10],
+    group_widths: InlineArray[Int, 10],
+    num_groups: Int,
 ) -> String:
     """Interpolate \\1..\\9 using precomputed fixed-width group offsets.
 
-    `segments` encodes the pattern structure: positive = group width,
-    negative = literal skip bytes. Group numbering is 1-based in order
-    of positive segments.
+    group_offsets[N] is the cumulative byte offset from 0 for group N.
+    The actual position in text is match_start + group_offsets[N].
     """
     var repl_ptr = repl.unsafe_ptr()
     var repl_len = len(repl)
     var out = String(capacity=repl_len + 32)
 
-    # Precompute group start offsets and widths from segments.
-    # Walk segments accumulating byte offset from match_start.
-    var group_starts = InlineArray[Int, 10](fill=0)
-    var group_widths = InlineArray[Int, 10](fill=0)
-    var num_groups = 0
-    var offset = match_start
-    for si in range(len(segments)):
-        var seg = segments[si]
-        if seg > 0:
-            # Capture group
-            num_groups += 1
-            group_starts[num_groups] = offset
-            group_widths[num_groups] = seg
-            offset += seg
-        else:
-            # Literal skip
-            offset += -seg
-
     var i = 0
+    var literal_start = 0
     while i < repl_len:
-        if Int(repl_ptr[i]) == ord("\\") and i + 1 < repl_len:
+        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
             var next_ch = Int(repl_ptr[i + 1])
-            if next_ch >= ord("1") and next_ch <= ord("9"):
-                var group_num = next_ch - ord("0")
+            if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
+                if i > literal_start:
+                    out += ImmSlice(
+                        ptr=repl_ptr + literal_start, length=i - literal_start
+                    )
+                var group_num = next_ch - CHAR_ZERO
                 if group_num <= num_groups:
-                    var gs = group_starts[group_num]
+                    var gs = match_start + group_offsets[group_num]
                     var gw = group_widths[group_num]
                     out += ImmSlice(ptr=text_ptr + gs, length=gw)
                 i += 2
+                literal_start = i
                 continue
-        out += ImmSlice(ptr=repl_ptr + i, length=1)
         i += 1
+    if literal_start < repl_len:
+        out += ImmSlice(
+            ptr=repl_ptr + literal_start, length=repl_len - literal_start
+        )
     return out
 
 
@@ -1168,6 +1189,20 @@ def sub(
         var fixed_widths = _detect_fixed_width_groups(pattern)
         if fixed_widths:
             var segments = fixed_widths.value().copy()
+            # Precompute group offsets and widths once (hoisted out of loop)
+            var group_offsets = InlineArray[Int, 10](fill=0)
+            var group_widths = InlineArray[Int, 10](fill=0)
+            var num_groups = 0
+            var seg_offset = 0
+            for si in range(len(segments)):
+                var seg = segments[si]
+                if seg > 0:
+                    num_groups += 1
+                    group_offsets[num_groups] = seg_offset
+                    group_widths[num_groups] = seg
+                    seg_offset += seg
+                else:
+                    seg_offset += -seg
             # Fixed-width fast path: use optimized matcher for finding
             # matches, compute groups from offsets (no NFA needed)
             while pos <= text_len:
@@ -1183,7 +1218,12 @@ def sub(
                     )
 
                 result += _interpolate_fixed_groups(
-                    repl, text_ptr, match_start, segments
+                    repl,
+                    text_ptr,
+                    match_start,
+                    group_offsets,
+                    group_widths,
+                    num_groups,
                 )
                 replacements += 1
 
