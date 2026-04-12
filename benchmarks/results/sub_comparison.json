@@ -1,0 +1,45 @@
+{
+  "date": "2026-04-12",
+  "benchmarks": [
+    {
+      "benchmark": "sub_literal",
+      "mojo_ms": 0.00307,
+      "python_ms": 0.00379,
+      "rust_ms": 0.00127,
+      "vs_python": 1.2,
+      "vs_rust": 0.41
+    },
+    {
+      "benchmark": "sub_digits",
+      "mojo_ms": 0.126,
+      "python_ms": 0.941,
+      "rust_ms": 0.102,
+      "vs_python": 7.5,
+      "vs_rust": 0.81
+    },
+    {
+      "benchmark": "sub_char_class",
+      "mojo_ms": 0.137,
+      "python_ms": 1.151,
+      "rust_ms": 0.181,
+      "vs_python": 8.4,
+      "vs_rust": 1.32
+    },
+    {
+      "benchmark": "sub_whitespace",
+      "mojo_ms": 0.018,
+      "python_ms": 0.064,
+      "rust_ms": 0.028,
+      "vs_python": 3.6,
+      "vs_rust": 1.56
+    },
+    {
+      "benchmark": "sub_limited_count",
+      "mojo_ms": 0.014,
+      "python_ms": 0.017,
+      "rust_ms": 0.007,
+      "vs_python": 1.2,
+      "vs_rust": 0.5
+    }
+  ]
+}

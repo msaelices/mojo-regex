@@ -264,6 +264,26 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_benchmark(&timer, &mut all_results, "is_match_predefined_word", &patterns.predefined_word, &text_range_10000, 1000, BenchType::IsMatchBool);
 
     // ===-----------------------------------------------------------------------===
+    // sub (replacement) Benchmarks
+    // ===-----------------------------------------------------------------------===
+    println!("=== sub (replacement) Benchmarks ===");
+
+    let short_text_20 = "hello world this is a test with hello again and hello there".repeat(20);
+    let whitespace_text = "  hello   world   foo   bar   baz  ".repeat(100);
+    let short_text_100 = "hello world this is a test with hello again and hello there".repeat(100);
+
+    let sub_hello = Regex::new("hello")?;
+    let sub_phone = Regex::new(r"\d{3}-\d{3}-\d{4}")?;
+    let sub_digits = Regex::new("[0-9]+")?;
+    let sub_whitespace = Regex::new(r"\s+")?;
+
+    run_sub_benchmark(&timer, &mut all_results, "sub_literal", &sub_hello, "REPLACED", &short_text_20, 100);
+    run_sub_benchmark(&timer, &mut all_results, "sub_digits", &sub_phone, "XXX-XXX-XXXX", &phone_text, 10);
+    run_sub_benchmark(&timer, &mut all_results, "sub_char_class", &sub_digits, "#", &phone_text, 10);
+    run_sub_benchmark(&timer, &mut all_results, "sub_whitespace", &sub_whitespace, " ", &whitespace_text, 50);
+    run_sub_benchmark(&timer, &mut all_results, "sub_limited_count", &sub_hello, "HI", &short_text_100, 100);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");
@@ -508,6 +528,32 @@ fn run_benchmark(
     };
 
     // Adjust time per operation by dividing by inner iterations
+    let adjusted_result = BenchmarkResult {
+        time_ns: result.time_ns / inner_iterations as f64,
+        time_ms: result.time_ms / inner_iterations as f64,
+        iterations: result.iterations * inner_iterations as u64,
+    };
+
+    results.insert(name.to_string(), adjusted_result);
+    println!("✓ {}", name);
+}
+
+fn run_sub_benchmark(
+    timer: &BenchmarkTimer,
+    results: &mut HashMap<String, BenchmarkResult>,
+    name: &str,
+    pattern: &Regex,
+    repl: &str,
+    text: &str,
+    inner_iterations: usize,
+) {
+    let result = timer.bench_function(|| {
+        for _ in 0..inner_iterations {
+            let replaced = pattern.replace_all(black_box(text), repl);
+            black_box(&replaced);
+        }
+    });
+
     let adjusted_result = BenchmarkResult {
         time_ns: result.time_ns / inner_iterations as f64,
         time_ms: result.time_ms / inner_iterations as f64,

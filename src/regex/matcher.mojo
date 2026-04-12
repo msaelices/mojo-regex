@@ -961,7 +961,7 @@ def sub(
     var compiled = compile_regex(pattern)
     var text_len = len(text)
     var text_ptr = text.unsafe_ptr()
-    var result = String()
+    var result = String(capacity=text_len + 64)
     var pos = 0
     var replacements = 0
 
