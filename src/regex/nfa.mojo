@@ -127,7 +127,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def get_pattern(self) -> String:
-        """Returns the pattern string.
+        """Returns the pattern string (Engine trait requirement).
 
         Returns:
             The pattern string.
@@ -135,6 +135,19 @@ struct NFAEngine(Copyable, Engine):
         if self.has_literal_optimization:
             return self.literal_prefix
         return self.pattern
+
+    @always_inline
+    def _get_search_literal_bytes(
+        self,
+    ) -> Span[Byte, ImmutAnyOrigin]:
+        """Returns a zero-copy byte view of the literal used for prefiltering.
+        Avoids the String copy that get_pattern() would produce.
+        """
+        if self.has_literal_optimization:
+            return rebind[Span[Byte, ImmutAnyOrigin]](
+                self.literal_prefix.as_bytes()
+            )
+        return rebind[Span[Byte, ImmutAnyOrigin]](self.pattern.as_bytes())
 
     def match_all(
         self,
@@ -224,7 +237,7 @@ struct NFAEngine(Copyable, Engine):
             while current_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.get_pattern().as_bytes(),
+                    self._get_search_literal_bytes(),
                     text,
                     current_pos,
                 )
@@ -415,7 +428,7 @@ struct NFAEngine(Copyable, Engine):
             while search_pos <= len(text):
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
-                    self.get_pattern().as_bytes(),
+                    self._get_search_literal_bytes(),
                     text,
                     search_pos,
                 )
