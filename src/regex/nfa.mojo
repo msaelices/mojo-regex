@@ -12,6 +12,7 @@ from regex.ast import (
     RANGE_KIND_ALPHA,
     RANGE_KIND_COMPLEX_ALNUM,
     RANGE_KIND_OTHER,
+    COMPLEX_CHAR_CLASS_THRESHOLD,
 )
 from regex.aliases import (
     CHAR_A,
@@ -53,10 +54,7 @@ from regex.literal_optimizer import extract_literals, extract_literal_prefix
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 
 
-# Threshold for complex character class patterns (e.g. [a-zA-Z0-9._%+-])
-# When a pattern has alphanumeric ranges plus more than this many characters,
-# use optimized two-phase matching (check alphanumeric first, then special chars)
-comptime COMPLEX_CHAR_CLASS_THRESHOLD = 10
+# COMPLEX_CHAR_CLASS_THRESHOLD is now imported from regex.ast
 
 # Minimum literal length thresholds for optimization.
 # Even single-char prefixes (like '8' in '8(?:00|33)...') are valuable
@@ -843,9 +841,6 @@ struct NFAEngine(Copyable, Engine):
         var ch_code = Int(str_ptr[str_i])
         var ch_found = False
 
-        # Switch on the precomputed range_kind tag instead of doing
-        # per-character string comparisons. The tag was set at AST
-        # build time by classify_range_kind() in ast.mojo.
         var kind = ast.range_kind
         if kind == RANGE_KIND_ALNUM:
             ch_found = (

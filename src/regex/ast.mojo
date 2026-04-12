@@ -46,6 +46,10 @@ comptime RANGE_KIND_ALPHA = 5  # [a-zA-Z]
 comptime RANGE_KIND_COMPLEX_ALNUM = 6  # [a-zA-Z0-9...] with extra chars
 comptime RANGE_KIND_OTHER = 7  # anything else
 
+# Threshold for complex character class patterns (e.g. [a-zA-Z0-9._%+-]).
+# Shared between classify_range_kind() and nfa.mojo's _match_range fallback.
+comptime COMPLEX_CHAR_CLASS_THRESHOLD = 10
+
 comptime LEAF_ELEMS: SIMD[DType.int8, 8] = [
     Int8(ELEMENT),
     Int8(WILDCARD),
@@ -656,7 +660,7 @@ def classify_range_kind(pattern: StringSlice) -> Int:
         var inner = pattern[byte=1:-1]
         if "a-z" in inner and "A-Z" in inner and "0-9" in inner and len(
             inner
-        ) > 10:
+        ) > COMPLEX_CHAR_CLASS_THRESHOLD:
             return RANGE_KIND_COMPLEX_ALNUM
     return RANGE_KIND_OTHER
 
