@@ -953,6 +953,97 @@ def _has_group_refs(repl: ImmSlice) -> Bool:
     return False
 
 
+def _detect_fixed_width_groups(
+    pattern: ImmSlice,
+) -> Optional[List[Int]]:
+    """Detect if pattern is a sequence of fixed-width \\d{N} capture groups
+    with optional fixed-width literals/escapes between them.
+
+    Returns a list encoding the pattern structure: positive values are
+    capture group widths (in order), negative values are inter-group
+    literal byte counts to skip. Example: `(\\d{3})-(\\d{4})` returns
+    [3, -1, 4].
+
+    Returns None if the pattern doesn't qualify (alternation, variable
+    quantifiers, nested groups, non-\\d groups, character classes).
+    """
+    var p = pattern.unsafe_ptr()
+    var plen = len(pattern)
+    var segments = List[Int]()
+    var i = 0
+    var literal_run = 0  # track bytes of literal content between groups
+
+    while i < plen:
+        if Int(p[i]) == ord("("):
+            # Flush any literal run
+            if literal_run > 0:
+                segments.append(-literal_run)
+                literal_run = 0
+
+            # Check for non-capturing (?:...)
+            if i + 1 < plen and Int(p[i + 1]) == ord("?"):
+                return None
+
+            i += 1  # skip (
+
+            # Expect \d or \d{N}
+            if (
+                i + 1 >= plen
+                or Int(p[i]) != ord("\\")
+                or Int(p[i + 1]) != ord("d")
+            ):
+                return None
+            i += 2  # skip \d
+
+            # Check for {N}
+            if i < plen and Int(p[i]) == ord("{"):
+                i += 1  # skip {
+                var num_start = i
+                while (
+                    i < plen and Int(p[i]) >= ord("0") and Int(p[i]) <= ord("9")
+                ):
+                    i += 1
+                if i == num_start or i >= plen or Int(p[i]) != ord("}"):
+                    return None
+                var width = 0
+                for j in range(num_start, i):
+                    width = width * 10 + (Int(p[j]) - ord("0"))
+                i += 1  # skip }
+                segments.append(width)
+            elif i < plen and Int(p[i]) == ord(")"):
+                # Bare \d: width 1
+                segments.append(1)
+            else:
+                return None  # Variable quantifier
+
+            # Expect closing )
+            if i >= plen or Int(p[i]) != ord(")"):
+                return None
+            i += 1  # skip )
+        elif Int(p[i]) == ord("|") or Int(p[i]) == ord("["):
+            return None
+        else:
+            # Literal or escape between groups
+            if Int(p[i]) == ord("\\") and i + 1 < plen:
+                literal_run += (
+                    1  # the escaped char takes 1 byte in matched text
+                )
+                i += 2
+            else:
+                literal_run += 1
+                i += 1
+
+    # Check we found at least one group
+    var has_group = False
+    for si in range(len(segments)):
+        if segments[si] > 0:
+            has_group = True
+            break
+    if not has_group:
+        return None
+    return segments^
+
+
 def _interpolate_groups(
     repl: ImmSlice,
     text: ImmSlice,
@@ -980,6 +1071,58 @@ def _interpolate_groups(
                 var idx = group_idx[group_num]
                 if idx >= 0:
                     out += groups[idx].get_match_text()
+                i += 2
+                continue
+        out += ImmSlice(ptr=repl_ptr + i, length=1)
+        i += 1
+    return out
+
+
+@always_inline
+def _interpolate_fixed_groups(
+    repl: ImmSlice,
+    text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+    match_start: Int,
+    segments: List[Int],
+) -> String:
+    """Interpolate \\1..\\9 using precomputed fixed-width group offsets.
+
+    `segments` encodes the pattern structure: positive = group width,
+    negative = literal skip bytes. Group numbering is 1-based in order
+    of positive segments.
+    """
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    var out = String(capacity=repl_len + 32)
+
+    # Precompute group start offsets and widths from segments.
+    # Walk segments accumulating byte offset from match_start.
+    var group_starts = InlineArray[Int, 10](fill=0)
+    var group_widths = InlineArray[Int, 10](fill=0)
+    var num_groups = 0
+    var offset = match_start
+    for si in range(len(segments)):
+        var seg = segments[si]
+        if seg > 0:
+            # Capture group
+            num_groups += 1
+            group_starts[num_groups] = offset
+            group_widths[num_groups] = seg
+            offset += seg
+        else:
+            # Literal skip
+            offset += -seg
+
+    var i = 0
+    while i < repl_len:
+        if Int(repl_ptr[i]) == ord("\\") and i + 1 < repl_len:
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= ord("1") and next_ch <= ord("9"):
+                var group_num = next_ch - ord("0")
+                if group_num <= num_groups:
+                    var gs = group_starts[group_num]
+                    var gw = group_widths[group_num]
+                    out += ImmSlice(ptr=text_ptr + gs, length=gw)
                 i += 2
                 continue
         out += ImmSlice(ptr=repl_ptr + i, length=1)
@@ -1019,30 +1162,69 @@ def sub(
     var use_groups = _has_group_refs(repl)
 
     if use_groups:
-        # Group-aware path: uses NFA engine to extract capture groups
-        while pos <= text_len:
-            var mg = compiled.matcher.nfa_matcher.engine.match_next_with_groups(
-                text, pos
-            )
-            if not mg[0]:
-                break
-            var m = mg[0].value()
+        # Check for fixed-width groups fast path: if all groups are \d{N},
+        # we can compute group boundaries from match position + widths
+        # without running the NFA at all.
+        var fixed_widths = _detect_fixed_width_groups(pattern)
+        if fixed_widths:
+            var segments = fixed_widths.value().copy()
+            # Fixed-width fast path: use optimized matcher for finding
+            # matches, compute groups from offsets (no NFA needed)
+            while pos <= text_len:
+                var m = compiled.match_next(text, pos)
+                if not m:
+                    break
+                var match_start = m.value().start_idx
+                var match_end = m.value().end_idx
 
-            if m.start_idx > pos:
-                result += ImmSlice(ptr=text_ptr + pos, length=m.start_idx - pos)
+                if match_start > pos:
+                    result += ImmSlice(
+                        ptr=text_ptr + pos, length=match_start - pos
+                    )
 
-            result += _interpolate_groups(repl, text, mg[1])
-            replacements += 1
+                result += _interpolate_fixed_groups(
+                    repl, text_ptr, match_start, segments
+                )
+                replacements += 1
 
-            if m.end_idx == m.start_idx:
-                if pos < text_len:
-                    result += ImmSlice(ptr=text_ptr + pos, length=1)
-                pos = m.end_idx + 1
-            else:
-                pos = m.end_idx
+                if match_end == match_start:
+                    if pos < text_len:
+                        result += ImmSlice(ptr=text_ptr + pos, length=1)
+                    pos = match_end + 1
+                else:
+                    pos = match_end
 
-            if count > 0 and replacements >= count:
-                break
+                if count > 0 and replacements >= count:
+                    break
+        else:
+            # General group path: uses NFA engine to extract captures
+            while pos <= text_len:
+                var mg = (
+                    compiled.matcher.nfa_matcher.engine.match_next_with_groups(
+                        text, pos
+                    )
+                )
+                if not mg[0]:
+                    break
+                var m = mg[0].value()
+
+                if m.start_idx > pos:
+                    result += ImmSlice(
+                        ptr=text_ptr + pos, length=m.start_idx - pos
+                    )
+
+                result += _interpolate_groups(repl, text, mg[1])
+                replacements += 1
+
+                if m.end_idx == m.start_idx:
+                    if pos < text_len:
+                        result += ImmSlice(ptr=text_ptr + pos, length=1)
+                    pos = m.end_idx + 1
+                else:
+                    pos = m.end_idx
+
+                if count > 0 and replacements >= count:
+                    break
     else:
         # Fast path: no group refs, use the optimized matcher chain
         while pos <= text_len:
