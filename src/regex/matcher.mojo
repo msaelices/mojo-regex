@@ -1254,3 +1254,212 @@ def sub(
         result += ImmSlice(ptr=text_ptr + pos, length=text_len - pos)
 
     return result
+
+
+# ===-----------------------------------------------------------------------===#
+# SubFormatter: pre-compiled format template for zero-regex substitution
+# ===-----------------------------------------------------------------------===#
+
+
+struct _TemplateSegment(Copyable, Movable, TrivialRegisterPassable):
+    """A segment of a pre-parsed replacement template.
+
+    If group_ref > 0, this segment is a group reference (\\N).
+    If group_ref == 0, this segment is a literal slice of the repl string
+    at [start, start+length).
+    """
+
+    comptime __copy_ctor_is_trivial = True
+
+    var group_ref: Int
+    var start: Int
+    var length: Int
+
+    @always_inline
+    def __init__(out self, group_ref: Int, start: Int, length: Int):
+        self.group_ref = group_ref
+        self.start = start
+        self.length = length
+
+
+struct SubFormatter(Copyable, Movable):
+    """Pre-compiled substitution template for fixed-width capture groups.
+
+    Created once per pattern+replacement pair. Formatting a number is then
+    pure slicing + concatenation with zero regex execution, zero cache
+    lookup, and zero replacement parsing.
+
+    Example:
+        var fmt = SubFormatter("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3")
+        var result = fmt.format("6502530000")  # -> "650-253-0000"
+    """
+
+    var _group_starts: InlineArray[Int, 10]
+    """Cumulative byte offset for each group (1-indexed). group_starts[i]
+    is the byte offset from match start where group i begins."""
+    var _group_widths: InlineArray[Int, 10]
+    """Width in bytes of each group (1-indexed)."""
+    var _num_groups: Int
+    """Number of capture groups."""
+    var _total_match_width: Int
+    """Total match width in bytes (sum of all segments)."""
+    var _template: List[_TemplateSegment]
+    """Pre-parsed replacement template segments."""
+    var _repl: String
+    """The original replacement string (kept alive for literal segments)."""
+    var _output_size_estimate: Int
+    """Estimated output size per substitution."""
+    var _valid: Bool
+    """Whether this formatter was successfully constructed."""
+
+    def __init__(out self, pattern: ImmSlice, repl: ImmSlice) raises:
+        """Construct a SubFormatter from a pattern and replacement string.
+
+        Args:
+            pattern: Regex pattern with fixed-width \\d{N} capture groups.
+            repl: Replacement string with \\1..\\9 backreferences.
+
+        Raises:
+            If the pattern is not a fixed-width capture group pattern.
+        """
+        self._group_starts = InlineArray[Int, 10](fill=0)
+        self._group_widths = InlineArray[Int, 10](fill=0)
+        self._num_groups = 0
+        self._total_match_width = 0
+        self._template = List[_TemplateSegment]()
+        self._repl = String(repl)
+        self._output_size_estimate = 0
+        self._valid = False
+
+        # Detect fixed-width groups
+        var segments = _detect_fixed_width_groups(pattern)
+        if not segments:
+            raise Error(
+                "SubFormatter requires a fixed-width \\d{N} capture group"
+                " pattern"
+            )
+
+        # Compute group offsets from segments
+        var segs = segments.value().copy()
+        var offset = 0
+        for si in range(len(segs)):
+            var seg = segs[si]
+            if seg > 0:
+                self._num_groups += 1
+                self._group_starts[self._num_groups] = offset
+                self._group_widths[self._num_groups] = seg
+                offset += seg
+            else:
+                offset += -seg
+        self._total_match_width = offset
+
+        # Pre-parse the replacement template
+        var repl_ptr = repl.unsafe_ptr()
+        var repl_len = len(repl)
+        var i = 0
+        var literal_start = 0
+        while i < repl_len:
+            if (
+                Int(repl_ptr[i]) == ord("\\")
+                and i + 1 < repl_len
+                and Int(repl_ptr[i + 1]) >= ord("1")
+                and Int(repl_ptr[i + 1]) <= ord("9")
+            ):
+                # Flush pending literal
+                if i > literal_start:
+                    self._template.append(
+                        _TemplateSegment(0, literal_start, i - literal_start)
+                    )
+                # Add group reference
+                var group_num = Int(repl_ptr[i + 1]) - ord("0")
+                self._template.append(_TemplateSegment(group_num, 0, 0))
+                i += 2
+                literal_start = i
+            else:
+                i += 1
+        # Flush trailing literal
+        if literal_start < repl_len:
+            self._template.append(
+                _TemplateSegment(0, literal_start, repl_len - literal_start)
+            )
+
+        # Estimate output size
+        var est = 0
+        for ti in range(len(self._template)):
+            ref seg = self._template[ti]
+            if seg.group_ref > 0 and seg.group_ref <= self._num_groups:
+                est += self._group_widths[seg.group_ref]
+            else:
+                est += seg.length
+        self._output_size_estimate = est
+        self._valid = True
+
+    @always_inline
+    def format(self, text: ImmSlice) -> String:
+        """Format a text string using the pre-compiled template.
+
+        Assumes the text is a valid match for the pattern (e.g., a phone
+        number that has already been validated). No regex execution occurs.
+
+        Args:
+            text: Input text to format. Must be at least _total_match_width
+                bytes long.
+
+        Returns:
+            Formatted string with group substitutions applied.
+        """
+        var text_ptr = text.unsafe_ptr()
+        var repl_ptr = self._repl.unsafe_ptr()
+        var result = String(capacity=self._output_size_estimate + 4)
+
+        for ti in range(len(self._template)):
+            ref seg = self._template[ti]
+            if seg.group_ref > 0 and seg.group_ref <= self._num_groups:
+                var gs = self._group_starts[seg.group_ref]
+                var gw = self._group_widths[seg.group_ref]
+                result += ImmSlice(ptr=text_ptr + gs, length=gw)
+            else:
+                result += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
+
+        return result
+
+    @always_inline
+    def format(self, text: ImmSlice, match_start: Int) -> String:
+        """Format from a match position within a larger text.
+
+        Args:
+            text: Full input text.
+            match_start: Byte offset where the match starts.
+
+        Returns:
+            Formatted string with group substitutions applied.
+        """
+        var text_ptr = text.unsafe_ptr() + match_start
+        var repl_ptr = self._repl.unsafe_ptr()
+        var result = String(capacity=self._output_size_estimate + 4)
+
+        for ti in range(len(self._template)):
+            ref seg = self._template[ti]
+            if seg.group_ref > 0 and seg.group_ref <= self._num_groups:
+                var gs = self._group_starts[seg.group_ref]
+                var gw = self._group_widths[seg.group_ref]
+                result += ImmSlice(ptr=text_ptr + gs, length=gw)
+            else:
+                result += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
+
+        return result
+
+    @always_inline
+    def is_valid(self) -> Bool:
+        """Whether this formatter was successfully constructed."""
+        return self._valid
+
+    @always_inline
+    def num_groups(self) -> Int:
+        """Number of capture groups in the pattern."""
+        return self._num_groups
+
+    @always_inline
+    def total_match_width(self) -> Int:
+        """Total match width in bytes."""
+        return self._total_match_width

@@ -9,6 +9,7 @@ from regex.matcher import (
     match_first,
     sub,
     clear_regex_cache,
+    SubFormatter,
 )
 from regex.optimizer import PatternComplexity
 
@@ -1792,6 +1793,57 @@ def test_sub_group_with_text_around() raises:
         "Date: 2026-04-12 is today",
     )
     assert_equal(result, "Date: 04/12/2026 is today")
+
+
+# ===== SubFormatter Tests =====
+
+
+def test_sub_formatter_phone() raises:
+    """Test SubFormatter for phone number formatting."""
+    var fmt = SubFormatter("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3")
+    assert_equal(fmt.format("6502530000"), "650-253-0000")
+    assert_equal(fmt.format("4155551234"), "415-555-1234")
+
+
+def test_sub_formatter_phone_spaces() raises:
+    """Test SubFormatter with space-separated groups."""
+    var fmt = SubFormatter("(\\d{3})(\\d{3})(\\d{4})", "\\1 \\2 \\3")
+    assert_equal(fmt.format("6502530000"), "650 253 0000")
+
+
+def test_sub_formatter_date() raises:
+    """Test SubFormatter for date reformatting."""
+    var fmt = SubFormatter("(\\d{4})-(\\d{2})-(\\d{2})", "\\2/\\3/\\1")
+    assert_equal(fmt.format("2026-04-12"), "04/12/2026")
+
+
+def test_sub_formatter_two_groups() raises:
+    """Test SubFormatter with two groups."""
+    var fmt = SubFormatter("(\\d{3})(\\d{4})", "\\1-\\2")
+    assert_equal(fmt.format("5551234"), "555-1234")
+
+
+def test_sub_formatter_match_start() raises:
+    """Test SubFormatter.format with match_start offset."""
+    var fmt = SubFormatter("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3")
+    var text = "Call 6502530000 today"
+    assert_equal(fmt.format(text, match_start=5), "650-253-0000")
+
+
+def test_sub_formatter_reuse() raises:
+    """Test SubFormatter reused across multiple inputs."""
+    var fmt = SubFormatter("(\\d{2})(\\d{2})", "\\2-\\1")
+    assert_equal(fmt.format("1234"), "34-12")
+    assert_equal(fmt.format("5678"), "78-56")
+    assert_equal(fmt.format("9012"), "12-90")
+
+
+def test_sub_formatter_properties() raises:
+    """Test SubFormatter properties."""
+    var fmt = SubFormatter("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3")
+    assert_true(fmt.is_valid())
+    assert_equal(fmt.num_groups(), 3)
+    assert_equal(fmt.total_match_width(), 10)
 
 
 def main() raises:
