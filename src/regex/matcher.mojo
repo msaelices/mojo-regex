@@ -820,6 +820,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.is_match(text, start)
 
+    @always_inline
     def sub(
         self,
         repl: ImmSlice,
@@ -1194,6 +1195,7 @@ def _apply_template_groups(
     return out
 
 
+@always_inline
 def _sub_impl(
     compiled: CompiledRegex,
     repl: ImmSlice,
