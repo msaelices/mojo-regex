@@ -4,6 +4,11 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### sub() comparison benchmarks and pre-allocation fix (PR #106)
+
+- Added 5 `sub()` benchmarks with equivalent logic across Mojo, Python, and Rust (`sub_literal`, `sub_digits`, `sub_char_class`, `sub_whitespace`, `sub_limited_count`). vs Python: 5/5 wins (1.2x-8.4x faster). vs Rust: 2 wins, 3 losses.
+- Pre-allocated result `String` in `sub()` with `capacity=text_len + 64` to reduce reallocations on replacement-heavy patterns.
+
 ### Eliminate per-match String copies in DFA/NFA hot paths (PR #105)
 
 - DFA `_try_match_at_position` called `get_pattern()` on every literal match attempt, copying `self.literal_pattern` (heap allocation). Now accesses the field directly.
