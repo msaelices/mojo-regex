@@ -25,9 +25,13 @@ from regex.ast import (
     START,
     END,
 )
+from std.sys.info import simd_width_of
+
 from regex.matching import Match, MatchList
 from regex.aliases import ImmSlice, WORD_CHARS
 from regex.dfa import _expand_character_range
+
+comptime SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
 # ===-----------------------------------------------------------------------===#
@@ -671,13 +675,78 @@ struct LazyDFA(Copyable, Movable):
     """Cached DFA states. Index = DFA state ID."""
     var start_state_id: Int
     """DFA state ID for the start state."""
+    var _filter_lo_nibble: SIMD[DType.uint8, 16]
+    """Low-nibble lookup table for SIMD first-byte scan."""
+    var _filter_hi_nibble: SIMD[DType.uint8, 16]
+    """High-nibble lookup table for SIMD first-byte scan."""
+    var _has_simd_filter: Bool
+    """True if SIMD nibble filter is available (selective + enough chars)."""
 
     def __init__(out self, var pikevm: PikeVMEngine):
+        self._filter_lo_nibble = SIMD[DType.uint8, 16](0)
+        self._filter_hi_nibble = SIMD[DType.uint8, 16](0)
+        self._has_simd_filter = False
         self.pikevm = pikevm^
         self.states = List[CachedState](capacity=64)
         self.start_state_id = LAZY_DFA_DEAD
         # Build start state from epsilon closure of PC 0
         self.start_state_id = self._get_or_create_state_for_pos(0, 0)
+        # Build nibble tables for SIMD first-byte scan
+        if self.pikevm.has_filter:
+            self._build_filter_nibble_tables()
+
+    def _build_filter_nibble_tables(mut self):
+        """Build 16-byte nibble tables from first_byte_filter for SIMD scan.
+        Same bucket encoding as CharacterClassSIMD._build_nibble_tables."""
+        var lo_tbl = SIMD[DType.uint8, 16](0)
+        var hi_tbl = SIMD[DType.uint8, 16](0)
+        var bucket = 0
+        for c in range(256):
+            if self.pikevm.first_byte_filter[c] != 0:
+                var lo = c & 0xF
+                var hi = (c >> 4) & 0xF
+                var bit = UInt8(1 << (bucket & 7))
+                lo_tbl[lo] = lo_tbl[lo] | bit
+                hi_tbl[hi] = hi_tbl[hi] | bit
+                bucket += 1
+        self._filter_lo_nibble = lo_tbl
+        self._filter_hi_nibble = hi_tbl
+        self._has_simd_filter = True
+
+    @always_inline
+    def _find_first_candidate(
+        self,
+        text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+        start: Int,
+        text_len: Int,
+    ) -> Int:
+        """Find first text position where the first-byte filter matches,
+        using SIMD nibble scan. Returns -1 if not found."""
+        var pos = start
+        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
+
+        while pos + SIMD_WIDTH <= text_len:
+            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+            var lo_res = self._filter_lo_nibble._dynamic_shuffle(
+                chunk & mask_0f
+            )
+            var hi_res = self._filter_hi_nibble._dynamic_shuffle(
+                (chunk >> 4) & mask_0f
+            )
+            var matches = (lo_res & hi_res).ne(0)
+            if matches.reduce_or():
+                for i in range(SIMD_WIDTH):
+                    if matches[i]:
+                        return pos + i
+            pos += SIMD_WIDTH
+
+        # Scalar tail
+        while pos < text_len:
+            if self.pikevm.first_byte_filter[Int(text_ptr[pos])] != 0:
+                return pos
+            pos += 1
+
+        return -1
 
     def is_supported(self) -> Bool:
         """Check if the underlying PikeVM program fits."""
@@ -692,19 +761,35 @@ struct LazyDFA(Copyable, Movable):
 
     @always_inline
     def match_next(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
-        """Search using cached DFA with first-byte prefilter."""
+        """Search using cached DFA with first-byte prefilter.
+        Uses SIMD nibble scan when available for 16/32-byte skip."""
         var text_len = len(text)
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()
             var pos = start
-            while pos < text_len:
-                if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
+            if self._has_simd_filter:
+                # SIMD scan: skip 16/32 bytes at a time
+                while pos < text_len:
+                    var candidate = self._find_first_candidate(
+                        text_ptr, pos, text_len
+                    )
+                    if candidate == -1:
+                        break
+                    pos = candidate
+                    var result = self._run_lazy(text, pos)
+                    if result:
+                        return result
                     pos += 1
-                    continue
-                var result = self._run_lazy(text, pos)
-                if result:
-                    return result
-                pos += 1
+            else:
+                # Scalar fallback
+                while pos < text_len:
+                    if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
+                        pos += 1
+                        continue
+                    var result = self._run_lazy(text, pos)
+                    if result:
+                        return result
+                    pos += 1
             return self._run_lazy(text, text_len)
 
         for try_pos in range(start, text_len + 1):
@@ -722,17 +807,33 @@ struct LazyDFA(Copyable, Movable):
 
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()
-            while pos < text_len:
-                if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
-                    pos += 1
-                    continue
-                var result = self._run_lazy(text, pos)
-                if result:
-                    ref m = result.value()
-                    matches.append(m)
-                    pos = max(pos + 1, m.end_idx)
-                else:
-                    pos += 1
+            if self._has_simd_filter:
+                while pos < text_len:
+                    var candidate = self._find_first_candidate(
+                        text_ptr, pos, text_len
+                    )
+                    if candidate == -1:
+                        break
+                    pos = candidate
+                    var result = self._run_lazy(text, pos)
+                    if result:
+                        ref m = result.value()
+                        matches.append(m)
+                        pos = max(pos + 1, m.end_idx)
+                    else:
+                        pos += 1
+            else:
+                while pos < text_len:
+                    if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
+                        pos += 1
+                        continue
+                    var result = self._run_lazy(text, pos)
+                    if result:
+                        ref m = result.value()
+                        matches.append(m)
+                        pos = max(pos + 1, m.end_idx)
+                    else:
+                        pos += 1
             return matches^
 
         while pos <= text_len:
