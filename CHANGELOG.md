@@ -4,6 +4,11 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### DFA fast path for sub() on fixed-width capture groups (PR #110)
+
+- When all capture groups are fixed-width `\d{N}` segments, `sub()` now skips the NFA entirely and computes group boundaries via pointer arithmetic. Uses `_detect_fixed_width_groups()` to analyze pattern structure at call time, then `compiled.match_next()` (DFA/lazy-DFA) for position finding + `_interpolate_fixed_groups()` for substitution.
+- Added 3 group-reference benchmarks (`sub_group_phone_fmt`, `sub_group_date_fmt`, `sub_group_word_swap`). Fixed-width path beats Python 2.8-3.2x and Rust 1.5-1.9x on phone number formatting.
+
 ### Capture group extraction and group-reference interpolation in sub() (PR #108)
 
 - `sub()` now supports `\1`..\`\9` backreferences in replacement strings, matching Python's `re.sub` behavior. Parser assigns 1-based `group_id` to capturing groups. NFA `_match_group` tags `Match` objects with group IDs. New `match_next_with_groups()` returns group captures. `_interpolate_groups()` uses `InlineArray` indexed lookup for O(1) per backreference.
