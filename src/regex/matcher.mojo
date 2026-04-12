@@ -941,17 +941,64 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
         return None
 
 
+def _has_group_refs(repl: ImmSlice) -> Bool:
+    """Check if repl contains \\1..\\9 backreferences."""
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    for i in range(repl_len - 1):
+        if Int(repl_ptr[i]) == ord("\\"):
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= ord("1") and next_ch <= ord("9"):
+                return True
+    return False
+
+
+def _interpolate_groups(
+    repl: ImmSlice,
+    text: ImmSlice,
+    groups: List[Match],
+) -> String:
+    """Replace \\1..\\9 in repl with the corresponding capture group text."""
+    var repl_ptr = repl.unsafe_ptr()
+    var repl_len = len(repl)
+    var out = String(capacity=repl_len + 32)
+    var i = 0
+    while i < repl_len:
+        if Int(repl_ptr[i]) == ord("\\") and i + 1 < repl_len:
+            var next_ch = Int(repl_ptr[i + 1])
+            if next_ch >= ord("1") and next_ch <= ord("9"):
+                var group_num = next_ch - ord("0")
+                # Find the group match with this ID
+                var found = False
+                for gi in range(len(groups)):
+                    if groups[gi].group_id == group_num:
+                        out += groups[gi].get_match_text()
+                        found = True
+                        break
+                if not found:
+                    # No match for this group, output empty string
+                    pass
+                i += 2
+                continue
+        out += ImmSlice(ptr=repl_ptr + i, length=1)
+        i += 1
+    return out
+
+
 def sub(
     pattern: ImmSlice,
     repl: ImmSlice,
     text: ImmSlice,
     count: Int = 0,
 ) raises -> String:
-    """Replace occurrences of pattern in text with repl (equivalent to re.sub in Python).
+    """Replace occurrences of pattern in text with repl (equivalent to re.sub).
+
+    If repl contains \\1..\\9 backreferences, they are replaced with the
+    corresponding capture group text from each match.
 
     Args:
         pattern: Regex pattern to search for.
-        repl: Replacement string.
+        repl: Replacement string (may contain \\1..\\9 group references).
         text: Text to search and replace in.
         count: Maximum number of replacements (0 means replace all).
 
@@ -964,20 +1011,39 @@ def sub(
     var result = String(capacity=text_len + 64)
     var pos = 0
     var replacements = 0
+    var use_groups = _has_group_refs(repl)
 
     while pos <= text_len:
-        var m = compiled.match_next(text, pos)
-        if not m:
-            break
+        var match_start: Int
+        var match_end: Int
+        var group_matches = List[Match]()
 
-        var match_obj = m.value()
-        var match_start = match_obj.start_idx
-        var match_end = match_obj.end_idx
+        if use_groups:
+            # Use NFA engine directly to get group captures
+            var mg = compiled.matcher.nfa_matcher.engine.match_next_with_groups(
+                text, pos
+            )
+            if not mg[0]:
+                break
+            var m = mg[0].value()
+            match_start = m.start_idx
+            match_end = m.end_idx
+            group_matches = mg[1].copy()
+        else:
+            var m = compiled.match_next(text, pos)
+            if not m:
+                break
+            match_start = m.value().start_idx
+            match_end = m.value().end_idx
 
         if match_start > pos:
             result += ImmSlice(ptr=text_ptr + pos, length=match_start - pos)
 
-        result += repl
+        if use_groups:
+            result += _interpolate_groups(repl, text, group_matches)
+        else:
+            result += repl
+
         replacements += 1
 
         # For zero-length matches, advance by one byte to avoid infinite loops.

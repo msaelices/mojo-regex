@@ -132,6 +132,7 @@ def parse_token_list[
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
     var tokens: List[Token],
+    mut group_counter: Int,
 ) raises -> ASTNode[MutAnyOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
@@ -161,7 +162,9 @@ def parse_token_list[
             # Parse both sides
             var left_ast: ASTNode[MutAnyOrigin]
             if len(left_tokens) > 0:
-                var left_result = parse_token_list(regex, left_tokens^)
+                var left_result = parse_token_list(
+                    regex, left_tokens^, group_counter
+                )
                 left_ast = rebind[ASTNode[MutAnyOrigin]](left_result)
             else:
                 var empty_group = GroupNode[ImmutAnyOrigin](
@@ -176,7 +179,9 @@ def parse_token_list[
 
             var right_ast: ASTNode[MutAnyOrigin]
             if len(right_tokens) > 0:
-                var right_result = parse_token_list(regex, right_tokens^)
+                var right_result = parse_token_list(
+                    regex, right_tokens^, group_counter
+                )
                 right_ast = rebind[ASTNode[MutAnyOrigin]](right_result)
             else:
                 var empty_group_2 = GroupNode[ImmutAnyOrigin](
@@ -397,13 +402,22 @@ def parse_token_list[
             # Calculate proper end position - should be just before the closing parenthesis
             var paren_end_pos = tokens[i].start_pos
 
+            # Assign group ID for capturing groups (1-based)
+            var gid = -1
+            if is_capturing:
+                group_counter += 1
+                gid = group_counter
+
             # Recursively parse the tokens inside the group
-            var group_ast = parse_token_list(regex, group_tokens^)
+            var group_ast = parse_token_list(
+                regex, group_tokens^, group_counter
+            )
             var group: ASTNode[MutAnyOrigin]
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
                 group = rebind[ASTNode[MutAnyOrigin]](group_ast)
                 group.capturing_group = is_capturing
+                group.group_id = gid
                 group.start_idx = group_content_start_pos
                 group.end_idx = paren_end_pos
             else:
@@ -420,7 +434,7 @@ def parse_token_list[
                     start_idx=group_content_start_pos,
                     end_idx=paren_end_pos,
                     capturing_group=is_capturing,
-                    group_id=0,
+                    group_id=gid,
                 )
                 group = rebind[ASTNode[MutAnyOrigin]](group_node)
             # Check for quantifiers after the group
@@ -470,7 +484,10 @@ def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
     var tokens = scan(pattern)
 
     # Use parse_token_list to do the actual parsing
-    var parsed_ast = parse_token_list[MutAnyOrigin](regex_ptr[], tokens^)
+    var group_counter = 0
+    var parsed_ast = parse_token_list[MutAnyOrigin](
+        regex_ptr[], tokens^, group_counter
+    )
 
     var children_len = regex_ptr[].get_children_len()
 

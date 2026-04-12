@@ -1657,5 +1657,58 @@ def test_sub_empty_text() raises:
     assert_equal(sub("abc", "x", ""), "")
 
 
+# ===== Capture Group Sub Tests =====
+
+
+def test_sub_group_phone_format() raises:
+    """Test sub with capture groups for phone number formatting."""
+    var result = sub(
+        "(\\d{3})(\\d{3})(\\d{4})",
+        "\\1-\\2-\\3",
+        "6502530000",
+    )
+    assert_equal(result, "650-253-0000")
+
+
+def test_sub_group_reorder() raises:
+    """Test sub with group references reordering captures."""
+    var result = sub(
+        "(\\w+) (\\w+)",
+        "\\2 \\1",
+        "hello world",
+    )
+    assert_equal(result, "world hello")
+
+
+def test_sub_group_duplicate_ref() raises:
+    """Test sub with repeated group reference."""
+    var result = sub(
+        "(\\d+)",
+        "[\\1,\\1]",
+        "42 and 99",
+    )
+    assert_equal(result, "[42,42] and [99,99]")
+
+
+def test_sub_group_no_match() raises:
+    """Test sub with group refs but literal repl (no backslash-digit)."""
+    var result = sub(
+        "(hello)",
+        "HI",
+        "hello world",
+    )
+    assert_equal(result, "HI world")
+
+
+def test_sub_group_multiple_matches() raises:
+    """Test sub with groups across multiple matches."""
+    var result = sub(
+        "(\\d{3})(\\d{4})",
+        "\\1-\\2",
+        "5551234 and 9876543",
+    )
+    assert_equal(result, "555-1234 and 987-6543")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
