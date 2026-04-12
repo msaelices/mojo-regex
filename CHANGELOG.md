@@ -4,6 +4,12 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Deep sub() optimization: CompiledRegex.sub, pre-parsed template, match bypass (PR #113)
+
+- Added `CompiledRegex.sub()` method to bypass the regex cache lookup for callers with an already-compiled regex. `sub()` refactored into `_sub_impl(compiled, repl, text, count)`.
+- Pre-parsed replacement template: `_parse_repl_template()` runs once per `sub()` call producing `List[_ReplSegment]`. Per-match interpolation walks the template via `unsafe_ptr()` without re-scanning repl.
+- Full-string match bypass: when `len(text) == total_match_width` for fixed-width `\d{N}` patterns, skip DFA execution entirely. `sub_group_phone_fmt` 20% faster, `sub_group_date_fmt` 24% faster vs baseline.
+
 ### Optimize sub() internals (PR #112)
 
 - Replaced all runtime `ord()` calls in sub-related functions with comptime `CHAR_*` constants. Added `@always_inline` to `_has_group_refs`, `_detect_fixed_width_groups`, `_interpolate_groups`. Batched literal runs in interpolation instead of one-byte appends. Hoisted group offset computation out of the per-match loop. `sub_literal` 23% faster, `sub_group_date_fmt` 7% faster.
