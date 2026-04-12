@@ -1383,17 +1383,34 @@ struct NFAEngine(Copyable, Engine):
                     )
                 else:
                     return self._quantifier_negated_loop(
-                        alnum_matcher, str_ptr, str, str_i, min_matches, max_matches
+                        alnum_matcher,
+                        str_ptr,
+                        str,
+                        str_i,
+                        min_matches,
+                        max_matches,
                     )
             elif kind == RANGE_KIND_LOWERCASE:
                 return self._quantifier_range_loop(
-                    CHAR_A, CHAR_Z, ast.positive_logic,
-                    str_ptr, str, str_i, min_matches, max_matches,
+                    CHAR_A,
+                    CHAR_Z,
+                    ast.positive_logic,
+                    str_ptr,
+                    str,
+                    str_i,
+                    min_matches,
+                    max_matches,
                 )
             elif kind == RANGE_KIND_UPPERCASE:
                 return self._quantifier_range_loop(
-                    CHAR_A_UPPER, CHAR_Z_UPPER, ast.positive_logic,
-                    str_ptr, str, str_i, min_matches, max_matches,
+                    CHAR_A_UPPER,
+                    CHAR_Z_UPPER,
+                    ast.positive_logic,
+                    str_ptr,
+                    str,
+                    str_i,
+                    min_matches,
+                    max_matches,
                 )
             elif kind == RANGE_KIND_DIGITS:
                 var digit_matcher = get_digit_matcher()
@@ -1403,7 +1420,12 @@ struct NFAEngine(Copyable, Engine):
                     )
                 else:
                     return self._quantifier_negated_loop(
-                        digit_matcher, str_ptr, str, str_i, min_matches, max_matches
+                        digit_matcher,
+                        str_ptr,
+                        str,
+                        str_i,
+                        min_matches,
+                        max_matches,
                     )
             elif kind == RANGE_KIND_ALPHA:
                 var alpha_matcher = get_alpha_matcher()
@@ -1413,7 +1435,12 @@ struct NFAEngine(Copyable, Engine):
                     )
                 else:
                     return self._quantifier_negated_loop(
-                        alpha_matcher, str_ptr, str, str_i, min_matches, max_matches
+                        alpha_matcher,
+                        str_ptr,
+                        str,
+                        str_i,
+                        min_matches,
+                        max_matches,
                     )
             elif kind == RANGE_KIND_COMPLEX_ALNUM:
                 var inner = range_pattern[byte=1:-1]

@@ -658,9 +658,12 @@ def classify_range_kind(pattern: StringSlice) -> Int:
     # Check for complex alphanumeric patterns like [a-zA-Z0-9._%+-]
     if pattern.startswith("[") and pattern.endswith("]"):
         var inner = pattern[byte=1:-1]
-        if "a-z" in inner and "A-Z" in inner and "0-9" in inner and len(
-            inner
-        ) > COMPLEX_CHAR_CLASS_THRESHOLD:
+        if (
+            "a-z" in inner
+            and "A-Z" in inner
+            and "0-9" in inner
+            and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+        ):
             return RANGE_KIND_COMPLEX_ALNUM
     return RANGE_KIND_OTHER
 
