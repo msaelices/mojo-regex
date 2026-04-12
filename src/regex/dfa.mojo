@@ -1778,7 +1778,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def get_pattern(self) -> String:
-        """Returns the pattern string.
+        """Returns the pattern string (Engine trait requirement).
 
         Returns:
             The pattern string.
@@ -1889,11 +1889,12 @@ struct DFAEngine(Engine):
         if start_pos > len(text):
             return None
 
-        # Fast path for pure literal patterns using SIMD
+        # Fast path for pure literal patterns using SIMD.
+        # Access literal_pattern directly to avoid the String copy that
+        # get_pattern() would produce on every match attempt.
         if self.is_pure_literal:
-            var pattern = self.get_pattern()
-            var pattern_bytes = pattern.as_bytes()
-            var pattern_len = len(pattern)
+            var pattern_bytes = self.literal_pattern.as_bytes()
+            var pattern_len = len(self.literal_pattern)
             if require_exact_position:
                 # For match_first, must match at exact position
                 if verify_match(
