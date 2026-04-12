@@ -4,6 +4,11 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Eliminate per-match String copies in DFA/NFA hot paths (PR #105)
+
+- DFA `_try_match_at_position` called `get_pattern()` on every literal match attempt, copying `self.literal_pattern` (heap allocation). Now accesses the field directly.
+- NFA `match_all`/`match_next` called `get_pattern().as_bytes()` in the literal prefilter loop. Added `_get_search_literal_bytes()` returning a zero-copy `Span[Byte]` view.
+
 ### Precompute range classification tag on ASTNode (PR #104)
 
 - Added `range_kind: Int` field to `ASTNode` with 8 classification constants, computed once at AST build time by `classify_range_kind()`. Replaces per-character string comparison chains in `_match_range` and `_apply_quantifier_simd` (up to 5 equality checks + `startswith`/`endswith`/`in` per char) with a single integer switch. Extracted `_quantifier_negated_loop` and `_quantifier_range_loop` helpers (net -14% code in nfa.mojo). Moved `COMPLEX_CHAR_CLASS_THRESHOLD` to ast.mojo as shared constant.
