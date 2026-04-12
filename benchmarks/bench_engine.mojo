@@ -1,5 +1,5 @@
 from std.time import perf_counter_ns
-from regex.matcher import compile_regex
+from regex.matcher import compile_regex, sub
 
 
 # ===-----------------------------------------------------------------------===#
@@ -310,6 +310,55 @@ def benchmark_is_match(
             var result = compiled.is_match(text)
             if not result:
                 print("ERROR: No match in", name, "for pattern:", pattern)
+                return
+
+        var end_time = perf_counter_ns()
+        var elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
+
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
+
+
+def benchmark_sub(
+    name: String,
+    pattern: String,
+    repl: String,
+    text: String,
+    internal_iterations: Int,
+) raises:
+    """Benchmark sub() with pre-compiled regex and median timing."""
+
+    # Warmup
+    for _ in range(WARMUP_ITERATIONS):
+        _ = sub(pattern, repl, text)
+
+    # Auto-calibrate
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = sub(pattern, repl, text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < MIN_SAMPLE_NS:
+        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    var times = List[Float64]()
+    var total_time: UInt = 0
+    var actual_iterations = 0
+
+    while (
+        total_time < UInt(TARGET_RUNTIME_NS)
+        and actual_iterations < MAX_ITERATIONS
+    ):
+        var start_time = perf_counter_ns()
+
+        for _ in range(iters):
+            var result = sub(pattern, repl, text)
+            if len(result) == 0 and len(text) > 0:
+                print("ERROR: Empty result in", name)
                 return
 
         var end_time = perf_counter_ns()
@@ -704,4 +753,46 @@ def main() raises:
     )
     benchmark_is_match(
         "is_match_predefined_word", "\\w+", text_range_10000, 1000
+    )
+
+    # ===== sub (replacement) Benchmarks =====
+    # Simple literal replacement
+    benchmark_sub(
+        "sub_literal",
+        "hello",
+        "REPLACED",
+        short_text * 20,
+        100,
+    )
+    # Digit replacement in phone-like text
+    benchmark_sub(
+        "sub_digits",
+        "\\d{3}-\\d{3}-\\d{4}",
+        "XXX-XXX-XXXX",
+        phone_text,
+        10,
+    )
+    # Character class replacement
+    benchmark_sub(
+        "sub_char_class",
+        "[0-9]+",
+        "#",
+        phone_text,
+        10,
+    )
+    # Whitespace normalization
+    benchmark_sub(
+        "sub_whitespace",
+        "\\s+",
+        " ",
+        "  hello   world   foo   bar   baz  " * 100,
+        50,
+    )
+    # Limited count replacement (first 5 only)
+    benchmark_sub(
+        "sub_limited_count",
+        "hello",
+        "HI",
+        short_text * 100,
+        100,
     )

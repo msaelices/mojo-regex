@@ -217,6 +217,52 @@ def benchmark_is_match(
     _store_benchmark_result(name, median_ms, total_matches)
 
 
+def benchmark_sub(
+    name: str,
+    pattern: str,
+    repl: str,
+    text: str,
+    internal_iterations: int,
+):
+    """Benchmark re.sub with pre-compiled regex and median timing."""
+
+    compiled_pattern = re.compile(pattern)
+
+    # Warmup
+    for _ in range(WARMUP_ITERATIONS):
+        compiled_pattern.sub(repl, text)
+
+    # Auto-calibrate
+    iters = _auto_calibrate(
+        lambda: compiled_pattern.sub(repl, text), internal_iterations
+    )
+
+    # Collect per-iteration times
+    times = []
+    total_time = 0
+    actual_iterations = 0
+
+    while total_time < TARGET_RUNTIME_NS and actual_iterations < MAX_ITERATIONS:
+        start_time = time.perf_counter_ns()
+
+        for _ in range(iters):
+            compiled_pattern.sub(repl, text)
+
+        end_time = time.perf_counter_ns()
+        elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(elapsed / iters / 1_000_000.0)
+
+    median_ms = _find_median(times)
+    total_matches = actual_iterations * iters
+
+    padded_name = name + " " * (25 - len(name))
+    print(f"| {padded_name} | {median_ms:>21.17f} | {total_matches:>6} |")
+
+    _store_benchmark_result(name, median_ms, total_matches)
+
+
 # ===-----------------------------------------------------------------------===#
 # Result Collection for JSON Export
 # ===-----------------------------------------------------------------------===#
@@ -671,6 +717,48 @@ def main():
     )
     benchmark_is_match(
         "is_match_predefined_word", r"\w+", text_range_10000, 1000
+    )
+
+    # ===== sub (replacement) Benchmarks =====
+    # Simple literal replacement
+    benchmark_sub(
+        "sub_literal",
+        "hello",
+        "REPLACED",
+        short_text * 20,
+        100,
+    )
+    # Digit replacement in phone-like text
+    benchmark_sub(
+        "sub_digits",
+        r"\d{3}-\d{3}-\d{4}",
+        "XXX-XXX-XXXX",
+        phone_text,
+        10,
+    )
+    # Character class replacement
+    benchmark_sub(
+        "sub_char_class",
+        "[0-9]+",
+        "#",
+        phone_text,
+        10,
+    )
+    # Whitespace normalization
+    benchmark_sub(
+        "sub_whitespace",
+        r"\s+",
+        " ",
+        "  hello   world   foo   bar   baz  " * 100,
+        50,
+    )
+    # Limited count replacement (first 5 only)
+    benchmark_sub(
+        "sub_limited_count",
+        "hello",
+        "HI",
+        short_text * 100,
+        100,
     )
 
     print()
