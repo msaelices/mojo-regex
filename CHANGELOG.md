@@ -4,6 +4,10 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Optimize sub() internals (PR #112)
+
+- Replaced all runtime `ord()` calls in sub-related functions with comptime `CHAR_*` constants. Added `@always_inline` to `_has_group_refs`, `_detect_fixed_width_groups`, `_interpolate_groups`. Batched literal runs in interpolation instead of one-byte appends. Hoisted group offset computation out of the per-match loop. `sub_literal` 23% faster, `sub_group_date_fmt` 7% faster.
+
 ### DFA fast path for sub() on fixed-width capture groups (PR #110)
 
 - When all capture groups are fixed-width `\d{N}` segments, `sub()` now skips the NFA entirely and computes group boundaries via pointer arithmetic. Uses `_detect_fixed_width_groups()` to analyze pattern structure at call time, then `compiled.match_next()` (DFA/lazy-DFA) for position finding + `_interpolate_fixed_groups()` for substitution.
