@@ -796,3 +796,30 @@ def main() raises:
         short_text * 100,
         100,
     )
+    # Group-reference substitution (exercises fixed-width DFA fast path)
+    var phone_numbers = String()
+    for _ in range(100):
+        phone_numbers += "Call 6502530000 or 4155551234 today. "
+    benchmark_sub(
+        "sub_group_phone_fmt",
+        "(\\d{3})(\\d{3})(\\d{4})",
+        "\\1-\\2-\\3",
+        phone_numbers,
+        10,
+    )
+    # Group-reference with literals between groups
+    benchmark_sub(
+        "sub_group_date_fmt",
+        "(\\d{4})-(\\d{2})-(\\d{2})",
+        "\\2/\\3/\\1",
+        "Event on 2026-04-12 and 2025-12-25 and 2024-01-01. " * 50,
+        20,
+    )
+    # General group path (not fixed-width, falls through to NFA)
+    benchmark_sub(
+        "sub_group_word_swap",
+        "(\\w+) (\\w+)",
+        "\\2 \\1",
+        "hello world foo bar baz qux " * 50,
+        20,
+    )

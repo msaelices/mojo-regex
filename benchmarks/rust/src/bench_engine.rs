@@ -283,6 +283,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_sub_benchmark(&timer, &mut all_results, "sub_whitespace", &sub_whitespace, " ", &whitespace_text, 50);
     run_sub_benchmark(&timer, &mut all_results, "sub_limited_count", &sub_hello, "HI", &short_text_100, 100);
 
+    // Group-reference substitution benchmarks
+    let phone_numbers = "Call 6502530000 or 4155551234 today. ".repeat(100);
+    let sub_group_phone = Regex::new(r"(\d{3})(\d{3})(\d{4})")?;
+    let sub_group_date = Regex::new(r"(\d{4})-(\d{2})-(\d{2})")?;
+    let sub_group_word = Regex::new(r"(\w+) (\w+)")?;
+
+    run_sub_benchmark(&timer, &mut all_results, "sub_group_phone_fmt", &sub_group_phone, "$1-$2-$3", &phone_numbers, 10);
+    run_sub_benchmark(&timer, &mut all_results, "sub_group_date_fmt", &sub_group_date, "$2/$3/$1", &("Event on 2026-04-12 and 2025-12-25 and 2024-01-01. ".repeat(50)), 20);
+    run_sub_benchmark(&timer, &mut all_results, "sub_group_word_swap", &sub_group_word, "$2 $1", &("hello world foo bar baz qux ".repeat(50)), 20);
+
     // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
