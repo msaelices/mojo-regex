@@ -4,6 +4,10 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### SIMD nibble scan for LazyDFA first-byte prefilter (PR #115)
+
+- LazyDFA first-byte filter previously checked `first_byte_filter[text_ptr[pos]]` one byte at a time. Now builds nibble lookup tables at construction and uses SIMD `_dynamic_shuffle` to scan 16/32 bytes per iteration via `_find_first_candidate()`. Added 4 sparse-match benchmarks (~1 match per 2KB). `sparse_flex_phone_findall` (lazy DFA path): 330x faster than Python, 18x faster than Rust.
+
 ### Deep sub() optimization: CompiledRegex.sub, pre-parsed template, match bypass (PR #113)
 
 - Added `CompiledRegex.sub()` method to bypass the regex cache lookup for callers with an already-compiled regex. `sub()` refactored into `_sub_impl(compiled, repl, text, count)`.
