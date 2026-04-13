@@ -25,13 +25,10 @@ from regex.ast import (
     START,
     END,
 )
-from std.sys.info import simd_width_of
-
 from regex.matching import Match, MatchList
 from regex.aliases import ImmSlice, WORD_CHARS
 from regex.dfa import _expand_character_range
-
-comptime SIMD_WIDTH = simd_width_of[DType.uint8]()
+from regex.simd_ops import build_nibble_tables, find_first_in_nibble_tables
 
 
 # ===-----------------------------------------------------------------------===#
@@ -693,21 +690,10 @@ struct LazyDFA(Copyable, Movable):
             self._build_filter_nibble_tables()
 
     def _build_filter_nibble_tables(mut self):
-        """Build 16-byte nibble tables from first_byte_filter for SIMD scan.
-        Same bucket encoding as CharacterClassSIMD._build_nibble_tables."""
-        var lo_tbl = SIMD[DType.uint8, 16](0)
-        var hi_tbl = SIMD[DType.uint8, 16](0)
-        var bucket = 0
-        for c in range(256):
-            if self.pikevm.first_byte_filter[c] != 0:
-                var lo = c & 0xF
-                var hi = (c >> 4) & 0xF
-                var bit = UInt8(1 << (bucket & 7))
-                lo_tbl[lo] = lo_tbl[lo] | bit
-                hi_tbl[hi] = hi_tbl[hi] | bit
-                bucket += 1
-        self._filter_lo_nibble = lo_tbl
-        self._filter_hi_nibble = hi_tbl
+        """Build nibble lookup tables from first_byte_filter for SIMD scan."""
+        var tables = build_nibble_tables(self.pikevm.first_byte_filter)
+        self._filter_lo_nibble = tables[0]
+        self._filter_hi_nibble = tables[1]
 
     @always_inline
     def _find_first_candidate(
@@ -718,31 +704,14 @@ struct LazyDFA(Copyable, Movable):
     ) -> Int:
         """Find first text position where the first-byte filter matches,
         using SIMD nibble scan. Returns -1 if not found."""
-        var pos = start
-        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
-
-        while pos + SIMD_WIDTH <= text_len:
-            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-            var lo_res = self._filter_lo_nibble._dynamic_shuffle(
-                chunk & mask_0f
-            )
-            var hi_res = self._filter_hi_nibble._dynamic_shuffle(
-                (chunk >> 4) & mask_0f
-            )
-            var matches = (lo_res & hi_res).ne(0)
-            if matches.reduce_or():
-                for i in range(SIMD_WIDTH):
-                    if matches[i]:
-                        return pos + i
-            pos += SIMD_WIDTH
-
-        # Scalar tail
-        while pos < text_len:
-            if self.pikevm.first_byte_filter[Int(text_ptr[pos])] != 0:
-                return pos
-            pos += 1
-
-        return -1
+        return find_first_in_nibble_tables(
+            self._filter_lo_nibble,
+            self._filter_hi_nibble,
+            self.pikevm.first_byte_filter,
+            text_ptr,
+            start,
+            text_len,
+        )
 
     def is_supported(self) -> Bool:
         """Check if the underlying PikeVM program fits."""

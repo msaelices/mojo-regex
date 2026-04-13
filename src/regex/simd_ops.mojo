@@ -59,6 +59,82 @@ from regex.simd_matchers import (
 comptime SIMD_WIDTH = simd_width_of[DType.uint8]()
 comptime USE_SHUFFLE = SIMD_WIDTH == 16 or SIMD_WIDTH == 32
 
+
+@always_inline
+def build_nibble_tables(
+    filter: SIMD[DType.uint8, 256],
+) -> Tuple[SIMD[DType.uint8, 16], SIMD[DType.uint8, 16]]:
+    """Build 16-byte nibble lookup tables from a 256-byte filter.
+
+    Each matching byte is assigned to a bucket (0-7). Both lo and hi
+    tables use the same bucket bit so AND produces correct results.
+    Used by CharacterClassSIMD and LazyDFA first-byte prefilter.
+
+    Returns:
+        Tuple of (lo_nibble_table, hi_nibble_table).
+    """
+    var lo_tbl = SIMD[DType.uint8, 16](0)
+    var hi_tbl = SIMD[DType.uint8, 16](0)
+    var bucket = 0
+    for c in range(256):
+        if filter[c] != 0:
+            var lo = c & 0xF
+            var hi = (c >> 4) & 0xF
+            var bit = UInt8(1 << (bucket & 7))
+            lo_tbl[lo] = lo_tbl[lo] | bit
+            hi_tbl[hi] = hi_tbl[hi] | bit
+            bucket += 1
+    return (lo_tbl, hi_tbl)
+
+
+@always_inline
+def find_first_in_nibble_tables(
+    lo_nibble: SIMD[DType.uint8, 16],
+    hi_nibble: SIMD[DType.uint8, 16],
+    filter: SIMD[DType.uint8, 256],
+    text_ptr: UnsafePointer[Byte, _],
+    start: Int,
+    text_len: Int,
+) -> Int:
+    """Find first matching byte using nibble-based SIMD scan.
+
+    Scans SIMD_WIDTH bytes per iteration using _dynamic_shuffle on
+    the nibble tables. Falls back to scalar filter lookup for tail bytes.
+
+    Args:
+        lo_nibble: Low-nibble lookup table.
+        hi_nibble: High-nibble lookup table.
+        filter: 256-byte filter for scalar tail.
+        text_ptr: Pointer to text bytes.
+        start: Starting position.
+        text_len: Total length of text.
+
+    Returns:
+        Position of first matching byte, or -1 if not found.
+    """
+    var pos = start
+    var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
+
+    while pos + SIMD_WIDTH <= text_len:
+        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+        var lo_res = lo_nibble._dynamic_shuffle(chunk & mask_0f)
+        var hi_res = hi_nibble._dynamic_shuffle((chunk >> 4) & mask_0f)
+        var matches = (lo_res & hi_res).ne(0)
+        if matches.reduce_or():
+            for i in range(SIMD_WIDTH):
+                if matches[i]:
+                    return pos + i
+        pos += SIMD_WIDTH
+
+    # Scalar tail
+    while pos < text_len:
+        if filter[Int(text_ptr[pos])] != 0:
+            return pos
+        pos += 1
+
+    return -1
+
+
 # Shuffle optimization thresholds
 # Below this size, simple lookup is faster than shuffle
 comptime SHUFFLE_MIN_SIZE = 4
@@ -145,26 +221,10 @@ struct CharacterClassSIMD(
         self._build_nibble_tables()
 
     def _build_nibble_tables(mut self):
-        """Build 16-byte nibble lookup tables from the 256-byte lookup table.
-        These enable fast SIMD character matching using two _dynamic_shuffle
-        calls on 16-byte tables (native pshufb) instead of one on 256-byte
-        table (emulated with multiple shuffles).
-        """
-        var lo_tbl = SIMD[DType.uint8, 16](0)
-        var hi_tbl = SIMD[DType.uint8, 16](0)
-        # Assign each character to a bucket (0-7). Both lo and hi tables
-        # use the same bucket bit so AND produces correct results.
-        var bucket = 0
-        for c in range(256):
-            if self.lookup_table[c] != 0:
-                var lo = c & 0xF
-                var hi = (c >> 4) & 0xF
-                var bit = UInt8(1 << (bucket & 7))
-                lo_tbl[lo] = lo_tbl[lo] | bit
-                hi_tbl[hi] = hi_tbl[hi] | bit
-                bucket += 1
-        self.lo_nibble_table = lo_tbl
-        self.hi_nibble_table = hi_tbl
+        """Build nibble lookup tables from the 256-byte lookup table."""
+        var tables = build_nibble_tables(self.lookup_table)
+        self.lo_nibble_table = tables[0]
+        self.hi_nibble_table = tables[1]
 
     def contains(self, char_code: Int) -> Bool:
         """Check if character is in this character class.
@@ -340,29 +400,14 @@ struct CharacterClassSIMD(
         Returns:
             Position of first matching character, or -1 if not found.
         """
-        var pos = start
-        var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
-
-        while pos + SIMD_WIDTH <= text_len:
-            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-            var lo_res = self.lo_nibble_table._dynamic_shuffle(chunk & mask_0f)
-            var hi_res = self.hi_nibble_table._dynamic_shuffle(
-                (chunk >> 4) & mask_0f
-            )
-            var chunk_matches = (lo_res & hi_res).ne(0)
-            if chunk_matches.reduce_or():
-                for i in range(SIMD_WIDTH):
-                    if chunk_matches[i]:
-                        return pos + i
-            pos += SIMD_WIDTH
-
-        # Scalar tail
-        while pos < text_len:
-            if self.contains(Int(text_ptr[pos])):
-                return pos
-            pos += 1
-
-        return -1
+        return find_first_in_nibble_tables(
+            self.lo_nibble_table,
+            self.hi_nibble_table,
+            self.lookup_table,
+            text_ptr,
+            start,
+            text_len,
+        )
 
     @always_inline
     def count_consecutive_matches(
