@@ -4,6 +4,14 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Inline match_next dispatch chain and _apply_quantifier_simd (PR #117)
+
+- Added `@always_inline` to `HybridMatcher.match_next` and `CompiledRegex.match_next` (the most-used dispatch path for `search`, `sub`, `test`). Added `@always_inline` to `_apply_quantifier_simd`. The other 6 NFA recursive dispatch functions cannot be inlined due to mutual recursion with `_match_node`.
+
+### Extract shared nibble table builder and SIMD scan (PR #116)
+
+- `build_nibble_tables()` and `find_first_in_nibble_tables()` extracted into `simd_ops.mojo` as shared free functions. Both `CharacterClassSIMD` and `LazyDFA` now delegate to them, removing ~50 lines of duplicated nibble table logic. Removed redundant `SIMD_WIDTH` from `pikevm.mojo`.
+
 ### SIMD nibble scan for LazyDFA first-byte prefilter (PR #115)
 
 - LazyDFA first-byte filter previously checked `first_byte_filter[text_ptr[pos]]` one byte at a time. Now builds nibble lookup tables at construction and uses SIMD `_dynamic_shuffle` to scan 16/32 bytes per iteration via `_find_first_candidate()`. Added 4 sparse-match benchmarks (~1 match per 2KB). `sparse_flex_phone_findall` (lazy DFA path): 330x faster than Python, 18x faster than Rust.
