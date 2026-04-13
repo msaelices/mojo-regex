@@ -1425,6 +1425,7 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
+    @always_inline
     def _apply_quantifier_simd(
         self,
         ast: ASTNode,
