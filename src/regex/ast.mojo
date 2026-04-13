@@ -175,7 +175,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     # Mark that is trivially copyable in lists
     comptime __copy_ctor_is_trivial = True
-    comptime max_children = 512
+    comptime max_children = 256
 
     var type: Int
     """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
