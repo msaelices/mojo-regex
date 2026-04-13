@@ -4,134 +4,150 @@ Target runtime: 500ms per benchmark, reporting median iteration time
 | name                      | med (ms)              | iters  |
 |---------------------------|-----------------------|--------|
 [ENGINE] literal_match_short -> Pattern: 'hello', Engine: DFA, Complexity: SIMPLE
-| literal_match_short       | 0.0014098927499999999     | 432000 |
+| literal_match_short       | 0.0015613652499999998     | 300000 |
 [ENGINE] literal_match_long -> Pattern: 'hello', Engine: DFA, Complexity: SIMPLE
-| literal_match_long        | 0.0098142895              | 52000  |
+| literal_match_long        | 0.0076677310000000005     | 64000  |
 [ENGINE] wildcard_match_any -> Pattern: '.*', Engine: NFA, Complexity: SIMPLE
-| wildcard_match_any        | 9.585537414965987e-07     | 497595000 |
+| wildcard_match_any        | 1.5181603773584905e-06    | 350436000 |
 [ENGINE] quantifier_zero_or_more -> Pattern: 'a*', Engine: DFA, Complexity: SIMPLE
-| quantifier_zero_or_more   | 1.0837718181818182e-05    | 49280000 |
+| quantifier_zero_or_more   | 8.041076923076924e-06     | 58890000 |
 [ENGINE] quantifier_one_or_more -> Pattern: 'a+', Engine: DFA, Complexity: SIMPLE
-| quantifier_one_or_more    | 7.661549618320611e-06     | 59998000 |
+| quantifier_one_or_more    | 2.160113829787234e-05     | 22560000 |
 [ENGINE] quantifier_zero_or_one -> Pattern: 'a?', Engine: DFA, Complexity: SIMPLE
-| quantifier_zero_or_one    | 1.088418427230047e-05     | 48564000 |
+| quantifier_zero_or_one    | 1.3549488888888887e-05    | 37125000 |
 [ENGINE] range_lowercase -> Pattern: '[a-z]+', Engine: DFA, Complexity: SIMPLE
-| range_lowercase           | 0.003979314               | 130000 |
+| range_lowercase           | 0.0100082755              | 50000  |
 [ENGINE] range_digits -> Pattern: '[0-9]+', Engine: DFA, Complexity: SIMPLE
-| range_digits              | 0.0007674245              | 636000 |
+| range_digits              | 0.002072214               | 274000 |
 [ENGINE] range_alphanumeric -> Pattern: '[a-zA-Z0-9]+', Engine: DFA, Complexity: SIMPLE
-| range_alphanumeric        | 0.028138734000000002      | 17000  |
+| range_alphanumeric        | 0.035848520999999994      | 14000  |
 [ENGINE] predefined_digits -> Pattern: '\d+', Engine: DFA, Complexity: SIMPLE
-| predefined_digits         | 0.0006168595              | 814000 |
+| predefined_digits         | 0.0006683065              | 748000 |
 [ENGINE] predefined_word -> Pattern: '\w+', Engine: DFA, Complexity: SIMPLE
-| predefined_word           | 0.025426546999999997      | 21000  |
+| predefined_word           | 0.025196559               | 16000  |
 [ENGINE] anchor_start -> Pattern: '^abc', Engine: DFA, Complexity: SIMPLE
-| anchor_start              | 1.9599e-05                | 25398000 |
+| anchor_start              | 1.3923234545454546e-05    | 41250000 |
 [ENGINE] anchor_end -> Pattern: 'xyz$', Engine: DFA, Complexity: SIMPLE
 ERROR: No match in anchor_end for pattern: xyz$
 [ENGINE] alternation_simple -> Pattern: 'a|b|c', Engine: DFA, Complexity: SIMPLE
-| alternation_simple        | 8.218693069306932e-06     | 60600000 |
+| alternation_simple        | 5.319041818181818e-06     | 81400000 |
 [ENGINE] group_alternation -> Pattern: '(a|b)', Engine: DFA, Complexity: SIMPLE
-| group_alternation         | 1.0826652857142858e-05    | 47600000 |
+| group_alternation         | 7.102338779956427e-06     | 70686000 |
 [ENGINE] large_8_alternations -> Pattern: '(apple|banana|cherry|date|elderberry|fig|grape|honey)', Engine: DFA, Complexity: SIMPLE
-| large_8_alternations      | 0.0001566248              | 3210000 |
+| large_8_alternations      | 0.00011649533333333334    | 3942000 |
 [ENGINE] deep_nested_groups_depth4 -> Pattern: '(?:(?:(?:a|b)|(?:c|d))|(?:(?:e|f)|(?:g|h)))', Engine: DFA, Complexity: SIMPLE
-| deep_nested_groups_depth4 | 5.939816666666667e-05     | 8334000 |
+| deep_nested_groups_depth4 | 5.962330769230769e-05     | 7878000 |
 [ENGINE] literal_heavy_alternation -> Pattern: '(user123|admin456|guest789|root000|test111|demo222|sample333|client444)', Engine: DFA, Complexity: SIMPLE
-| literal_heavy_alternation | 0.00019683975000000002    | 2516000 |
+| literal_heavy_alternation | 0.00017657519999999998    | 2675000 |
 [ENGINE] complex_group_5_children -> Pattern: '(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}', Engine: DFA, Complexity: SIMPLE
-| complex_group_5_children  | 0.00017956585714285715    | 2744000 |
+| complex_group_5_children  | 0.00014848316666666667    | 3510000 |
 [ENGINE] match_all_simple -> Pattern: 'hello', Engine: DFA, Complexity: SIMPLE
-| match_all_simple          | 0.009786129999999999      | 51000  |
+| match_all_simple          | 0.01025867                | 45800  |
 [ENGINE] match_all_digits -> Pattern: '[0-9]+', Engine: DFA, Complexity: SIMPLE
-| match_all_digits          | 0.006325905               | 81600  |
+| match_all_digits          | 0.00914607                | 52600  |
 [ENGINE] literal_prefix_short -> Pattern: 'hello.*', Engine: NFA, Complexity: MEDIUM
-| literal_prefix_short      | 0.0003031909353905497     | 1683051 |
+| literal_prefix_short      | 0.00025848358647721705    | 1961401 |
 [ENGINE] literal_prefix_long -> Pattern: 'hello.*', Engine: NFA, Complexity: MEDIUM
-| literal_prefix_long       | 0.0034846403162055333     | 141174 |
+| literal_prefix_long       | 0.0034620478873239437     | 147325 |
 [ENGINE] required_literal_short -> Pattern: '.*@example\.com', Engine: NFA+Prefilter, Complexity: MEDIUM
-| required_literal_short    | 0.00041407350475125765    | 1091290 |
+| required_literal_short    | 0.0002533224513172967     | 1859490 |
 [ENGINE] no_literal_baseline -> Pattern: '[a-z]+', Engine: DFA, Complexity: SIMPLE
-| no_literal_baseline       | 1.5680164319248826e-05    | 28649352 |
+| no_literal_baseline       | 1.5043536503683859e-05    | 36960708 |
 [ENGINE] alternation_common_prefix -> Pattern: '(hello|help|helicopter)', Engine: DFA, Complexity: SIMPLE
-| alternation_common_prefix | 2.504309806371018e-05     | 19725921 |
+| alternation_common_prefix | 1.7431935246504783e-05    | 28532205 |
 [ENGINE] complex_email -> Pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', Engine: DFA, Complexity: SIMPLE
-| complex_email             | 0.010966816666666667      | 45000  |
+| complex_email             | 0.012546508333333335      | 39360  |
 [ENGINE] complex_number -> Pattern: '[0-9]+\.[0-9]+', Engine: DFA, Complexity: SIMPLE
-| complex_number            | 0.019424692               | 26500  |
+| complex_number            | 0.024916732               | 19500  |
 [ENGINE] simple_phone -> Pattern: '\d{3}-\d{3}-\d{4}', Engine: DFA, Complexity: SIMPLE
-| simple_phone              | 0.21889992000000003       | 2300   |
+| simple_phone              | 0.4282732                 | 1100   |
 [ENGINE] flexible_phone -> Pattern: '\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}', Engine: NFA, Complexity: MEDIUM
-| flexible_phone            | 0.10661659                | 4900   |
+| flexible_phone            | 0.20082148                | 2400   |
 [ENGINE] multi_format_phone -> Pattern: '\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\d{3}-\d{3}-\d{4}|\d{10}', Engine: NFA, Complexity: MEDIUM
-| multi_format_phone        | 0.16226794                | 3050   |
+| multi_format_phone        | 0.32642943                | 1600   |
 [ENGINE] phone_validation -> Pattern: '^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$', Engine: NFA, Complexity: MEDIUM
-| phone_validation          | 2.9978767857142856e-05    | 16688000 |
+| phone_validation          | 5.1815e-05                | 8789000 |
 [ENGINE] dfa_simple_phone -> Pattern: '[0-9]{3}-[0-9]{3}-[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| dfa_simple_phone          | 0.24791508                | 2000   |
+| dfa_simple_phone          | 0.21884131499999998       | 2400   |
 [ENGINE] dfa_paren_phone -> Pattern: '\([0-9]{3}\) [0-9]{3}-[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| dfa_paren_phone           | 0.02473809                | 20500  |
+| dfa_paren_phone           | 0.0309423                 | 15400  |
 [ENGINE] dfa_dot_phone -> Pattern: '[0-9]{3}\.[0-9]{3}\.[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| dfa_dot_phone             | 0.24309111499999997       | 2000   |
+| dfa_dot_phone             | 0.20681000500000002       | 2200   |
 [ENGINE] dfa_digits_only -> Pattern: '[0-9]{10}', Engine: DFA, Complexity: SIMPLE
-| dfa_digits_only           | 0.27409498                | 2100   |
+| dfa_digits_only           | 0.34711753                | 1600   |
 [ENGINE] pure_dfa_dash -> Pattern: '555-123-4567', Engine: DFA, Complexity: SIMPLE
-| pure_dfa_dash             | 0.003406589               | 153000 |
+| pure_dfa_dash             | 0.0029696970000000003     | 191000 |
 [ENGINE] pure_dfa_paren -> Pattern: '\(555\) 123-4567', Engine: DFA, Complexity: SIMPLE
-| pure_dfa_paren            | 0.0005966265              | 784000 |
+| pure_dfa_paren            | 0.00048845825             | 844000 |
 [ENGINE] pure_dfa_dot -> Pattern: '555\.123\.4567', Engine: DFA, Complexity: SIMPLE
-| pure_dfa_dot              | 0.00019685949999999997    | 2680000 |
+| pure_dfa_dot              | 0.00025103975             | 2044000 |
 [ENGINE] smart_phone_primary -> Pattern: '[0-9]{3}-[0-9]{3}-[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| smart_phone_primary       | 0.201433105               | 2400   |
+| smart_phone_primary       | 0.19958892499999997       | 2600   |
 [ENGINE] national_phone_validation -> Pattern: '(?:3052(?:0[0-8]|[1-9]\d)|5056(?:[0-35-9]\d|4[0-68]))\d{4}|(?:2742|305[3-9]|472[247-9]|505[2-57-9]|983[2-47-9])\d{6}|(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\d{6}', Engine: DFA, Complexity: SIMPLE
-| national_phone_validation | 0.0621505                 | 7410   |
+| national_phone_validation | 0.0800506                 | 6780   |
 [ENGINE] toll_free_simple -> Pattern: '[89]00\d{6}', Engine: DFA, Complexity: SIMPLE
-| toll_free_simple          | 0.032666245               | 14200  |
+| toll_free_simple          | 0.032705295               | 14800  |
 [ENGINE] toll_free_complex -> Pattern: '8(?:00|33|44|55|66|77|88)[2-9]\d{6}', Engine: DFA, Complexity: SIMPLE
-| toll_free_complex         | 0.01747673                | 25600  |
+| toll_free_complex         | 0.017126080000000002      | 26500  |
 [ENGINE] single_quantifier_digits -> Pattern: '[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| single_quantifier_digits  | 0.034921915               | 13200  |
+| single_quantifier_digits  | 0.036168345000000005      | 14400  |
 [ENGINE] single_quantifier_alpha -> Pattern: '[A-Z]{3}', Engine: DFA, Complexity: SIMPLE
-| single_quantifier_alpha   | 0.021370055               | 20400  |
+| single_quantifier_alpha   | 0.0239208275              | 21200  |
 [ENGINE] dual_quantifiers -> Pattern: '[A-Z]{3}[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| dual_quantifiers          | 0.04835240666666667       | 9450   |
+| dual_quantifiers          | 0.05670240666666667       | 8550   |
 [ENGINE] triple_quantifiers -> Pattern: '[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}', Engine: DFA, Complexity: SIMPLE
-| triple_quantifiers        | 0.05521864                | 9100   |
+| triple_quantifiers        | 0.044746                  | 10700  |
 [ENGINE] quad_quantifiers -> Pattern: '[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{3}[0-9]{3}', Engine: DFA, Complexity: SIMPLE
-| quad_quantifiers          | 0.05320676                | 9500   |
+| quad_quantifiers          | 0.09967010000000001       | 5700   |
 [ENGINE] range_quantifiers -> Pattern: '[A-Z]{2,4}[0-9]{3,5}', Engine: DFA, Complexity: SIMPLE
-| range_quantifiers         | 0.02689098                | 15500  |
+| range_quantifiers         | 0.081977445               | 6200   |
 [ENGINE] mixed_range_quantifiers -> Pattern: '[A-Z]{1,3}-[0-9]{2,4}-[A-Z]{2,3}[0-9]{3,4}', Engine: DFA, Complexity: SIMPLE
-| mixed_range_quantifiers   | 0.05538987333333334       | 9750   |
+| mixed_range_quantifiers   | 0.13185685333333333       | 4050   |
 [ENGINE] datetime_quantifiers -> Pattern: '[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]{3}', Engine: DFA, Complexity: SIMPLE
-| datetime_quantifiers      | 0.08232942                | 6100   |
+| datetime_quantifiers      | 0.10893102                | 4100   |
 [ENGINE] flexible_datetime -> Pattern: '[0-9]{4}-[0-9]{1,2}-[0-9]{1,2} [0-9]{1,2}:[0-9]{2}:[0-9]{2}', Engine: DFA, Complexity: SIMPLE
-| flexible_datetime         | 0.17886073                | 2600   |
+| flexible_datetime         | 0.24447076999999998       | 2100   |
 [ENGINE] dense_quantifiers -> Pattern: '[A-Z]{2}[0-9]{5}-[A-Z]{4}[0-9]{3}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{3}', Engine: DFA, Complexity: SIMPLE
-| dense_quantifiers         | 0.0847405                 | 5650   |
+| dense_quantifiers         | 0.08819441                | 5600   |
 [ENGINE] ultra_dense_quantifiers -> Pattern: '[A-Z]{1,2}[0-9]{3,5}-[A-Z]{2,4}[0-9]{2,4}-[A-Z]{1,3}[0-9]{2,4}-[A-Z]{2,3}[0-9]{2,3}', Engine: DFA, Complexity: SIMPLE
-| ultra_dense_quantifiers   | 0.10088375999999999       | 4975   |
+| ultra_dense_quantifiers   | 0.1103156                 | 3575   |
 [ENGINE] grouped_quantifiers -> Pattern: '([A-Z]{3}[0-9]{4})-([A-Z]{3}[0-9]{3})', Engine: DFA, Complexity: SIMPLE
-| grouped_quantifiers       | 0.03641546                | 12900  |
+| grouped_quantifiers       | 0.041132709999999996      | 11700  |
 [ENGINE] alternation_quantifiers -> Pattern: '([A-Z]{2,3}[0-9]{3,4})|([0-9]{4}-[A-Z]{3})', Engine: NFA, Complexity: SIMPLE
-| alternation_quantifiers   | 0.06521896666666667       | 7800   |
+| alternation_quantifiers   | 0.1132444                 | 4425   |
 [ENGINE] optimize_range_quantifier -> Pattern: 'a{2,4}', Engine: NFA, Complexity: SIMPLE
-| optimize_range_quantifier | 0.014910184               | 34000  |
+| optimize_range_quantifier | 0.022031766               | 23000  |
 [ENGINE] optimize_multiple_quantifiers -> Pattern: '[A-Z]{3}[0-9]{4}-[A-Z]{3}[0-9]{3}-[A-Z]{2}[0-9]{2}', Engine: DFA, Complexity: SIMPLE
-| optimize_multiple_quantifiers | 0.15695954999999998       | 3400   |
+| optimize_multiple_quantifiers | 0.1192444175              | 4000   |
 [ENGINE] optimize_phone_quantifiers -> Pattern: '[0-9]{3}-[0-9]{3}-[0-9]{4}', Engine: DFA, Complexity: SIMPLE
-| optimize_phone_quantifiers | 0.05127760166666667       | 9000   |
+| optimize_phone_quantifiers | 0.046932785               | 10200  |
 [ENGINE] optimize_large_quantifiers -> Pattern: '[A-Z]{10,20}[0-9]{15,25}', Engine: DFA, Complexity: SIMPLE
-| optimize_large_quantifiers | 0.009610229999999999      | 53000  |
+| optimize_large_quantifiers | 0.0076592349999999995     | 61800  |
 [ENGINE] optimize_extreme_quantifiers -> Pattern: 'a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}', Engine: NFA, Complexity: MEDIUM
-| optimize_extreme_quantifiers | 0.0026478179999999997     | 174000 |
+| optimize_extreme_quantifiers | 0.003233182               | 141500 |
 [ENGINE] is_match_lowercase -> Pattern: '[a-z]+', Engine: DFA, Complexity: SIMPLE
-| is_match_lowercase        | 8.072486725663717e-06     | 62828000 |
+| is_match_lowercase        | 4.5466091370558375e-06    | 108153000 |
 [ENGINE] is_match_digits -> Pattern: '[0-9]+', Engine: DFA, Complexity: SIMPLE
-| is_match_digits           | 6.349462962962963e-06     | 76248000 |
+| is_match_digits           | 2.8412050781249996e-06    | 153088000 |
 [ENGINE] is_match_alphanumeric -> Pattern: '[a-zA-Z0-9]+', Engine: DFA, Complexity: SIMPLE
-| is_match_alphanumeric     | 7.593577235772358e-06     | 64083000 |
+| is_match_alphanumeric     | 6.110395833333333e-06     | 88128000 |
 [ENGINE] is_match_predefined_digits -> Pattern: '\d+', Engine: DFA, Complexity: SIMPLE
-| is_match_predefined_digits | 7.105328859060402e-06     | 64815000 |
+| is_match_predefined_digits | 3.2415262529832936e-06    | 155030000 |
 [ENGINE] is_match_predefined_word -> Pattern: '\w+', Engine: DFA, Complexity: SIMPLE
-| is_match_predefined_word  | 9.9725e-06                | 50688000 |
+| is_match_predefined_word  | 4.922009146341463e-06     | 98400000 |
+| sub_literal               | 0.0091646775              | 50400  |
+| sub_digits                | 0.6156775                 | 780    |
+| sub_char_class            | 0.4636004                 | 990    |
+| sub_whitespace            | 0.05755176                | 8750   |
+| sub_limited_count         | 0.038342680000000004      | 12200  |
+| sub_group_phone_fmt       | 0.05724395                | 7740   |
+| sub_group_date_fmt        | 0.032672625               | 13400  |
+| sub_group_word_swap       | 0.094988125               | 4800   |
+[ENGINE] sparse_phone_findall -> Pattern: '\d{3}-\d{3}-\d{4}', Engine: DFA, Complexity: SIMPLE
+| sparse_phone_findall      | 0.0044579522727272725     | 88440  |
+[ENGINE] sparse_phone_search -> Pattern: '\(\d{3}\)\s\d{3}-\d{4}', Engine: DFA, Complexity: SIMPLE
+| sparse_phone_search       | 0.006860041666666667      | 65520  |
+[ENGINE] sparse_email_findall -> Pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}', Engine: DFA, Complexity: SIMPLE
+| sparse_email_findall      | 0.2235995                 | 1920   |
+[ENGINE] sparse_flex_phone_findall -> Pattern: '\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}', Engine: NFA, Complexity: MEDIUM
+| sparse_flex_phone_findall | 0.002449421875            | 181056 |

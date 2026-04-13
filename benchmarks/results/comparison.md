@@ -1,6 +1,6 @@
 # Benchmark Results
 
-Comparison of mojo-regex v0.9.0, Python `re` module, and Rust `regex` crate.
+Comparison of mojo-regex v0.10.0, Python `re` module, and Rust `regex` crate.
 
 - **Mojo**: 0.26.2 stable, compiled with default optimization
 - **Python**: CPython (system), `re` module (C implementation)
@@ -11,105 +11,82 @@ Comparison of mojo-regex v0.9.0, Python `re` module, and Rust `regex` crate.
 
 | Benchmark | Python (ms) | Mojo (ms) | Rust (ms) | Mojo vs Python | Mojo vs Rust |
 |---|---|---|---|---|---|
-| alternation_common_prefix | 0.000205 | 0.000019 | 0.002763 | 10.9x faster | 147.1x faster |
-| alternation_quantifiers | 0.548116 | 0.033851 | 0.077938 | 16.2x faster | 2.3x faster |
-| alternation_simple | 0.000216 | 0.000006 | 0.000022 | 37.1x faster | 3.7x faster |
-| anchor_start | 0.000239 | 0.000010 | 0.000048 | 23.7x faster | 4.8x faster |
-| complex_email | 0.015001 | 0.005766 | - | 2.6x faster | - |
-| complex_group_5_children | 0.000535 | 0.000094 | 0.000080 | 5.7x faster | 1.2x slower |
-| complex_number | 0.096042 | 0.014874 | - | 6.5x faster | - |
-| datetime_quantifiers | 0.149279 | 0.041595 | 0.063636 | 3.6x faster | 1.5x faster |
-| deep_nested_groups_depth4 | 0.000269 | 0.000047 | 0.000022 | 5.7x faster | 2.2x slower |
-| dense_quantifiers | 0.277012 | 0.049089 | 0.020186 | 5.6x faster | 2.4x slower |
-| dfa_digits_only | 1.366024 | 0.141156 | 0.065954 | 9.7x faster | 2.1x slower |
-| dfa_dot_phone | 1.028099 | 0.134110 | 0.038332 | 7.7x faster | 3.5x slower |
-| dfa_paren_phone | 0.054192 | 0.017243 | 0.012261 | 3.1x faster | 1.4x slower |
-| dfa_simple_phone | 1.397189 | 0.111576 | 0.062035 | 12.5x faster | 1.8x slower |
-| dual_quantifiers | 0.153833 | 0.034622 | 0.018107 | 4.4x faster | 1.9x slower |
-| flexible_datetime | 0.125663 | 0.072618 | 0.034419 | 1.7x faster | 2.1x slower |
-| flexible_phone | 2.587829 | 0.085225 | 0.165093 | 30.4x faster | 1.9x faster |
-| group_alternation | 0.000240 | 0.000006 | 0.000062 | 40.0x faster | 10.3x faster |
-| grouped_quantifiers | 0.177344 | 0.038188 | 0.016153 | 4.6x faster | 2.4x slower |
-| is_match_alphanumeric | 0.022975 | 0.000004 | 0.000013 | 5529.8x faster | 3.1x faster |
-| is_match_digits | 0.018364 | 0.000004 | 0.000028 | 4437.4x faster | 6.7x faster |
-| is_match_lowercase | 0.023235 | 0.000006 | 0.000016 | 3658.7x faster | 2.5x faster |
-| is_match_predefined_digits | 0.039575 | 0.000004 | 0.000014 | 9542.6x faster | 3.4x faster |
-| is_match_predefined_word | 0.041491 | 0.000007 | 0.000018 | 6366.3x faster | 2.8x faster |
-| large_8_alternations | 0.000452 | 0.000138 | 0.000060 | 3.3x faster | 2.3x slower |
-| literal_heavy_alternation | 0.000539 | 0.000131 | 0.000069 | 4.1x faster | 1.9x slower |
-| literal_match_long | 0.009688 | 0.008765 | 0.003100 | 1.1x faster | 2.8x slower |
-| literal_match_short | 0.001917 | 0.000611 | 0.000309 | 3.1x faster | 2.0x slower |
-| literal_prefix_long | 0.028644 | 0.001355 | 0.032224 | 21.1x faster | 23.8x faster |
-| literal_prefix_short | 0.000365 | 0.000162 | 0.000248 | 2.3x faster | 1.5x faster |
-| match_all_digits | 1.156175 | 0.003261 | - | 354.5x faster | - |
-| match_all_simple | 0.028153 | 0.006819 | 0.006090 | 4.1x faster | 1.1x slower |
-| mixed_range_quantifiers | 0.083792 | 0.031456 | 0.004234 | 2.7x faster | 7.4x slower |
-| multi_format_phone | 6.741780 | 0.072897 | 0.304144 | 92.5x faster | 4.2x faster |
-| national_phone_validation | 0.705109 | 0.045283 | 0.067209 | 15.6x faster | 1.5x faster |
-| no_literal_baseline | 0.000199 | 0.000007 | 0.007527 | 28.2x faster | 1065.0x faster |
-| optimize_extreme_quantifiers | 0.011433 | 0.001857 | 0.000187 | 6.2x faster | 9.9x slower |
-| optimize_large_quantifiers | 0.008836 | 0.004483 | 0.008854 | 2.0x faster | 2.0x faster |
-| optimize_multiple_quantifiers | 0.537967 | 0.094062 | 0.018045 | 5.7x faster | 5.2x slower |
-| optimize_phone_quantifiers | 0.194558 | 0.033955 | 0.045880 | 5.7x faster | 1.4x faster |
-| optimize_range_quantifier | 0.186627 | 0.010034 | 0.027581 | 18.6x faster | 2.7x faster |
-| phone_validation | 0.000377 | 0.000019 | 0.000024 | 20.1x faster | 1.3x faster |
-| predefined_digits | 0.199526 | 0.000329 | 0.000047 | 606.5x faster | 7.0x slower |
-| predefined_word | 0.037938 | 0.015731 | 0.046293 | 2.4x faster | 2.9x faster |
-| quad_quantifiers | 0.096664 | 0.032846 | 0.010804 | 2.9x faster | 3.0x slower |
-| quantifier_one_or_more | 0.000388 | 0.000006 | 0.000050 | 69.4x faster | 9.0x faster |
-| quantifier_zero_or_more | 0.000204 | 0.000007 | 0.000047 | 30.4x faster | 7.1x faster |
-| quantifier_zero_or_one | 0.000390 | 0.000007 | 0.000047 | 52.4x faster | 6.4x faster |
-| range_alphanumeric | 0.017999 | 0.015931 | 0.047641 | 1.1x faster | 3.0x faster |
-| range_digits | 0.124570 | 0.000350 | 0.000057 | 356.0x faster | 6.1x slower |
-| range_lowercase | 0.017171 | 0.001836 | 0.000050 | 9.4x faster | 37.1x slower |
-| range_quantifiers | 0.178140 | 0.023613 | 0.036654 | 7.5x faster | 1.6x faster |
-| required_literal_short | 0.002636 | 0.000190 | 0.000227 | 13.9x faster | 1.2x faster |
-| simple_phone | 1.967730 | 0.152060 | 0.160663 | 12.9x faster | ~same |
-| single_quantifier_alpha | 0.150912 | 0.015334 | 0.037164 | 9.8x faster | 2.4x faster |
-| single_quantifier_digits | 0.114151 | 0.019651 | 0.021230 | 5.8x faster | ~same |
-| toll_free_complex | 0.037972 | 0.013105 | - | 2.9x faster | - |
-| toll_free_simple | 0.110093 | 0.033758 | - | 3.3x faster | - |
-| triple_quantifiers | 0.193418 | 0.028606 | 0.008678 | 6.8x faster | 3.3x slower |
-| ultra_dense_quantifiers | 0.318297 | 0.093721 | 0.040502 | 3.4x faster | 2.3x slower |
-| wildcard_match_any | 0.006336 | 0.000001 | 0.051336 | 5906.2x faster | 47856.1x faster |
+| alternation_common_prefix | 0.000826 | 0.000017 | 0.003816 | **47.4x faster** | **218.9x faster** |
+| alternation_quantifiers | 0.558568 | 0.113244 | 0.088148 | **4.9x faster** | 1.3x slower |
+| alternation_simple | 0.001097 | 0.000005 | 0.000051 | **206.2x faster** | **9.5x faster** |
+| anchor_start | 0.000748 | 0.000014 | 0.000088 | **53.7x faster** | **6.3x faster** |
+| complex_email | 0.070160 | 0.012547 | - | **5.6x faster** |  |
+| complex_group_5_children | 0.001476 | 0.000148 | 0.000104 | **9.9x faster** | 1.4x slower |
+| complex_number | 0.461907 | 0.024917 | - | **18.5x faster** |  |
+| datetime_quantifiers | 0.455806 | 0.108931 | 0.070875 | **4.2x faster** | 1.5x slower |
+| deep_nested_groups_depth4 | 0.000587 | 0.000060 | 0.000079 | **9.9x faster** | **1.3x faster** |
+| dense_quantifiers | 0.359791 | 0.088194 | 0.024651 | **4.1x faster** | 3.6x slower |
+| dfa_digits_only | 3.773143 | 0.347118 | 0.105233 | **10.9x faster** | 3.3x slower |
+| dfa_dot_phone | 4.522031 | 0.206810 | 0.043691 | **21.9x faster** | 4.7x slower |
+| dfa_paren_phone | 0.189192 | 0.030942 | 0.029768 | **6.1x faster** | ~same |
+| dfa_simple_phone | 3.356700 | 0.218841 | 0.103409 | **15.3x faster** | 2.1x slower |
+| dual_quantifiers | 0.424495 | 0.056702 | 0.045129 | **7.5x faster** | 1.3x slower |
+| flexible_datetime | 0.596272 | 0.244471 | 0.053651 | **2.4x faster** | 4.6x slower |
+| flexible_phone | 9.679496 | 0.200821 | 0.379183 | **48.2x faster** | **1.9x faster** |
+| group_alternation | 0.000765 | 0.000007 | 0.000122 | **107.7x faster** | **17.2x faster** |
+| grouped_quantifiers | 0.182999 | 0.041133 | 0.013317 | **4.4x faster** | 3.1x slower |
+| is_match_alphanumeric | 0.030454 | 0.000006 | 0.000021 | **4984.0x faster** | **3.5x faster** |
+| is_match_digits | 0.018994 | 0.000003 | 0.000055 | **6685.3x faster** | **19.3x faster** |
+| is_match_lowercase | 0.025201 | 0.000005 | 0.000021 | **5542.7x faster** | **4.5x faster** |
+| is_match_predefined_digits | 0.076034 | 0.000003 | 0.000041 | **23456.1x faster** | **12.5x faster** |
+| is_match_predefined_word | 0.087704 | 0.000005 | 0.000027 | **17818.7x faster** | **5.4x faster** |
+| large_8_alternations | 0.001484 | 0.000116 | 0.000350 | **12.7x faster** | **3.0x faster** |
+| literal_heavy_alternation | 0.002165 | 0.000177 | 0.000146 | **12.3x faster** | 1.2x slower |
+| literal_match_long | 0.033884 | 0.007668 | 0.008249 | **4.4x faster** | **1.1x faster** |
+| literal_match_short | 0.006112 | 0.001561 | 0.000829 | **3.9x faster** | 1.9x slower |
+| literal_prefix_long | 0.055659 | 0.003462 | 0.067002 | **16.1x faster** | **19.4x faster** |
+| literal_prefix_short | 0.001019 | 0.000258 | 0.000571 | **3.9x faster** | **2.2x faster** |
+| match_all_digits | 5.191154 | 0.009146 | - | **567.6x faster** |  |
+| match_all_simple | 0.086683 | 0.010259 | 0.009634 | **8.4x faster** | 1.1x slower |
+| mixed_range_quantifiers | 0.414676 | 0.131857 | 0.008486 | **3.1x faster** | 15.5x slower |
+| multi_format_phone | 14.477114 | 0.326429 | 0.294373 | **44.3x faster** | 1.1x slower |
+| national_phone_validation | 1.487162 | 0.080051 | 0.092973 | **18.6x faster** | **1.2x faster** |
+| no_literal_baseline | 0.000958 | 0.000015 | 0.010672 | **63.7x faster** | **709.4x faster** |
+| optimize_extreme_quantifiers | 0.015186 | 0.003233 | 0.000442 | **4.7x faster** | 7.3x slower |
+| optimize_large_quantifiers | 0.007850 | 0.007659 | 0.014534 | ~same | **1.9x faster** |
+| optimize_multiple_quantifiers | 0.376304 | 0.119244 | 0.035518 | **3.2x faster** | 3.4x slower |
+| optimize_phone_quantifiers | 0.192039 | 0.046933 | 0.106254 | **4.1x faster** | **2.3x faster** |
+| optimize_range_quantifier | 0.215721 | 0.022032 | 0.077929 | **9.8x faster** | **3.5x faster** |
+| phone_validation | 0.000766 | 0.000052 | 0.000047 | **14.8x faster** | 1.1x slower |
+| predefined_digits | 0.722623 | 0.000668 | 0.000127 | **1081.3x faster** | 5.2x slower |
+| predefined_word | 0.147209 | 0.025197 | 0.074794 | **5.8x faster** | **3.0x faster** |
+| quad_quantifiers | 0.486208 | 0.099670 | 0.025278 | **4.9x faster** | 3.9x slower |
+| quantifier_one_or_more | 0.000835 | 0.000022 | 0.000144 | **38.7x faster** | **6.7x faster** |
+| quantifier_zero_or_more | 0.000694 | 0.000008 | 0.000110 | **86.3x faster** | **13.7x faster** |
+| quantifier_zero_or_one | 0.000675 | 0.000014 | 0.000088 | **49.8x faster** | **6.5x faster** |
+| range_alphanumeric | 0.091014 | 0.035849 | 0.078458 | **2.5x faster** | **2.2x faster** |
+| range_digits | 0.401415 | 0.002072 | 0.000111 | **193.7x faster** | 18.7x slower |
+| range_lowercase | 0.064163 | 0.010008 | 0.000108 | **6.4x faster** | 92.9x slower |
+| range_quantifiers | 0.491603 | 0.081977 | 0.050994 | **6.0x faster** | 1.6x slower |
+| required_literal_short | 0.008950 | 0.000253 | 0.000529 | **35.3x faster** | **2.1x faster** |
+| simple_phone | 5.812477 | 0.428273 | 0.280827 | **13.6x faster** | 1.5x slower |
+| single_quantifier_alpha | 0.777377 | 0.023921 | 0.102319 | **32.5x faster** | **4.3x faster** |
+| single_quantifier_digits | 0.506991 | 0.036168 | 0.034972 | **14.0x faster** | ~same |
+| sparse_email_findall | 0.895117 | 0.223600 | 0.002552 | **4.0x faster** | 87.6x slower |
+| sparse_flex_phone_findall | 1.077527 | 0.002449 | 0.081576 | **439.9x faster** | **33.3x faster** |
+| sparse_phone_findall | 1.263343 | 0.004458 | 0.004078 | **283.4x faster** | 1.1x slower |
+| sparse_phone_search | 0.078280 | 0.006860 | 0.002867 | **11.4x faster** | 2.4x slower |
+| sub_char_class | 2.223741 | 0.463600 | 0.315234 | **4.8x faster** | 1.5x slower |
+| sub_digits | 4.191351 | 0.615677 | 0.196898 | **6.8x faster** | 3.1x slower |
+| sub_group_date_fmt | 0.220319 | 0.032673 | 0.046133 | **6.7x faster** | **1.4x faster** |
+| sub_group_phone_fmt | 0.323632 | 0.057244 | 0.064509 | **5.7x faster** | **1.1x faster** |
+| sub_group_word_swap | 0.174808 | 0.094988 | 0.050184 | **1.8x faster** | 1.9x slower |
+| sub_limited_count | 0.052567 | 0.038343 | 0.009397 | **1.4x faster** | 4.1x slower |
+| sub_literal | 0.011989 | 0.009165 | 0.002510 | **1.3x faster** | 3.7x slower |
+| sub_whitespace | 0.209092 | 0.057552 | 0.046967 | **3.6x faster** | 1.2x slower |
+| toll_free_complex | 0.142056 | 0.017126 | - | **8.3x faster** |  |
+| toll_free_simple | 0.210704 | 0.032705 | - | **6.4x faster** |  |
+| triple_quantifiers | 0.478265 | 0.044746 | 0.012623 | **10.7x faster** | 3.5x slower |
+| ultra_dense_quantifiers | 0.533211 | 0.110316 | 0.067306 | **4.8x faster** | 1.6x slower |
+| wildcard_match_any | 0.017084 | 0.000002 | 0.121582 | **11253.3x faster** | **80085.1x faster** |
 
 ## Summary
 
-**Mojo vs Python:** 61 wins, 0 losses out of 61 benchmarks (100% win rate)
+**Mojo vs Python:** 73 wins, 0 losses out of 73 benchmarks (100% win rate)
 
-**Mojo vs Rust:** 32 wins, 24 losses out of 56 common benchmarks (57% win rate)
-
-### Where Mojo excels (vs Python)
-
-- **is_match (bool-only):** 3600-9500x faster. O(1) SIMD lookup table check.
-- **Simple quantifiers** (`a*`, `a+`, `a?`): 30-69x faster. Inlined DFA dispatch.
-- **Character class search/findall** (`[a-z]+`, `\w+`, `\d+`): 9-606x faster.
-  SIMD range comparison for contiguous ranges, nibble-based matching for others.
-- **Wildcard** (`.*`): 5900+x faster. Constant-time fast path.
-- **`.*` prefix/suffix patterns**: `rfind` for last-literal, skip NFA entirely.
-- **DFA findall** (phone numbers, quantifiers): 3-13x faster.
-- **NFA/LazyDFA patterns** (`flexible_phone`, `multi_format_phone`, `phone_validation`):
-  Inlined lazy DFA with unchecked state access, 20-93x faster than Python.
-
-### Remaining gaps (vs Rust)
-
-- DFA findall patterns (dense quantifiers, grouped quantifiers): 2-5x slower.
-  Rust's lazy DFA and Aho-Corasick are more efficient for bulk scanning.
-- `range_lowercase` (`[a-z]+` match_first on 10K chars): 37x slower. Rust uses
-  highly optimized SIMD scanning; Mojo's SIMD range comparison is fast but not
-  on par with Rust's mature implementation.
-- `optimize_extreme_quantifiers`, `mixed_range_quantifiers`: 7-10x slower.
-
-### Notes
-
-- Rust's `regex` crate is a highly optimized production library using Thompson NFA
-  simulation, lazy DFA, and Aho-Corasick multi-pattern matching.
-- Python's `re` module is implemented in C with a bytecode interpreter.
-- mojo-regex uses a hybrid DFA/NFA/PikeVM/LazyDFA architecture with SIMD-optimized
-  character class matching. The DFA compiler handles alternation groups, variable-length
-  branches, nested groups, and capturing group flattening. The PikeVM provides O(n*m)
-  guaranteed matching with first-byte prefiltering. The lazy DFA caches PikeVM state-set
-  transitions for O(1) per-byte matching after warmup. SIMD range comparison for
-  contiguous byte ranges. Fast paths for `.*` prefix/suffix.
-- Benchmarks run with pre-compiled regex, 500ms target runtime, median timing, and
-  auto-calibration to reduce noise.
+**Mojo vs Rust:** 33 wins, 35 losses out of 68 common benchmarks (48% win rate)
