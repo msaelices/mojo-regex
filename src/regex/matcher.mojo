@@ -487,8 +487,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             )
             self.is_exact_literal = is_exact
 
-            # Create prefilter if beneficial
-            self.prefilter = create_optimized_prefilter(self.literal_info)
+            # Create prefilter if beneficial. Skip for alternation patterns
+            # where the extracted literal comes from one branch only and
+            # is not required across all match possibilities (issue #114).
+            if "|" not in pattern:
+                self.prefilter = create_optimized_prefilter(self.literal_info)
+            else:
+                self.prefilter = None
         else:
             # Initialize with empty info for simple patterns
             self.literal_info = OptimizedLiteralInfo(None, False, False)

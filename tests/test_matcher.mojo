@@ -1794,5 +1794,45 @@ def test_sub_group_with_text_around() raises:
     assert_equal(result, "Date: 04/12/2026 is today")
 
 
+# ===== Regression Tests =====
+
+
+def test_3way_alternation_with_char_class() raises:
+    """Regression test for issue #114: 3+ way alternation with character
+    classes fails to match. The prefilter extracted a literal from one
+    alternation branch and rejected matches from other branches."""
+    # 2-way works
+    var m1 = search("3[02]|40", "301234")
+    assert_true(Bool(m1))
+
+    # 3-way was failing
+    var m2 = search("3[02]|40|[68]9", "301234")
+    assert_true(Bool(m2))
+    assert_equal(m2.value().start_idx, 0)
+    assert_equal(m2.value().end_idx, 2)
+
+    # 4-way
+    var m3 = search("24|[346]|7[2-57-9]|9[2-9]", "301234")
+    assert_true(Bool(m3))
+
+    # Match the third alternative
+    var m4 = search("3[02]|40|[68]9", "891234")
+    assert_true(Bool(m4))
+    assert_equal(m4.value().start_idx, 0)
+    assert_equal(m4.value().end_idx, 2)
+
+    # Match the second alternative
+    var m5 = search("3[02]|40|[68]9", "401234")
+    assert_true(Bool(m5))
+    assert_equal(m5.value().start_idx, 0)
+    assert_equal(m5.value().end_idx, 2)
+
+
+def test_3way_alternation_sub() raises:
+    """Regression test for issue #114: sub with 3+ way alternation."""
+    var result = sub("3[02]|40|[68]9", "XX", "30 and 40 and 89")
+    assert_equal(result, "XX and XX and XX")
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()
