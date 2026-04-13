@@ -679,13 +679,10 @@ struct LazyDFA(Copyable, Movable):
     """Low-nibble lookup table for SIMD first-byte scan."""
     var _filter_hi_nibble: SIMD[DType.uint8, 16]
     """High-nibble lookup table for SIMD first-byte scan."""
-    var _has_simd_filter: Bool
-    """True if SIMD nibble filter is available (selective + enough chars)."""
 
     def __init__(out self, var pikevm: PikeVMEngine):
         self._filter_lo_nibble = SIMD[DType.uint8, 16](0)
         self._filter_hi_nibble = SIMD[DType.uint8, 16](0)
-        self._has_simd_filter = False
         self.pikevm = pikevm^
         self.states = List[CachedState](capacity=64)
         self.start_state_id = LAZY_DFA_DEAD
@@ -711,7 +708,6 @@ struct LazyDFA(Copyable, Movable):
                 bucket += 1
         self._filter_lo_nibble = lo_tbl
         self._filter_hi_nibble = hi_tbl
-        self._has_simd_filter = True
 
     @always_inline
     def _find_first_candidate(
@@ -761,35 +757,22 @@ struct LazyDFA(Copyable, Movable):
 
     @always_inline
     def match_next(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
-        """Search using cached DFA with first-byte prefilter.
-        Uses SIMD nibble scan when available for 16/32-byte skip."""
+        """Search using cached DFA with SIMD first-byte prefilter."""
         var text_len = len(text)
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()
             var pos = start
-            if self._has_simd_filter:
-                # SIMD scan: skip 16/32 bytes at a time
-                while pos < text_len:
-                    var candidate = self._find_first_candidate(
-                        text_ptr, pos, text_len
-                    )
-                    if candidate == -1:
-                        break
-                    pos = candidate
-                    var result = self._run_lazy(text, pos)
-                    if result:
-                        return result
-                    pos += 1
-            else:
-                # Scalar fallback
-                while pos < text_len:
-                    if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
-                        pos += 1
-                        continue
-                    var result = self._run_lazy(text, pos)
-                    if result:
-                        return result
-                    pos += 1
+            while pos < text_len:
+                var candidate = self._find_first_candidate(
+                    text_ptr, pos, text_len
+                )
+                if candidate == -1:
+                    break
+                pos = candidate
+                var result = self._run_lazy(text, pos)
+                if result:
+                    return result
+                pos += 1
             return self._run_lazy(text, text_len)
 
         for try_pos in range(start, text_len + 1):
@@ -807,33 +790,20 @@ struct LazyDFA(Copyable, Movable):
 
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()
-            if self._has_simd_filter:
-                while pos < text_len:
-                    var candidate = self._find_first_candidate(
-                        text_ptr, pos, text_len
-                    )
-                    if candidate == -1:
-                        break
-                    pos = candidate
-                    var result = self._run_lazy(text, pos)
-                    if result:
-                        ref m = result.value()
-                        matches.append(m)
-                        pos = max(pos + 1, m.end_idx)
-                    else:
-                        pos += 1
-            else:
-                while pos < text_len:
-                    if self.pikevm.first_byte_filter[Int(text_ptr[pos])] == 0:
-                        pos += 1
-                        continue
-                    var result = self._run_lazy(text, pos)
-                    if result:
-                        ref m = result.value()
-                        matches.append(m)
-                        pos = max(pos + 1, m.end_idx)
-                    else:
-                        pos += 1
+            while pos < text_len:
+                var candidate = self._find_first_candidate(
+                    text_ptr, pos, text_len
+                )
+                if candidate == -1:
+                    break
+                pos = candidate
+                var result = self._run_lazy(text, pos)
+                if result:
+                    ref m = result.value()
+                    matches.append(m)
+                    pos = max(pos + 1, m.end_idx)
+                else:
+                    pos += 1
             return matches^
 
         while pos <= text_len:
