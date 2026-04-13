@@ -195,11 +195,11 @@ def parse_token_list[
                 right_ast = rebind[ASTNode[MutAnyOrigin]](empty_group_2)
 
             # Add children to regex and get their indices
-            var left_index = UInt8(
+            var left_index = UInt16(
                 regex.get_children_len() + 1
             )  # +1 because we use 1-based indexing
             regex.append_child(left_ast)
-            var right_index = UInt8(
+            var right_index = UInt16(
                 regex.get_children_len() + 1
             )  # +1 because we use 1-based indexing
             regex.append_child(right_ast)
@@ -423,7 +423,7 @@ def parse_token_list[
             else:
                 # Otherwise wrap in a group - add to regex.get_children_len() and create group node
                 var group_ast_mut = rebind[ASTNode[MutAnyOrigin]](group_ast)
-                var child_index = UInt8(
+                var child_index = UInt16(
                     regex.get_children_len() + 1
                 )  # +1 because we use 1-based indexing
                 regex.append_child(group_ast_mut^)
@@ -448,7 +448,7 @@ def parse_token_list[
     var children_indexes = ChildrenIndexes(capacity=len(elements))
     for ref element in elements:
         children_indexes.append(
-            UInt8(regex.get_children_len() + 1)
+            UInt16(regex.get_children_len() + 1)
         )  # +1 because we use 1-based indexing
         regex.append_child(element)
 
@@ -494,7 +494,7 @@ def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
     # Create a RE root node that wraps the parsed result
     # The tests expect the root to be of type RE with a GROUP child
     var parsed_ast_immutable = rebind[ASTNode[ImmutAnyOrigin]](parsed_ast)
-    var root_child_index = UInt8(
+    var root_child_index = UInt16(
         children_len + 1
     )  # +1 because we use 1-based indexing
     regex_ptr[].append_child(parsed_ast_immutable)

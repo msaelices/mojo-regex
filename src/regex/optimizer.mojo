@@ -360,8 +360,11 @@ struct PatternAnalyzer:
             if self._is_literal_heavy_alternation(ast):
                 # Literal-heavy alternations can be handled efficiently by DFA
                 return PatternComplexity(PatternComplexity.MEDIUM)
-            elif self._is_common_prefix_alternation_in_tree(ast):
-                # Common prefix alternation - can be handled by specialized DFA
+            elif depth <= 4 and self._is_common_prefix_alternation_in_tree(ast):
+                # Common prefix alternation with pure literals (no char classes
+                # or nested alternation) - can be handled by specialized DFA.
+                # Depth > 4 means deeply nested alternation trees that the DFA
+                # compiler can't handle correctly (issue #120).
                 return PatternComplexity(PatternComplexity.SIMPLE)
             # Otherwise, deep nesting - too complex for simple DFA
             return PatternComplexity(PatternComplexity.COMPLEX)
@@ -379,15 +382,17 @@ struct PatternAnalyzer:
                 max_complexity = PatternComplexity(PatternComplexity.MEDIUM)
 
         # Simple alternation between simple patterns can often be handled by DFA
-        # Allow more alternations for better pattern coverage
+        # Allow more alternations for better pattern coverage.
+        # But reject if any branch contains nested alternation — the DFA
+        # compiler produces incorrect matches for deeply nested OR trees
+        # with character classes (issue #120).
         if (
             max_complexity.value == PatternComplexity.SIMPLE
-            and ast.get_children_len()
-            <= 8  # Increased from 3 to support larger alternation patterns
+            and ast.get_children_len() <= 8
+            and not self._has_nested_alternation(ast)
         ):
             return PatternComplexity(PatternComplexity.SIMPLE)
         else:
-            # Mark as MEDIUM instead of falling back, to avoid slow NFA path
             return PatternComplexity(PatternComplexity.MEDIUM)
 
     def _analyze_group(self, ast: ASTNode, depth: Int) -> PatternComplexity:
@@ -570,6 +575,39 @@ struct PatternAnalyzer:
                 return False
 
         return True
+
+    def _has_nested_alternation(self, ast: ASTNode) -> Bool:
+        """Check if any leaf branch of an OR tree contains a nested OR
+        inside a GROUP. The DFA compiler produces incorrect matches for
+        alternation trees where branches themselves contain alternation
+        (e.g. `(?:2(?:0[1-9]|1[0-9])|6(?:5[0-9]))[2-9]\\d{6}`)."""
+        from regex.ast import OR, GROUP
+
+        # Walk the binary OR tree to reach each leaf branch
+        for i in range(ast.get_children_len()):
+            ref child = ast.get_child(i)
+            # Right child of OR is another OR in the binary tree — recurse
+            if child.type == OR:
+                if self._has_nested_alternation(child):
+                    return True
+            elif child.type == GROUP:
+                # Check if this GROUP branch contains any nested OR
+                if self._group_contains_or(child):
+                    return True
+        return False
+
+    def _group_contains_or(self, ast: ASTNode) -> Bool:
+        """Recursively check if a GROUP contains any OR node."""
+        from regex.ast import OR, GROUP
+
+        for i in range(ast.get_children_len()):
+            ref child = ast.get_child(i)
+            if child.type == OR:
+                return True
+            if child.type == GROUP:
+                if self._group_contains_or(child):
+                    return True
+        return False
 
     def _is_common_prefix_alternation_in_tree(self, ast: ASTNode) -> Bool:
         """Check if alternation tree represents a common prefix alternation.
