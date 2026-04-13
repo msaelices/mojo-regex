@@ -4,6 +4,10 @@
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
 
+### Fix 3+ way alternation with character classes failing to match (PR #118)
+
+- Fixed bug where patterns like `3[02]|40|[68]9` failed to match. The prefilter extracted a literal from one alternation branch (`"40"`) and rejected matches from other branches (`"30"` matching `3[02]`). Fix: skip prefilter creation when the pattern contains alternation (`|`).
+
 ### Inline match_next dispatch chain and _apply_quantifier_simd (PR #117)
 
 - Added `@always_inline` to `HybridMatcher.match_next` and `CompiledRegex.match_next` (the most-used dispatch path for `search`, `sub`, `test`). Added `@always_inline` to `_apply_quantifier_simd`. The other 6 NFA recursive dispatch functions cannot be inlined due to mutual recursion with `_match_node`.
