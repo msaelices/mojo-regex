@@ -294,6 +294,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     run_sub_benchmark(&timer, &mut all_results, "sub_group_word_swap", &sub_group_word, "$2 $1", &("hello world foo bar baz qux ".repeat(50)), 20);
 
     // ===-----------------------------------------------------------------------===
+    // Sparse Match Benchmarks (long text, rare matches)
+    // ===-----------------------------------------------------------------------===
+    println!("=== Sparse Match Benchmarks ===");
+
+    let filler = "The quick brown fox jumps over the lazy dog. ".repeat(40);
+    let mut sparse_phone_text = String::new();
+    for _ in 0..20 {
+        sparse_phone_text.push_str(&filler);
+        sparse_phone_text.push_str("Call 555-123-4567 now. ");
+    }
+
+    let sparse_phone_pat = Regex::new(r"\d{3}-\d{3}-\d{4}")?;
+    run_benchmark(&timer, &mut all_results, "sparse_phone_findall", &sparse_phone_pat, &sparse_phone_text, 5, BenchType::FindAll);
+
+    let sparse_paren_phone_pat = Regex::new(r"\(\d{3}\)\s\d{3}-\d{4}")?;
+    let sparse_search_text = format!("{}(555) 123-4567{}", filler.repeat(50), filler.repeat(50));
+    run_benchmark(&timer, &mut all_results, "sparse_phone_search", &sparse_paren_phone_pat, &sparse_search_text, 5, BenchType::Search);
+
+    let sparse_email_pat = Regex::new(r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}")?;
+    let sparse_email_text = format!("{filler}Contact admin@example.com for details. ").repeat(10);
+    run_benchmark(&timer, &mut all_results, "sparse_email_findall", &sparse_email_pat, &sparse_email_text, 5, BenchType::FindAll);
+
+    let sparse_flex_phone_pat = Regex::new(r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}")?;
+    let mut sparse_flex_text = String::new();
+    for _ in 0..10 {
+        sparse_flex_text.push_str(&filler);
+        sparse_flex_text.push_str("Reach us at (555) 123-4567 today. ");
+    }
+    run_benchmark(&timer, &mut all_results, "sparse_flex_phone_findall", &sparse_flex_phone_pat, &sparse_flex_text, 2, BenchType::FindAll);
+
+    // ===-----------------------------------------------------------------------===
     // Results Summary
     // ===-----------------------------------------------------------------------===
     println!("\n=== Benchmark Results ===");

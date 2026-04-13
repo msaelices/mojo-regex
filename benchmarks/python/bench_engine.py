@@ -784,6 +784,40 @@ def main():
         20,
     )
 
+    # ===== Sparse Match Benchmarks (long text, rare matches) =====
+    filler = "The quick brown fox jumps over the lazy dog. " * 40
+    sparse_phone_text = ""
+    for _ in range(20):
+        sparse_phone_text += filler + "Call 555-123-4567 now. "
+
+    benchmark_findall(
+        "sparse_phone_findall",
+        r"\d{3}-\d{3}-\d{4}",
+        sparse_phone_text,
+        5,
+    )
+    benchmark_search(
+        "sparse_phone_search",
+        r"\(\d{3}\)\s\d{3}-\d{4}",
+        filler * 50 + "(555) 123-4567" + filler * 50,
+        5,
+    )
+    benchmark_findall(
+        "sparse_email_findall",
+        r"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}",
+        (filler + "Contact admin@example.com for details. ") * 10,
+        5,
+    )
+    sparse_flex_text = ""
+    for _ in range(10):
+        sparse_flex_text += filler + "Reach us at (555) 123-4567 today. "
+    benchmark_findall(
+        "sparse_flex_phone_findall",
+        r"\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}",
+        sparse_flex_text,
+        2,
+    )
+
     print()
     export_json_results()
 
