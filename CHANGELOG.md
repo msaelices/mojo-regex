@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.0 (unreleased)
+
+### Fix large alternation (7+ branches) failing to match full pattern (PR #121)
+
+- Root cause: `UInt8` overflow in `ASTNode.children_indexes`. Patterns with > 255 AST nodes (like the US NANPA area code pattern with 303 nodes) silently corrupted child indices, producing a 1-byte match instead of the full pattern. Fix: widened indices from `UInt8` to `UInt16` (`SIMD[uint16, 256]`), supporting up to 65535 AST nodes. Added `_has_nested_alternation` defense-in-depth in the optimizer.
+
+### Skip per-character _create_range_matcher indirection (PR #119)
+
+- For `RANGE_KIND_OTHER` patterns, `_match_range` called `_match_with_simd_or_fallback` -> `_create_range_matcher` per character, but `_create_range_matcher` returns `None` for all bracket patterns. Now goes directly to `ast._is_char_in_range_by_code`. Removed dead `_match_with_simd_or_fallback`.
+
 ## v0.10.0 (2026-04-11)
 
 Performance tuning release. Mojo vs Rust win rate improved from 57% to 64%.
