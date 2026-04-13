@@ -568,6 +568,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # Fall back to NFA for complex patterns
             return self.nfa_matcher.match_first(text, start)
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
@@ -771,6 +772,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         """
         return self.matcher.match_first(text, start)
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match in text. This is equivalent to re.search in Python.
 
