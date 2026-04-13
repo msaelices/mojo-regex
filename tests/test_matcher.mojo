@@ -1834,5 +1834,28 @@ def test_3way_alternation_sub() raises:
     assert_equal(result, "XX and XX and XX")
 
 
+def test_large_alternation_nanpa() raises:
+    """Regression test for issue #120: large alternation with nested
+    character classes fails because UInt8 children_indexes overflow
+    when the AST has > 255 nodes."""
+    # Full US NANPA area code pattern (8 outer branches, 303 AST nodes)
+    var p = "(?:2(?:0[1-35-9]|1[02-9]|2[03-57-9]|3[1459]|4[08]|5[1-46]|6[0279]|7[0269]|8[13])|3(?:0[1-47-9]|1[02-9]|2[0135-79]|3[0-24679]|4[167]|5[0-2]|6[01349]|8[056])|4(?:0[124-9]|1[02-579]|2[3-5]|3[0245]|4[023578]|58|6[349]|7[0589]|8[04])|5(?:0[1-47-9]|1[0235-8]|20|3[0149]|4[01]|5[179]|6[1-47]|7[0-5]|8[0256])|6(?:0[1-35-9]|1[024-9]|2[03689]|3[016]|4[0156]|5[01679]|6[0-279]|78|8[0-29])|7(?:0[1-46-8]|1[2-9]|2[04-8]|3[0-247]|4[037]|5[47]|6[02359]|7[0-59]|8[156])|8(?:0[1-68]|1[02-8]|2[0168]|3[0-2589]|4[03578]|5[046-9]|6[02-5]|7[028])|9(?:0[1346-9]|1[02-9]|2[0589]|3[0146-8]|4[01357-9]|5[12469]|7[0-389]|8[04-69]))[2-9]\\d{6}"
+
+    # Area code 650
+    var m1 = match_first(p, "6502530000")
+    assert_true(Bool(m1))
+    assert_equal(m1.value().end_idx, 10)
+
+    # Area code 212
+    var m2 = match_first(p, "2125551234")
+    assert_true(Bool(m2))
+    assert_equal(m2.value().end_idx, 10)
+
+    # Area code 917
+    var m3 = match_first(p, "9175551234")
+    assert_true(Bool(m3))
+    assert_equal(m3.value().end_idx, 10)
+
+
 def main() raises:
     TestSuite.discover_tests[__functions_in_module()]().run()

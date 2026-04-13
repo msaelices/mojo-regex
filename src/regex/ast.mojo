@@ -67,12 +67,12 @@ comptime SIMD_QUANTIFIERS: SIMD[DType.int8, 4] = [
     Int8(RANGE),
 ]
 
-comptime ChildrenIndexes = List[UInt8]
+comptime ChildrenIndexes = List[UInt16]
 
 
 @always_inline
-def _make_children_indexes(*values: UInt8) -> ChildrenIndexes:
-    """Helper to create a ChildrenIndexes list from variadic UInt8 values."""
+def _make_children_indexes(*values: UInt16) -> ChildrenIndexes:
+    """Helper to create a ChildrenIndexes list from variadic UInt16 values."""
     var result = ChildrenIndexes(capacity=len(values))
     for i in range(len(values)):
         result.append(values[i])
@@ -175,7 +175,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     # Mark that is trivially copyable in lists
     comptime __copy_ctor_is_trivial = True
-    comptime max_children = 256
+    comptime max_children = 512
 
     var type: Int
     """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
@@ -187,7 +187,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     """Ending position of this node in the original pattern string."""
     var capturing_group: Bool
     """Whether this node represents a capturing group."""
-    var children_indexes: SIMD[DType.uint8, Self.max_children]
+    var children_indexes: SIMD[DType.uint16, Self.max_children]
     """Bit vector for each ASCII character, used for efficient character class lookups."""
     var children_len: Int
     """Number of child nodes this AST node contains."""
@@ -227,7 +227,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.positive_logic = positive_logic
         self.range_kind = range_kind
         self.group_id = -1
-        self.children_indexes = SIMD[DType.uint8, Self.max_children](
+        self.children_indexes = SIMD[DType.uint16, Self.max_children](
             0
         )  # Initialize with all bits set to 0
         self.children_len = 0
@@ -236,7 +236,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         out self,
         regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
         type: Int,
-        child_index: UInt8,
+        child_index: UInt16,
         start_idx: Int,
         end_idx: Int,
         capturing_group: Bool = False,
@@ -256,7 +256,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.positive_logic = positive_logic
         self.range_kind = range_kind
         self.group_id = -1
-        self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
+        self.children_indexes = SIMD[DType.uint16, Self.max_children](0)
         self.children_indexes[0] = child_index  # Set the first child index
         self.children_len = 1
 
@@ -284,7 +284,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         self.positive_logic = positive_logic
         self.range_kind = range_kind
         self.group_id = -1
-        self.children_indexes = SIMD[DType.uint8, Self.max_children](0)
+        self.children_indexes = SIMD[DType.uint16, Self.max_children](0)
         for i in range(len(children_indexes)):
             self.children_indexes[i] = children_indexes[i]
         self.children_len = len(children_indexes)
@@ -752,8 +752,8 @@ def OrNode[
     regex_origin: ImmutOrigin
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
-    left_child_index: UInt8,
-    right_child_index: UInt8,
+    left_child_index: UInt16,
+    right_child_index: UInt16,
     start_idx: Int,
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
@@ -777,7 +777,7 @@ def NotNode[
     regex_origin: ImmutOrigin,
 ](
     ref[regex_origin] regex: Regex[ImmutAnyOrigin],
-    child_index: UInt8,
+    child_index: UInt16,
     start_idx: Int,
     end_idx: Int,
 ) -> ASTNode[regex_origin]:

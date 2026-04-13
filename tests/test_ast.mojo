@@ -185,7 +185,7 @@ def test_GroupNode() raises:
     mut_regex.append_child(elem1)
     mut_regex.append_child(elem2)
 
-    var children_indexes = _make_children_indexes(UInt8(1), UInt8(2))
+    var children_indexes = _make_children_indexes(UInt16(1), UInt16(2))
     var group = GroupNode[MutAnyOrigin](
         regex,
         children_indexes=children_indexes,
@@ -208,7 +208,7 @@ def test_GroupNode_default_name() raises:
     # Add child to mutable regex
     mut_regex.append_child(elem)
 
-    var children_indexes = _make_children_indexes(UInt8(1))
+    var children_indexes = _make_children_indexes(UInt16(1))
     var group = GroupNode[MutAnyOrigin](
         regex,
         children_indexes=children_indexes,
