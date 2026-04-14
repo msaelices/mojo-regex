@@ -965,12 +965,12 @@ struct NFAEngine(Copyable, Engine):
                 var inner = range_pattern[byte=1:-1]
                 ch_found = byte_in_string(ch_code, inner)
         else:
-            # RANGE_KIND_OTHER: fall back to SIMD or general matcher
+            # RANGE_KIND_OTHER: use direct byte-level range matching.
+            # _create_range_matcher returns None for all bracket patterns,
+            # so skip the indirection and go straight to the AST fallback.
             if ast.get_value():
                 ref range_pattern = ast.get_value().value()
-                ch_found = self._match_with_simd_or_fallback(
-                    ast, range_pattern, ch_code
-                )
+                ch_found = ast._is_char_in_range_by_code(ch_code, range_pattern)
 
         if ch_found == ast.positive_logic:
             return self._apply_quantifier(
@@ -998,20 +998,6 @@ struct NFAEngine(Copyable, Engine):
             return (True, str_i)
         else:
             return (False, str_i)
-
-    def _match_with_simd_or_fallback(
-        self,
-        ast: ASTNode,
-        range_pattern: StringSlice[origin_of(ast.regex_ptr[].pattern)],
-        ch_code: Int,
-    ) -> Bool:
-        """Try to match with SIMD matcher, fallback to regular matching."""
-        var simd_matcher = self._create_range_matcher(range_pattern)
-        if simd_matcher:
-            return simd_matcher.value().contains(ch_code)
-        else:
-            # Fallback to zero-allocation range matching
-            return ast._is_char_in_range_by_code(ch_code, range_pattern)
 
     def _match_or(
         self,
