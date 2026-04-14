@@ -2,6 +2,10 @@
 
 ## v0.11.0 (unreleased)
 
+### Increase PikeVM MAX_STATES to 512: enable lazy DFA for NANPA patterns (PR #124)
+
+- The US NANPA area code pattern (290 PikeVM instructions) exceeded `MAX_STATES=128` and fell back to the backtracking NFA, 28x slower than Python. Bumping to 512 enables the lazy DFA which produces only 11 cached states. `nanpa_match_first` **94,579x faster** (3.594ms -> 0.000038ms), now **6.1x faster than Python** and **1.3x faster than Rust**. `nanpa_findall` **273x faster**, now 8x faster than Python. Added NANPA benchmarks to all 3 engines.
+
 ### Cache DFA dispatch condition and inline LazyDFA helpers (PR #122)
 
 - M5: Replaced 6 occurrences of `self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE` with a cached `_use_dfa` Bool field. `DFAMatcher` now conforms to `Boolable`.
