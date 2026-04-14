@@ -2,6 +2,10 @@
 
 ## v0.11.0 (unreleased)
 
+### Multi-range SIMD scan for [a-zA-Z0-9]+ and similar patterns (PR #126)
+
+- Added multi-range SIMD path to `count_consecutive_matches` for character classes with 2-3 contiguous sub-ranges. Uses SIMD unsigned subtraction + OR across all ranges instead of scalar lookup. `range_alphanumeric` **9x faster** (0.025ms -> 0.003ms), flipped from 1.4x slower than Python to ~4.7x faster. Zero regressions on single-range benchmarks. Python win rate: 96% -> 97%.
+
 ### Increase PikeVM MAX_STATES to 512: enable lazy DFA for NANPA patterns (PR #124)
 
 - The US NANPA area code pattern (290 PikeVM instructions) exceeded `MAX_STATES=128` and fell back to the backtracking NFA, 28x slower than Python. Bumping to 512 enables the lazy DFA which produces only 11 cached states. `nanpa_match_first` **94,579x faster** (3.594ms -> 0.000038ms), now **6.1x faster than Python** and **1.3x faster than Rust**. `nanpa_findall` **273x faster**, now 8x faster than Python. Added NANPA benchmarks to all 3 engines.
