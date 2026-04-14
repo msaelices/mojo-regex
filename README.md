@@ -1,62 +1,11 @@
 # Regex
-Regex Library for Mojo
+Regular Expressions Library for Mojo
 
-
-`regex` is a regex library featuring a hybrid DFA/NFA engine architecture that automatically optimizes pattern matching based on complexity.
+`mojo-regex` is a regex library featuring a hybrid DFA/NFA/PikeVM/LazyDFA engine architecture that automatically optimizes pattern matching based on complexity.
 
 It aims to provide a similar interface as the [re](https://docs.python.org/3/library/re.html) stdlib package while leveraging Mojo's performance capabilities.
 
-## Disclaimer ⚠️
-
-This software is in an early stage of development. Even though it is functional, it is not yet feature-complete and may contain bugs. Check the features section below and the TO-DO sections for the current status
-
-## Implemented Features
-
-### Basic Elements
-- ✅ Literal characters (`a`, `hello`)
-- ✅ Wildcard (`.`) - matches any character except newline
-- ✅ Whitespace (`\s`) - matches space, tab, newline, carriage return, form feed
-- ✅ Digits (`\d`) - matches ASCII digits 0-9
-- ✅ Word characters (`\w`) - matches letters, digits, and underscore [a-zA-Z0-9_]
-- ✅ Escape sequences (`\t` for tab, `\\` for literal backslash)
-
-### Character Classes
-- ✅ Character ranges (`[a-z]`, `[0-9]`, `[A-Za-z0-9]`)
-- ✅ Negated ranges (`[^a-z]`, `[^0-9]`)
-- ✅ Mixed character sets (`[abc123]`)
-- ✅ Character ranges within groups (`(b|[c-n])`)
-
-### Quantifiers
-- ✅ Zero or more (`*`)
-- ✅ One or more (`+`)
-- ✅ Zero or one (`?`)
-- ✅ Exact count (`{3}`)
-- ✅ Range count (`{2,4}`)
-- ✅ Minimum count (`{2,}`)
-- ✅ Quantifiers on all elements (characters, wildcards, ranges, groups)
-
-### Anchors
-- ✅ Start of string (`^`)
-- ✅ End of string (`$`)
-- ✅ Anchors in OR expressions (`^na|nb$`)
-
-### Groups and Alternation
-- ✅ Capturing groups (`(abc)`)
-- ✅ Alternation/OR (`a|b`)
-- ✅ Complex OR patterns (`(a|b)`, `na|nb`)
-- ✅ Nested alternations (`(b|[c-n])`)
-- ✅ Group quantifiers (`(a)*`, `(abc)+`)
-
-### Engine Features
-- ✅ **Hybrid DFA/NFA Architecture** - Automatic engine selection for optimal performance
-- ✅ **O(n) Performance** - DFA engine for simple patterns (literals, basic quantifiers, character classes)
-- ✅ **Full Regex Support** - NFA engine with backtracking for complex patterns
-- ✅ **Pattern Complexity Analysis** - Intelligent routing between engines
-- ✅ **SIMD Optimization** - Vectorized character class matching
-- ✅ **Pattern Compilation Caching** - Pre-compiled patterns for reuse
-- ✅ **Match Position Tracking** - Precise start_idx, end_idx reporting
-- ✅ **Simple API**: `match_first`, `search`, `findall`, `sub`
-
+Beats Python's C-based `re` module on 96% of benchmarks. Beats Rust's `regex` crate on 61%.
 
 ## Installation
 
@@ -71,164 +20,63 @@ This software is in an early stage of development. Even though it is functional,
 ## Example Usage
 
 ```mojo
-from regex import match_first, findall, sub
+from regex import match_first, findall, search, sub
 
 # Basic matching
 var result = match_first("hello", "hello world")
 if result:
     print("Match found:", result.value().get_match_text())
 
-# Wildcards, quantifiers, and character classes
+# Character classes and quantifiers
 result = match_first("[a-z]+\\d+", "item42")
-if result:
-    print("Found:", result.value().get_match_text())
-
-# Predefined classes and anchors
-result = match_first("^\\w+@\\w+\\.\\w+$", "user@example.com")
-if result:
-    print("Valid email format")
-
-# Groups and alternation
-result = match_first("(com|org|net)", "example.com")
-if result:
-    print("TLD found:", result.value().get_match_text())
 
 # Find all matches
-var numbers = findall("\\d+", "Price: $123, Quantity: 456, Total: $579")
+var numbers = findall("\\d+", "Price: $123, Quantity: 456")
 for i in range(len(numbers)):
-    print("Number found:", numbers[i].get_match_text())
-
-# Phone number patterns (DFA-optimized)
-var phones = findall("[0-9]{3}-[0-9]{3}-[0-9]{4}", "Call 555-123-4567 or 800-555-9999")
-for i in range(len(phones)):
-    print("Phone found:", phones[i].get_match_text())
+    print("Number:", numbers[i].get_match_text())
 
 # Pattern substitution (re.sub equivalent)
 var cleaned = sub("\\s+", " ", "hello   world")
 print(cleaned)  # "hello world"
 
-var redacted = sub("[0-9]{3}-[0-9]{4}", "***-****", "Call 555-123-4567")
-print(redacted)  # "Call 555-***-****"
-
-# Limit replacements with count
-var result2 = sub("o", "0", "hello world", count=1)
-print(result2)  # "hell0 world"
+# Capture group interpolation
+var formatted = sub("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3", "6502530000")
+print(formatted)  # "650-253-0000"
 ```
 
 ## Performance
 
-The hybrid DFA/NFA/PikeVM/LazyDFA architecture automatically selects the optimal engine for each pattern. See [benchmarks/results/comparison.md](benchmarks/results/comparison.md) for detailed results comparing Mojo, Python, and Rust across 80 benchmarks.
+See [benchmarks/results/comparison.md](benchmarks/results/comparison.md) for detailed results across 80 benchmarks comparing Mojo, Python, and Rust.
 
 ## Building and Testing
 
 ```bash
-# Build the package
-./tools/build.sh
-
 # Run tests
-./tools/run-tests.sh
+pixi run test
 
-# Or run specific test
-mojo test -I src/ tests/test_matcher.mojo
-
-# Run benchmarks to see performance including SIMD optimizations
-mojo benchmarks/bench_engine.mojo
-
-# Run SIMD-specific tests
-mojo test -I src/ tests/test_simd_integration.mojo
+# Run benchmarks
+pixi run mojo run -I src benchmarks/bench_engine.mojo
 ```
 
-## TO-DO: Missing Features
+## Missing Features
 
-### High Priority
-- [x] Global matching (`findall()`)
-- [x] Match replacement (`sub()`) with `\1`..`\9` capture group interpolation
-- [x] Hybrid DFA/NFA/PikeVM/LazyDFA engine architecture
-- [x] Pattern complexity analysis and automatic engine routing
-- [x] SIMD-accelerated character class matching (nibble-based lookup)
-- [x] Predefined character classes (`\d`, `\w`, `\s`) with inline range checks
-- [x] Non-capturing groups (`(?:...)`)
-- [x] Capture group extraction in `sub()` (numbered groups `\1`..`\9`)
-- [ ] Named groups (`(?<name>...)` or `(?P<name>...)`)
-- [ ] Case insensitive matching options
-- [ ] String splitting (`split()`)
-
-### Medium Priority
-- [ ] Non-greedy quantifiers (`*?`, `+?`, `??`)
-- [ ] Word boundaries (`\b`, `\B`)
-- [ ] Unicode character classes (`\p{L}`, `\p{N}`)
-- [ ] Multiline mode (`^` and `$` match line boundaries)
-- [ ] Dot-all mode (`.` matches newlines)
-- [ ] Negated predefined classes (`\S`, `\D`, `\W`)
-
-### Advanced Features
-- [ ] Positive lookahead (`(?=...)`)
-- [ ] Negative lookahead (`(?!...)`)
-- [ ] Positive lookbehind (`(?<=...)`)
-- [ ] Negative lookbehind (`(?<!...)`)
-- [ ] Atomic groups (`(?>...)`)
-- [ ] Possessive quantifiers (`*+`, `++`)
-- [ ] Conditional expressions (`(?(condition)yes|no)`)
-- [ ] Recursive patterns
-
-### Engine Improvements
-- [x] Lazy DFA with cached PikeVM state transitions (O(n) amortized)
-- [x] SIMD nibble-based first-byte prefilter for lazy DFA skip scan
-- [x] Precomputed range classification tags on ASTNode (eliminates per-character string comparisons)
-- [x] `CompiledRegex.sub()` method bypassing regex cache lookup
-- [x] Pre-parsed replacement templates for `sub()` group interpolation
-- [x] DFA fast path for fixed-width `\d{N}` capture group substitution
-- [x] MAX_STATES=512 enabling lazy DFA for complex patterns (NANPA: 290 instructions)
-- [ ] Compile-time pattern specialization for string literals
-- [ ] Aho-Corasick multi-pattern matching for alternations
-- [ ] Advanced NFA optimizations (lazy quantifiers, cut operators)
-- [ ] One-Pass DFA for advanced capturing groups
-- [ ] Lazy DFA construction for very large pattern sets
-
-## Optimization Strategy
-
-The regex engine uses a **selective optimization approach** to extend DFA coverage while avoiding performance regressions:
-
-### Pattern Classification System
-
-Patterns are automatically classified into three categories:
-
-- **SIMPLE**: DFA-optimized with O(n) performance - literals, basic quantifiers, character classes, optimized alternations
-- **MEDIUM**: Hybrid DFA/NFA approach - complex groups, medium alternations, some phone patterns
-- **COMPLEX**: NFA with backtracking - backreferences, lookahead, very complex nesting
-
-### Selective Optimization Criteria
-
-Optimizations are applied only when they provide clear benefits:
-
-1. **Extended Alternation Support**: Increased from 3→8 branches for DFA optimization
-2. **Deep Nesting Tolerance**: Groups now supported up to depth 4 (vs. 3 previously)
-3. **Literal-Heavy Detection**: 80% threshold for alternations with mostly literal branches
-4. **Complex Group Support**: Up to 5 children in groups (vs. 3 previously)
-5. **Early Termination**: Analysis functions use selective branching to reduce overhead
-
-### Performance Validation
-
-All optimizations undergo rigorous validation:
-
-- **Cross-language benchmarking** against Python and Rust implementations
-- **Regression testing** to ensure no performance degradation on existing patterns
-- **Analysis overhead measurement** to validate optimization efficiency
-- **Real-world pattern testing** with complex phone validation and email patterns
-
-This approach ensures that optimizations extend engine capabilities without compromising the performance characteristics that make the main implementation effective.
+- Named groups (`(?<name>...)`)
+- Case insensitive matching
+- String splitting (`split()`)
+- Non-greedy quantifiers (`*?`, `+?`, `??`)
+- Word boundaries (`\b`, `\B`)
+- Unicode character classes (`\p{L}`, `\p{N}`)
+- Multiline mode, dot-all mode
+- Lookahead / lookbehind
+- Negated predefined classes (`\S`, `\D`, `\W`)
 
 ## Contributing
 
-Contributions are welcome! If you'd like to contribute, please follow the contribution guidelines in the [CONTRIBUTING.md](CONTRIBUTING.md) file in the repository.
-
-## Acknowledgments
-
-Thanks to Claude Code for helping a lot with the implementation and testing of the regex library, and to the Mojo community for their support and feedback.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture overview, development setup, and guidelines.
 
 ## License
 
-mojo is licensed under the [MIT license](LICENSE).
+MIT. See [LICENSE](LICENSE).
 
 ---
 
