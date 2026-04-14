@@ -644,7 +644,6 @@ struct NFAEngine(Copyable, Engine):
         else:
             # Already expanded - pass directly as StringSlice, no allocation
             return get_character_class_matcher(range_pattern)
-        return None
 
     @always_inline
     def _match_contains_literal(
