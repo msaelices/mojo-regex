@@ -244,44 +244,46 @@ struct CharacterClassSIMD(
         # Build nibble tables for fast SIMD scanning
         self.lo_nibble_table = SIMD[DType.uint8, 16](0)
         self.hi_nibble_table = SIMD[DType.uint8, 16](0)
-        self._detect_ranges()
         self._build_nibble_tables()
 
     def _detect_ranges(mut self):
         """Detect up to 3 contiguous sub-ranges in the lookup table.
         For patterns like [a-zA-Z0-9], this finds ranges a-z, A-Z, 0-9
-        enabling multi-range SIMD scan."""
-        var ranges = List[Tuple[Int, Int]](capacity=4)
+        enabling multi-range SIMD scan. Uses stack-local variables only."""
+        var starts = InlineArray[Int, 4](fill=-1)
+        var ends = InlineArray[Int, 4](fill=-1)
+        var count = 0
         var in_range = False
-        var start = 0
         for c in range(256):
             if self.lookup_table[c] != 0:
                 if not in_range:
-                    start = c
+                    if count < 4:
+                        starts[count] = c
                     in_range = True
             else:
                 if in_range:
-                    ranges.append((start, c - 1))
+                    if count < 4:
+                        ends[count] = c - 1
+                    count += 1
                     in_range = False
         if in_range:
-            ranges.append((start, 255))
+            if count < 4:
+                ends[count] = 255
+            count += 1
 
-        self.num_ranges = len(ranges)
-        if len(ranges) == 1:
-            self.range_start = ranges[0][0]
-            self.range_end = ranges[0][1]
-        elif len(ranges) == 2:
-            self.range_start = ranges[0][0]
-            self.range_end = ranges[0][1]
-            self.range2_start = ranges[1][0]
-            self.range2_end = ranges[1][1]
-        elif len(ranges) == 3:
-            self.range_start = ranges[0][0]
-            self.range_end = ranges[0][1]
-            self.range2_start = ranges[1][0]
-            self.range2_end = ranges[1][1]
-            self.range3_start = ranges[2][0]
-            self.range3_end = ranges[2][1]
+        if count > 3:
+            count = 0  # Too many ranges, fall back to scalar
+
+        self.num_ranges = count
+        if count >= 1:
+            self.range_start = starts[0]
+            self.range_end = ends[0]
+        if count >= 2:
+            self.range2_start = starts[1]
+            self.range2_end = ends[1]
+        if count >= 3:
+            self.range3_start = starts[2]
+            self.range3_end = ends[2]
 
     def _build_nibble_tables(mut self):
         """Build nibble lookup tables from the 256-byte lookup table."""
@@ -494,7 +496,7 @@ struct CharacterClassSIMD(
 
         # SIMD fast path for contiguous byte ranges (e.g. [a-z], [0-9]).
         # Uses unsigned subtraction + min + eq: 3 SIMD ops per SIMD_WIDTH bytes.
-        if self.range_start >= 0 and self.num_ranges == 1:
+        if self.num_ranges == 1:
             var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
