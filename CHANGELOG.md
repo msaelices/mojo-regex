@@ -2,6 +2,12 @@
 
 ## v0.11.0 (unreleased)
 
+### Cache DFA dispatch condition and inline LazyDFA helpers (PR #122)
+
+- M5: Replaced 6 occurrences of `self.dfa_matcher and self.complexity.value == PatternComplexity.SIMPLE` with a cached `_use_dfa` Bool field. `DFAMatcher` now conforms to `Boolable`.
+- M6: Added `@always_inline` to 4 LazyDFA helpers (`_compute_transition`, `_get_or_create_state_for_pos`, `_find_or_create_state`, `_has_match_in_set`). `_add_state` is recursive and cannot be inlined.
+- **64/77 benchmarks show >10% speedup.** Lazy DFA patterns (`flexible_phone` 2.2x, `multi_format_phone` 1.7x, `alternation_quantifiers` 1.9x, `simple_phone` 2.4x, `match_all_digits` 2.4x). LLVM was NOT inlining the LazyDFA helpers before.
+
 ### Fix large alternation (7+ branches) failing to match full pattern (PR #121)
 
 - Root cause: `UInt8` overflow in `ASTNode.children_indexes`. Patterns with > 255 AST nodes (like the US NANPA area code pattern with 303 nodes) silently corrupted child indices, producing a 1-byte match instead of the full pattern. Fix: widened indices from `UInt8` to `UInt16` (`SIMD[uint16, 256]`), supporting up to 65535 AST nodes. Added `_has_nested_alternation` defense-in-depth in the optimizer.
