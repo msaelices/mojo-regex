@@ -406,6 +406,9 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     """True if pattern is exactly .* (matches any string)."""
     var use_pure_dfa: Bool
     """True if pattern should use pure DFA without SIMD integration."""
+    var _use_dfa: Bool
+    """Cached dispatch flag: True when dfa_matcher is valid and complexity
+    is SIMPLE. Eliminates a pointer null-check + enum comparison per call."""
 
     def __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -425,6 +428,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.complexity = PatternComplexity(PatternComplexity.SIMPLE)
             self.dfa_matcher = DFAMatcher()
             self.use_pure_dfa = False  # Special wildcard handling
+            self._use_dfa = False
             # Create minimal NFA matcher (required field, but won't be used)
             var dummy_ast = parse(
                 "a"
@@ -507,11 +511,14 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         if self.complexity.value == PatternComplexity.SIMPLE:
             try:
                 self.dfa_matcher = DFAMatcher(ast, pattern)
+                self._use_dfa = self.dfa_matcher.__bool__()
             except:
                 # DFA compilation failed, fall back to NFA only
                 self.dfa_matcher = DFAMatcher()
+                self._use_dfa = False
         else:
             self.dfa_matcher = DFAMatcher()
+            self._use_dfa = False
 
     def __copyinit__(out self, copy: Self):
         """Copy constructor."""
@@ -523,6 +530,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = copy.is_exact_literal
         self.is_wildcard_match_any = copy.is_wildcard_match_any
         self.use_pure_dfa = copy.use_pure_dfa
+        self._use_dfa = copy._use_dfa
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
@@ -534,6 +542,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_exact_literal = take.is_exact_literal
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
+        self._use_dfa = take._use_dfa
 
     @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
@@ -541,10 +550,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         if self.is_wildcard_match_any:
             return start <= len(text)
 
-        if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
-        ):
+        if self._use_dfa:
             return self.dfa_matcher.is_match(text, start)
 
         # NFA fallback: use full match
@@ -563,10 +569,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 return None
 
         # Prioritize DFA for SIMPLE patterns, especially pure DFA patterns
-        if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
-        ):
+        if self._use_dfa:
             # Use high-performance DFA for simple patterns
             return self.dfa_matcher.match_first(text, start)
         else:
@@ -609,19 +612,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
             var search_start = candidate_pos.value()
             # Use appropriate engine for the filtered position
-            if (
-                self.dfa_matcher
-                and self.complexity.value == PatternComplexity.SIMPLE
-            ):
+            if self._use_dfa:
                 return self.dfa_matcher.match_next(text, search_start)
             else:
                 return self.nfa_matcher.match_next(text, search_start)
 
         # Standard path: Regular matching without prefilters
-        if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
-        ):
+        if self._use_dfa:
             return self.dfa_matcher.match_next(text, start)
         else:
             return self.nfa_matcher.match_next(text, start)
@@ -673,10 +670,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             pass
 
         # Standard path: Use regular engine matching
-        if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
-        ):
+        if self._use_dfa:
             return self.dfa_matcher.match_all(text)
         else:
             return self.nfa_matcher.match_all(text)
@@ -688,10 +682,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             String indicating which engine is active with prefilter info.
         """
         var base_engine: String
-        if (
-            self.dfa_matcher
-            and self.complexity.value == PatternComplexity.SIMPLE
-        ):
+        if self._use_dfa:
             base_engine = "DFA"
         else:
             base_engine = "NFA"

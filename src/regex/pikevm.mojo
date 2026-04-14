@@ -833,6 +833,7 @@ struct LazyDFA(Copyable, Movable):
             return Match(0, start, match_end, text)
         return None
 
+    @always_inline
     def _compute_transition(
         mut self,
         state_id: Int,
@@ -907,6 +908,7 @@ struct LazyDFA(Copyable, Movable):
         # Find or create cached state for this NFA set
         return self._find_or_create_state(nxt_seen)
 
+    @always_inline
     def _get_or_create_state_for_pos(mut self, pc: Int, pos: Int) -> Int:
         """Create a DFA state from the epsilon closure of a given PC."""
         var pcs = InlineArray[Int, MAX_STATES](fill=0)
@@ -921,6 +923,7 @@ struct LazyDFA(Copyable, Movable):
 
         return self._find_or_create_state(seen)
 
+    @always_inline
     def _find_or_create_state(
         mut self, nfa_set: SIMD[DType.uint8, MAX_STATES]
     ) -> Int:
@@ -939,6 +942,7 @@ struct LazyDFA(Copyable, Movable):
         self.states.append(CachedState(nfa_set, is_match))
         return new_id
 
+    @always_inline
     def _has_match_in_set(self, nfa_set: SIMD[DType.uint8, MAX_STATES]) -> Bool:
         """Check if any PC in the NFA set is a MATCH instruction."""
         for pc in range(len(self.pikevm.program)):
