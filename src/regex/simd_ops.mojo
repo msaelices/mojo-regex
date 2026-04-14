@@ -161,6 +161,18 @@ struct CharacterClassSIMD(
     """Start of contiguous byte range (-1 if not a contiguous range)."""
     var range_end: Int
     """End of contiguous byte range (-1 if not a contiguous range)."""
+    var num_ranges: Int
+    """Number of contiguous sub-ranges detected (0-3). When > 1, the
+    multi-range SIMD path in count_consecutive_matches uses OR of
+    range checks instead of scalar lookup."""
+    var range2_start: Int
+    """Start of second sub-range (-1 if none)."""
+    var range2_end: Int
+    """End of second sub-range (-1 if none)."""
+    var range3_start: Int
+    """Start of third sub-range (-1 if none)."""
+    var range3_end: Int
+    """End of third sub-range (-1 if none)."""
 
     def __init__(out self, char_class: StringSlice):
         """Initialize SIMD character class matcher.
@@ -182,15 +194,24 @@ struct CharacterClassSIMD(
         )
         self.range_start = -1
         self.range_end = -1
+        self.num_ranges = 0
+        self.range2_start = -1
+        self.range2_end = -1
+        self.range3_start = -1
+        self.range3_end = -1
+
+        self.lo_nibble_table = SIMD[DType.uint8, 16](0)
+        self.hi_nibble_table = SIMD[DType.uint8, 16](0)
 
         # Set bits for each character in the class
         var cc_ptr = char_class.unsafe_ptr()
         for i in range(len(char_class)):
             self.lookup_table[Int(cc_ptr[i])] = 1
 
+        # Detect contiguous ranges from the lookup table
+        self._detect_ranges()
+
         # Build nibble tables for fast SIMD scanning
-        self.lo_nibble_table = SIMD[DType.uint8, 16](0)
-        self.hi_nibble_table = SIMD[DType.uint8, 16](0)
         self._build_nibble_tables()
 
     def __init__(out self, start_code: Int, end_code: Int):
@@ -211,6 +232,11 @@ struct CharacterClassSIMD(
         self.use_shuffle = self.size_hint >= SHUFFLE_MIN_SIZE and USE_SHUFFLE
         self.range_start = clamped_start
         self.range_end = clamped_end
+        self.num_ranges = 1
+        self.range2_start = -1
+        self.range2_end = -1
+        self.range3_start = -1
+        self.range3_end = -1
 
         for char_code in range(clamped_start, clamped_end + 1):
             self.lookup_table[char_code] = 1
@@ -218,7 +244,44 @@ struct CharacterClassSIMD(
         # Build nibble tables for fast SIMD scanning
         self.lo_nibble_table = SIMD[DType.uint8, 16](0)
         self.hi_nibble_table = SIMD[DType.uint8, 16](0)
+        self._detect_ranges()
         self._build_nibble_tables()
+
+    def _detect_ranges(mut self):
+        """Detect up to 3 contiguous sub-ranges in the lookup table.
+        For patterns like [a-zA-Z0-9], this finds ranges a-z, A-Z, 0-9
+        enabling multi-range SIMD scan."""
+        var ranges = List[Tuple[Int, Int]](capacity=4)
+        var in_range = False
+        var start = 0
+        for c in range(256):
+            if self.lookup_table[c] != 0:
+                if not in_range:
+                    start = c
+                    in_range = True
+            else:
+                if in_range:
+                    ranges.append((start, c - 1))
+                    in_range = False
+        if in_range:
+            ranges.append((start, 255))
+
+        self.num_ranges = len(ranges)
+        if len(ranges) == 1:
+            self.range_start = ranges[0][0]
+            self.range_end = ranges[0][1]
+        elif len(ranges) == 2:
+            self.range_start = ranges[0][0]
+            self.range_end = ranges[0][1]
+            self.range2_start = ranges[1][0]
+            self.range2_end = ranges[1][1]
+        elif len(ranges) == 3:
+            self.range_start = ranges[0][0]
+            self.range_end = ranges[0][1]
+            self.range2_start = ranges[1][0]
+            self.range2_end = ranges[1][1]
+            self.range3_start = ranges[2][0]
+            self.range3_end = ranges[2][1]
 
     def _build_nibble_tables(mut self):
         """Build nibble lookup tables from the 256-byte lookup table."""
@@ -431,7 +494,7 @@ struct CharacterClassSIMD(
 
         # SIMD fast path for contiguous byte ranges (e.g. [a-z], [0-9]).
         # Uses unsigned subtraction + min + eq: 3 SIMD ops per SIMD_WIDTH bytes.
-        if self.range_start >= 0:
+        if self.range_start >= 0 and self.num_ranges == 1:
             var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
@@ -443,6 +506,60 @@ struct CharacterClassSIMD(
                 # min clamps to span, so eq detects out-of-range.
                 var shifted = chunk - lo
                 var in_range = shifted.eq(min(shifted, span))
+                if in_range.reduce_and():
+                    pos += SIMD_WIDTH
+                else:
+                    for i in range(SIMD_WIDTH):
+                        if not in_range[i]:
+                            return pos + i - start
+        elif self.num_ranges == 2:
+            # Multi-range SIMD: 2 contiguous ranges combined with OR.
+            # E.g., [a-zA-Z] = (a <= ch <= z) | (A <= ch <= Z)
+            var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span1 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            var lo2 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range2_start))
+            var span2 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range2_end - self.range2_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var s1 = chunk - lo1
+                var r1 = s1.eq(min(s1, span1))
+                var s2 = chunk - lo2
+                var r2 = s2.eq(min(s2, span2))
+                var in_range = r1 | r2
+                if in_range.reduce_and():
+                    pos += SIMD_WIDTH
+                else:
+                    for i in range(SIMD_WIDTH):
+                        if not in_range[i]:
+                            return pos + i - start
+        elif self.num_ranges == 3:
+            # Multi-range SIMD: 3 contiguous ranges combined with OR.
+            # E.g., [a-zA-Z0-9] = (a <= ch <= z) | (A <= ch <= Z) | (0 <= ch <= 9)
+            var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span1 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            var lo2 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range2_start))
+            var span2 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range2_end - self.range2_start)
+            )
+            var lo3 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range3_start))
+            var span3 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range3_end - self.range3_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var s1 = chunk - lo1
+                var r1 = s1.eq(min(s1, span1))
+                var s2 = chunk - lo2
+                var r2 = s2.eq(min(s2, span2))
+                var s3 = chunk - lo3
+                var r3 = s3.eq(min(s3, span3))
+                var in_range = r1 | r2 | r3
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
                 else:
@@ -559,6 +676,8 @@ def _create_ascii_alphanumeric() -> CharacterClassSIMD:
     for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
+    result._detect_ranges()
+    result._build_nibble_tables()
     return result
 
 
@@ -579,6 +698,8 @@ def _create_ascii_alpha() -> CharacterClassSIMD:
     for i in range(CHAR_A_UPPER, CHAR_Z_UPPER + 1):
         result.lookup_table[i] = 1
 
+    result._detect_ranges()
+    result._build_nibble_tables()
     return result
 
 
@@ -592,6 +713,8 @@ def _create_ascii_alnum_lower() -> CharacterClassSIMD:
     for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
+    result._detect_ranges()
+    result._build_nibble_tables()
     return result
 
 
@@ -605,6 +728,8 @@ def _create_ascii_alnum_upper() -> CharacterClassSIMD:
     for i in range(CHAR_ZERO, CHAR_NINE + 1):
         result.lookup_table[i] = 1
 
+    result._detect_ranges()
+    result._build_nibble_tables()
     return result
 
 
