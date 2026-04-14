@@ -73,9 +73,7 @@ def main() raises:
     if compiled.matcher.nfa_matcher._lazy_dfa_ptr:
         t0 = perf_counter_ns()
         for _ in range(iters):
-            _ = compiled.matcher.nfa_matcher._lazy_dfa_ptr[].match_first(
-                number
-            )
+            _ = compiled.matcher.nfa_matcher._lazy_dfa_ptr[].match_first(number)
         var lazy_us = time_ns(t0) / Float64(iters)
         print("4b. Lazy DFA match_first per call:", lazy_us, "us")
         print(
@@ -137,6 +135,4 @@ def main() raises:
     print("   nanpa_findall:     ~34.7 us  (Python, 50 repeats)")
     print()
     print("   Mojo nanpa_match_first:", match_first_us, "us")
-    print(
-        "   Mojo / Python ratio:", match_first_us / 0.198, "x slower"
-    )
+    print("   Mojo / Python ratio:", match_first_us / 0.198, "x slower")

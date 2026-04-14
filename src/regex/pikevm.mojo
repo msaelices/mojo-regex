@@ -336,7 +336,7 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
 
 # Maximum program size for PikeVM. Uses fixed-size SIMD for state tracking.
 # Patterns compiling to > MAX_STATES instructions fall back to NFA.
-comptime MAX_STATES = 128
+comptime MAX_STATES = 512
 
 
 struct PikeVMEngine(Copyable, Movable):
