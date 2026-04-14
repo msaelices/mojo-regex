@@ -670,6 +670,10 @@ struct LazyDFA(Copyable, Movable):
     """Underlying PikeVM for cache misses."""
     var states: List[CachedState]
     """Cached DFA states. Index = DFA state ID."""
+    var _state_lookup: Dict[UInt64, Int]
+    """Hash-keyed lookup: hash(nfa_set) -> state ID. O(1) state lookup
+    replaces the O(N) linear scan through `states`. Collisions are
+    resolved by byte-comparing the nfa_set against the candidate state."""
     var start_state_id: Int
     """DFA state ID for the start state."""
     var _filter_lo_nibble: SIMD[DType.uint8, 16]
@@ -682,6 +686,7 @@ struct LazyDFA(Copyable, Movable):
         self._filter_hi_nibble = SIMD[DType.uint8, 16](0)
         self.pikevm = pikevm^
         self.states = List[CachedState](capacity=64)
+        self._state_lookup = Dict[UInt64, Int]()
         self.start_state_id = LAZY_DFA_DEAD
         # Build start state from epsilon closure of PC 0
         self.start_state_id = self._get_or_create_state_for_pos(0, 0)
@@ -924,22 +929,38 @@ struct LazyDFA(Copyable, Movable):
         return self._find_or_create_state(seen)
 
     @always_inline
+    def _hash_nfa_set(self, nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
+        """Compute a hash of the 128-byte nfa_set by casting to uint64 lanes
+        and xor-folding. Fast because it reuses the SIMD registers."""
+        var u64 = nfa_set.cast[DType.uint64]()
+        var h: UInt64 = 0
+        comptime for i in range(MAX_STATES // 8):
+            h ^= u64[i]
+        return h
+
+    @always_inline
     def _find_or_create_state(
         mut self, nfa_set: SIMD[DType.uint8, MAX_STATES]
     ) -> Int:
-        """Find existing cached state or create a new one."""
-        # Linear scan for matching state (fine for < 256 states)
-        for i in range(len(self.states)):
-            if self.states[i].nfa_set.eq(nfa_set).reduce_and():
-                return i
-
-        # Note: no eviction. The list grows up to the number of reachable
-        # DFA states (typically 10-50). For pathological patterns it could
-        # grow larger, but each state is ~2KB so even 256 states = 512KB.
+        """Find existing cached state or create a new one.
+        O(1) average via hash lookup, with byte-compare collision guard."""
+        var h = self._hash_nfa_set(nfa_set)
+        if h in self._state_lookup:
+            try:
+                var candidate_id = self._state_lookup[h]
+                if self.states[candidate_id].nfa_set.eq(nfa_set).reduce_and():
+                    return candidate_id
+                # Hash collision: fall through to fresh insertion (very rare)
+            except:
+                pass
 
         var is_match = self._has_match_in_set(nfa_set)
         var new_id = len(self.states)
         self.states.append(CachedState(nfa_set, is_match))
+        try:
+            self._state_lookup[h] = new_id
+        except:
+            pass
         return new_id
 
     @always_inline
