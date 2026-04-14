@@ -142,61 +142,46 @@ mojo test -I src/ tests/test_simd_integration.mojo
 
 ### High Priority
 - [x] Global matching (`findall()`)
-- [x] Hybrid DFA/NFA engine architecture
-- [x] Pattern complexity analysis and optimization
-- [x] SIMD-accelerated character class matching
-- [x] SIMD-accelerated literal string search
-- [x] SIMD capability detection and automatic routing
-- [x] Vectorized quantifier processing for character classes
-- [x] **Predefined character classes (`\d`, `\w`) - digits and word characters with DFA optimization (29.78x faster)**
-- [x] **SIMD vector processing optimization** - Direct SIMD vector handling with early return
-- [ ] Remaining predefined character classes (`\s`, `\S`, `\D`, `\W`) - negated and space variants
-- [ ] Non-capturing groups (`(?:...)`)
+- [x] Match replacement (`sub()`) with `\1`..`\9` capture group interpolation
+- [x] Hybrid DFA/NFA/PikeVM/LazyDFA engine architecture
+- [x] Pattern complexity analysis and automatic engine routing
+- [x] SIMD-accelerated character class matching (nibble-based lookup)
+- [x] Predefined character classes (`\d`, `\w`, `\s`) with inline range checks
+- [x] Non-capturing groups (`(?:...)`)
+- [x] Capture group extraction in `sub()` (numbered groups `\1`..`\9`)
 - [ ] Named groups (`(?<name>...)` or `(?P<name>...)`)
 - [ ] Case insensitive matching options
-- [x] Match replacement (`sub()`)
 - [ ] String splitting (`split()`)
 
 ### Medium Priority
 - [ ] Non-greedy quantifiers (`*?`, `+?`, `??`)
 - [ ] Word boundaries (`\b`, `\B`)
-- [ ] Match groups extraction and iteration
-- [ ] Pattern compilation object
 - [ ] Unicode character classes (`\p{L}`, `\p{N}`)
 - [ ] Multiline mode (`^` and `$` match line boundaries)
 - [ ] Dot-all mode (`.` matches newlines)
+- [ ] Negated predefined classes (`\S`, `\D`, `\W`)
 
 ### Advanced Features
 - [ ] Positive lookahead (`(?=...)`)
 - [ ] Negative lookahead (`(?!...)`)
 - [ ] Positive lookbehind (`(?<=...)`)
 - [ ] Negative lookbehind (`(?<!...)`)
-- [ ] Backreferences (`\1`, `\2`)
 - [ ] Atomic groups (`(?>...)`)
 - [ ] Possessive quantifiers (`*+`, `++`)
 - [ ] Conditional expressions (`(?(condition)yes|no)`)
 - [ ] Recursive patterns
-- [ ] Subroutine calls
 
 ### Engine Improvements
-- [x] Hybrid DFA/NFA architecture with automatic engine selection
-- [x] O(n) DFA engine for simple patterns
-- [x] SIMD optimization for character class matching and literal string search
-- [x] Pattern complexity analysis for optimal routing
-- [x] SIMD capability detection for intelligent engine selection
-- [x] Vectorized operations for quantifiers and repetition counting
-- [x] **Extended DFA pattern support** - Large alternations (up to 8 branches)
-- [x] **Deep nesting support** - Groups up to depth 4
-- [x] **Literal-heavy alternation detection** - 80% threshold optimization
-- [x] **Selective optimization** - High-value, low-overhead improvements only
-- [x] **Analysis overhead reduction** - Early termination and selective analysis
-- [x] **Cross-language performance validation** - Benchmarking vs Python/Rust
-- [x] **SIMD vector optimization** - Direct vector processing eliminates string slicing overhead
-- [x] **Early return optimization** - Exit immediately on first match for better cache performance
+- [x] Lazy DFA with cached PikeVM state transitions (O(n) amortized)
+- [x] SIMD nibble-based first-byte prefilter for lazy DFA skip scan
+- [x] Precomputed range classification tags on ASTNode (eliminates per-character string comparisons)
+- [x] `CompiledRegex.sub()` method bypassing regex cache lookup
+- [x] Pre-parsed replacement templates for `sub()` group interpolation
+- [x] DFA fast path for fixed-width `\d{N}` capture group substitution
+- [x] MAX_STATES=512 enabling lazy DFA for complex patterns (NANPA: 290 instructions)
 - [ ] Compile-time pattern specialization for string literals
 - [ ] Aho-Corasick multi-pattern matching for alternations
 - [ ] Advanced NFA optimizations (lazy quantifiers, cut operators)
-- [ ] Parallel matching for multiple patterns
 - [ ] One-Pass DFA for advanced capturing groups
 - [ ] Lazy DFA construction for very large pattern sets
 
