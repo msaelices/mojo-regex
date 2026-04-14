@@ -138,7 +138,7 @@ trait RegexMatcher:
         ...
 
 
-struct DFAMatcher(Copyable, Movable, RegexMatcher):
+struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
     var engine_ptr: UnsafePointer[DFAEngine, MutAnyOrigin]
@@ -511,7 +511,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         if self.complexity.value == PatternComplexity.SIMPLE:
             try:
                 self.dfa_matcher = DFAMatcher(ast, pattern)
-                self._use_dfa = self.dfa_matcher.__bool__()
+                self._use_dfa = Bool(self.dfa_matcher)
             except:
                 # DFA compilation failed, fall back to NFA only
                 self.dfa_matcher = DFAMatcher()
