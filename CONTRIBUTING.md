@@ -185,16 +185,39 @@ Check the TO-DO section in the README for current feature requests and improveme
 
 ## Performance Considerations
 
-### Hybrid Architecture Benefits
-- **DFA Engine**: O(n) time complexity for simple patterns (literals, basic quantifiers, character classes)
-- **NFA Engine**: O(n) to O(2^n) for complex patterns with full regex feature support
-- **Smart Routing**: Optimizer automatically selects optimal engine based on pattern complexity
-- **SIMD Acceleration**: Vectorized operations for character matching and string search
+### Pattern Performance Characteristics
+
+| Pattern Type | Engine | Time Complexity | SIMD | Example |
+|---|---|---|---|---|
+| **Literal strings** | DFA + SIMD | O(n/w) | String search vectorization | `"hello"`, `"example.com"` |
+| **Character classes** | DFA + SIMD | O(n/w) | Nibble-based lookup tables | `"[a-z]+"`, `"[0-9]+"` |
+| **Built-in classes** | DFA + SIMD | O(n/w) | Pre-built SIMD matchers | `"\d+"`, `"\w+"`, `"\s+"` |
+| **Simple quantifiers** | DFA + SIMD | O(n/w) | Vectorized counting | `"a*"`, `"[0-9]{3}"` |
+| **Anchors** | DFA | O(1) | Position validation | `"^start"`, `"end$"` |
+| **Basic groups** | DFA + SIMD | O(n/w) | Capture group flattening | `"(abc)+"`, `"([a-z]+)"` |
+| **Small alternation** | DFA + SIMD | O(n/w) | DFA state optimization | `"cat\|dog"`, `"(a\|b\|c)"` |
+| **Large alternation** | Lazy DFA | O(n) | SIMD first-byte prefilter | `"(apple\|banana\|...\|honey)"` |
+| **Nested alternation** | Lazy DFA | O(n) | SIMD first-byte prefilter | `"(?:2(?:0[1-9]\|1[0-9])\|6(?:5[0-9]))"` |
+| **Deep nested groups** | Lazy DFA | O(n) | Nibble-based skip scan | `"(?:(?:(?:a\|b)\|(?:c\|d))\|...)"` |
+| **Complex phone (NANPA)** | Lazy DFA | O(n) | 11 cached states | US area code validation (290 instructions) |
+| **`.*` prefix/suffix** | NFA fast path | O(n) | `rfind`/`twoway_search` | `".*@example.com"`, `"hello.*"` |
+| **Complex patterns** | NFA backtracking | O(nm) | Inline range checks | Backreferences, nested quantifiers |
+
+*Where w = SIMD width (typically 16-32 characters per instruction), n = text length, m = pattern size*
+
+### Engine Selection
+
+The optimizer classifies each pattern as SIMPLE, MEDIUM, or COMPLEX:
+- **SIMPLE** -> DFA engine (O(n), SIMD-accelerated)
+- **MEDIUM/COMPLEX without nested alternation** -> Lazy DFA (O(n) amortized, cached state transitions)
+- **MEDIUM/COMPLEX with literal optimization** -> NFA with `twoway_search` prefiltering
+- **Fallback** -> Backtracking NFA with inline range checks
 
 ### Performance Guidelines
 - **Simple patterns** (literals, anchors, basic quantifiers): Automatically use DFA for O(n) performance
-- **Medium patterns** (groups, alternations): May use optimized DFA or fallback to NFA
-- **Complex patterns** (backreferences, lookahead): Use NFA with optimized backtracking
+- **Medium patterns** (groups, alternations): Lazy DFA caches state transitions for near-DFA speed
+- **Complex patterns** (nested alternation, NANPA): Lazy DFA with up to 512 PikeVM instructions
+- **Very complex patterns** (backreferences, lookahead): NFA with optimized backtracking
 
 ### Optimization Guidelines
 - Profile before optimizing

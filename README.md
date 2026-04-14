@@ -117,28 +117,7 @@ print(result2)  # "hell0 world"
 
 ## Performance
 
-The hybrid DFA/NFA architecture provides significant performance benefits:
-
-### Pattern Performance Characteristics
-
-| Pattern Type | Engine Used | Time Complexity | SIMD Optimization | Example |
-|--------------|-------------|-----------------|-------------------|---------|
-| **Literal strings** | DFA + SIMD | O(n/w) | String search vectorization | `"hello"`, `"example.com"` |
-| **Character classes** | DFA + SIMD | O(n/w) | Lookup table vectorization | `"[a-z]+"`, `"[0-9]+"` |
-| **Built-in classes** | **DFA + SIMD** | O(n/w) | **Pre-built SIMD matchers** | `"\d+"`, `"\w+"` |
-| **Simple quantifiers** | DFA + SIMD | O(n/w) | Vectorized counting | `"a*"`, `"[0-9]{3}"` |
-| **Anchors** | DFA | O(1) | Position validation | `"^start"`, `"end$"` |
-| **Basic groups** | DFA/NFA + SIMD | O(n) to O(nm) | Partial vectorization | `"(abc)+"`, `"([a-z]+)"` |
-| **Small alternation** | DFA + SIMD | O(n/w) | DFA state optimization | `"cat\|dog"`, `"(a\|b\|c)"` |
-| **Large alternation** | NFA + Prefilter | O(n) to O(nm) | **Extended to 8 branches** | `"(apple\|banana\|...\|honey)"` |
-| **Literal-heavy alternation** | NFA + Prefilter | O(n) to O(nm) | **80% threshold detection** | `"(user123\|admin456\|...)"` |
-| **Deep nested groups** | NFA + SIMD | O(n) to O(nm) | **Depth 4 support** | `"(?:(?:(?:a\|b)\|(?:c\|d))\|...)"` |
-| **Complex phone patterns** | DFA + SIMD | O(n/w) | **Now DFA-optimized** | US national phone validation |
-| **Complex patterns** | NFA + SIMD | O(nm) to O(2^n) | Character-level SIMD | Backreferences, lookahead |
-
-*Where w = SIMD width (typically 16-32 characters processed per instruction)*
-
-For detailed benchmark results comparing Mojo, Python, and Rust, see [benchmarks/results/comparison.md](benchmarks/results/comparison.md).
+The hybrid DFA/NFA/PikeVM/LazyDFA architecture automatically selects the optimal engine for each pattern. See [benchmarks/results/comparison.md](benchmarks/results/comparison.md) for detailed results comparing Mojo, Python, and Rust across 80 benchmarks.
 
 ## Building and Testing
 
