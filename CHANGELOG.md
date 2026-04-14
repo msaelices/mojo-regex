@@ -2,6 +2,10 @@
 
 ## v0.11.0 (unreleased)
 
+### Eliminate CompiledRegex copy in sub() via cache pointer lookup (PR #127)
+
+- `sub()` copied the entire `CompiledRegex` out of the Dict cache on every call (2.5µs copy overhead). Now uses `_compile_and_cache()` returning an `UnsafePointer` into the cache. `sub()` per call: 36,632ns -> 1,125ns (**33x faster**), now within 1.4x of `compiled.sub()`.
+
 ### Multi-range SIMD scan for [a-zA-Z0-9]+ and similar patterns (PR #126)
 
 - Added multi-range SIMD path to `count_consecutive_matches` for character classes with 2-3 contiguous sub-ranges. Uses SIMD unsigned subtraction + OR across all ranges instead of scalar lookup. `range_alphanumeric` **9x faster** (0.025ms -> 0.003ms), flipped from 1.4x slower than Python to ~4.7x faster. Zero regressions on single-range benchmarks. Python win rate: 96% -> 97%.
