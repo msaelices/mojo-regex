@@ -1,485 +1,485 @@
 {
   "engine": "mojo",
-  "timestamp": "2026-04-14T23:20:25.972394",
+  "timestamp": "2026-04-15T00:45:02.074102",
   "results": {
     "literal_match_short": {
-      "time_ns": 626.4032500000001,
-      "time_ms": 0.0006264032500000001,
-      "iterations": 776000,
+      "time_ns": 703.601,
+      "time_ms": 0.000703601,
+      "iterations": 620000,
       "engine": "DFA,"
     },
     "literal_match_long": {
-      "time_ns": 4447.2065,
-      "time_ms": 0.0044472065,
-      "iterations": 102000,
+      "time_ns": 6218.44175,
+      "time_ms": 0.0062184417499999995,
+      "iterations": 56000,
       "engine": "DFA,"
     },
     "wildcard_match_any": {
-      "time_ns": 0.5906302816901409,
-      "time_ms": 5.906302816901409e-07,
-      "iterations": 659448000,
+      "time_ns": 0.6383161984459056,
+      "time_ms": 6.383161984459056e-07,
+      "iterations": 634067000,
       "engine": "NFA,"
     },
     "quantifier_zero_or_more": {
-      "time_ns": 3.037703237410072,
-      "time_ms": 3.037703237410072e-06,
-      "iterations": 152900000,
+      "time_ns": 3.3004149184149183,
+      "time_ms": 3.300414918414918e-06,
+      "iterations": 134277000,
       "engine": "DFA,"
     },
     "quantifier_one_or_more": {
-      "time_ns": 3.1289661016949153,
-      "time_ms": 3.1289661016949153e-06,
-      "iterations": 126555000,
+      "time_ns": 3.1798128019323673,
+      "time_ms": 3.179812801932367e-06,
+      "iterations": 132480000,
       "engine": "DFA,"
     },
     "quantifier_zero_or_one": {
-      "time_ns": 3.512887399463807,
-      "time_ms": 3.512887399463807e-06,
-      "iterations": 127193000,
+      "time_ns": 3.3138138461538467,
+      "time_ms": 3.3138138461538466e-06,
+      "iterations": 132600000,
       "engine": "DFA,"
     },
     "range_lowercase": {
-      "time_ns": 1786.895,
-      "time_ms": 0.001786895,
-      "iterations": 223000,
+      "time_ns": 1603.6204999999998,
+      "time_ms": 0.0016036204999999998,
+      "iterations": 250000,
       "engine": "DFA,"
     },
     "range_digits": {
-      "time_ns": 302.94016666666664,
-      "time_ms": 0.00030294016666666666,
-      "iterations": 1452000,
+      "time_ns": 269.5955,
+      "time_ms": 0.00026959550000000003,
+      "iterations": 1598000,
       "engine": "DFA,"
     },
     "range_alphanumeric": {
-      "time_ns": 14610.869000000002,
-      "time_ms": 0.014610869000000002,
-      "iterations": 28000,
+      "time_ns": 1958.5840000000003,
+      "time_ms": 0.001958584,
+      "iterations": 213000,
       "engine": "DFA,"
     },
     "predefined_digits": {
-      "time_ns": 309.51033333333334,
-      "time_ms": 0.00030951033333333336,
-      "iterations": 1569000,
+      "time_ns": 261.838,
+      "time_ms": 0.000261838,
+      "iterations": 1586000,
       "engine": "DFA,"
     },
     "predefined_word": {
-      "time_ns": 16106.803999999998,
-      "time_ms": 0.016106804,
-      "iterations": 26000,
+      "time_ns": 13959.0305,
+      "time_ms": 0.0139590305,
+      "iterations": 28000,
       "engine": "DFA,"
     },
     "anchor_start": {
-      "time_ns": 5.931772594752187,
-      "time_ms": 5.9317725947521864e-06,
-      "iterations": 82320000,
+      "time_ns": 4.688328793774319,
+      "time_ms": 4.68832879377432e-06,
+      "iterations": 95604000,
       "engine": "DFA,"
     },
     "alternation_simple": {
-      "time_ns": 4.832336106489184,
-      "time_ms": 4.832336106489184e-06,
-      "iterations": 100367000,
+      "time_ns": 3.183167919799499,
+      "time_ms": 3.183167919799499e-06,
+      "iterations": 126084000,
       "engine": "DFA,"
     },
     "group_alternation": {
-      "time_ns": 3.032311077389985,
-      "time_ms": 3.032311077389985e-06,
-      "iterations": 158160000,
+      "time_ns": 3.4543753026634385,
+      "time_ms": 3.4543753026634384e-06,
+      "iterations": 136290000,
       "engine": "DFA,"
     },
     "large_8_alternations": {
-      "time_ns": 67.89426315789474,
-      "time_ms": 6.789426315789474e-05,
-      "iterations": 6745000,
+      "time_ns": 62.820555555555565,
+      "time_ms": 6.282055555555556e-05,
+      "iterations": 6786000,
       "engine": "DFA,"
     },
     "deep_nested_groups_depth4": {
-      "time_ns": 13.91498275862069,
-      "time_ms": 1.391498275862069e-05,
-      "iterations": 34800000,
+      "time_ns": 14.617692307692307,
+      "time_ms": 1.4617692307692308e-05,
+      "iterations": 30264000,
       "engine": "DFA,"
     },
     "literal_heavy_alternation": {
-      "time_ns": 81.85175,
-      "time_ms": 8.185175e-05,
-      "iterations": 5488000,
+      "time_ns": 64.21973333333334,
+      "time_ms": 6.421973333333334e-05,
+      "iterations": 6030000,
       "engine": "DFA,"
     },
     "complex_group_5_children": {
-      "time_ns": 41.948138888888884,
-      "time_ms": 4.194813888888889e-05,
-      "iterations": 11592000,
+      "time_ns": 41.999,
+      "time_ms": 4.1999e-05,
+      "iterations": 10476000,
       "engine": "DFA,"
     },
     "match_all_simple": {
-      "time_ns": 6890.03,
-      "time_ms": 0.00689003,
-      "iterations": 67600,
+      "time_ns": 5330.605,
+      "time_ms": 0.0053306049999999995,
+      "iterations": 74600,
       "engine": "DFA,"
     },
     "match_all_digits": {
-      "time_ns": 3624.50625,
-      "time_ms": 0.00362450625,
-      "iterations": 136800,
+      "time_ns": 3688.185,
+      "time_ms": 0.003688185,
+      "iterations": 122600,
       "engine": "DFA,"
     },
     "literal_prefix_short": {
-      "time_ns": 149.73476373351144,
-      "time_ms": 0.00014973476373351144,
-      "iterations": 2970544,
+      "time_ns": 116.15813859790492,
+      "time_ms": 0.00011615813859790492,
+      "iterations": 3425160,
       "engine": "NFA,"
     },
     "literal_prefix_long": {
-      "time_ns": 1226.8738656987296,
-      "time_ms": 0.0012268738656987296,
-      "iterations": 391210,
+      "time_ns": 1323.5843828715365,
+      "time_ms": 0.0013235843828715364,
+      "iterations": 347375,
       "engine": "NFA,"
     },
     "required_literal_short": {
-      "time_ns": 281.04152873909123,
-      "time_ms": 0.00028104152873909124,
-      "iterations": 1754544,
+      "time_ns": 167.2369997860047,
+      "time_ms": 0.0001672369997860047,
+      "iterations": 2476690,
       "engine": "NFA+Prefilter,"
     },
     "no_literal_baseline": {
-      "time_ns": 5.87360594795539,
-      "time_ms": 5.87360594795539e-06,
-      "iterations": 80938065,
+      "time_ns": 6.239043824701195,
+      "time_ms": 6.239043824701195e-06,
+      "iterations": 69076204,
       "engine": "DFA,"
     },
     "alternation_common_prefix": {
-      "time_ns": 9.043950154093528,
-      "time_ms": 9.043950154093528e-06,
-      "iterations": 51106624,
+      "time_ns": 9.267008639308855,
+      "time_ms": 9.267008639308855e-06,
+      "iterations": 52970904,
       "engine": "DFA,"
     },
     "complex_email": {
-      "time_ns": 3452.567857142857,
-      "time_ms": 0.0034525678571428573,
-      "iterations": 143640,
+      "time_ns": 3486.979166666667,
+      "time_ms": 0.003486979166666667,
+      "iterations": 140640,
       "engine": "DFA,"
     },
     "complex_number": {
-      "time_ns": 10495.88,
-      "time_ms": 0.010495879999999999,
-      "iterations": 43500,
+      "time_ns": 11198.678,
+      "time_ms": 0.011198678,
+      "iterations": 42000,
       "engine": "DFA,"
     },
     "simple_phone": {
-      "time_ns": 77984.04,
-      "time_ms": 0.07798403999999999,
-      "iterations": 6500,
+      "time_ns": 81115.59500000002,
+      "time_ms": 0.08111559500000001,
+      "iterations": 6200,
       "engine": "DFA,"
     },
     "flexible_phone": {
-      "time_ns": 71223.405,
-      "time_ms": 0.071223405,
-      "iterations": 6600,
+      "time_ns": 75937.99500000001,
+      "time_ms": 0.07593799500000001,
+      "iterations": 6200,
       "engine": "NFA,"
     },
     "multi_format_phone": {
-      "time_ns": 57569.54,
-      "time_ms": 0.05756954,
-      "iterations": 8750,
+      "time_ns": 57311.86,
+      "time_ms": 0.05731186,
+      "iterations": 8650,
       "engine": "NFA,"
     },
     "phone_validation": {
-      "time_ns": 21.289205298013243,
-      "time_ms": 2.1289205298013245e-05,
-      "iterations": 20913500,
+      "time_ns": 21.989062068965517,
+      "time_ms": 2.1989062068965516e-05,
+      "iterations": 21170000,
       "engine": "NFA,"
     },
     "dfa_simple_phone": {
-      "time_ns": 76717.78,
-      "time_ms": 0.07671778,
-      "iterations": 6600,
+      "time_ns": 82430.685,
+      "time_ms": 0.082430685,
+      "iterations": 5800,
       "engine": "DFA,"
     },
     "dfa_paren_phone": {
-      "time_ns": 13693.91,
-      "time_ms": 0.01369391,
-      "iterations": 34500,
+      "time_ns": 14747.26,
+      "time_ms": 0.01474726,
+      "iterations": 31900,
       "engine": "DFA,"
     },
     "dfa_dot_phone": {
-      "time_ns": 84365.15999999999,
-      "time_ms": 0.08436516,
-      "iterations": 6000,
+      "time_ns": 84562.27,
+      "time_ms": 0.08456227000000001,
+      "iterations": 5900,
       "engine": "DFA,"
     },
     "dfa_digits_only": {
-      "time_ns": 118833.89,
-      "time_ms": 0.11883389,
-      "iterations": 3900,
+      "time_ns": 128595.54000000001,
+      "time_ms": 0.12859554,
+      "iterations": 3800,
       "engine": "DFA,"
     },
     "pure_dfa_dash": {
-      "time_ns": 939.969,
-      "time_ms": 0.000939969,
-      "iterations": 519000,
+      "time_ns": 992.0609999999998,
+      "time_ms": 0.0009920609999999998,
+      "iterations": 500000,
       "engine": "DFA,"
     },
     "pure_dfa_paren": {
-      "time_ns": 305.00375,
-      "time_ms": 0.00030500375,
+      "time_ns": 332.80833333333334,
+      "time_ms": 0.00033280833333333335,
       "iterations": 1536000,
       "engine": "DFA,"
     },
     "pure_dfa_dot": {
-      "time_ns": 94.93381818181817,
-      "time_ms": 9.493381818181817e-05,
-      "iterations": 5214000,
+      "time_ns": 106.57169999999999,
+      "time_ms": 0.00010657169999999999,
+      "iterations": 4130000,
       "engine": "DFA,"
     },
     "smart_phone_primary": {
-      "time_ns": 95714.13,
-      "time_ms": 0.09571413000000001,
-      "iterations": 4700,
+      "time_ns": 114775.5,
+      "time_ms": 0.1147755,
+      "iterations": 4200,
       "engine": "DFA,"
     },
     "national_phone_validation": {
-      "time_ns": 28225.425000000003,
-      "time_ms": 0.028225425000000002,
-      "iterations": 17520,
+      "time_ns": 27424.775,
+      "time_ms": 0.027424775000000002,
+      "iterations": 18040,
       "engine": "NFA,"
     },
     "toll_free_simple": {
-      "time_ns": 16607.109999999997,
-      "time_ms": 0.016607109999999998,
-      "iterations": 27200,
+      "time_ns": 18321.77,
+      "time_ms": 0.01832177,
+      "iterations": 26300,
       "engine": "DFA,"
     },
     "toll_free_complex": {
-      "time_ns": 7765.435,
-      "time_ms": 0.007765435,
-      "iterations": 63200,
+      "time_ns": 7600.555,
+      "time_ms": 0.007600555,
+      "iterations": 65000,
       "engine": "DFA,"
     },
     "single_quantifier_digits": {
-      "time_ns": 16850.275,
-      "time_ms": 0.016850275,
-      "iterations": 26200,
+      "time_ns": 22022.795,
+      "time_ms": 0.022022794999999998,
+      "iterations": 23000,
       "engine": "DFA,"
     },
     "single_quantifier_alpha": {
-      "time_ns": 10208.78,
-      "time_ms": 0.01020878,
-      "iterations": 47800,
+      "time_ns": 9934.07,
+      "time_ms": 0.00993407,
+      "iterations": 49800,
       "engine": "DFA,"
     },
     "dual_quantifiers": {
-      "time_ns": 21216.826666666668,
-      "time_ms": 0.021216826666666667,
-      "iterations": 21000,
-      "engine": "DFA,"
-    },
-    "triple_quantifiers": {
-      "time_ns": 17323.01,
-      "time_ms": 0.01732301,
-      "iterations": 27900,
-      "engine": "DFA,"
-    },
-    "quad_quantifiers": {
-      "time_ns": 22771.56,
-      "time_ms": 0.02277156,
-      "iterations": 18900,
-      "engine": "DFA,"
-    },
-    "range_quantifiers": {
-      "time_ns": 16729.5,
-      "time_ms": 0.0167295,
-      "iterations": 28900,
-      "engine": "DFA,"
-    },
-    "mixed_range_quantifiers": {
-      "time_ns": 19952.82,
-      "time_ms": 0.01995282,
-      "iterations": 21450,
-      "engine": "DFA,"
-    },
-    "datetime_quantifiers": {
-      "time_ns": 24462.96,
-      "time_ms": 0.02446296,
-      "iterations": 19100,
-      "engine": "DFA,"
-    },
-    "flexible_datetime": {
-      "time_ns": 58518.64,
-      "time_ms": 0.05851864,
-      "iterations": 7500,
-      "engine": "DFA,"
-    },
-    "dense_quantifiers": {
-      "time_ns": 30833.22,
-      "time_ms": 0.03083322,
-      "iterations": 15500,
-      "engine": "DFA,"
-    },
-    "ultra_dense_quantifiers": {
-      "time_ns": 40950.52,
-      "time_ms": 0.04095052,
-      "iterations": 10925,
-      "engine": "DFA,"
-    },
-    "grouped_quantifiers": {
-      "time_ns": 17835.07,
-      "time_ms": 0.01783507,
-      "iterations": 26000,
-      "engine": "DFA,"
-    },
-    "alternation_quantifiers": {
-      "time_ns": 32961.31333333333,
-      "time_ms": 0.03296131333333333,
-      "iterations": 12750,
-      "engine": "NFA,"
-    },
-    "optimize_range_quantifier": {
-      "time_ns": 10190.335,
-      "time_ms": 0.010190335,
-      "iterations": 46000,
-      "engine": "NFA,"
-    },
-    "optimize_multiple_quantifiers": {
-      "time_ns": 49814.39,
-      "time_ms": 0.04981439,
-      "iterations": 8800,
-      "engine": "DFA,"
-    },
-    "optimize_phone_quantifiers": {
-      "time_ns": 22665.593333333334,
-      "time_ms": 0.022665593333333334,
+      "time_ns": 24103.103333333333,
+      "time_ms": 0.024103103333333334,
       "iterations": 19500,
       "engine": "DFA,"
     },
+    "triple_quantifiers": {
+      "time_ns": 17425.17,
+      "time_ms": 0.017425169999999997,
+      "iterations": 28300,
+      "engine": "DFA,"
+    },
+    "quad_quantifiers": {
+      "time_ns": 27013.28,
+      "time_ms": 0.027013279999999997,
+      "iterations": 17500,
+      "engine": "DFA,"
+    },
+    "range_quantifiers": {
+      "time_ns": 15820.105000000001,
+      "time_ms": 0.015820105,
+      "iterations": 31400,
+      "engine": "DFA,"
+    },
+    "mixed_range_quantifiers": {
+      "time_ns": 23851.666666666668,
+      "time_ms": 0.023851666666666667,
+      "iterations": 19725,
+      "engine": "DFA,"
+    },
+    "datetime_quantifiers": {
+      "time_ns": 24901.84,
+      "time_ms": 0.02490184,
+      "iterations": 19500,
+      "engine": "DFA,"
+    },
+    "flexible_datetime": {
+      "time_ns": 78985.24,
+      "time_ms": 0.07898524,
+      "iterations": 6600,
+      "engine": "DFA,"
+    },
+    "dense_quantifiers": {
+      "time_ns": 30895.22,
+      "time_ms": 0.03089522,
+      "iterations": 14450,
+      "engine": "DFA,"
+    },
+    "ultra_dense_quantifiers": {
+      "time_ns": 46591.34,
+      "time_ms": 0.046591339999999995,
+      "iterations": 10400,
+      "engine": "DFA,"
+    },
+    "grouped_quantifiers": {
+      "time_ns": 17929.81,
+      "time_ms": 0.01792981,
+      "iterations": 23500,
+      "engine": "DFA,"
+    },
+    "alternation_quantifiers": {
+      "time_ns": 72409.22666666667,
+      "time_ms": 0.07240922666666667,
+      "iterations": 7125,
+      "engine": "NFA,"
+    },
+    "optimize_range_quantifier": {
+      "time_ns": 9585.503,
+      "time_ms": 0.009585503,
+      "iterations": 47000,
+      "engine": "NFA,"
+    },
+    "optimize_multiple_quantifiers": {
+      "time_ns": 52586.585,
+      "time_ms": 0.052586585,
+      "iterations": 8200,
+      "engine": "DFA,"
+    },
+    "optimize_phone_quantifiers": {
+      "time_ns": 22563.420000000002,
+      "time_ms": 0.02256342,
+      "iterations": 20400,
+      "engine": "DFA,"
+    },
     "optimize_large_quantifiers": {
-      "time_ns": 3181.7,
-      "time_ms": 0.0031817,
-      "iterations": 152100,
+      "time_ns": 2994.4849999999997,
+      "time_ms": 0.002994485,
+      "iterations": 145200,
       "engine": "DFA,"
     },
     "optimize_extreme_quantifiers": {
-      "time_ns": 1894.03,
-      "time_ms": 0.0018940299999999999,
-      "iterations": 223000,
+      "time_ns": 2110.354,
+      "time_ms": 0.0021103539999999996,
+      "iterations": 213500,
       "engine": "NFA,"
     },
     "is_match_lowercase": {
-      "time_ns": 1.1490223404255318,
-      "time_ms": 1.1490223404255318e-06,
-      "iterations": 330880000,
+      "time_ns": 1.73881541218638,
+      "time_ms": 1.7388154121863798e-06,
+      "iterations": 256122000,
       "engine": "DFA,"
     },
     "is_match_digits": {
-      "time_ns": 1.2272309562398704,
-      "time_ms": 1.2272309562398703e-06,
-      "iterations": 359094000,
+      "time_ns": 1.32850212404418,
+      "time_ms": 1.3285021240441801e-06,
+      "iterations": 347215000,
       "engine": "DFA,"
     },
     "is_match_alphanumeric": {
-      "time_ns": 1.267148401826484,
-      "time_ms": 1.267148401826484e-06,
-      "iterations": 346458000,
+      "time_ns": 1.413319845857418,
+      "time_ms": 1.4133198458574182e-06,
+      "iterations": 297906000,
       "engine": "DFA,"
     },
     "is_match_predefined_digits": {
-      "time_ns": 1.2220851979345955,
-      "time_ms": 1.2220851979345955e-06,
-      "iterations": 362544000,
+      "time_ns": 1.327778787878788,
+      "time_ms": 1.3277787878787878e-06,
+      "iterations": 346500000,
       "engine": "DFA,"
     },
     "is_match_predefined_word": {
-      "time_ns": 1.2565668402777779,
-      "time_ms": 1.2565668402777778e-06,
-      "iterations": 350208000,
+      "time_ns": 1.5595348837209302,
+      "time_ms": 1.5595348837209301e-06,
+      "iterations": 271674000,
       "engine": "DFA,"
     },
     "sub_literal": {
-      "time_ns": 2785.645,
-      "time_ms": 0.002785645,
-      "iterations": 150800,
+      "time_ns": 3034.4575,
+      "time_ms": 0.0030344575,
+      "iterations": 153200,
       "engine": "N/A"
     },
     "sub_digits": {
-      "time_ns": 86580.09999999999,
-      "time_ms": 0.0865801,
-      "iterations": 5060,
+      "time_ns": 96448.1,
+      "time_ms": 0.09644810000000001,
+      "iterations": 4370,
       "engine": "N/A"
     },
     "sub_char_class": {
-      "time_ns": 125109.49999999999,
-      "time_ms": 0.12510949999999998,
-      "iterations": 3480,
+      "time_ns": 126685.3,
+      "time_ms": 0.1266853,
+      "iterations": 3620,
       "engine": "N/A"
     },
     "sub_whitespace": {
-      "time_ns": 18599.6,
-      "time_ms": 0.018599599999999997,
-      "iterations": 23350,
+      "time_ns": 20357.28,
+      "time_ms": 0.02035728,
+      "iterations": 20350,
       "engine": "N/A"
     },
     "sub_limited_count": {
-      "time_ns": 12163.13,
-      "time_ms": 0.01216313,
-      "iterations": 35300,
+      "time_ns": 13585.87,
+      "time_ms": 0.013585870000000002,
+      "iterations": 33700,
       "engine": "N/A"
     },
     "sub_group_phone_fmt": {
-      "time_ns": 18010.125,
-      "time_ms": 0.018010125,
-      "iterations": 24520,
+      "time_ns": 19802.5,
+      "time_ms": 0.0198025,
+      "iterations": 21810,
       "engine": "N/A"
     },
     "sub_group_date_fmt": {
-      "time_ns": 14051.9125,
-      "time_ms": 0.014051912500000001,
-      "iterations": 31600,
+      "time_ns": 12966.65,
+      "time_ms": 0.01296665,
+      "iterations": 34880,
       "engine": "N/A"
     },
     "sub_group_word_swap": {
-      "time_ns": 54719.4,
-      "time_ms": 0.0547194,
-      "iterations": 8060,
+      "time_ns": 57597.1,
+      "time_ms": 0.0575971,
+      "iterations": 7420,
       "engine": "N/A"
     },
     "sparse_phone_findall": {
-      "time_ns": 2005.7569892473116,
-      "time_ms": 0.0020057569892473117,
-      "iterations": 213435,
+      "time_ns": 2038.1466666666665,
+      "time_ms": 0.0020381466666666665,
+      "iterations": 219150,
       "engine": "DFA,"
     },
     "sparse_phone_search": {
-      "time_ns": 2784.7268292682925,
-      "time_ms": 0.0027847268292682924,
-      "iterations": 160515,
+      "time_ns": 2640.1073170731706,
+      "time_ms": 0.0026401073170731707,
+      "iterations": 161130,
       "engine": "DFA,"
     },
     "sparse_email_findall": {
-      "time_ns": 123775.2,
-      "time_ms": 0.1237752,
-      "iterations": 3470,
+      "time_ns": 128499.1,
+      "time_ms": 0.1284991,
+      "iterations": 3490,
       "engine": "DFA,"
     },
     "sparse_flex_phone_findall": {
-      "time_ns": 1251.6502463054187,
-      "time_ms": 0.0012516502463054188,
-      "iterations": 351190,
+      "time_ns": 1249.746835443038,
+      "time_ms": 0.001249746835443038,
+      "iterations": 335592,
       "engine": "NFA,"
     },
     "nanpa_findall": {
-      "time_ns": 5179.728723404255,
-      "time_ms": 0.0051797287234042555,
-      "iterations": 81404,
+      "time_ns": 5035.29381443299,
+      "time_ms": 0.00503529381443299,
+      "iterations": 87494,
       "engine": "NFA,"
     },
     "nanpa_search": {
-      "time_ns": 244.20317073170733,
-      "time_ms": 0.00024420317073170733,
-      "iterations": 1804000,
+      "time_ns": 254.00975000000003,
+      "time_ms": 0.00025400975,
+      "iterations": 1712000,
       "engine": "NFA,"
     },
     "nanpa_match_first": {
-      "time_ns": 14.068417061611372,
-      "time_ms": 1.4068417061611373e-05,
-      "iterations": 30384000,
+      "time_ns": 14.05876,
+      "time_ms": 1.4058759999999999e-05,
+      "iterations": 31600000,
       "engine": "NFA,"
     }
   }
