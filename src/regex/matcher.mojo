@@ -893,6 +893,41 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
         abort[prefix="ERROR:"](String(e))
 
 
+def _compile_and_cache(
+    pattern: ImmSlice,
+) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
+    """Compile a regex pattern and return a pointer into the global cache.
+
+    Returns an UnsafePointer to the cached CompiledRegex, avoiding the
+    copy that compile_regex() must do when returning by value. Callers
+    must not store this pointer past the current call — the cache may
+    rehash on a subsequent compile_regex() call.
+    """
+    var regex_cache_ptr = _get_regex_cache()
+    var key = hash(pattern)
+
+    if key in regex_cache_ptr[]:
+        try:
+            ref cached = regex_cache_ptr[][key]
+            if cached.pattern == pattern:
+                return UnsafePointer(to=cached)
+        except:
+            pass
+
+    var compiled = CompiledRegex(String(pattern))
+    try:
+        regex_cache_ptr[][key] = compiled
+        return UnsafePointer(to=regex_cache_ptr[][key])
+    except:
+        pass
+    # Fallback: shouldn't reach here, but return a valid pointer
+    try:
+        regex_cache_ptr[][key] = compiled
+    except:
+        pass
+    return UnsafePointer[CompiledRegex, MutAnyOrigin]()
+
+
 def compile_regex(pattern: ImmSlice) raises -> CompiledRegex:
     """Compile a regex pattern with caching for repeated use.
 
@@ -1395,5 +1430,5 @@ def sub(
     Returns:
         New string with replacements applied.
     """
-    var compiled = compile_regex(pattern)
-    return _sub_impl(compiled, repl, text, count)
+    var compiled_ptr = _compile_and_cache(pattern)
+    return _sub_impl(compiled_ptr[], repl, text, count)
