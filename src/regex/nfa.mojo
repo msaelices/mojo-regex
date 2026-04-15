@@ -206,7 +206,7 @@ struct NFAEngine(Copyable, Engine):
         # Fast path for .* prefix patterns in findall.
         # Only safe when no newlines in text (since .* doesn't match \n).
         if (
-            self._starts_with_dotstar()
+            self.starts_with_dotstar
             and self.has_literal_optimization
             and text.find("\n") == -1
         ):
@@ -225,9 +225,9 @@ struct NFAEngine(Copyable, Engine):
         # Fast path for LITERAL.* suffix patterns in findall.
         # Find the first literal, then match extends to end of text.
         if (
-            self._ends_with_dotstar()
+            self.ends_with_dotstar
             and self.has_literal_optimization
-            and self._is_prefix_literal()
+            and self.is_prefix_literal
             and text.find("\n") == -1
         ):
             var literal_bytes = self.literal_prefix.as_bytes()
@@ -264,7 +264,7 @@ struct NFAEngine(Copyable, Engine):
                 var search_window = (
                     10  # Reduced from 100 to 10 for better performance
                 )
-                if self.literal_prefix and not self._is_prefix_literal():
+                if self.literal_prefix and not self.is_prefix_literal:
                     try_pos = max(current_pos, literal_pos - search_window)
 
                 # Search for matches around the literal with limited iterations
@@ -404,7 +404,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Fast path: .* prefix with literal suffix. Only safe without newlines.
         if (
-            self._starts_with_dotstar()
+            self.starts_with_dotstar
             and self.has_literal_optimization
             and text.find("\n") == -1
         ):
@@ -417,9 +417,9 @@ struct NFAEngine(Copyable, Engine):
 
         # Fast path: LITERAL.* suffix. Find first literal, match to end.
         if (
-            self._ends_with_dotstar()
+            self.ends_with_dotstar
             and self.has_literal_optimization
-            and self._is_prefix_literal()
+            and self.is_prefix_literal
             and text.find("\n") == -1
         ):
             var literal_bytes = self.literal_prefix.as_bytes()
@@ -441,7 +441,7 @@ struct NFAEngine(Copyable, Engine):
                     return None
 
                 var try_pos = literal_pos
-                if self.literal_prefix and not self._is_prefix_literal():
+                if self.literal_prefix and not self.is_prefix_literal:
                     try_pos = max(0, literal_pos - self.pattern_len)
 
                 var end_pos = min(
@@ -519,7 +519,7 @@ struct NFAEngine(Copyable, Engine):
                     return (None, empty_groups^)
 
                 var try_pos = literal_pos
-                if self.literal_prefix and not self._is_prefix_literal():
+                if self.literal_prefix and not self.is_prefix_literal:
                     try_pos = max(0, literal_pos - self.pattern_len)
 
                 while try_pos <= literal_pos:
@@ -569,18 +569,6 @@ struct NFAEngine(Copyable, Engine):
         if pos >= start:
             return pos
         return -1
-
-    @always_inline
-    def _ends_with_dotstar(self) -> Bool:
-        return self.ends_with_dotstar
-
-    @always_inline
-    def _starts_with_dotstar(self) -> Bool:
-        return self.starts_with_dotstar
-
-    @always_inline
-    def _is_prefix_literal(self) -> Bool:
-        return self.is_prefix_literal
 
     def _create_range_matcher(
         self, range_pattern: StringSlice
