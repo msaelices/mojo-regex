@@ -338,8 +338,12 @@ struct NFAEngine(Copyable, Engine):
             try:
                 var ast = parse(self.pattern)
                 var result = self._match_node(
-                    ast, text, str_i, matches,
-                    match_first_mode=True, required_start_pos=start,
+                    ast,
+                    text,
+                    str_i,
+                    matches,
+                    match_first_mode=True,
+                    required_start_pos=start,
                 )
                 if result[0]:
                     return Match(0, str_i, result[1], text)
@@ -349,8 +353,12 @@ struct NFAEngine(Copyable, Engine):
 
         ref ast = self.regex.value()
         var result = self._match_node(
-            ast, text, str_i, matches,
-            match_first_mode=True, required_start_pos=start,
+            ast,
+            text,
+            str_i,
+            matches,
+            match_first_mode=True,
+            required_start_pos=start,
         )
         if result[0]:
             return Match(0, str_i, result[1], text)
@@ -512,7 +520,10 @@ struct NFAEngine(Copyable, Engine):
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
-                            return (Match(0, try_pos, match_end, text), matches^)
+                            return (
+                                Match(0, try_pos, match_end, text),
+                                matches^,
+                            )
                     try_pos += 1
 
                 search_pos = literal_pos + 1
