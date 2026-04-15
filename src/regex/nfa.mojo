@@ -79,6 +79,10 @@ struct NFAEngine(Copyable, Engine):
     """Extracted literal prefix for optimization."""
     var has_literal_optimization: Bool
     """Whether literal optimization is available for this pattern."""
+    var pattern_len: Int
+    var ends_with_dotstar: Bool
+    var starts_with_dotstar: Bool
+    var is_prefix_literal: Bool
 
     def __init__(out self, pattern: String):
         """Initialize the regex engine."""
@@ -87,21 +91,19 @@ struct NFAEngine(Copyable, Engine):
         self.pattern = pattern
         self.literal_prefix = ""
         self.has_literal_optimization = False
+        self.pattern_len = len(pattern)
+        self.ends_with_dotstar = False
+        self.starts_with_dotstar = False
+        self.is_prefix_literal = False
 
         try:
             self.regex = parse(pattern)
 
-            # Only apply literal optimization for patterns that benefit from it
-            # Skip for simple patterns that will use DFA anyway
             if self.regex:
                 ref ast = self.regex.value()
                 var analyzer = PatternAnalyzer()
                 var complexity = analyzer.classify(ast)
 
-                # Extract literals for all complexity levels, not just
-                # MEDIUM/COMPLEX. SIMPLE patterns may fall back to NFA when
-                # the DFA compiler can't handle them (e.g., non-capturing
-                # groups with alternation like 8(?:00|33)[2-9]\d{6}).
                 var literal_set = extract_literals(ast)
 
                 ref best_literal = literal_set.get_best_literal()
@@ -124,6 +126,21 @@ struct NFAEngine(Copyable, Engine):
                         self.has_literal_optimization = True
         except:
             self.regex = None
+
+        self.ends_with_dotstar = pattern.endswith(
+            ".*"
+        ) and not pattern.endswith("\\.*")
+        var _swd = False
+        if pattern.startswith(".*"):
+            _swd = True
+            if self.pattern_len > 2:
+                var third = pattern[byte=2]
+                if third == "?" or third == "*" or third == "+":
+                    _swd = False
+        self.starts_with_dotstar = _swd
+        self.is_prefix_literal = len(
+            self.literal_prefix
+        ) > 0 and pattern.startswith(self.literal_prefix)
 
     @always_inline
     def get_pattern(self) -> String:
@@ -425,7 +442,7 @@ struct NFAEngine(Copyable, Engine):
 
                 var try_pos = literal_pos
                 if self.literal_prefix and not self._is_prefix_literal():
-                    try_pos = max(0, literal_pos - len(self.pattern))
+                    try_pos = max(0, literal_pos - self.pattern_len)
 
                 var end_pos = min(
                     len(text), literal_pos + len(self.literal_prefix)
@@ -503,7 +520,7 @@ struct NFAEngine(Copyable, Engine):
 
                 var try_pos = literal_pos
                 if self.literal_prefix and not self._is_prefix_literal():
-                    try_pos = max(0, literal_pos - len(self.pattern))
+                    try_pos = max(0, literal_pos - self.pattern_len)
 
                 while try_pos <= literal_pos:
                     matches.clear()
@@ -555,25 +572,15 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _ends_with_dotstar(self) -> Bool:
-        """Check if the pattern ends with greedy .* (not lazy .*?)."""
-        return self.pattern.endswith(".*") and not self.pattern.endswith("\\.*")
+        return self.ends_with_dotstar
 
     @always_inline
     def _starts_with_dotstar(self) -> Bool:
-        """Check if the pattern starts with greedy .* (not lazy .*?)."""
-        if not self.pattern.startswith(".*"):
-            return False
-        # Exclude .*? (lazy) and .** (double quantifier)
-        if len(self.pattern) > 2:
-            var third = self.pattern[byte=2]
-            if third == "?" or third == "*" or third == "+":
-                return False
-        return True
+        return self.starts_with_dotstar
 
+    @always_inline
     def _is_prefix_literal(self) -> Bool:
-        """Check if the extracted literal is a prefix literal."""
-        # Simple heuristic: if pattern starts with the literal, it's a prefix
-        return self.pattern.startswith(self.literal_prefix)
+        return self.is_prefix_literal
 
     def _create_range_matcher(
         self, range_pattern: StringSlice
