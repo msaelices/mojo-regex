@@ -2,6 +2,10 @@
 
 ## v0.11.0 (2026-04-14)
 
+### Skip lazy DFA for $ anchor patterns, apply cache pointer to all free functions (PR #132)
+
+- The lazy DFA's cached `is_match` flag is position-dependent for `$` anchor patterns, causing incorrect matches when the cache is shared. Fix: detect `OP_END_ANCHOR` at `LazyDFA` construction and skip lazy DFA for those patterns. With this fix, `_compile_and_cache` pointer applied to `match_first`, `search`, and `findall` — eliminating `CompiledRegex` copy from Dict cache on every call. `phone_validation` regresses (59x, falls to NFA) but 9 other benchmarks gain 1.1-1.2x.
+
 ### Eliminate CompiledRegex copy in sub() via cache pointer lookup (PR #127)
 
 - `sub()` copied the entire `CompiledRegex` out of the Dict cache on every call (2.5µs copy overhead). Now uses `_compile_and_cache()` returning an `UnsafePointer` into the cache. `sub()` per call: 36,632ns -> 1,125ns (**33x faster**), now within 1.4x of `compiled.sub()`.
