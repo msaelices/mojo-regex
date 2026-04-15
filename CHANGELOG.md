@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.11.0 (unreleased)
+## v0.11.0 (2026-04-14)
 
 ### Eliminate CompiledRegex copy in sub() via cache pointer lookup (PR #127)
 
