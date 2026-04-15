@@ -676,10 +676,19 @@ struct LazyDFA(Copyable, Movable):
     """Low-nibble lookup table for SIMD first-byte scan."""
     var _filter_hi_nibble: SIMD[DType.uint8, 16]
     """High-nibble lookup table for SIMD first-byte scan."""
+    var has_end_anchor: Bool
+    """True if program contains OP_END_ANCHOR. The lazy DFA's cached
+    is_match flag is position-dependent for $ patterns, so we skip
+    lazy DFA and fall back to backtracking NFA for correctness."""
 
     def __init__(out self, var pikevm: PikeVMEngine):
         self._filter_lo_nibble = SIMD[DType.uint8, 16](0)
         self._filter_hi_nibble = SIMD[DType.uint8, 16](0)
+        self.has_end_anchor = False
+        for i in range(len(pikevm.program)):
+            if pikevm.program.instructions[i].opcode == OP_END_ANCHOR:
+                self.has_end_anchor = True
+                break
         self.pikevm = pikevm^
         self.states = List[CachedState](capacity=64)
         self.start_state_id = LAZY_DFA_DEAD
