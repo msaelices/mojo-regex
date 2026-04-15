@@ -255,7 +255,10 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
-        """Find first match. Uses lazy DFA if available."""
+        """Find first match. Uses lazy DFA if available.
+        Skip lazy DFA for $ anchor patterns: the cached is_match flag
+        is position-dependent and produces incorrect results when the
+        cache is shared across calls with different text lengths."""
         if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
             return self._lazy_dfa_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
@@ -265,7 +268,6 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Use lazy DFA when NFA has no fast paths."""
         return (
             Bool(self._lazy_dfa_ptr)
-            and not self._lazy_dfa_ptr[].has_end_anchor
             and not self.engine.has_literal_optimization
             and not self.engine._starts_with_dotstar()
             and not self.engine._ends_with_dotstar()
