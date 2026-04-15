@@ -175,18 +175,10 @@ struct NFAEngine(Copyable, Engine):
             match, and in the subsequent positions all the group and subgroups
             matched.
         """
-        # Parse the regex if it's different from the cached one
         var matches = MatchList()
-        var ast: ASTNode[MutAnyOrigin]
-        if self.prev_ast:
-            ast = self.prev_ast.value()
-        elif self.regex:
-            ast = self.regex.value()
-        else:
-            try:
-                ast = parse(self.pattern)
-            except:
-                return matches^
+        if not self.prev_ast and not self.regex:
+            return matches^
+        ref ast = self.prev_ast.value() if self.prev_ast else self.regex.value()
 
         # Use smart MatchList container with lazy allocation
         var current_pos = 0
@@ -282,8 +274,7 @@ struct NFAEngine(Copyable, Engine):
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
-                            var matched = Match(0, try_pos, match_end, text)
-                            matches.append(matched)
+                            matches.append(Match(0, try_pos, match_end, text))
 
                             # Move past this match to avoid overlapping matches
                             if match_end == try_pos:
@@ -314,9 +305,7 @@ struct NFAEngine(Copyable, Engine):
                     var match_start = current_pos
                     ref match_end = result[1]
 
-                    # Create match object
-                    var matched = Match(0, match_start, match_end, text)
-                    matches.append(matched)
+                    matches.append(Match(0, match_start, match_end, text))
 
                     # Move past this match to find next one
                     # Avoid infinite loop on zero-width matches
@@ -345,30 +334,26 @@ struct NFAEngine(Copyable, Engine):
         """
         var matches = List[Match]()
         var str_i = start
-        var ast: ASTNode[MutAnyOrigin]
-        if self.regex:
-            ast = self.regex.value()
-        else:
+        if not self.regex:
             try:
-                ast = parse(self.pattern)
+                var ast = parse(self.pattern)
+                var result = self._match_node(
+                    ast, text, str_i, matches,
+                    match_first_mode=True, required_start_pos=start,
+                )
+                if result[0]:
+                    return Match(0, str_i, result[1], text)
             except:
-                return None
+                pass
+            return None
 
-        # Try to match at the exact start position only (like Python's re.match)
-        # Use match_first_mode for optimized early termination
+        ref ast = self.regex.value()
         var result = self._match_node(
-            ast,
-            text,
-            str_i,
-            matches,
-            match_first_mode=True,
-            required_start_pos=start,
+            ast, text, str_i, matches,
+            match_first_mode=True, required_start_pos=start,
         )
-        if result[0]:  # Match found
-            ref end_idx = result[1]
-            # Create the match object
-            return Match(0, str_i, end_idx, text)
-
+        if result[0]:
+            return Match(0, str_i, result[1], text)
         return None
 
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
@@ -386,15 +371,10 @@ struct NFAEngine(Copyable, Engine):
             contain all the group and subgroups matched.
         """
         var matches = List[Match]()
-        var ast: ASTNode[MutAnyOrigin]
-        if self.regex:
-            ast = self.regex.value()
-        else:
-            try:
-                ast = parse(self.pattern)
-            except:
-                return None
+        if not self.regex:
+            return None
 
+        ref ast = self.regex.value()
         var search_pos = start
 
         # Fast path: .* prefix with literal suffix. Only safe without newlines.
@@ -495,16 +475,9 @@ struct NFAEngine(Copyable, Engine):
             Match objects with group_id set to the 1-based capture group index.
         """
         var empty_groups = List[Match]()
-        var ast: ASTNode[MutAnyOrigin]
-        if self.prev_ast:
-            ast = self.prev_ast.value()
-        elif self.regex:
-            ast = self.regex.value()
-        else:
-            try:
-                ast = parse(self.pattern)
-            except:
-                return (None, empty_groups^)
+        if not self.prev_ast and not self.regex:
+            return (None, empty_groups^)
+        ref ast = self.prev_ast.value() if self.prev_ast else self.regex.value()
 
         var search_pos = start
         var matches = List[Match](capacity=8)
@@ -539,8 +512,7 @@ struct NFAEngine(Copyable, Engine):
                         if self._match_contains_literal(
                             text, try_pos, match_end
                         ):
-                            var overall = Match(0, try_pos, match_end, text)
-                            return (overall, matches^)
+                            return (Match(0, try_pos, match_end, text), matches^)
                     try_pos += 1
 
                 search_pos = literal_pos + 1
@@ -556,9 +528,7 @@ struct NFAEngine(Copyable, Engine):
                     required_start_pos=-1,
                 )
                 if result[0]:
-                    ref end_idx = result[1]
-                    var overall = Match(0, search_pos, end_idx, text)
-                    return (overall, matches^)
+                    return (Match(0, search_pos, result[1], text), matches^)
                 search_pos += 1
 
         return (None, empty_groups^)
@@ -1076,8 +1046,7 @@ struct NFAEngine(Copyable, Engine):
         # If this is a capturing group, add the match with its group ID
         if ast.is_capturing():
             var gid = ast.group_id if ast.group_id >= 0 else 0
-            var matched = Match(gid, start_pos, result[1], str)
-            matches.append(matched)
+            matches.append(Match(gid, start_pos, result[1], str))
 
         return result
 
@@ -1122,8 +1091,7 @@ struct NFAEngine(Copyable, Engine):
                     break
                 if ast.is_capturing():
                     var gid = ast.group_id if ast.group_id >= 0 else 0
-                    var matched = Match(gid, str_i, current_pos, str)
-                    matches.append(matched)
+                    matches.append(Match(gid, str_i, current_pos, str))
             else:
                 break
 
@@ -1714,7 +1682,8 @@ def match_first(pattern: String, text: ImmSlice) raises -> Optional[Match]:
     var result = engine.match_first(text, 0)
 
     # Python's re.match only succeeds if match starts at position 0
-    if result and result.value().start_idx == 0:
-        return result
-    else:
-        return None
+    if result:
+        ref m = result.value()
+        if m.start_idx == 0:
+            return result
+    return None
