@@ -256,7 +256,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match. Uses lazy DFA if available."""
-        if self._lazy_dfa_ptr:
+        if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
             return self._lazy_dfa_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
 
@@ -265,6 +265,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Use lazy DFA when NFA has no fast paths."""
         return (
             Bool(self._lazy_dfa_ptr)
+            and not self._lazy_dfa_ptr[].has_end_anchor
             and not self.engine.has_literal_optimization
             and not self.engine._starts_with_dotstar()
             and not self.engine._ends_with_dotstar()
@@ -971,10 +972,8 @@ def search(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
     Returns:
         Optional Match if found.
     """
-    var compiled = compile_regex(pattern)
-    # search() should find a match anywhere, not just at the beginning
-    # so we use match_next instead of match_first
-    return compiled.match_next(text)
+    var compiled_ptr = _compile_and_cache(pattern)
+    return compiled_ptr[].match_next(text)
 
 
 def findall(pattern: ImmSlice, text: ImmSlice) raises -> MatchList:
@@ -987,8 +986,8 @@ def findall(pattern: ImmSlice, text: ImmSlice) raises -> MatchList:
     Returns:
         Matches container with all matches found.
     """
-    var compiled = compile_regex(pattern)
-    return compiled.match_all(text)
+    var compiled_ptr = _compile_and_cache(pattern)
+    return compiled_ptr[].match_all(text)
 
 
 def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
@@ -1001,8 +1000,8 @@ def match_first(pattern: ImmSlice, text: ImmSlice) raises -> Optional[Match]:
     Returns:
         Optional Match if pattern matches at start of text.
     """
-    var compiled = compile_regex(pattern)
-    var result = compiled.match_first(text, 0)
+    var compiled_ptr = _compile_and_cache(pattern)
+    var result = compiled_ptr[].match_first(text, 0)
 
     # Python's re.match only succeeds if match starts at position 0
     if result and result.value().start_idx == 0:
