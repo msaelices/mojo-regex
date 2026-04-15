@@ -2,6 +2,10 @@
 
 ## v0.11.0 (2026-04-14)
 
+### Use ref instead of copy for ASTNode in NFA match methods (PR #133)
+
+- Replaced ~550-byte `ASTNode` copies with `ref` bindings in all 4 public NFA match methods (`match_all`, `match_first`, `match_next`, `match_next_with_groups`). Inlined `Match` temporaries directly into list appends. `findall` **2.6-2.9x faster**, free functions (`search`, `findall`, `match_first`) **1.6x faster**.
+
 ### Skip lazy DFA for $ anchor patterns, apply cache pointer to all free functions (PR #132)
 
 - The lazy DFA's cached `is_match` flag is position-dependent for `$` anchor patterns, causing incorrect matches when the cache is shared. Fix: detect `OP_END_ANCHOR` at `LazyDFA` construction and skip lazy DFA for those patterns. With this fix, `_compile_and_cache` pointer applied to `match_first`, `search`, and `findall` — eliminating `CompiledRegex` copy from Dict cache on every call. `phone_validation` regresses (59x, falls to NFA) but 9 other benchmarks gain 1.1-1.2x.
