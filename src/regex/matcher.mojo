@@ -269,8 +269,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return (
             Bool(self._lazy_dfa_ptr)
             and not self.engine.has_literal_optimization
-            and not self.engine._starts_with_dotstar()
-            and not self.engine._ends_with_dotstar()
+            and not self.engine.starts_with_dotstar
+            and not self.engine.ends_with_dotstar
         )
 
     @always_inline

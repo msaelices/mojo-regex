@@ -82,8 +82,8 @@ def make_complex_pattern_test_data(num_entries: Int) -> String:
 comptime TARGET_RUNTIME_NS = 500_000_000
 comptime MAX_ITERATIONS = 200_000
 comptime WARMUP_ITERATIONS = 10
-# Minimum time per sample (1ms) to ensure OS jitter is a small fraction
-comptime MIN_SAMPLE_NS = 1_000_000
+# Minimum time per sample (10ms) to reduce noise for sub-microsecond benchmarks
+comptime MIN_SAMPLE_NS = 10_000_000
 
 
 def _find_median(mut times: List[Float64]) -> Float64:
