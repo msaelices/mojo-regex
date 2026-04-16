@@ -455,11 +455,13 @@ def main() raises:
     print("=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===")
     if _dev_mode():
         print(
-            "Dev mode: 1ms samples, 50ms per-bench budget (use for fast iteration)"
+            "Dev mode: 1ms samples, 50ms per-bench budget (use for fast"
+            " iteration)"
         )
     else:
         print(
-            "Target runtime: 500ms per benchmark, reporting median iteration time"
+            "Target runtime: 500ms per benchmark, reporting median iteration"
+            " time"
         )
     var filter = _arg_value("--filter=")
     if len(filter) > 0:
