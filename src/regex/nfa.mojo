@@ -381,6 +381,7 @@ struct NFAEngine(Copyable, Engine):
             return Match(0, str_i, result[1], text)
         return None
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.

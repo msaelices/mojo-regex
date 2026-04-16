@@ -416,6 +416,7 @@ struct PikeVMEngine(Copyable, Movable):
         """Match pattern at the given position (like re.match)."""
         return self._run(text, start)
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)

@@ -1841,6 +1841,7 @@ struct DFAEngine(Engine):
             text, start, require_exact_position=True
         )
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
         position.
