@@ -2,6 +2,10 @@
 
 ## v0.11.0 (2026-04-14)
 
+### Precompute pattern properties, eliminate string ops from match paths (PR #135)
+
+- Replaced runtime `endswith`, `startswith`, `len` calls on `self.pattern` with precomputed Bool/Int fields set once at construction. `nanpa_search` **17.9x faster**, `sub_whitespace` **1.49x**, `nanpa_findall` **1.42x**, `sparse_phone_search` **1.36x**, `multi_format_phone` **1.33x**. Also increased benchmark `MIN_SAMPLE_NS` from 1ms to 10ms for more stable sub-microsecond measurements.
+
 ### Use ref instead of copy for ASTNode in NFA match methods (PR #133)
 
 - Replaced ~550-byte `ASTNode` copies with `ref` bindings in all 4 public NFA match methods (`match_all`, `match_first`, `match_next`, `match_next_with_groups`). Inlined `Match` temporaries directly into list appends. `findall` **2.6-2.9x faster**, free functions (`search`, `findall`, `match_first`) **1.6x faster**.
