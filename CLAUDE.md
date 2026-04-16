@@ -84,12 +84,11 @@ already encountered:
   "Assisted by Claude"). Project-level global rule — see
   `~/.claude/CLAUDE.md` for the user-wide version.
 - Don't use the `—` character in messages; use `.` instead.
-- **Always run `pixi run format` before committing any `.mojo` file**.
-  CI runs `pre-commit run --all-files` and fails on unformatted code;
-  catching it locally saves a round-trip. The repo ships a hook config
-  in `.pre-commit-config.yaml` that you can install with `pre-commit
-  install` (may require `git config --unset core.hooksPath` first,
-  which requires explicit user permission — don't do it unprompted).
+- The pre-commit hook (`.pre-commit-config.yaml`) is installed locally
+  and runs `pixi run format` on every commit touching `.mojo` files.
+  If the hook reformats files, the commit fails; re-add and commit
+  again. To save the round-trip, run `pixi run format` before
+  `git commit` on any `.mojo` change. CI runs the same hook.
 
 ## Mojo syntax notes
 
