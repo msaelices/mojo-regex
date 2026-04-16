@@ -1989,10 +1989,13 @@ struct DFAEngine(Engine):
         Returns:
             Matches container with all matches found.
         """
-        # Pre-allocate based on text length. Heuristic: one match per ~32
-        # bytes. Avoids 5-7 reallocations on long-text findall.
+        # Pre-allocate for long-text findall to avoid 5-7 reallocations.
+        # Skip the hint on short texts where over-allocating wastes more
+        # than the grows cost.
         var text_len = len(text)
-        var matches = MatchList(capacity=max(8, text_len >> 5))
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:

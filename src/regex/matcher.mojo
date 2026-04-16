@@ -636,7 +636,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var matches = MatchList(capacity=max(8, len(text) >> 5))
+            var text_len = len(text)
+            var matches = MatchList(
+                capacity=text_len >> 7 if text_len >= 1024 else 0
+            )
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()

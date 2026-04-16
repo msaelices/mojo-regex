@@ -192,9 +192,12 @@ struct NFAEngine(Copyable, Engine):
             match, and in the subsequent positions all the group and subgroups
             matched.
         """
-        # Pre-allocate based on text length. Heuristic: one match per ~32
-        # bytes. Avoids 5-7 reallocations on long-text findall.
-        var matches = MatchList(capacity=max(8, len(text) >> 5))
+        # Pre-allocate for long-text findall. Skip the hint on short texts
+        # where over-allocating wastes more than the grows cost.
+        var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
         if not self.prev_ast and not self.regex:
             return matches^
         ref ast = self.prev_ast.value() if self.prev_ast else self.regex.value()

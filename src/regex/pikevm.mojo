@@ -444,7 +444,9 @@ struct PikeVMEngine(Copyable, Movable):
     def match_all(self, text: ImmSlice) -> MatchList:
         """Find all non-overlapping matches (like re.findall)."""
         var text_len = len(text)
-        var matches = MatchList(capacity=max(8, text_len >> 5))
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
         var pos = 0
 
         if self.has_filter:
@@ -764,7 +766,9 @@ struct LazyDFA(Copyable, Movable):
     def match_all(mut self, text: ImmSlice) -> MatchList:
         """Find all matches using cached DFA."""
         var text_len = len(text)
-        var matches = MatchList(capacity=max(8, text_len >> 5))
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
         var pos = 0
 
         if self.pikevm.has_filter:
