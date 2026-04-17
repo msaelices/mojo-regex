@@ -31,7 +31,14 @@ from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
-from regex.pikevm import compile_ast, PikeVMEngine, LazyDFA
+from regex.pikevm import (
+    compile_ast,
+    PikeVMEngine,
+    LazyDFA,
+    Program,
+    OP_END_ANCHOR,
+)
+from regex.onepass import OnePassNFA, compile_onepass
 from regex.simd_ops import simd_find_byte
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
@@ -97,6 +104,17 @@ def create_optimized_prefilter(
         if len(literal) >= 2:
             return MemchrPrefilter(literal, False)
     return None
+
+
+fn _program_has_end_anchor(program: Program) -> Bool:
+    """True iff `program` contains an OP_END_ANCHOR instruction. Used to
+    gate OnePass NFA compilation at NFAMatcher construction: only
+    `$`-anchored patterns benefit, and skipping the compile for others
+    avoids a Program copy + state-graph walk on every regex build."""
+    for i in range(len(program)):
+        if program.instructions[i].opcode == OP_END_ANCHOR:
+            return True
+    return False
 
 
 fn _find_rare_required_byte(
@@ -256,13 +274,25 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     var _lazy_dfa_ptr: UnsafePointer[LazyDFA, MutAnyOrigin]
     """Heap-allocated lazy DFA. Null when the pattern is not eligible for
     lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES)."""
+    var _onepass_ptr: UnsafePointer[OnePassNFA, MutAnyOrigin]
+    """Heap-allocated OnePass NFA for unambiguous patterns. Null when
+    the pattern failed the one-pass check. Preferred over the lazy DFA
+    and the backtracking NFA when available since it does not pay per-
+    call setup cost or rely on state-set caching."""
 
     def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
-        """Initialize NFA matcher with optional lazy DFA."""
+        """Initialize NFA matcher with OnePass and LazyDFA acceleration."""
         self.engine = NFAEngine(pattern)
         self.ast = ast
         var vm = PikeVMEngine(compile_ast(ast))
+        # OnePass is only consulted for `$`-anchored patterns (the narrow
+        # case LazyDFA mishandles). Skip the compile for other patterns
+        # so non-anchored regexes don't pay a Program.copy() and a full
+        # state-graph walk per NFAMatcher construction.
+        self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
         if vm.is_supported():
+            if _program_has_end_anchor(vm.program):
+                self._onepass_ptr = compile_onepass(vm.program.copy())
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
             # `init_pointee_move` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
@@ -273,8 +303,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
 
     def __copyinit__(out self, copy: Self):
-        """Copy constructor. Deep-copies the lazy DFA so each matcher
-        owns an independent cache."""
+        """Copy constructor. Deep-copies owned engines."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
         if copy._lazy_dfa_ptr:
@@ -282,49 +311,82 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             self._lazy_dfa_ptr.init_pointee_move(copy._lazy_dfa_ptr[].copy())
         else:
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+        if copy._onepass_ptr:
+            self._onepass_ptr = alloc[OnePassNFA](1)
+            self._onepass_ptr.init_pointee_move(copy._onepass_ptr[].copy())
+        else:
+            self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor. Transfers ownership of the heap-allocated
-        lazy DFA from `take` to `self`. No need to clear `take`'s pointer:
-        Mojo's `deinit take` semantics guarantee `take.__del__` is not
-        called after this function returns (the compiler will warn if a
-        field write is interpreted as a dead store, confirming `take` is
-        fully consumed)."""
+        engines from `take` to `self`."""
         self.engine = take.engine^
         self.ast = take.ast^
         self._lazy_dfa_ptr = take._lazy_dfa_ptr
+        self._onepass_ptr = take._onepass_ptr
 
     def __del__(deinit self):
-        """Free the heap-allocated lazy DFA if we still own one."""
+        """Free the heap-allocated engines if we still own them."""
         if self._lazy_dfa_ptr:
             self._lazy_dfa_ptr.destroy_pointee()
             self._lazy_dfa_ptr.free()
+        if self._onepass_ptr:
+            self._onepass_ptr.destroy_pointee()
+            self._onepass_ptr.free()
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
-        """Find first match. Uses lazy DFA if available.
-        Skip lazy DFA for $ anchor patterns: the cached is_match flag
-        is position-dependent and produces incorrect results when the
-        cache is shared across calls with different text lengths."""
+        """Find first match. Routing order:
+        - LazyDFA when available and the pattern has no `$` anchor
+          (cached is_match is position-dependent otherwise).
+        - OnePass NFA for `$`-anchored patterns that compiled one-pass;
+          this is the narrow case LazyDFA can't handle correctly, and
+          OnePass beats the backtracking NFA there. Non-anchored
+          patterns stick with LazyDFA whose first-byte filter wins on
+          long sparse text.
+        - Backtracking NFA as the fallback."""
         if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
             return self._lazy_dfa_ptr[].match_first(text, start)
+        if self._onepass_ptr:
+            return self._onepass_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
 
     @always_inline
-    def _use_lazy_dfa_for_search(self) -> Bool:
-        """Use lazy DFA when NFA has no fast paths."""
+    def _nfa_fast_paths_absent(self) -> Bool:
+        """True when the backtracking NFA has no pattern-specific fast
+        path that beats the automaton engines (literal prefilter,
+        leading/trailing `.*`). Shared by the OnePass and LazyDFA
+        dispatch predicates so both route consistently."""
         return (
-            Bool(self._lazy_dfa_ptr)
-            and not self.engine.has_literal_optimization
+            not self.engine.has_literal_optimization
             and not self.engine.starts_with_dotstar
             and not self.engine.ends_with_dotstar
         )
+
+    @always_inline
+    def _use_onepass_for_search(self) -> Bool:
+        """Use OnePass only for `$`-anchored patterns (where LazyDFA is
+        disabled for correctness). LazyDFA's first-byte SIMD prefilter
+        beats OnePass's position-by-position scan everywhere else."""
+        return (
+            Bool(self._onepass_ptr)
+            and Bool(self._lazy_dfa_ptr)
+            and self._lazy_dfa_ptr[].has_end_anchor
+            and self._nfa_fast_paths_absent()
+        )
+
+    @always_inline
+    def _use_lazy_dfa_for_search(self) -> Bool:
+        """Use lazy DFA when NFA has no pattern-specific fast path."""
+        return Bool(self._lazy_dfa_ptr) and self._nfa_fast_paths_absent()
 
     @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for match."""
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_next(text, start)
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
@@ -332,6 +394,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Find all matches."""
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_all(text)
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_all(text)
         return self.engine.match_all(text)
 
 
