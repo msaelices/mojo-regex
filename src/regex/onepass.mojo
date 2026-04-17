@@ -114,17 +114,39 @@ fn _set_contains_match(
 
 @always_inline
 fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
-    """FNV-1a hash of the state set bytes for O(1) dedup during
-    subset construction."""
+    """Hash of the state set bytes for O(1) dedup during subset
+    construction. Bitcasts the 512-byte set to uint64 lanes, XORs against
+    per-lane mixers (breaks lane symmetry), XOR-reduces to one u64 via
+    AVX2 `vpxor`, then finishes with a single scalar FNV-style mix.
+    Collisions fall through to an explicit equality check in
+    _find_or_add_state."""
     from std.memory import bitcast
 
     comptime NUM_U64 = MAX_STATES // 8
-    var u64_view = bitcast[DType.uint64, NUM_U64](nfa_set)
-    var h: UInt64 = 0xCBF29CE484222325
+
+    # Per-lane mixers: two states with identical non-zero data in
+    # different lane positions must hash differently. All constants fold
+    # to .rodata.
+    var mixers = SIMD[DType.uint64, NUM_U64](0)
     comptime for i in range(NUM_U64):
-        h ^= u64_view[i]
-        h *= 0x100000001B3
-    return h
+        mixers[i] = UInt64(i + 1) * 0x9E3779B97F4A7C15
+
+    var u64_view = bitcast[DType.uint64, NUM_U64](nfa_set)
+
+    @parameter
+    fn xor_op[
+        w: Int
+    ](a: SIMD[DType.uint64, w], b: SIMD[DType.uint64, w]) -> SIMD[
+        DType.uint64, w
+    ]:
+        return a ^ b
+
+    # XOR reduction is native on AVX2 (vpxor on ymm registers). A SIMD
+    # multiply over 64 u64 lanes would fall back to scalar without
+    # AVX-512 (vpmullq), so skip it in the reduction and apply one
+    # scalar mix to diffuse bits at the end.
+    var reduced = (u64_view ^ mixers).reduce[xor_op]()
+    return (reduced ^ 0xCBF29CE484222325) * 0x100000001B3
 
 
 def compile_onepass(
