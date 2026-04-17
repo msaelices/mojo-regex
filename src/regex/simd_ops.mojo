@@ -537,7 +537,9 @@ struct CharacterClassSIMD(
                             return pos + i - start
         elif self.num_ranges == 2:
             # Multi-range SIMD: 2 contiguous ranges combined with OR.
-            # E.g., [a-zA-Z] = (a <= ch <= z) | (A <= ch <= Z)
+            # E.g., [a-zA-Z] = (a <= ch <= z) | (A <= ch <= Z).
+            # 2-way unrolled for pipelinable throughput; see single-range
+            # path above for the rationale.
             var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span1 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
@@ -546,6 +548,25 @@ struct CharacterClassSIMD(
             var span2 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range2_end - self.range2_start)
             )
+            while pos + 2 * SIMD_WIDTH <= text_len:
+                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var r1 = (c1 - lo1).eq(min(c1 - lo1, span1)) | (c1 - lo2).eq(
+                    min(c1 - lo2, span2)
+                )
+                var r2 = (c2 - lo1).eq(min(c2 - lo1, span1)) | (c2 - lo2).eq(
+                    min(c2 - lo2, span2)
+                )
+                if (r1 & r2).reduce_and():
+                    pos += 2 * SIMD_WIDTH
+                    continue
+                if not r1.reduce_and():
+                    for i in range(SIMD_WIDTH):
+                        if not r1[i]:
+                            return pos + i - start
+                for i in range(SIMD_WIDTH):
+                    if not r2[i]:
+                        return pos + SIMD_WIDTH + i - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
                 var s1 = chunk - lo1
@@ -561,7 +582,8 @@ struct CharacterClassSIMD(
                             return pos + i - start
         elif self.num_ranges == 3:
             # Multi-range SIMD: 3 contiguous ranges combined with OR.
-            # E.g., [a-zA-Z0-9] = (a <= ch <= z) | (A <= ch <= Z) | (0 <= ch <= 9)
+            # E.g., [a-zA-Z0-9] = (a <= ch <= z) | (A <= ch <= Z) | (0 <= ch <= 9).
+            # 2-way unrolled; see single-range path for rationale.
             var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span1 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
@@ -574,6 +596,29 @@ struct CharacterClassSIMD(
             var span3 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range3_end - self.range3_start)
             )
+            while pos + 2 * SIMD_WIDTH <= text_len:
+                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var r1 = (
+                    (c1 - lo1).eq(min(c1 - lo1, span1))
+                    | (c1 - lo2).eq(min(c1 - lo2, span2))
+                    | (c1 - lo3).eq(min(c1 - lo3, span3))
+                )
+                var r2 = (
+                    (c2 - lo1).eq(min(c2 - lo1, span1))
+                    | (c2 - lo2).eq(min(c2 - lo2, span2))
+                    | (c2 - lo3).eq(min(c2 - lo3, span3))
+                )
+                if (r1 & r2).reduce_and():
+                    pos += 2 * SIMD_WIDTH
+                    continue
+                if not r1.reduce_and():
+                    for i in range(SIMD_WIDTH):
+                        if not r1[i]:
+                            return pos + i - start
+                for i in range(SIMD_WIDTH):
+                    if not r2[i]:
+                        return pos + SIMD_WIDTH + i - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
                 var s1 = chunk - lo1
