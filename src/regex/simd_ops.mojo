@@ -496,11 +496,32 @@ struct CharacterClassSIMD(
 
         # SIMD fast path for contiguous byte ranges (e.g. [a-z], [0-9]).
         # Uses unsigned subtraction + min + eq: 3 SIMD ops per SIMD_WIDTH bytes.
+        # The main loop is 2-way unrolled so LLVM can pipeline the two
+        # chunks' dependent op chains in parallel, doubling throughput on
+        # long all-matching runs (e.g. `[a-z]+` on 10KB lowercase text).
         if self.num_ranges == 1:
             var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
             )
+            while pos + 2 * SIMD_WIDTH <= text_len:
+                var chunk1 = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var s1 = chunk1 - lo
+                var s2 = chunk2 - lo
+                var r1 = s1.eq(min(s1, span))
+                var r2 = s2.eq(min(s2, span))
+                if (r1 & r2).reduce_and():
+                    pos += 2 * SIMD_WIDTH
+                    continue
+                # Mismatch in at least one chunk. Find exactly where.
+                if not r1.reduce_and():
+                    for i in range(SIMD_WIDTH):
+                        if not r1[i]:
+                            return pos + i - start
+                for i in range(SIMD_WIDTH):
+                    if not r2[i]:
+                        return pos + SIMD_WIDTH + i - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
                 # (chunk - lo) wraps for values < lo. In-range values
