@@ -31,7 +31,13 @@ from regex.ast import ASTNode
 from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
-from regex.pikevm import compile_ast, PikeVMEngine, LazyDFA
+from regex.pikevm import (
+    compile_ast,
+    PikeVMEngine,
+    LazyDFA,
+    Program,
+    OP_END_ANCHOR,
+)
 from regex.onepass import OnePassNFA, compile_onepass
 from regex.simd_ops import simd_find_byte
 from regex.optimizer import PatternAnalyzer, PatternComplexity
@@ -98,6 +104,17 @@ def create_optimized_prefilter(
         if len(literal) >= 2:
             return MemchrPrefilter(literal, False)
     return None
+
+
+fn _program_has_end_anchor(program: Program) -> Bool:
+    """True iff `program` contains an OP_END_ANCHOR instruction. Used to
+    gate OnePass NFA compilation at NFAMatcher construction: only
+    `$`-anchored patterns benefit, and skipping the compile for others
+    avoids a Program copy + state-graph walk on every regex build."""
+    for i in range(len(program)):
+        if program.instructions[i].opcode == OP_END_ANCHOR:
+            return True
+    return False
 
 
 fn _find_rare_required_byte(
@@ -268,13 +285,14 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = NFAEngine(pattern)
         self.ast = ast
         var vm = PikeVMEngine(compile_ast(ast))
-        # Attempt OnePass compilation from the same bytecode before the
-        # PikeVM is consumed into the LazyDFA. `compile_onepass` returns
-        # null for patterns that don't pass the one-pass check, in which
-        # case we fall through to LazyDFA / backtracking NFA.
+        # OnePass is only consulted for `$`-anchored patterns (the narrow
+        # case LazyDFA mishandles). Skip the compile for other patterns
+        # so non-anchored regexes don't pay a Program.copy() and a full
+        # state-graph walk per NFAMatcher construction.
         self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
         if vm.is_supported():
-            self._onepass_ptr = compile_onepass(vm.program.copy())
+            if _program_has_end_anchor(vm.program):
+                self._onepass_ptr = compile_onepass(vm.program.copy())
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
             # `init_pointee_move` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
@@ -334,29 +352,33 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return self.engine.match_first(text, start)
 
     @always_inline
-    def _use_onepass_for_search(self) -> Bool:
-        """Use OnePass for search/findall only when LazyDFA is
-        unavailable for correctness (patterns with `$` anchor). For
-        everything else LazyDFA's first-byte SIMD prefilter beats
-        OnePass's position-by-position scan on long sparse text."""
+    def _nfa_fast_paths_absent(self) -> Bool:
+        """True when the backtracking NFA has no pattern-specific fast
+        path that beats the automaton engines (literal prefilter,
+        leading/trailing `.*`). Shared by the OnePass and LazyDFA
+        dispatch predicates so both route consistently."""
         return (
-            Bool(self._onepass_ptr)
-            and Bool(self._lazy_dfa_ptr)
-            and self._lazy_dfa_ptr[].has_end_anchor
-            and not self.engine.has_literal_optimization
+            not self.engine.has_literal_optimization
             and not self.engine.starts_with_dotstar
             and not self.engine.ends_with_dotstar
         )
 
     @always_inline
-    def _use_lazy_dfa_for_search(self) -> Bool:
-        """Use lazy DFA when NFA has no fast paths."""
+    def _use_onepass_for_search(self) -> Bool:
+        """Use OnePass only for `$`-anchored patterns (where LazyDFA is
+        disabled for correctness). LazyDFA's first-byte SIMD prefilter
+        beats OnePass's position-by-position scan everywhere else."""
         return (
-            Bool(self._lazy_dfa_ptr)
-            and not self.engine.has_literal_optimization
-            and not self.engine.starts_with_dotstar
-            and not self.engine.ends_with_dotstar
+            Bool(self._onepass_ptr)
+            and Bool(self._lazy_dfa_ptr)
+            and self._lazy_dfa_ptr[].has_end_anchor
+            and self._nfa_fast_paths_absent()
         )
+
+    @always_inline
+    def _use_lazy_dfa_for_search(self) -> Bool:
+        """Use lazy DFA when NFA has no pattern-specific fast path."""
+        return Bool(self._lazy_dfa_ptr) and self._nfa_fast_paths_absent()
 
     @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:

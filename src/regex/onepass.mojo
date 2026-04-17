@@ -422,7 +422,6 @@ struct OnePassNFA(Copyable, Movable):
         return None
 
     def match_all(self, text: ImmSlice) -> MatchList:
-        # Find all non-overlapping matches.
         var text_len = len(text)
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
@@ -450,7 +449,6 @@ struct OnePassNFA(Copyable, Movable):
     def _fire_end_anchor(
         self, nfa_set: SIMD[DType.uint8, MAX_STATES], text_len: Int
     ) -> Bool:
-        # End-of-text anchor fixup for dollar-anchored patterns.
         var pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
         var count = 0
         for pc in range(len(self.program)):
