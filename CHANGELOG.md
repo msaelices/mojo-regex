@@ -2,6 +2,11 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Single-byte required-literal memchr prefilter for findall (PR #139)
+
+- Patterns like `[a-zA-Z0-9._%+-]+@[...]\.[...]` (email) or `\d{3}-\d{3}-\d{4}` (phone) have a rare required byte (`@` or `-`) outside the first-element character class. Rust's prefilter memchr-scans for it; Mojo did not. Adds `simd_find_byte` (memchr-style SIMD scan), `_find_rare_required_byte` (top-level AST walker), and a `_match_all_required_byte` fast path on `HybridMatcher` that does memchr → backward-scan to candidate match start → `dfa.match_first`.
+- Measurements (3x median): `sparse_email_findall` **~160x faster** (199 us → 1.25 us; previously 167x slower than Rust, now within ~5%); `simple_phone` **4.4x faster** (155 us → 35 us). Full bench geom mean vs main: **1.32x** across 80 benchmarks, with broad wins on phone and quantifier patterns that have rare separator bytes.
+
 ### Two-way unroll of count_consecutive_matches SIMD loops (PR #138)
 
 - The SIMD loops in `CharacterClassSIMD.count_consecutive_matches` for contiguous-range character classes had a tight dependency chain per iteration (load → sub → min → eq → reduce_and). Unrolling two chunks per iteration lets LLVM schedule the two chains in parallel, doubling effective throughput on long all-matching runs. Applied to the single-range (`[a-z]+`, `[0-9]+`), 2-range (`[a-zA-Z]+`), and 3-range (`[a-zA-Z0-9]+`) paths, all deduped behind `@always_inline` helpers (`_in_range_1/2/3`, `_first_false`, `_first_false_in_two`).
