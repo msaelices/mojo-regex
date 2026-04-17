@@ -416,6 +416,7 @@ struct PikeVMEngine(Copyable, Movable):
         """Match pattern at the given position (like re.match)."""
         return self._run(text, start)
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)
@@ -442,9 +443,11 @@ struct PikeVMEngine(Copyable, Movable):
 
     def match_all(self, text: ImmSlice) -> MatchList:
         """Find all non-overlapping matches (like re.findall)."""
-        var matches = MatchList()
-        var pos = 0
         var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
+        var pos = 0
 
         if self.has_filter:
             var text_ptr = text.unsafe_ptr()
@@ -762,9 +765,11 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def match_all(mut self, text: ImmSlice) -> MatchList:
         """Find all matches using cached DFA."""
-        var matches = MatchList()
-        var pos = 0
         var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
+        var pos = 0
 
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()

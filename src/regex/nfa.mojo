@@ -192,7 +192,12 @@ struct NFAEngine(Copyable, Engine):
             match, and in the subsequent positions all the group and subgroups
             matched.
         """
-        var matches = MatchList()
+        # Pre-allocate for long-text findall. Skip the hint on short texts
+        # where over-allocating wastes more than the grows cost.
+        var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
         if not self.prev_ast and not self.regex:
             return matches^
         ref ast = self.prev_ast.value() if self.prev_ast else self.regex.value()
@@ -381,6 +386,7 @@ struct NFAEngine(Copyable, Engine):
             return Match(0, str_i, result[1], text)
         return None
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.

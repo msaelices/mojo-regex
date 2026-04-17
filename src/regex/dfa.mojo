@@ -1841,6 +1841,7 @@ struct DFAEngine(Engine):
             text, start, require_exact_position=True
         )
 
+    @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Execute DFA matching against input text. It will match from the given start
         position.
@@ -1988,7 +1989,13 @@ struct DFAEngine(Engine):
         Returns:
             Matches container with all matches found.
         """
-        var matches = MatchList()
+        # Pre-allocate for long-text findall to avoid 5-7 reallocations.
+        # Skip the hint on short texts where over-allocating wastes more
+        # than the grows cost.
+        var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
 
         # Special handling for anchored patterns
         if self.has_start_anchor or self.has_end_anchor:
@@ -1998,7 +2005,6 @@ struct DFAEngine(Engine):
             return matches^
 
         var pos = 0
-        var text_len = len(text)
         var text_ptr = text.unsafe_ptr()
         var num_states = len(self.states)
 
