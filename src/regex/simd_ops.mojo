@@ -142,6 +142,83 @@ comptime SHUFFLE_MIN_SIZE = 4
 comptime SHUFFLE_MAX_SIZE = 32
 
 
+@always_inline
+fn _in_range_1(
+    c: SIMD[DType.uint8, SIMD_WIDTH],
+    lo: SIMD[DType.uint8, SIMD_WIDTH],
+    span: SIMD[DType.uint8, SIMD_WIDTH],
+) -> SIMD[DType.bool, SIMD_WIDTH]:
+    """Per-lane: True iff `c[i]` is in the contiguous byte range
+    `[lo[i], lo[i] + span[i]]`.
+
+    `c - lo` wraps for values below `lo`; in-range values produce
+    `[0, span]`, out-of-range produce values greater than `span`. `min`
+    clamps to `span` so `eq` detects the in-range lanes in one compare."""
+    var s = c - lo
+    return s.eq(min(s, span))
+
+
+@always_inline
+fn _in_range_2(
+    c: SIMD[DType.uint8, SIMD_WIDTH],
+    lo1: SIMD[DType.uint8, SIMD_WIDTH],
+    span1: SIMD[DType.uint8, SIMD_WIDTH],
+    lo2: SIMD[DType.uint8, SIMD_WIDTH],
+    span2: SIMD[DType.uint8, SIMD_WIDTH],
+) -> SIMD[DType.bool, SIMD_WIDTH]:
+    """Per-lane: True iff `c[i]` is in either of the two contiguous
+    byte ranges. Used by `[a-zA-Z]`-style char classes."""
+    return _in_range_1(c, lo1, span1) | _in_range_1(c, lo2, span2)
+
+
+@always_inline
+fn _in_range_3(
+    c: SIMD[DType.uint8, SIMD_WIDTH],
+    lo1: SIMD[DType.uint8, SIMD_WIDTH],
+    span1: SIMD[DType.uint8, SIMD_WIDTH],
+    lo2: SIMD[DType.uint8, SIMD_WIDTH],
+    span2: SIMD[DType.uint8, SIMD_WIDTH],
+    lo3: SIMD[DType.uint8, SIMD_WIDTH],
+    span3: SIMD[DType.uint8, SIMD_WIDTH],
+) -> SIMD[DType.bool, SIMD_WIDTH]:
+    """Per-lane: True iff `c[i]` is in any of the three contiguous byte
+    ranges. Used by `[a-zA-Z0-9]`-style char classes."""
+    return (
+        _in_range_1(c, lo1, span1)
+        | _in_range_1(c, lo2, span2)
+        | _in_range_1(c, lo3, span3)
+    )
+
+
+@always_inline
+fn _first_false(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
+    """Return the lane index of the first False in `r`.
+
+    Precondition: `not r.reduce_and()`. Used after a SIMD-wide compare
+    to locate the first mismatch."""
+    for i in range(SIMD_WIDTH):
+        if not r[i]:
+            return i
+    return SIMD_WIDTH  # unreachable given the precondition
+
+
+@always_inline
+fn _first_false_in_two(
+    r1: SIMD[DType.bool, SIMD_WIDTH],
+    r2: SIMD[DType.bool, SIMD_WIDTH],
+) -> Int:
+    """Return the lane index (0 to 2*SIMD_WIDTH-1) of the first False in
+    the concatenation of `r1` (lanes 0..SIMD_WIDTH-1) and `r2`
+    (lanes SIMD_WIDTH..2*SIMD_WIDTH-1).
+
+    Precondition: `not (r1 & r2).reduce_and()`. Used by the 2-way
+    unrolled SIMD loops to locate the first mismatch across both chunks
+    without scanning lanes that are known to match."""
+    if not r1.reduce_and():
+        return _first_false(r1)
+    return SIMD_WIDTH + _first_false(r2)
+
+
 struct CharacterClassSIMD(
     Copyable, Movable, SIMDMatcher, TrivialRegisterPassable
 ):
@@ -495,51 +572,36 @@ struct CharacterClassSIMD(
         var pos = start
 
         # SIMD fast path for contiguous byte ranges (e.g. [a-z], [0-9]).
-        # Uses unsigned subtraction + min + eq: 3 SIMD ops per SIMD_WIDTH bytes.
         # The main loop is 2-way unrolled so LLVM can pipeline the two
         # chunks' dependent op chains in parallel, doubling throughput on
         # long all-matching runs (e.g. `[a-z]+` on 10KB lowercase text).
+        # The 1/2/3-range variants share the unroll skeleton and only
+        # differ in the per-chunk predicate, expressed via _in_range_*
+        # @always_inline helpers that collapse away at the call site.
         if self.num_ranges == 1:
             var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
             )
             while pos + 2 * SIMD_WIDTH <= text_len:
-                var chunk1 = text_ptr.load[width=SIMD_WIDTH](pos)
-                var chunk2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
-                var s1 = chunk1 - lo
-                var s2 = chunk2 - lo
-                var r1 = s1.eq(min(s1, span))
-                var r2 = s2.eq(min(s2, span))
+                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var r1 = _in_range_1(c1, lo, span)
+                var r2 = _in_range_1(c2, lo, span)
                 if (r1 & r2).reduce_and():
                     pos += 2 * SIMD_WIDTH
                     continue
-                # Mismatch in at least one chunk. Find exactly where.
-                if not r1.reduce_and():
-                    for i in range(SIMD_WIDTH):
-                        if not r1[i]:
-                            return pos + i - start
-                for i in range(SIMD_WIDTH):
-                    if not r2[i]:
-                        return pos + SIMD_WIDTH + i - start
+                return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-                # (chunk - lo) wraps for values < lo. In-range values
-                # produce [0, span]; out-of-range produce > span.
-                # min clamps to span, so eq detects out-of-range.
-                var shifted = chunk - lo
-                var in_range = shifted.eq(min(shifted, span))
+                var in_range = _in_range_1(chunk, lo, span)
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
                 else:
-                    for i in range(SIMD_WIDTH):
-                        if not in_range[i]:
-                            return pos + i - start
+                    return pos + _first_false(in_range) - start
         elif self.num_ranges == 2:
             # Multi-range SIMD: 2 contiguous ranges combined with OR.
             # E.g., [a-zA-Z] = (a <= ch <= z) | (A <= ch <= Z).
-            # 2-way unrolled for pipelinable throughput; see single-range
-            # path above for the rationale.
             var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span1 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
@@ -551,39 +613,22 @@ struct CharacterClassSIMD(
             while pos + 2 * SIMD_WIDTH <= text_len:
                 var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
                 var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
-                var r1 = (c1 - lo1).eq(min(c1 - lo1, span1)) | (c1 - lo2).eq(
-                    min(c1 - lo2, span2)
-                )
-                var r2 = (c2 - lo1).eq(min(c2 - lo1, span1)) | (c2 - lo2).eq(
-                    min(c2 - lo2, span2)
-                )
+                var r1 = _in_range_2(c1, lo1, span1, lo2, span2)
+                var r2 = _in_range_2(c2, lo1, span1, lo2, span2)
                 if (r1 & r2).reduce_and():
                     pos += 2 * SIMD_WIDTH
                     continue
-                if not r1.reduce_and():
-                    for i in range(SIMD_WIDTH):
-                        if not r1[i]:
-                            return pos + i - start
-                for i in range(SIMD_WIDTH):
-                    if not r2[i]:
-                        return pos + SIMD_WIDTH + i - start
+                return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-                var s1 = chunk - lo1
-                var r1 = s1.eq(min(s1, span1))
-                var s2 = chunk - lo2
-                var r2 = s2.eq(min(s2, span2))
-                var in_range = r1 | r2
+                var in_range = _in_range_2(chunk, lo1, span1, lo2, span2)
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
                 else:
-                    for i in range(SIMD_WIDTH):
-                        if not in_range[i]:
-                            return pos + i - start
+                    return pos + _first_false(in_range) - start
         elif self.num_ranges == 3:
             # Multi-range SIMD: 3 contiguous ranges combined with OR.
             # E.g., [a-zA-Z0-9] = (a <= ch <= z) | (A <= ch <= Z) | (0 <= ch <= 9).
-            # 2-way unrolled; see single-range path for rationale.
             var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
             var span1 = SIMD[DType.uint8, SIMD_WIDTH](
                 UInt8(self.range_end - self.range_start)
@@ -599,41 +644,21 @@ struct CharacterClassSIMD(
             while pos + 2 * SIMD_WIDTH <= text_len:
                 var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
                 var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
-                var r1 = (
-                    (c1 - lo1).eq(min(c1 - lo1, span1))
-                    | (c1 - lo2).eq(min(c1 - lo2, span2))
-                    | (c1 - lo3).eq(min(c1 - lo3, span3))
-                )
-                var r2 = (
-                    (c2 - lo1).eq(min(c2 - lo1, span1))
-                    | (c2 - lo2).eq(min(c2 - lo2, span2))
-                    | (c2 - lo3).eq(min(c2 - lo3, span3))
-                )
+                var r1 = _in_range_3(c1, lo1, span1, lo2, span2, lo3, span3)
+                var r2 = _in_range_3(c2, lo1, span1, lo2, span2, lo3, span3)
                 if (r1 & r2).reduce_and():
                     pos += 2 * SIMD_WIDTH
                     continue
-                if not r1.reduce_and():
-                    for i in range(SIMD_WIDTH):
-                        if not r1[i]:
-                            return pos + i - start
-                for i in range(SIMD_WIDTH):
-                    if not r2[i]:
-                        return pos + SIMD_WIDTH + i - start
+                return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
                 var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
-                var s1 = chunk - lo1
-                var r1 = s1.eq(min(s1, span1))
-                var s2 = chunk - lo2
-                var r2 = s2.eq(min(s2, span2))
-                var s3 = chunk - lo3
-                var r3 = s3.eq(min(s3, span3))
-                var in_range = r1 | r2 | r3
+                var in_range = _in_range_3(
+                    chunk, lo1, span1, lo2, span2, lo3, span3
+                )
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
                 else:
-                    for i in range(SIMD_WIDTH):
-                        if not in_range[i]:
-                            return pos + i - start
+                    return pos + _first_false(in_range) - start
         else:
             # Scalar 4-way unroll for non-contiguous character classes
             while pos + 4 <= text_len:
