@@ -2,6 +2,11 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Two-way unroll of count_consecutive_matches SIMD loops (PR #138)
+
+- The SIMD loops in `CharacterClassSIMD.count_consecutive_matches` for contiguous-range character classes had a tight dependency chain per iteration (load → sub → min → eq → reduce_and). Unrolling two chunks per iteration lets LLVM schedule the two chains in parallel, doubling effective throughput on long all-matching runs. Applied to the single-range (`[a-z]+`, `[0-9]+`), 2-range (`[a-zA-Z]+`), and 3-range (`[a-zA-Z0-9]+`) paths, all deduped behind `@always_inline` helpers (`_in_range_1/2/3`, `_first_false`, `_first_false_in_two`).
+- Measurements (3x median): `range_lowercase` `[a-z]+` **7.77x faster** (1.65us → 0.21us), `range_alphanumeric` `[a-zA-Z0-9]+` **3.1x faster** (2.08us → 0.67us), `range_digits` `[0-9]+` 1.4x faster. `range_lowercase` was ~33x slower than Rust before this change; after, ~5x.
+
 ### `--dev` and `--filter` flags for bench_engine (PR #137)
 
 - Added two CLI flags to `bench_engine.mojo` for fast dev iteration. `--dev` switches sample budget from 10ms to 1ms and per-bench target from 500ms to 50ms (noisier, for directional signal only). `--filter=<substr>` runs only benchmarks whose name contains the substring. Flags compose: `--dev --filter=sub_` runs the sub() subset in ~8 s vs ~4 min for a full stable run. Added `CLAUDE.md` at project root and expanded `benchmarks/BENCHMARKING_GUIDE.md` to document the iteration workflow.

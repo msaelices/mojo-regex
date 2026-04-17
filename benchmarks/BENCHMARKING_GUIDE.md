@@ -59,6 +59,34 @@ editing, then drop the flags for a stable final run before you commit
 or update `benchmarks/results/`. Do **not** publish numbers from
 `--dev`; it's noisier by design.
 
+### Verifying regressions with 3x medians
+
+Single-run prod bench numbers on sub-microsecond benchmarks can vary
+by 30-50% run-to-run. When a full-suite comparison flags a regression
+on one of those benchmarks, don't trust it until you re-measure with
+3x medians on both branches in the same session. Example:
+
+```bash
+# On the branch under test
+for b in literal_match_long complex_email predefined_digits; do
+  for i in 1 2 3; do
+    pixi run -- bash -c \
+      "mojo run -I src benchmarks/bench_engine.mojo -- --filter=$b" \
+      | grep -E "^\|\s*$b\s*\|"
+  done
+done | tee /tmp/reg_branch.txt
+
+# Then same loop on main (after git stash + checkout main)
+# ...into /tmp/reg_main.txt
+
+# Median of 3 per benchmark, ratio of medians = real speedup
+```
+
+In practice, most single-run "regressions" disappear under 3x median:
+of 10 flagged in PR #138's single-run comparison, 9 turned out to be
+noise (several even flipped to wins). Only use 1x numbers for wins
+that exceed ~1.3x; treat anything closer as needing replication.
+
 Run SIMD-focused benchmarks:
 
 ```bash
