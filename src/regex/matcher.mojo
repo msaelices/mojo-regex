@@ -32,6 +32,7 @@ from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
 from regex.pikevm import compile_ast, PikeVMEngine, LazyDFA
+from regex.onepass import OnePassNFA, compile_onepass
 from regex.simd_ops import simd_find_byte
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
@@ -256,12 +257,20 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     var _lazy_dfa_ptr: UnsafePointer[LazyDFA, MutAnyOrigin]
     """Heap-allocated lazy DFA. Null when the pattern is not eligible for
     lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES)."""
+    var _onepass_ptr: UnsafePointer[OnePassNFA, MutAnyOrigin]
+    """Heap-allocated OnePass NFA for unambiguous patterns. Null when
+    the pattern failed the one-pass check. Preferred over the lazy DFA
+    and the backtracking NFA when available since it does not pay per-
+    call setup cost or rely on state-set caching."""
 
     def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
-        """Initialize NFA matcher with optional lazy DFA."""
+        """Initialize NFA matcher with OnePass and LazyDFA acceleration."""
         self.engine = NFAEngine(pattern)
         self.ast = ast
         var vm = PikeVMEngine(compile_ast(ast))
+        # OnePass integration is temporarily gated off while the engine
+        # is validated in isolation; enable once the standalone tests pass.
+        self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
         if vm.is_supported():
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
             # `init_pointee_move` constructs into uninitialized memory.
@@ -273,8 +282,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
 
     def __copyinit__(out self, copy: Self):
-        """Copy constructor. Deep-copies the lazy DFA so each matcher
-        owns an independent cache."""
+        """Copy constructor. Deep-copies owned engines."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
         if copy._lazy_dfa_ptr:
@@ -282,33 +290,55 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             self._lazy_dfa_ptr.init_pointee_move(copy._lazy_dfa_ptr[].copy())
         else:
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+        if copy._onepass_ptr:
+            self._onepass_ptr = alloc[OnePassNFA](1)
+            self._onepass_ptr.init_pointee_move(copy._onepass_ptr[].copy())
+        else:
+            self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor. Transfers ownership of the heap-allocated
-        lazy DFA from `take` to `self`. No need to clear `take`'s pointer:
-        Mojo's `deinit take` semantics guarantee `take.__del__` is not
-        called after this function returns (the compiler will warn if a
-        field write is interpreted as a dead store, confirming `take` is
-        fully consumed)."""
+        engines from `take` to `self`."""
         self.engine = take.engine^
         self.ast = take.ast^
         self._lazy_dfa_ptr = take._lazy_dfa_ptr
+        self._onepass_ptr = take._onepass_ptr
 
     def __del__(deinit self):
-        """Free the heap-allocated lazy DFA if we still own one."""
+        """Free the heap-allocated engines if we still own them."""
         if self._lazy_dfa_ptr:
             self._lazy_dfa_ptr.destroy_pointee()
             self._lazy_dfa_ptr.free()
+        if self._onepass_ptr:
+            self._onepass_ptr.destroy_pointee()
+            self._onepass_ptr.free()
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
-        """Find first match. Uses lazy DFA if available.
-        Skip lazy DFA for $ anchor patterns: the cached is_match flag
-        is position-dependent and produces incorrect results when the
-        cache is shared across calls with different text lengths."""
+        """Find first match. Routing order:
+        - OnePass NFA when the pattern compiled one-pass (covers
+          `^...$`-style anchored patterns that would otherwise fall all
+          the way to the backtracking NFA).
+        - LazyDFA when available and the pattern has no `$` anchor (the
+          cached is_match flag is position-dependent for `$`).
+        - Backtracking NFA as the fallback."""
+        if self._onepass_ptr:
+            return self._onepass_ptr[].match_first(text, start)
         if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
             return self._lazy_dfa_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
+
+    @always_inline
+    def _use_onepass_for_search(self) -> Bool:
+        """Use OnePass for `match_next`/`match_all` when available and
+        the NFA has no overriding fast paths (literal prefix search,
+        `.*` prefix/suffix)."""
+        return (
+            Bool(self._onepass_ptr)
+            and not self.engine.has_literal_optimization
+            and not self.engine.starts_with_dotstar
+            and not self.engine.ends_with_dotstar
+        )
 
     @always_inline
     def _use_lazy_dfa_for_search(self) -> Bool:
@@ -323,6 +353,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for match."""
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_next(text, start)
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_next(text, start)
         return self.engine.match_next(text, start)
@@ -330,6 +362,8 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches."""
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_all(text)
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_all(text)
         return self.engine.match_all(text)
