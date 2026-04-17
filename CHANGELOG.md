@@ -2,6 +2,11 @@
 
 ## v0.11.0 (2026-04-17)
 
+### OnePass NFA engine for `$`-anchored patterns (PR #140)
+
+- Adds a OnePass NFA in `src/regex/onepass.mojo` for patterns where at every state, for every input byte, at most one forward transition fires. Such patterns run in O(n) per byte with no backtracking, no state-set tracking, and no per-call setup. Unlike LazyDFA it compiles all transitions ahead of time and correctly handles `$` (keeps `OP_END_ANCHOR` in the set, fires it only at `pos == text_len`), so it fills the niche LazyDFA declines. `NFAMatcher` dispatches to OnePass whenever the pattern has `$` and the program is one-pass; LazyDFA stays preferred for `$`-free patterns where its first-byte SIMD prefilter wins.
+- `phone_validation` `^\+?1?[\s.-]?\(?([2-9]\d{2})\)?[\s.-]?([2-9]\d{2})[\s.-]?(\d{4})$` (5x median): backtracking NFA 1.76 us → OnePass 0.25 us (**6.92x faster**). Full `bench_engine` geom mean **1.09x** across 80 benchmarks (44 wins / 28 losses / 8 similar). Compile-time hash in `_hash_set` also rewritten from a 64-deep serial FNV-1a chain to a SIMD XOR-reduction over uint64 lanes (58 ns → 8 ns on the hash itself).
+
 ### Single-byte required-literal memchr prefilter for findall (PR #139)
 
 - Patterns like `[a-zA-Z0-9._%+-]+@[...]\.[...]` (email) or `\d{3}-\d{3}-\d{4}` (phone) have a rare required byte (`@` or `-`) outside the first-element character class. Rust's prefilter memchr-scans for it; Mojo did not. Adds `simd_find_byte` (memchr-style SIMD scan), `_find_rare_required_byte` (top-level AST walker), and a `_match_all_required_byte` fast path on `HybridMatcher` that does memchr → backward-scan to candidate match start → `dfa.match_first`.
