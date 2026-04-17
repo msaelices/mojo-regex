@@ -162,6 +162,11 @@ def compile_onepass(
     states.append(
         OnePassState(start_set, _set_contains_match(program, start_set))
     )
+    var state_index = Dict[UInt64, List[Int]]()
+    try:
+        state_index[_hash_set(start_set)] = [0]
+    except:
+        pass
 
     var worklist = List[Int](capacity=32)
     worklist.append(0)
@@ -208,7 +213,9 @@ def compile_onepass(
                 var new_set = _epsilon_close(
                     program, first_pcs, 1, at_start=False
                 )
-                var idx = _find_or_add_state(program, states, new_set)
+                var idx = _find_or_add_state(
+                    program, states, state_index, new_set
+                )
                 if idx < 0:
                     return UnsafePointer[OnePassNFA, MutAnyOrigin]()
                 if idx == len(states) - 1:
@@ -230,7 +237,9 @@ def compile_onepass(
                         break
                 if not one_pass:
                     return UnsafePointer[OnePassNFA, MutAnyOrigin]()
-                var idx = _find_or_add_state(program, states, first_closure)
+                var idx = _find_or_add_state(
+                    program, states, state_index, first_closure
+                )
                 if idx < 0:
                     return UnsafePointer[OnePassNFA, MutAnyOrigin]()
                 if idx == len(states) - 1:
@@ -246,20 +255,43 @@ def compile_onepass(
     return ptr
 
 
-fn _find_or_add_state(
+def _find_or_add_state(
     program: Program,
     mut states: List[OnePassState],
+    mut index: Dict[UInt64, List[Int]],
     nfa_set: SIMD[DType.uint8, MAX_STATES],
 ) -> Int:
-    """Linear scan for an existing state with this nfa_set; append one
-    if missing. Returns the state id, or -1 if the cap was exceeded."""
-    for i in range(len(states)):
-        if states[i].nfa_set.eq(nfa_set).reduce_and():
-            return i
+    """Hash-indexed lookup-or-append for an OnePass state set.
+
+    Without this, compile_onepass is O(num_states * prog_len) per lookup
+    (linear scan + SIMD compare over all existing states), which for a
+    40-instruction anchored phone pattern compiled in ~13s. The hash
+    buckets the states by FNV-1a of the nfa_set bytes; collisions fall
+    through to a short bucket scan, so the common case is O(1). Returns
+    -1 if the state cap was exceeded."""
+    var key = _hash_set(nfa_set)
+    try:
+        if key in index:
+            ref bucket = index[key]
+            for i in range(len(bucket)):
+                var sid = bucket[i]
+                if states[sid].nfa_set.eq(nfa_set).reduce_and():
+                    return sid
+    except:
+        pass
     if len(states) >= ONEPASS_MAX_STATES:
         return -1
     var new_id = len(states)
     states.append(OnePassState(nfa_set, _set_contains_match(program, nfa_set)))
+    try:
+        if key in index:
+            index[key].append(new_id)
+        else:
+            index[key] = [new_id]
+    except:
+        # Index insert failed; correctness preserved (state is still in
+        # `states`), future lookups may dedup slower.
+        pass
     return new_id
 
 
