@@ -319,25 +319,30 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match. Routing order:
-        - OnePass NFA when the pattern compiled one-pass (covers
-          `^...$`-style anchored patterns that would otherwise fall all
-          the way to the backtracking NFA).
-        - LazyDFA when available and the pattern has no `$` anchor (the
-          cached is_match flag is position-dependent for `$`).
+        - LazyDFA when available and the pattern has no `$` anchor
+          (cached is_match is position-dependent otherwise).
+        - OnePass NFA for `$`-anchored patterns that compiled one-pass;
+          this is the narrow case LazyDFA can't handle correctly, and
+          OnePass beats the backtracking NFA there. Non-anchored
+          patterns stick with LazyDFA whose first-byte filter wins on
+          long sparse text.
         - Backtracking NFA as the fallback."""
-        if self._onepass_ptr:
-            return self._onepass_ptr[].match_first(text, start)
         if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
             return self._lazy_dfa_ptr[].match_first(text, start)
+        if self._onepass_ptr:
+            return self._onepass_ptr[].match_first(text, start)
         return self.engine.match_first(text, start)
 
     @always_inline
     def _use_onepass_for_search(self) -> Bool:
-        """Use OnePass for `match_next`/`match_all` when available and
-        the NFA has no overriding fast paths (literal prefix search,
-        `.*` prefix/suffix)."""
+        """Use OnePass for search/findall only when LazyDFA is
+        unavailable for correctness (patterns with `$` anchor). For
+        everything else LazyDFA's first-byte SIMD prefilter beats
+        OnePass's position-by-position scan on long sparse text."""
         return (
             Bool(self._onepass_ptr)
+            and Bool(self._lazy_dfa_ptr)
+            and self._lazy_dfa_ptr[].has_end_anchor
             and not self.engine.has_literal_optimization
             and not self.engine.starts_with_dotstar
             and not self.engine.ends_with_dotstar
@@ -356,19 +361,19 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for match."""
-        if self._use_onepass_for_search():
-            return self._onepass_ptr[].match_next(text, start)
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_next(text, start)
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
     def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches."""
-        if self._use_onepass_for_search():
-            return self._onepass_ptr[].match_all(text)
         if self._use_lazy_dfa_for_search():
             return self._lazy_dfa_ptr[].match_all(text)
+        if self._use_onepass_for_search():
+            return self._onepass_ptr[].match_all(text)
         return self.engine.match_all(text)
 
 
