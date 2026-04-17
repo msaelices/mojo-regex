@@ -268,10 +268,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = NFAEngine(pattern)
         self.ast = ast
         var vm = PikeVMEngine(compile_ast(ast))
-        # OnePass integration is temporarily gated off while the engine
-        # is validated in isolation; enable once the standalone tests pass.
+        # Attempt OnePass compilation from the same bytecode before the
+        # PikeVM is consumed into the LazyDFA. `compile_onepass` returns
+        # null for patterns that don't pass the one-pass check, in which
+        # case we fall through to LazyDFA / backtracking NFA.
         self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
         if vm.is_supported():
+            self._onepass_ptr = compile_onepass(vm.program.copy())
             self._lazy_dfa_ptr = alloc[LazyDFA](1)
             # `init_pointee_move` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran

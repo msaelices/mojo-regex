@@ -57,7 +57,7 @@ blow-ups."""
 
 fn _epsilon_close(
     program: Program,
-    var start_pcs: InlineArray[Int, MAX_STATES],
+    read start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
     at_start: Bool,
 ) -> SIMD[DType.uint8, MAX_STATES]:
@@ -176,18 +176,38 @@ def compile_onepass(
     var first_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
     var other_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
 
+    # Per-state scratch: list of "active" PCs (those marked in nfa_set
+    # with a byte-consuming op). Filtering once per state is O(prog_len);
+    # the inner byte loop then only touches the (typically small) active
+    # set instead of probing all PCs for every byte.
+    var active_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+
     while len(worklist) > 0:
         var state_id = worklist[len(worklist) - 1]
         _ = worklist.pop()
         var cur_set = states[state_id].nfa_set
         var transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD)
 
+        # Collect byte-consuming PCs once per state.
+        var active_count = 0
+        for pc in range(prog_len):
+            if cur_set[pc] == 0:
+                continue
+            var opc = program.instructions[pc].opcode
+            if (
+                opc == OP_BYTE
+                or opc == OP_CLASS
+                or opc == OP_ANY
+                or opc == OP_RANGE
+            ):
+                active_pcs[active_count] = pc
+                active_count += 1
+
         for byte in range(256):
-            # Collect PCs in `cur_set` whose op fires on this byte.
+            # For each byte, walk only the active byte-consuming PCs.
             var next_count = 0
-            for pc in range(prog_len):
-                if cur_set[pc] == 0:
-                    continue
+            for i in range(active_count):
+                var pc = active_pcs[i]
                 ref inst = program.instructions[pc]
                 var fires = False
                 if inst.opcode == OP_BYTE:
@@ -208,19 +228,16 @@ def compile_onepass(
             # One-pass check: all firing PCs must lead to the same
             # epsilon closure; otherwise this byte has ambiguous
             # successors and the pattern is not one-pass.
+            var is_new = False
+            var idx: Int
             if next_count == 1:
                 first_pcs[0] = next_pcs[0]
                 var new_set = _epsilon_close(
                     program, first_pcs, 1, at_start=False
                 )
-                var idx = _find_or_add_state(
-                    program, states, state_index, new_set
+                idx = _find_or_add_state(
+                    program, states, state_index, new_set, is_new
                 )
-                if idx < 0:
-                    return UnsafePointer[OnePassNFA, MutAnyOrigin]()
-                if idx == len(states) - 1:
-                    worklist.append(idx)
-                transitions[byte] = idx
             else:
                 first_pcs[0] = next_pcs[0]
                 var first_closure = _epsilon_close(
@@ -237,14 +254,14 @@ def compile_onepass(
                         break
                 if not one_pass:
                     return UnsafePointer[OnePassNFA, MutAnyOrigin]()
-                var idx = _find_or_add_state(
-                    program, states, state_index, first_closure
+                idx = _find_or_add_state(
+                    program, states, state_index, first_closure, is_new
                 )
-                if idx < 0:
-                    return UnsafePointer[OnePassNFA, MutAnyOrigin]()
-                if idx == len(states) - 1:
-                    worklist.append(idx)
-                transitions[byte] = idx
+            if idx < 0:
+                return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+            if is_new:
+                worklist.append(idx)
+            transitions[byte] = idx
 
         states[state_id].transitions = transitions
 
@@ -260,15 +277,21 @@ def _find_or_add_state(
     mut states: List[OnePassState],
     mut index: Dict[UInt64, List[Int]],
     nfa_set: SIMD[DType.uint8, MAX_STATES],
+    mut is_new: Bool,
 ) -> Int:
     """Hash-indexed lookup-or-append for an OnePass state set.
 
-    Without this, compile_onepass is O(num_states * prog_len) per lookup
-    (linear scan + SIMD compare over all existing states), which for a
-    40-instruction anchored phone pattern compiled in ~13s. The hash
-    buckets the states by FNV-1a of the nfa_set bytes; collisions fall
-    through to a short bucket scan, so the common case is O(1). Returns
-    -1 if the state cap was exceeded."""
+    Sets `is_new = True` when a new state was appended (the caller uses
+    this to schedule the state on the worklist exactly once). Returns
+    -1 if the state cap was exceeded.
+
+    Without hash indexing, compile_onepass is O(num_states * prog_len)
+    per lookup (linear scan + SIMD compare over all existing states),
+    which for a 40-instruction anchored phone pattern compiled in ~13s.
+    The FNV-1a hash buckets the states by nfa_set bytes; collisions
+    fall through to a short bucket scan, so the common case is O(1).
+    """
+    is_new = False
     var key = _hash_set(nfa_set)
     try:
         if key in index:
@@ -283,6 +306,7 @@ def _find_or_add_state(
         return -1
     var new_id = len(states)
     states.append(OnePassState(nfa_set, _set_contains_match(program, nfa_set)))
+    is_new = True
     try:
         if key in index:
             index[key].append(new_id)
@@ -349,17 +373,20 @@ struct OnePassNFA(Copyable, Movable):
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Match the pattern starting exactly at `start`. Returns None
         if the pattern cannot match here (e.g. `^` anchor with start > 0,
-        or no accepting state reached)."""
+        or no accepting state reached).
+
+        `is_match` is authoritative for any state whose MATCH is already
+        in the closure (no pending `$`). OR patterns with mixed anchors
+        like `^a|b$` depend on this: the `^a` branch reaches MATCH
+        mid-text and must not be suppressed by the end-of-text gating.
+        The end-of-text fixup only extends match_end when `$` fires."""
         if self.has_start_anchor and start > 0:
             return None
         var text_ptr = text.unsafe_ptr()
         var text_len = len(text)
         var state_id = 0
         var match_end = -1
-        # Start state may itself be accepting (e.g. for `a*`). For
-        # `$`-anchored patterns this is suppressed until the end-of-text
-        # fixup below.
-        if self.states[0].is_match and not self.has_end_anchor:
+        if self.states[0].is_match:
             match_end = start
         var pos = start
         var states_ptr = self.states.unsafe_ptr()
@@ -369,7 +396,7 @@ struct OnePassNFA(Copyable, Movable):
                 break
             state_id = next_id
             pos += 1
-            if states_ptr[state_id].is_match and not self.has_end_anchor:
+            if states_ptr[state_id].is_match:
                 match_end = pos
         # End-of-text fixup for `$` anchors.
         if self.has_end_anchor and pos == text_len:
