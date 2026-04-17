@@ -32,6 +32,7 @@ from regex.matching import Match, MatchList
 from regex.nfa import NFAEngine
 from regex.dfa import DFAEngine, compile_dfa_pattern
 from regex.pikevm import compile_ast, PikeVMEngine, LazyDFA
+from regex.simd_ops import simd_find_byte
 from regex.optimizer import PatternAnalyzer, PatternComplexity
 from regex.parser import parse
 from regex.prefilter import (
@@ -96,6 +97,52 @@ def create_optimized_prefilter(
         if len(literal) >= 2:
             return MemchrPrefilter(literal, False)
     return None
+
+
+fn _find_rare_required_byte(
+    ast: ASTNode[MutAnyOrigin],
+    first_class_lookup: SIMD[DType.uint8, 256],
+) -> Int:
+    """Walk the top-level sequence of `ast` looking for a required,
+    single-byte ELEMENT whose byte is NOT present in the first-element
+    character class lookup. Returns the byte code (0-255), or -1 if no
+    such element exists.
+
+    Used to enable the memchr-style sparse-findall prefilter for patterns
+    like `[a-zA-Z0-9._%+-]+@[...]\\.[...]` where `@` is a rare required
+    byte outside the first-element class."""
+    from regex.ast import (
+        RE as RE_KIND,
+        GROUP as GROUP_KIND,
+        ELEMENT as ELEMENT_KIND,
+    )
+
+    # Unwrap RE -> single GROUP child (typical parser output)
+    var node = ast
+    if node.type == RE_KIND and node.get_children_len() == 1:
+        node = node.get_child(0)
+    if node.type != GROUP_KIND:
+        return -1
+
+    for i in range(node.get_children_len()):
+        var child = node.get_child(i)
+        if child.type != ELEMENT_KIND:
+            continue
+        # Required: min >= 1 and not optional. max == 1 means fixed one
+        # occurrence; max == -1 with min >= 1 means `+` quantifier,
+        # which still requires at least one of this byte.
+        if child.min < 1:
+            continue
+        var val = child.get_value()
+        if not val:
+            continue
+        ref s = val.value()
+        if len(s) != 1:
+            continue
+        var byte = Int(s.unsafe_ptr()[0])
+        if first_class_lookup[byte] == 0:
+            return byte
+    return -1
 
 
 def check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
@@ -412,6 +459,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     var _use_dfa: Bool
     """Cached dispatch flag: True when dfa_matcher is valid and complexity
     is SIMPLE. Eliminates a pointer null-check + enum comparison per call."""
+    var _required_byte: Int
+    """Byte code (0-255) of a required 1-char literal in the pattern that
+    is not part of the first-element character class. -1 when no such
+    byte exists or the pattern isn't eligible for this prefilter. Used by
+    `match_all` for sparse-match findall (e.g. `@` in an email pattern):
+    memchr-scan the text for this byte, then backward-scan to a candidate
+    match start. Near-memchr throughput on non-matching spans."""
 
     def __init__(out self, pattern: String) raises:
         """Initialize hybrid matcher by analyzing pattern and creating appropriate engines.
@@ -432,6 +486,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.dfa_matcher = DFAMatcher()
             self.use_pure_dfa = False  # Special wildcard handling
             self._use_dfa = False
+            self._required_byte = -1
             # Create minimal NFA matcher (required field, but won't be used)
             var dummy_ast = parse(
                 "a"
@@ -523,6 +578,24 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             self.dfa_matcher = DFAMatcher()
             self._use_dfa = False
 
+        # Enable the single-byte required prefilter when:
+        # - pattern is DFA-routed with no anchors
+        # - the AST contains a required single-byte ELEMENT (e.g. `@` in
+        #   an email pattern) whose byte is NOT in the first-element
+        #   character class. The extra class check ensures a memchr hit
+        #   uniquely identifies a candidate position; without it every
+        #   byte in the text would be a hit.
+        self._required_byte = -1
+        if (
+            self._use_dfa
+            and not self.literal_info.has_anchors
+            and self.dfa_matcher.engine_ptr[]._has_simd_matcher
+        ):
+            self._required_byte = _find_rare_required_byte(
+                ast,
+                self.dfa_matcher.engine_ptr[]._simd_char_matcher.lookup_table,
+            )
+
     def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.dfa_matcher = copy.dfa_matcher.copy()
@@ -534,6 +607,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = copy.is_wildcard_match_any
         self.use_pure_dfa = copy.use_pure_dfa
         self._use_dfa = copy._use_dfa
+        self._required_byte = copy._required_byte
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
@@ -546,6 +620,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self.is_wildcard_match_any = take.is_wildcard_match_any
         self.use_pure_dfa = take.use_pure_dfa
         self._use_dfa = take._use_dfa
+        self._required_byte = take._required_byte
 
     @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
@@ -669,17 +744,51 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                         break
             return matches^
 
-        # Prefilter path: Use candidate positions (non-anchored only)
-        if self.prefilter and not self.literal_info.has_anchors:
-            # Disabled for now to isolate performance issue
-            # TODO: Fix prefilter performance issue
-            pass
+        # Required-byte prefilter path: for patterns like
+        # `[a-zA-Z0-9._%+-]+@[...]\.[...]` where `@` is a required 1-byte
+        # literal NOT in the first-element class. memchr-scan for `@`,
+        # backward-scan to the earliest possible match start (greedy
+        # first-element class match), then DFA.match_first from there.
+        # Near-memchr throughput on non-matching spans.
+        if self._required_byte >= 0:
+            return self._match_all_required_byte(text)
 
         # Standard path: Use regular engine matching
         if self._use_dfa:
             return self.dfa_matcher.match_all(text)
         else:
             return self.nfa_matcher.match_all(text)
+
+    def _match_all_required_byte(self, text: ImmSlice) raises -> MatchList:
+        """findall fast path for patterns with a rare required byte."""
+        var text_len = len(text)
+        var matches = MatchList(
+            capacity=text_len >> 7 if text_len >= 1024 else 0
+        )
+        var text_ptr = text.unsafe_ptr()
+        var needle = UInt8(self._required_byte)
+        ref cc = self.dfa_matcher.engine_ptr[]._simd_char_matcher
+        var pos = 0
+        while pos < text_len:
+            var hit = simd_find_byte(text_ptr, pos, text_len, needle)
+            if hit == -1:
+                break
+            # Scan backward while the previous byte is in the first-element
+            # character class. That gives the earliest possible match start
+            # for a pattern of shape `[class]+<needle>...`.
+            var start = hit
+            while start > 0 and cc.lookup_table[Int(text_ptr[start - 1])] != 0:
+                start -= 1
+            var m = self.dfa_matcher.match_first(text, start)
+            if m and m.value().end_idx > hit:
+                ref mref = m.value()
+                matches.append(mref)
+                pos = mref.end_idx
+                if pos <= hit:
+                    pos = hit + 1  # zero-width match guard
+            else:
+                pos = hit + 1
+        return matches^
 
     def get_engine_type(self) -> String:
         """Get the type of engine being used (for debugging/profiling).

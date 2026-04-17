@@ -203,6 +203,46 @@ fn _first_false(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
 
 
 @always_inline
+fn _first_true(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
+    """Return the lane index of the first True in `r`.
+
+    Precondition: `r.reduce_or()`. Used to locate the first hit after
+    a SIMD-wide equality scan."""
+    for i in range(SIMD_WIDTH):
+        if r[i]:
+            return i
+    return SIMD_WIDTH  # unreachable given the precondition
+
+
+@always_inline
+fn simd_find_byte(
+    text_ptr: UnsafePointer[Byte, _],
+    start: Int,
+    text_len: Int,
+    needle: UInt8,
+) -> Int:
+    """Return the first position of `needle` in `text_ptr[start:text_len]`,
+    or -1 if not found.
+
+    memchr-style SIMD scan. Used as a prefilter when a rare required byte
+    (e.g. `@` in an email pattern) can short-circuit the main regex
+    engine by restricting candidate positions."""
+    var pos = start
+    var splat = SIMD[DType.uint8, SIMD_WIDTH](needle)
+    while pos + SIMD_WIDTH <= text_len:
+        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+        var matches = chunk.eq(splat)
+        if matches.reduce_or():
+            return pos + _first_true(matches)
+        pos += SIMD_WIDTH
+    while pos < text_len:
+        if text_ptr[pos] == needle:
+            return pos
+        pos += 1
+    return -1
+
+
+@always_inline
 fn _first_false_in_two(
     r1: SIMD[DType.bool, SIMD_WIDTH],
     r2: SIMD[DType.bool, SIMD_WIDTH],
