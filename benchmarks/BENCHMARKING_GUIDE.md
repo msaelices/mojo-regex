@@ -31,6 +31,34 @@ Run the complete benchmark comparison for the main benchmark suite:
 ./benchmarks/run_comparison.sh bench_engine
 ```
 
+## Fast iteration flags
+
+A full `bench_engine.mojo` run takes ~4 min, which is slow when iterating
+on an optimization. Two flags cut the loop to seconds; combine them.
+
+| Flag | Effect |
+|---|---|
+| `--dev` | 1 ms sample / 50 ms per-bench budget (vs 10 ms / 500 ms). Noisier, for directional signal only. Full 80-bench run: ~8 s. |
+| `--filter=<substr>` | Only run benchmarks whose name contains `<substr>`. Substring match, single value. |
+
+Pass flags after a literal `--` so Mojo forwards them to the program:
+
+```bash
+# Fast dev iteration on a specific code path
+mojo run -I src benchmarks/bench_engine.mojo -- --dev --filter=sub_
+
+# Just one benchmark, stable measurement
+mojo run -I src benchmarks/bench_engine.mojo -- --filter=phone_validation
+
+# Full stable run (pre-commit, publishable numbers)
+mojo run -I src benchmarks/bench_engine.mojo
+```
+
+**Workflow**: use `--dev --filter=...` to get a quick signal while
+editing, then drop the flags for a stable final run before you commit
+or update `benchmarks/results/`. Do **not** publish numbers from
+`--dev`; it's noisier by design.
+
 Run SIMD-focused benchmarks:
 
 ```bash

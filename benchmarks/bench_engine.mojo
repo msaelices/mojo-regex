@@ -1,3 +1,4 @@
+from std.sys import argv
 from std.time import perf_counter_ns
 from regex.matcher import compile_regex, sub
 
@@ -78,12 +79,65 @@ def make_complex_pattern_test_data(num_entries: Int) -> String:
 # Benchmark Infrastructure
 # ===-----------------------------------------------------------------------===#
 
-# Target runtime per benchmark: 500ms for more stable measurements
-comptime TARGET_RUNTIME_NS = 500_000_000
+# Target runtime per benchmark: 500ms prod, 50ms dev
+comptime TARGET_RUNTIME_NS_PROD = 500_000_000
+comptime TARGET_RUNTIME_NS_DEV = 50_000_000
 comptime MAX_ITERATIONS = 200_000
 comptime WARMUP_ITERATIONS = 10
-# Minimum time per sample (10ms) to reduce noise for sub-microsecond benchmarks
-comptime MIN_SAMPLE_NS = 10_000_000
+# Minimum time per sample: 10ms prod (stable), 1ms dev (fast, noisier)
+comptime MIN_SAMPLE_NS_PROD = 10_000_000
+comptime MIN_SAMPLE_NS_DEV = 1_000_000
+
+
+# ===-----------------------------------------------------------------------===#
+# CLI flags
+# ===-----------------------------------------------------------------------===#
+#
+# Supported:
+#   --dev              Fast mode: 1ms samples, 50ms per-bench budget (10x)
+#   --filter=<substr>  Only run benchmarks whose name contains <substr>
+#
+# Example: mojo run -I src benchmarks/bench_engine.mojo -- --dev --filter=sub_
+
+
+def _arg_has(flag: StaticString) -> Bool:
+    """True if `flag` appears as a bare argv entry."""
+    var args = argv()
+    for i in range(1, len(args)):
+        if args[i] == flag:
+            return True
+    return False
+
+
+def _arg_value(prefix: StaticString) -> String:
+    """Return the suffix of an argv entry starting with `prefix`, or empty."""
+    var args = argv()
+    var plen = len(prefix)
+    for i in range(1, len(args)):
+        var a = args[i]
+        if len(a) >= plen and a[byte=0:plen] == prefix:
+            return String(a[byte=plen:])
+    return ""
+
+
+def _dev_mode() -> Bool:
+    return _arg_has("--dev")
+
+
+def _min_sample_ns() -> UInt:
+    return UInt(MIN_SAMPLE_NS_DEV) if _dev_mode() else UInt(MIN_SAMPLE_NS_PROD)
+
+
+def _target_runtime_ns() -> UInt:
+    return UInt(TARGET_RUNTIME_NS_DEV) if _dev_mode() else UInt(
+        TARGET_RUNTIME_NS_PROD
+    )
+
+
+def _bench_skip(name: String) -> Bool:
+    """True if --filter=<substr> is set and `name` does not contain it."""
+    var f = _arg_value("--filter=")
+    return len(f) > 0 and f not in name
 
 
 def _find_median(mut times: List[Float64]) -> Float64:
@@ -124,6 +178,10 @@ def benchmark_match_first(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark match_first with pre-compiled regex and median timing."""
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
 
     # Pre-compile regex outside timing loop
     var compiled = compile_regex(pattern)
@@ -134,14 +192,14 @@ def benchmark_match_first(
     for _ in range(WARMUP_ITERATIONS):
         _ = compiled.match_first(text)
 
-    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    # Auto-calibrate: ensure each sample takes >= min_sample_ns
     var iters = internal_iterations
     var cal_start = perf_counter_ns()
     for _ in range(iters):
         _ = compiled.match_first(text)
     var cal_elapsed = perf_counter_ns() - cal_start
-    if cal_elapsed < MIN_SAMPLE_NS:
-        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
         iters = iters * multiplier
 
     # Collect per-iteration times
@@ -150,7 +208,7 @@ def benchmark_match_first(
     var actual_iterations = 0
 
     while (
-        total_time < UInt(TARGET_RUNTIME_NS)
+        total_time < UInt(target_runtime_ns)
         and actual_iterations < MAX_ITERATIONS
     ):
         var start_time = perf_counter_ns()
@@ -176,6 +234,10 @@ def benchmark_search(
 ) raises:
     """Benchmark search (match_next) with pre-compiled regex and median timing.
     """
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
 
     var compiled = compile_regex(pattern)
     var stats = compiled.get_stats()
@@ -185,14 +247,14 @@ def benchmark_search(
     for _ in range(WARMUP_ITERATIONS):
         _ = compiled.match_next(text)
 
-    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    # Auto-calibrate: ensure each sample takes >= min_sample_ns
     var iters = internal_iterations
     var cal_start = perf_counter_ns()
     for _ in range(iters):
         _ = compiled.match_next(text)
     var cal_elapsed = perf_counter_ns() - cal_start
-    if cal_elapsed < MIN_SAMPLE_NS:
-        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
         iters = iters * multiplier
 
     var times = List[Float64]()
@@ -200,7 +262,7 @@ def benchmark_search(
     var actual_iterations = 0
 
     while (
-        total_time < UInt(TARGET_RUNTIME_NS)
+        total_time < UInt(target_runtime_ns)
         and actual_iterations < MAX_ITERATIONS
     ):
         var start_time = perf_counter_ns()
@@ -227,6 +289,10 @@ def benchmark_findall(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
     """Benchmark findall with pre-compiled regex and median timing."""
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
 
     var compiled = compile_regex(pattern)
     var stats = compiled.get_stats()
@@ -236,14 +302,14 @@ def benchmark_findall(
     for _ in range(WARMUP_ITERATIONS):
         _ = compiled.match_all(text)
 
-    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    # Auto-calibrate: ensure each sample takes >= min_sample_ns
     var iters = internal_iterations
     var cal_start = perf_counter_ns()
     for _ in range(iters):
         _ = compiled.match_all(text)
     var cal_elapsed = perf_counter_ns() - cal_start
-    if cal_elapsed < MIN_SAMPLE_NS:
-        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
         iters = iters * multiplier
 
     var times = List[Float64]()
@@ -251,7 +317,7 @@ def benchmark_findall(
     var actual_iterations = 0
 
     while (
-        total_time < UInt(TARGET_RUNTIME_NS)
+        total_time < UInt(target_runtime_ns)
         and actual_iterations < MAX_ITERATIONS
     ):
         var start_time = perf_counter_ns()
@@ -276,6 +342,10 @@ def benchmark_is_match(
 ) raises:
     """Benchmark is_match (bool-only) with pre-compiled regex and median timing.
     """
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
 
     var compiled = compile_regex(pattern)
     var stats = compiled.get_stats()
@@ -285,14 +355,14 @@ def benchmark_is_match(
     for _ in range(WARMUP_ITERATIONS):
         _ = compiled.is_match(text)
 
-    # Auto-calibrate: ensure each sample takes >= MIN_SAMPLE_NS
+    # Auto-calibrate: ensure each sample takes >= min_sample_ns
     var iters = internal_iterations
     var cal_start = perf_counter_ns()
     for _ in range(iters):
         _ = compiled.is_match(text)
     var cal_elapsed = perf_counter_ns() - cal_start
-    if cal_elapsed < MIN_SAMPLE_NS:
-        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
         iters = iters * multiplier
 
     # Collect per-iteration times
@@ -301,7 +371,7 @@ def benchmark_is_match(
     var actual_iterations = 0
 
     while (
-        total_time < UInt(TARGET_RUNTIME_NS)
+        total_time < UInt(target_runtime_ns)
         and actual_iterations < MAX_ITERATIONS
     ):
         var start_time = perf_counter_ns()
@@ -330,6 +400,10 @@ def benchmark_sub(
     internal_iterations: Int,
 ) raises:
     """Benchmark sub() with pre-compiled regex and median timing."""
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
 
     # Warmup
     for _ in range(WARMUP_ITERATIONS):
@@ -341,8 +415,8 @@ def benchmark_sub(
     for _ in range(iters):
         _ = sub(pattern, repl, text)
     var cal_elapsed = perf_counter_ns() - cal_start
-    if cal_elapsed < MIN_SAMPLE_NS:
-        var multiplier = Int(MIN_SAMPLE_NS // cal_elapsed) + 1
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
         iters = iters * multiplier
 
     var times = List[Float64]()
@@ -350,7 +424,7 @@ def benchmark_sub(
     var actual_iterations = 0
 
     while (
-        total_time < UInt(TARGET_RUNTIME_NS)
+        total_time < UInt(target_runtime_ns)
         and actual_iterations < MAX_ITERATIONS
     ):
         var start_time = perf_counter_ns()
@@ -379,9 +453,19 @@ def benchmark_sub(
 def main() raises:
     """Run all regex benchmarks with manual timing."""
     print("=== REGEX ENGINE BENCHMARKS (Pre-compiled, Median Timing) ===")
-    print(
-        "Target runtime: 500ms per benchmark, reporting median iteration time"
-    )
+    if _dev_mode():
+        print(
+            "Dev mode: 1ms samples, 50ms per-bench budget (use for fast"
+            " iteration)"
+        )
+    else:
+        print(
+            "Target runtime: 500ms per benchmark, reporting median iteration"
+            " time"
+        )
+    var filter = _arg_value("--filter=")
+    if len(filter) > 0:
+        print("Filter: only running benchmarks matching '" + filter + "'")
     print()
 
     # Prepare test data - same as original benchmarks
