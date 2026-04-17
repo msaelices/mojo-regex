@@ -1,6 +1,17 @@
 # Changelog
 
-## v0.11.0 (2026-04-14)
+## v0.11.0 (2026-04-17)
+
+### `--dev` and `--filter` flags for bench_engine (PR #137)
+
+- Added two CLI flags to `bench_engine.mojo` for fast dev iteration. `--dev` switches sample budget from 10ms to 1ms and per-bench target from 500ms to 50ms (noisier, for directional signal only). `--filter=<substr>` runs only benchmarks whose name contains the substring. Flags compose: `--dev --filter=sub_` runs the sub() subset in ~8 s vs ~4 min for a full stable run. Added `CLAUDE.md` at project root and expanded `benchmarks/BENCHMARKING_GUIDE.md` to document the iteration workflow.
+
+### Inline match_next dispatchers and pre-allocate MatchList in findall (PR #136)
+
+- Added `@always_inline` to `DFAEngine.match_next`, `NFAEngine.match_next`, and `PikeVM.match_next` so the dispatch chain from `HybridMatcher` (already inlined) collapses end-to-end.
+- Pre-allocated `MatchList` capacity in all 6 `match_all` entry points based on text length (`text_len >> 7` when `text_len >= 1024`, else lazy default), avoiding 5-7 reallocations on long-text findall.
+- Vs baseline: 39 wins / 24 losses / 17 similar over 80 benchmarks, geom mean **1.060x**. sub() operations: clean 8/0 win, geom **1.28x**. Top wins: `deep_nested_groups_depth4` **2.95x**, `complex_group_5_children` 1.70x, `sub_group_phone_fmt` 1.62x, `simple_phone` 1.60x, `dfa_simple_phone` 1.56x, `sub_group_word_swap` 1.53x, `sub_digits` 1.49x, `multi_format_phone` 1.49x, `dfa_dot_phone` 1.48x, `complex_email` 1.46x.
+- A Dict-keyed LazyDFA state lookup was also implemented and benchmarked, but reverted: net-neutral overall and slightly negative on the NFA path, reproducing PR #123's original conclusion.
 
 ### Precompute pattern properties, eliminate string ops from match paths (PR #135)
 
