@@ -1,85 +1,94 @@
 | Benchmark | Mojo (ms) | Python (ms) | Rust (ms) | vs Python | vs Rust |
 |-----------|-----------|-------------|-----------|-----------|---------|
-| alternation_common_prefix           | 0.000007 |    0.000547 |    0.001854 |     75.5x |  255.9x |
-| alternation_quantifiers             | 0.035321 |    0.489585 |    0.069565 |     13.9x |    2.0x |
-| alternation_simple                  | 0.000003 |    0.000301 |    0.000020 |     93.7x |    6.2x |
-| anchor_start                        | 0.000005 |    0.000339 |    0.000031 |     72.3x |    6.7x |
-| complex_email                       | 0.003731 |    0.037064 |           - |      9.9x |         |
-| complex_group_5_children            | 0.000041 |    0.000883 |    0.000063 |     21.4x |    1.5x |
-| complex_number                      | 0.009512 |    0.159805 |           - |     16.8x |         |
-| datetime_quantifiers                | 0.031873 |    0.109464 |    0.065831 |      3.4x |    2.1x |
-| deep_nested_groups_depth4           | 0.000014 |    0.000379 |    0.000028 |     26.2x |    1.9x |
-| dense_quantifiers                   | 0.032941 |    0.256674 |    0.021631 |      7.8x |    0.7x |
-| dfa_digits_only                     | 0.096780 |    1.475895 |    0.054834 |     15.3x |    0.6x |
-| dfa_dot_phone                       | 0.096010 |    1.436735 |    0.046611 |     15.0x |    0.5x |
-| dfa_paren_phone                     | 0.010724 |    0.080414 |    0.012085 |      7.5x |    1.1x |
-| dfa_simple_phone                    | 0.087436 |    1.490457 |    0.061031 |     17.0x |    0.7x |
-| dual_quantifiers                    | 0.018034 |    0.141045 |    0.016627 |      7.8x |    0.9x |
-| flexible_datetime                   | 0.051562 |    0.112842 |    0.033228 |      2.2x |    0.6x |
-| flexible_phone                      | 0.062644 |    3.413087 |    0.205540 |     54.5x |    3.3x |
-| group_alternation                   | 0.000003 |    0.000384 |    0.000050 |    123.7x |   16.0x |
-| grouped_quantifiers                 | 0.026095 |    0.145508 |    0.010661 |      5.6x |    0.4x |
-| is_match_alphanumeric               | 0.000001 |    0.022264 |    0.000013 |  18288.1x |   10.7x |
-| is_match_digits                     | 0.000002 |    0.011394 |    0.000033 |   6311.9x |   18.5x |
-| is_match_lowercase                  | 0.000001 |    0.014647 |    0.000014 |  11678.8x |   10.9x |
-| is_match_predefined_digits          | 0.000001 |    0.031321 |    0.000016 |  24155.8x |   12.6x |
-| is_match_predefined_word            | 0.000001 |    0.034199 |    0.000015 |  27221.9x |   11.7x |
-| large_8_alternations                | 0.000054 |    0.000691 |    0.000088 |     12.8x |    1.6x |
-| literal_heavy_alternation           | 0.000075 |    0.001196 |    0.000084 |     15.9x |    1.1x |
-| literal_match_long                  | 0.004576 |    0.013881 |    0.003485 |      3.0x |    0.8x |
-| literal_match_short                 | 0.000469 |    0.001096 |    0.000392 |      2.3x |    0.8x |
-| literal_prefix_long                 | 0.001376 |    0.066937 |    0.024374 |     48.6x |   17.7x |
-| literal_prefix_short                | 0.000129 |    0.000722 |    0.000225 |      5.6x |    1.7x |
-| match_all_digits                    | 0.003773 |    2.464576 |           - |    653.2x |         |
-| match_all_simple                    | 0.004602 |    0.048548 |    0.008049 |     10.5x |    1.7x |
-| mixed_range_quantifiers             | 0.018002 |    0.126202 |    0.005266 |      7.0x |    0.3x |
-| multi_format_phone                  | 0.067873 |    7.384705 |    0.162659 |    108.8x |    2.4x |
-| nanpa_findall                       | 0.008329 |    0.030105 |    0.011408 |      3.6x |    1.4x |
-| nanpa_match_first                   | 0.000019 |    0.000257 |    0.000075 |     13.5x |    3.9x |
-| nanpa_search                        | 0.000250 |    0.000368 |    0.000049 |      1.5x |    0.2x |
-| national_phone_validation           | 0.033063 |    0.758234 |    0.065229 |     22.9x |    2.0x |
-| no_literal_baseline                 | 0.000006 |    0.000500 |    0.006798 |     78.0x | 1060.0x |
-| optimize_extreme_quantifiers        | 0.002007 |    0.010219 |    0.000228 |      5.1x |    0.1x |
-| optimize_large_quantifiers          | 0.002858 |    0.007304 |    0.009638 |      2.6x |    3.4x |
-| optimize_multiple_quantifiers       | 0.050998 |    0.317536 |    0.020859 |      6.2x |    0.4x |
-| optimize_phone_quantifiers          | 0.033437 |    0.160340 |    0.040922 |      4.8x |    1.2x |
-| optimize_range_quantifier           | 0.011402 |    0.121677 |    0.029285 |     10.7x |    2.6x |
-| phone_validation                    | 0.000997 |    0.000605 |    0.000025 |      0.6x |    0.0x |
-| predefined_digits                   | 0.000324 |    0.381956 |    0.000058 |   1177.6x |    0.2x |
-| predefined_word                     | 0.014372 |    0.070110 |    0.050321 |      4.9x |    3.5x |
-| pure_dfa_dash                       | 0.000995 |           - |           - |           |         |
-| pure_dfa_dot                        | 0.000106 |           - |           - |           |         |
-| pure_dfa_paren                      | 0.000196 |           - |           - |           |         |
-| quad_quantifiers                    | 0.023139 |    0.112981 |    0.011142 |      4.9x |    0.5x |
-| quantifier_one_or_more              | 0.000003 |    0.000176 |    0.000054 |     54.5x |   16.6x |
-| quantifier_zero_or_more             | 0.000003 |    0.000182 |    0.000049 |     54.4x |   14.7x |
-| quantifier_zero_or_one              | 0.000003 |    0.000260 |    0.000049 |     78.8x |   15.0x |
-| range_alphanumeric                  | 0.002077 |    0.032487 |    0.052020 |     15.6x |   25.0x |
-| range_digits                        | 0.000288 |    0.100344 |    0.000063 |    348.7x |    0.2x |
-| range_lowercase                     | 0.001657 |    0.015387 |    0.000054 |      9.3x |    0.0x |
-| range_quantifiers                   | 0.018053 |    0.147700 |    0.043307 |      8.2x |    2.4x |
-| required_literal_short              | 0.000171 |    0.004958 |    0.000375 |     29.0x |    2.2x |
-| simple_phone                        | 0.087369 |    1.610087 |    0.169202 |     18.4x |    1.9x |
-| single_quantifier_alpha             | 0.011083 |    0.141457 |    0.041816 |     12.8x |    3.8x |
-| single_quantifier_digits            | 0.014850 |    0.110362 |    0.015880 |      7.4x |    1.1x |
-| smart_phone_primary                 | 0.086531 |           - |           - |           |         |
-| sparse_email_findall                | 0.157667 |    0.343117 |    0.001813 |      2.2x |    0.0x |
-| sparse_flex_phone_findall           | 0.001225 |    0.475264 |    0.031423 |    387.9x |   25.6x |
-| sparse_phone_findall                | 0.003690 |    0.457766 |    0.002141 |    124.1x |    0.6x |
-| sparse_phone_search                 | 0.002770 |    0.048210 |    0.001285 |     17.4x |    0.5x |
-| sub_char_class                      | 0.137799 |    1.384432 |    0.294229 |     10.0x |    2.1x |
-| sub_digits                          | 0.082827 |    2.304235 |    0.107894 |     27.8x |    1.3x |
-| sub_group_date_fmt                  | 0.014180 |    0.084292 |    0.043515 |      5.9x |    3.1x |
-| sub_group_phone_fmt                 | 0.017437 |    0.150427 |    0.039236 |      8.6x |    2.3x |
-| sub_group_word_swap                 | 0.049490 |    0.057045 |    0.030552 |      1.2x |    0.6x |
-| sub_limited_count                   | 0.017480 |    0.020367 |    0.008527 |      1.2x |    0.5x |
-| sub_literal                         | 0.003747 |    0.004935 |    0.001769 |      1.3x |    0.5x |
-| sub_whitespace                      | 0.015286 |    0.097564 |    0.029016 |      6.4x |    1.9x |
-| toll_free_complex                   | 0.008293 |    0.046846 |           - |      5.6x |         |
-| toll_free_simple                    | 0.013388 |    0.102655 |           - |      7.7x |         |
-| triple_quantifiers                  | 0.019100 |    0.115594 |    0.010795 |      6.1x |    0.6x |
-| ultra_dense_quantifiers             | 0.036103 |    0.344414 |    0.043424 |      9.5x |    1.2x |
-| wildcard_match_any                  | 0.000001 |    0.005006 |    0.057507 |   8226.8x | 94502.9x |
-
-**vs Python: 75/76 wins (98%)**
-**vs Rust: 46/71 wins (64%)**
+| alternation_common_prefix           | 0.000012 | 0.000264 | 0.003953 |    21.5x |   320.7x |
+| alternation_quantifiers             | 0.049491 | 0.556531 | 0.107863 |    11.2x |     2.2x |
+| alternation_simple                  | 0.000005 | 0.000286 | 0.000026 |    53.1x |     4.8x |
+| alternation_words                   |        - |        - | 0.000042 |          |          |
+| anchor_end                          |        - |        - | 0.000042 |          |          |
+| anchor_start                        | 0.000008 | 0.000213 | 0.000057 |    26.3x |     7.1x |
+| complex_email                       | 0.008191 | 0.016640 |        - |     2.0x |          |
+| complex_email_extraction            |        - |        - | 0.000606 |          |          |
+| complex_group_5_children            | 0.000081 | 0.000402 | 0.000107 |     5.0x |     1.3x |
+| complex_number                      | 0.011224 | 0.125218 |        - |    11.2x |          |
+| complex_number_extraction           |        - |        - | 0.139007 |          |          |
+| datetime_quantifiers                | 0.053781 | 0.128595 | 0.091245 |     2.4x |     1.7x |
+| deep_nested_groups_depth4           | 0.000010 | 0.000221 | 0.000042 |    21.4x |     4.1x |
+| dense_quantifiers                   | 0.010753 | 0.276547 | 0.022911 |    25.7x |     2.1x |
+| dfa_digits_only                     | 0.155784 | 1.375611 | 0.071988 |     8.8x |     0.5x |
+| dfa_dot_phone                       | 0.064011 | 1.298394 | 0.067797 |    20.3x |     1.1x |
+| dfa_paren_phone                     | 0.006550 | 0.070818 | 0.023280 |    10.8x |     3.6x |
+| dfa_simple_phone                    | 0.033403 | 1.573652 | 0.086957 |    47.1x |     2.6x |
+| dual_quantifiers                    | 0.040848 | 0.216160 | 0.022736 |     5.3x |     0.6x |
+| flexible_datetime                   | 0.017899 | 0.180503 | 0.071304 |    10.1x |     4.0x |
+| flexible_phone                      | 0.090297 | 2.882232 | 0.248750 |    31.9x |     2.8x |
+| group_alternation                   | 0.000008 | 0.000222 | 0.000085 |    28.2x |    10.8x |
+| group_quantified                    |        - |        - | 0.074030 |          |          |
+| grouped_quantifiers                 | 0.007049 | 0.160509 | 0.017364 |    22.8x |     2.5x |
+| is_match_alphanumeric               | 0.000002 | 0.023260 | 0.000019 | 11283.0x |     9.3x |
+| is_match_digits                     | 0.000002 | 0.017992 | 0.000039 |  8315.8x |    17.9x |
+| is_match_lowercase                  | 0.000003 | 0.018398 | 0.000026 |  5828.7x |     8.1x |
+| is_match_predefined_digits          | 0.000002 | 0.045671 | 0.000024 | 21689.0x |    11.6x |
+| is_match_predefined_word            | 0.000003 | 0.048920 | 0.000023 | 16002.7x |     7.4x |
+| large_8_alternations                | 0.000083 | 0.000602 | 0.000104 |     7.2x |     1.2x |
+| literal_heavy_alternation           | 0.000087 | 0.000713 | 0.000100 |     8.2x |     1.1x |
+| literal_match_long                  | 0.010373 | 0.012147 | 0.005674 |     1.2x |     0.5x |
+| literal_match_short                 | 0.000743 | 0.001489 | 0.000640 |     2.0x |     0.9x |
+| literal_prefix_long                 | 0.003281 | 0.037577 | 0.048944 |    11.5x |    14.9x |
+| literal_prefix_medium               |        - |        - | 0.003596 |          |          |
+| literal_prefix_short                | 0.000163 | 0.000324 | 0.000356 |     2.0x |     2.2x |
+| match_all_digits                    | 0.007701 | 1.401607 |        - |   182.0x |          |
+| match_all_pattern                   |        - |        - | 0.078393 |          |          |
+| match_all_simple                    | 0.008201 | 0.029522 | 0.010193 |     3.6x |     1.2x |
+| mixed_range_quantifiers             | 0.008492 | 0.138298 | 0.005969 |    16.3x |     0.7x |
+| multi_format_phone                  | 0.150229 | 6.330939 | 0.369736 |    42.1x |     2.5x |
+| nanpa_findall                       | 0.008390 | 0.037791 | 0.013984 |     4.5x |     1.7x |
+| nanpa_match_first                   | 0.000024 | 0.000260 | 0.000095 |    10.8x |     4.0x |
+| nanpa_search                        | 0.000034 | 0.000414 | 0.000085 |    12.3x |     2.5x |
+| national_phone_validation           | 0.047730 | 0.789663 | 0.068774 |    16.5x |     1.4x |
+| no_literal_baseline                 | 0.000010 | 0.000239 | 0.008327 |    23.5x |   818.0x |
+| optimize_extreme_quantifiers        | 0.002697 | 0.015323 | 0.000350 |     5.7x |     0.1x |
+| optimize_large_quantifiers          | 0.004743 | 0.010100 | 0.014549 |     2.1x |     3.1x |
+| optimize_multiple_quantifiers       | 0.020902 | 0.323469 | 0.029334 |    15.5x |     1.4x |
+| optimize_phone_quantifiers          | 0.036075 | 0.214129 | 0.061391 |     5.9x |     1.7x |
+| optimize_range_quantifier           | 0.017416 | 0.174210 | 0.050976 |    10.0x |     2.9x |
+| phone_validation                    | 0.000315 | 0.000412 | 0.000032 |     1.3x |     0.1x |
+| predefined_digits                   | 0.000873 | 0.213673 | 0.000069 |   244.6x |     0.1x |
+| predefined_word                     | 0.022492 | 0.048996 | 0.083677 |     2.2x |     3.7x |
+| pure_dfa_dash                       | 0.001505 |        - |        - |          |          |
+| pure_dfa_dot                        | 0.000215 |        - |        - |          |          |
+| pure_dfa_paren                      | 0.000362 |        - |        - |          |          |
+| quad_quantifiers                    | 0.005735 | 0.164902 | 0.020969 |    28.8x |     3.7x |
+| quantifier_one_or_more              | 0.000005 | 0.000259 | 0.000095 |    49.5x |    18.1x |
+| quantifier_zero_or_more             | 0.000005 | 0.000251 | 0.000070 |    48.2x |    13.4x |
+| quantifier_zero_or_one              | 0.000008 | 0.000264 | 0.000087 |    34.7x |    11.4x |
+| range_alphanumeric                  | 0.000632 | 0.019410 | 0.085043 |    30.7x |   134.6x |
+| range_digits                        | 0.000596 | 0.181070 | 0.000081 |   303.7x |     0.1x |
+| range_lowercase                     | 0.000368 | 0.017352 | 0.000084 |    47.1x |     0.2x |
+| range_quantifiers                   | 0.028179 | 0.162222 | 0.051449 |     5.8x |     1.8x |
+| required_literal_long               |        - |        - | 0.001445 |          |          |
+| required_literal_short              | 0.000267 | 0.003548 | 0.000450 |    13.3x |     1.7x |
+| simd_alphanumeric_large             |        - |        - | 0.000092 |          |          |
+| simd_alphanumeric_xlarge            |        - |        - | 0.000083 |          |          |
+| simd_multi_char_class               |        - |        - | 0.000102 |          |          |
+| simd_negated_alphanumeric           |        - |        - | 0.000084 |          |          |
+| simple_phone                        | 0.034965 | 1.838891 | 0.238230 |    52.6x |     6.8x |
+| single_quantifier_alpha             | 0.016839 | 0.159466 | 0.057365 |     9.5x |     3.4x |
+| single_quantifier_digits            | 0.024138 | 0.146672 | 0.027762 |     6.1x |     1.2x |
+| smart_phone_primary                 | 0.033384 |        - |        - |          |          |
+| sparse_email_findall                | 0.001331 | 0.397052 | 0.002306 |   298.4x |     1.7x |
+| sparse_flex_phone_findall           | 0.002813 | 0.819068 | 0.058359 |   291.2x |    20.7x |
+| sparse_phone_findall                | 0.002401 | 0.710015 | 0.002866 |   295.7x |     1.2x |
+| sparse_phone_search                 | 0.006044 | 0.053727 | 0.002198 |     8.9x |     0.4x |
+| sub_char_class                      | 0.147189 | 1.691695 | 0.433766 |    11.5x |     2.9x |
+| sub_digits                          | 0.122019 | 1.917956 | 0.186000 |    15.7x |     1.5x |
+| sub_group_date_fmt                  | 0.017179 | 0.095022 | 0.062268 |     5.5x |     3.6x |
+| sub_group_phone_fmt                 | 0.022811 | 0.166928 | 0.058261 |     7.3x |     2.6x |
+| sub_group_word_swap                 | 0.115922 | 0.090370 | 0.059016 |     0.8x |     0.5x |
+| sub_limited_count                   | 0.016199 | 0.028171 | 0.008259 |     1.7x |     0.5x |
+| sub_literal                         | 0.003487 | 0.007092 | 0.001905 |     2.0x |     0.5x |
+| sub_whitespace                      | 0.029452 | 0.139113 | 0.054358 |     4.7x |     1.8x |
+| toll_free_complex                   | 0.017490 | 0.044849 |        - |     2.6x |          |
+| toll_free_simple                    | 0.016794 | 0.117023 |        - |     7.0x |          |
+| triple_quantifiers                  | 0.007438 | 0.116495 | 0.016147 |    15.7x |     2.2x |
+| ultra_dense_quantifiers             | 0.015137 | 0.406660 | 0.069478 |    26.9x |     4.6x |
+| wildcard_match_any                  | 0.000001 | 0.005263 | 0.089212 |  4128.4x | 69973.8x |
