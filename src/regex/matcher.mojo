@@ -900,6 +900,23 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     """The original regex pattern string."""
     var compiled_at: Int
     """Timestamp when the regex was compiled, used for cache management."""
+    var _fixed_sub_total_width: Int
+    """For patterns matching a sequence of fixed-width `(\\d{N})`
+    capture groups (with optional fixed-byte literal separators): the
+    total byte width of one match. Negative means the pattern isn't a
+    fixed-width form and `sub()` goes through the general NFA path."""
+    var _fixed_sub_num_groups: Int
+    """Number of capture groups in the fixed-width pattern (1..9)."""
+    var _fixed_sub_offsets: InlineArray[Int, 10]
+    """Byte offset of each capture group relative to the match start.
+    Indexed by group number (1..num_groups)."""
+    var _fixed_sub_widths: InlineArray[Int, 10]
+    """Byte width of each capture group. Indexed by group number."""
+    var _fixed_sub_concat: Bool
+    """True when the fixed-width pattern has no literal separators (pure
+    concatenated `(\\d{N})` groups). Enables the whole-text-match
+    validate-and-emit fast path in `sub()`. False patterns keep the
+    DFA match_next + offset-slicing path."""
 
     def __init__(out self, pattern: String) raises:
         """Compile a regex pattern with automatic optimization.
@@ -910,18 +927,70 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.pattern = pattern
         self.matcher = HybridMatcher(pattern)
         self.compiled_at = Int(monotonic())
+        self._fixed_sub_total_width = -1
+        self._fixed_sub_num_groups = 0
+        self._fixed_sub_offsets = InlineArray[Int, 10](fill=0)
+        self._fixed_sub_widths = InlineArray[Int, 10](fill=0)
+        self._fixed_sub_concat = False
+        self._try_precompute_fixed_sub()
 
     def __copyinit__(out self, copy: Self):
         """Copy constructor."""
         self.matcher = copy.matcher.copy()
         self.pattern = copy.pattern
         self.compiled_at = copy.compiled_at
+        self._fixed_sub_total_width = copy._fixed_sub_total_width
+        self._fixed_sub_num_groups = copy._fixed_sub_num_groups
+        self._fixed_sub_offsets = copy._fixed_sub_offsets
+        self._fixed_sub_widths = copy._fixed_sub_widths
+        self._fixed_sub_concat = copy._fixed_sub_concat
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
         self.matcher = take.matcher^
         self.pattern = take.pattern^
         self.compiled_at = take.compiled_at
+        self._fixed_sub_total_width = take._fixed_sub_total_width
+        self._fixed_sub_num_groups = take._fixed_sub_num_groups
+        self._fixed_sub_offsets = take._fixed_sub_offsets
+        self._fixed_sub_widths = take._fixed_sub_widths
+        self._fixed_sub_concat = take._fixed_sub_concat
+
+    def _try_precompute_fixed_sub(mut self):
+        """If `pattern` is a sequence of fixed-width `(\\d{N})` capture
+        groups (with optional fixed-byte literal separators),
+        precompute offsets/widths/total_width so `sub()` can skip the
+        general NFA path. Sets `_fixed_sub_concat` when there are no
+        literal separators, enabling an additional whole-text-match
+        fast path that validates digits and emits the template
+        without any engine dispatch."""
+        var pat_slice = rebind[ImmSlice](self.pattern.as_string_slice())
+        var fixed = _detect_fixed_width_groups(pat_slice)
+        if not fixed:
+            return
+
+        var segs = fixed.value().copy()
+        var num_groups = 0
+        var total_width = 0
+        var has_literals = False
+        for si in range(len(segs)):
+            var s = segs[si]
+            if s > 0:
+                num_groups += 1
+                if num_groups > 9:
+                    return
+                self._fixed_sub_offsets[num_groups] = total_width
+                self._fixed_sub_widths[num_groups] = s
+                total_width += s
+            else:
+                has_literals = True
+                total_width += -s
+
+        if num_groups == 0:
+            return
+        self._fixed_sub_num_groups = num_groups
+        self._fixed_sub_total_width = total_width
+        self._fixed_sub_concat = not has_literals
 
     # @always_inline
     # fn __del__(deinit self):
@@ -1439,28 +1508,13 @@ def _sub_impl(
         var template = _parse_repl_template(repl)
         var repl_ptr = repl.unsafe_ptr()
 
-        var pat_slice = rebind[ImmSlice](compiled.pattern.as_string_slice())
-        var fixed_widths = _detect_fixed_width_groups(pat_slice)
-        if fixed_widths:
-            var segments = fixed_widths.value().copy()
-            # Precompute group offsets and widths once
-            var group_offsets = InlineArray[Int, 10](fill=0)
-            var group_widths = InlineArray[Int, 10](fill=0)
-            var num_groups = 0
-            var total_width = 0
-            var seg_offset = 0
-            for si in range(len(segments)):
-                var seg = segments[si]
-                if seg > 0:
-                    num_groups += 1
-                    group_offsets[num_groups] = seg_offset
-                    group_widths[num_groups] = seg
-                    seg_offset += seg
-                else:
-                    seg_offset += -seg
-            total_width = seg_offset
+        if compiled._fixed_sub_total_width >= 0:
+            ref group_offsets = compiled._fixed_sub_offsets
+            ref group_widths = compiled._fixed_sub_widths
+            var num_groups = compiled._fixed_sub_num_groups
+            var total_width = compiled._fixed_sub_total_width
 
-            # Estimate output size from template
+            # Estimate output size from template.
             var output_est = 0
             for ti in range(len(template)):
                 ref tseg = template[ti]
@@ -1469,10 +1523,18 @@ def _sub_impl(
                 else:
                     output_est += tseg.length
 
-            # FAST PATH: if text length == total match width, the match
-            # is trivially at position 0. Skip DFA execution entirely.
-            if text_len == total_width and count != 1 or count == 0:
-                if text_len == total_width:
+            # FAST PATH (no literal separators, whole-text match):
+            # validate digit-ness and emit the template at position 0
+            # without any engine dispatch. For patterns with literal
+            # separators the DFA path below still applies.
+            if compiled._fixed_sub_concat and text_len == total_width:
+                var all_digits = True
+                for i in range(total_width):
+                    var b = Int(text_ptr[i])
+                    if b < CHAR_ZERO or b > CHAR_NINE:
+                        all_digits = False
+                        break
+                if all_digits:
                     return _apply_template_fixed(
                         template,
                         repl_ptr,
@@ -1483,6 +1545,7 @@ def _sub_impl(
                         num_groups,
                         output_est,
                     )
+                return String(text)
 
             # DFA fast path: match_next + offset slicing
             while pos <= text_len:
