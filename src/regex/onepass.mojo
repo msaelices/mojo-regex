@@ -100,6 +100,7 @@ fn _epsilon_close(
     return result
 
 
+@always_inline
 fn _set_contains_match(
     program: Program,
     nfa_set: SIMD[DType.uint8, MAX_STATES],
@@ -443,6 +444,7 @@ struct OnePassNFA(Copyable, Movable):
                 return m
         return None
 
+    @always_inline
     def match_all(self, text: ImmSlice) -> MatchList:
         var text_len = len(text)
         var matches = MatchList(
