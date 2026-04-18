@@ -1542,7 +1542,6 @@ def _apply_template_groups(
 
 
 @always_inline
-@always_inline
 def _parse_repl_info(
     repl: ImmSlice,
 ) -> Tuple[Bool, List[_ReplSegment]]:
@@ -1555,6 +1554,7 @@ def _parse_repl_info(
     return (False, List[_ReplSegment]())
 
 
+@always_inline
 def _sub_impl(
     compiled: CompiledRegex,
     repl: ImmSlice,
