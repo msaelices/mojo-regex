@@ -941,16 +941,19 @@ struct NFAEngine(Copyable, Engine):
                 or (CHAR_ZERO <= ch_code <= CHAR_NINE)
             ):
                 ch_found = True
-            elif ast.get_value():
-                ref range_pattern = ast.get_value().value()
-                var inner = range_pattern[byte=1:-1]
-                ch_found = byte_in_string(ch_code, inner)
+            else:
+                var opt = ast.get_value()
+                if opt:
+                    ref range_pattern = opt.value()
+                    var inner = range_pattern[byte=1:-1]
+                    ch_found = byte_in_string(ch_code, inner)
         else:
             # RANGE_KIND_OTHER: use direct byte-level range matching.
             # _create_range_matcher returns None for all bracket patterns,
             # so skip the indirection and go straight to the AST fallback.
-            if ast.get_value():
-                ref range_pattern = ast.get_value().value()
+            var opt = ast.get_value()
+            if opt:
+                ref range_pattern = opt.value()
                 ch_found = ast._is_char_in_range_by_code(ch_code, range_pattern)
 
         if ch_found == ast.positive_logic:
