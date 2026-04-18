@@ -1142,31 +1142,31 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
 
 
 # One-slot identity cache for the module-level `sub()` hot path.
+# Keyed on `(unsafe_ptr address, byte length)` of pattern and repl.
+# Same address + same length implies same bytes for `StaticString`
+# literals and other immutable buffers; callers that mutate a buffer
+# in place and then re-pass the same address would break this, but
+# the public API only accepts `StringSlice` which is read-only, so
+# such misuse requires going out of the typed API.
 #
-# When the same `pattern` and `repl` pointers come through sub() on
-# consecutive calls (the typical case for `StaticString` literals),
-# the cache lets us skip:
-#   1. `hash(pattern)` — the Dict probe still runs (pointers into the
-#      Dict can be invalidated by a rehash after an intervening
-#      compile_regex on a different pattern, so we can't cache the
-#      UnsafePointer safely) but we reuse the cached hash.
-#   2. `_has_group_refs(repl)` + `_parse_repl_template(repl)` — the
-#      parsed template is stored and reused verbatim.
-# The pattern cache is keyed on `(ptr_address, byte_length)`, not on
-# the bytes themselves; if two different `StaticString`s share the
-# same address they also share content, and if they differ in length
-# they trivially can't be equal.
+# We cannot cache the `UnsafePointer[CompiledRegex]` returned from the
+# regex Dict across calls: an intervening `compile_regex` on a
+# different pattern can rehash the Dict and invalidate prior pointers.
+# Caching only `hash(pattern)` is safe — we re-probe the Dict but skip
+# the hash recomputation.
+#
+# Like the regex cache itself, this state is process-global with no
+# locking; concurrent sub() calls from different threads can race and
+# produce a torn state (wrong template applied to wrong repl bytes).
+# Mojo's threading story is single-threaded today, so this matches
+# the posture of `_CACHE_GLOBAL`; revisit when that changes.
 @fieldwise_init
 struct _LastSubCache(Copyable, Movable):
     var pattern_addr: Int
-    """Byte address of the last `pattern` passed to sub(). 0 = empty
-    cache."""
     var pattern_len: Int
     var pattern_hash: UInt64
 
     var repl_addr: Int
-    """Byte address of the last `repl` passed to sub(). 0 = empty
-    cache."""
     var repl_len: Int
     var repl_has_groups: Bool
     var repl_template: List[_ReplSegment]
@@ -1188,7 +1188,6 @@ def _init_last_sub_cache() -> _LastSubCache:
 
 
 def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutAnyOrigin]:
-    """Returns a pointer to the one-slot sub() identity cache."""
     try:
         return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
     except e:
@@ -1543,27 +1542,30 @@ def _apply_template_groups(
 
 
 @always_inline
+@always_inline
+def _parse_repl_info(
+    repl: ImmSlice,
+) -> Tuple[Bool, List[_ReplSegment]]:
+    """Scan repl for `\\1..\\9` group references and pre-parse the
+    template when any are present. Returns (use_groups, template);
+    template is an empty list when use_groups is False."""
+    var use_groups = _has_group_refs(repl)
+    if use_groups:
+        return (True, _parse_repl_template(repl))
+    return (False, List[_ReplSegment]())
+
+
 def _sub_impl(
     compiled: CompiledRegex,
     repl: ImmSlice,
     text: ImmSlice,
     count: Int = 0,
 ) raises -> String:
-    """Core sub() implementation operating on an already-compiled regex.
-
-    Parses the replacement string's group-ref structure and template,
-    then delegates to `_sub_impl_with_repl`. Module-level `sub()` caches
-    both and calls `_sub_impl_with_repl` directly.
+    """Parse repl and delegate to `_sub_impl_with_repl`. Module-level
+    `sub()` caches the parse and calls `_sub_impl_with_repl` directly.
     """
-    var use_groups = _has_group_refs(repl)
-    var template: List[_ReplSegment]
-    if use_groups:
-        template = _parse_repl_template(repl)
-    else:
-        template = List[_ReplSegment]()
-    return _sub_impl_with_repl(
-        compiled, repl, text, count, use_groups, template
-    )
+    var info = _parse_repl_info(repl)
+    return _sub_impl_with_repl(compiled, repl, text, count, info[0], info[1])
 
 
 @always_inline
@@ -1762,9 +1764,6 @@ def sub(
     var pattern_addr = Int(pattern.unsafe_ptr())
     var pattern_len = len(pattern)
 
-    # Pattern: skip the hash() call when the caller passes the same
-    # pointer-identity pattern as last time (typical for `StaticString`
-    # literals, e.g., phone-number format patterns reused per call).
     var pattern_hash: UInt64
     if (
         cache[].pattern_addr == pattern_addr
@@ -1779,35 +1778,26 @@ def sub(
 
     var compiled_ptr = _compile_and_cache_with_key(pattern, pattern_hash)
 
-    # Repl: skip `_has_group_refs` + `_parse_repl_template` on pointer
-    # identity. The template stores byte offsets into `repl`, so it is
-    # only valid when the repl pointer is the same as when it was
-    # parsed — the pointer-identity check enforces that.
     var repl_addr = Int(repl.unsafe_ptr())
     var repl_len = len(repl)
 
-    if cache[].repl_addr == repl_addr and cache[].repl_len == repl_len:
-        return _sub_impl_with_repl(
-            compiled_ptr[],
-            repl,
-            text,
-            count,
-            cache[].repl_has_groups,
-            cache[].repl_template,
-        )
-
-    var use_groups = _has_group_refs(repl)
-    var template: List[_ReplSegment]
-    if use_groups:
-        template = _parse_repl_template(repl)
-    else:
-        template = List[_ReplSegment]()
-
-    cache[].repl_addr = repl_addr
-    cache[].repl_len = repl_len
-    cache[].repl_has_groups = use_groups
-    cache[].repl_template = template.copy()
+    if cache[].repl_addr != repl_addr or cache[].repl_len != repl_len:
+        # Cache miss: parse into the cache slot directly so the template
+        # is stored without an extra `.copy()`. _sub_impl_with_repl then
+        # reads it back through the cache ref.
+        cache[].repl_addr = repl_addr
+        cache[].repl_len = repl_len
+        cache[].repl_has_groups = _has_group_refs(repl)
+        if cache[].repl_has_groups:
+            cache[].repl_template = _parse_repl_template(repl)
+        else:
+            cache[].repl_template = List[_ReplSegment]()
 
     return _sub_impl_with_repl(
-        compiled_ptr[], repl, text, count, use_groups, template
+        compiled_ptr[],
+        repl,
+        text,
+        count,
+        cache[].repl_has_groups,
+        cache[].repl_template,
     )
