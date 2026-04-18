@@ -1141,6 +1141,59 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
         abort[prefix="ERROR:"](String(e))
 
 
+# One-slot identity cache for the module-level `sub()` hot path.
+# Keyed on `(unsafe_ptr address, byte length)` of pattern and repl.
+# Same address + same length implies same bytes for `StaticString`
+# literals and other immutable buffers; callers that mutate a buffer
+# in place and then re-pass the same address would break this, but
+# the public API only accepts `StringSlice` which is read-only, so
+# such misuse requires going out of the typed API.
+#
+# We cannot cache the `UnsafePointer[CompiledRegex]` returned from the
+# regex Dict across calls: an intervening `compile_regex` on a
+# different pattern can rehash the Dict and invalidate prior pointers.
+# Caching only `hash(pattern)` is safe — we re-probe the Dict but skip
+# the hash recomputation.
+#
+# Like the regex cache itself, this state is process-global with no
+# locking; concurrent sub() calls from different threads can race and
+# produce a torn state (wrong template applied to wrong repl bytes).
+# Mojo's threading story is single-threaded today, so this matches
+# the posture of `_CACHE_GLOBAL`; revisit when that changes.
+@fieldwise_init
+struct _LastSubCache(Copyable, Movable):
+    var pattern_addr: Int
+    var pattern_len: Int
+    var pattern_hash: UInt64
+
+    var repl_addr: Int
+    var repl_len: Int
+    var repl_has_groups: Bool
+    var repl_template: List[_ReplSegment]
+
+
+comptime _LAST_SUB_CACHE_GLOBAL = _Global["LastSubCache", _init_last_sub_cache]
+
+
+def _init_last_sub_cache() -> _LastSubCache:
+    return _LastSubCache(
+        pattern_addr=0,
+        pattern_len=0,
+        pattern_hash=UInt64(0),
+        repl_addr=0,
+        repl_len=0,
+        repl_has_groups=False,
+        repl_template=List[_ReplSegment](),
+    )
+
+
+def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutAnyOrigin]:
+    try:
+        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+
+
 def _compile_and_cache(
     pattern: ImmSlice,
 ) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
@@ -1151,8 +1204,22 @@ def _compile_and_cache(
     must not store this pointer past the current call — the cache may
     rehash on a subsequent compile_regex() call.
     """
+    return _compile_and_cache_with_key(pattern, hash(pattern))
+
+
+@always_inline
+def _compile_and_cache_with_key(
+    pattern: ImmSlice,
+    key: UInt64,
+) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
+    """Variant of `_compile_and_cache` that takes a precomputed hash.
+
+    Used by `sub()` with a pointer-identity fast path so repeat calls
+    with the same `StaticString` pattern skip the `hash()` call
+    entirely. The Dict lookup itself is unavoidable (pointers into the
+    cache can rehash, so we cannot cache the resulting `UnsafePointer`
+    across calls without stale-pointer risk)."""
     var regex_cache_ptr = _get_regex_cache()
-    var key = hash(pattern)
 
     if key in regex_cache_ptr[]:
         try:
@@ -1475,23 +1542,49 @@ def _apply_template_groups(
 
 
 @always_inline
+def _parse_repl_info(
+    repl: ImmSlice,
+) -> Tuple[Bool, List[_ReplSegment]]:
+    """Scan repl for `\\1..\\9` group references and pre-parse the
+    template when any are present. Returns (use_groups, template);
+    template is an empty list when use_groups is False."""
+    var use_groups = _has_group_refs(repl)
+    if use_groups:
+        return (True, _parse_repl_template(repl))
+    return (False, List[_ReplSegment]())
+
+
+@always_inline
 def _sub_impl(
     compiled: CompiledRegex,
     repl: ImmSlice,
     text: ImmSlice,
     count: Int = 0,
 ) raises -> String:
-    """Core sub() implementation operating on an already-compiled regex.
+    """Parse repl and delegate to `_sub_impl_with_repl`. Module-level
+    `sub()` caches the parse and calls `_sub_impl_with_repl` directly.
+    """
+    var info = _parse_repl_info(repl)
+    return _sub_impl_with_repl(compiled, repl, text, count, info[0], info[1])
 
-    Bypasses the regex cache lookup. Three fast paths:
+
+@always_inline
+def _sub_impl_with_repl(
+    compiled: CompiledRegex,
+    repl: ImmSlice,
+    text: ImmSlice,
+    count: Int,
+    use_groups: Bool,
+    read template: List[_ReplSegment],
+) raises -> String:
+    """Core sub() body with pre-parsed repl info passed in.
+
+    Three fast paths:
     1. No group refs: literal replacement via optimized matcher chain.
     2. Fixed-width \\d{N} groups + len(text)==total_width: skip match entirely,
        slice at precomputed offsets.
     3. Fixed-width groups + search needed: DFA match_next + offset slicing.
     4. General: NFA match_next_with_groups for complex patterns.
-
-    All paths use a pre-parsed replacement template so the per-match
-    interpolation never re-scans the repl string.
     """
     var text_len = len(text)
     if text_len == 0:
@@ -1501,11 +1594,8 @@ def _sub_impl(
     var result = String(capacity=text_len + 64)
     var pos = 0
     var replacements = 0
-    var use_groups = _has_group_refs(repl)
 
     if use_groups:
-        # Pre-parse replacement template once (not per match)
-        var template = _parse_repl_template(repl)
         var repl_ptr = repl.unsafe_ptr()
 
         if compiled._fixed_sub_total_width >= 0:
@@ -1670,5 +1760,44 @@ def sub(
     Returns:
         New string with replacements applied.
     """
-    var compiled_ptr = _compile_and_cache(pattern)
-    return _sub_impl(compiled_ptr[], repl, text, count)
+    var cache = _get_last_sub_cache()
+    var pattern_addr = Int(pattern.unsafe_ptr())
+    var pattern_len = len(pattern)
+
+    var pattern_hash: UInt64
+    if (
+        cache[].pattern_addr == pattern_addr
+        and cache[].pattern_len == pattern_len
+    ):
+        pattern_hash = cache[].pattern_hash
+    else:
+        pattern_hash = hash(pattern)
+        cache[].pattern_addr = pattern_addr
+        cache[].pattern_len = pattern_len
+        cache[].pattern_hash = pattern_hash
+
+    var compiled_ptr = _compile_and_cache_with_key(pattern, pattern_hash)
+
+    var repl_addr = Int(repl.unsafe_ptr())
+    var repl_len = len(repl)
+
+    if cache[].repl_addr != repl_addr or cache[].repl_len != repl_len:
+        # Cache miss: parse into the cache slot directly so the template
+        # is stored without an extra `.copy()`. _sub_impl_with_repl then
+        # reads it back through the cache ref.
+        cache[].repl_addr = repl_addr
+        cache[].repl_len = repl_len
+        cache[].repl_has_groups = _has_group_refs(repl)
+        if cache[].repl_has_groups:
+            cache[].repl_template = _parse_repl_template(repl)
+        else:
+            cache[].repl_template = List[_ReplSegment]()
+
+    return _sub_impl_with_repl(
+        compiled_ptr[],
+        repl,
+        text,
+        count,
+        cache[].repl_has_groups,
+        cache[].repl_template,
+    )
