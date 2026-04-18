@@ -2,6 +2,12 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Precompute fixed-width `sub()` metadata; short-circuit whole-text matches (PR #143)
+
+- Closes half of issue #142 (smith-phonenums `format_number` bottleneck). For `sub()` on patterns that are concatenated fixed-width `(\d{N})` capture groups, `CompiledRegex` now precomputes per-match offsets/widths at construction time and `_sub_impl` short-circuits whole-text matches without invoking the regex engine.
+- Three fixes in one: (1) pattern parsing + offset/width computation moved from per-`sub()`-call to once-at-compile-time; (2) short-circuit condition `text_len == total_width and count != 1 or count == 0` (parses as `(text_len == total_width and count != 1) or count == 0`) didn't fire for the target `count=1` case — fixed to fire whenever `text_len == total_width`; (3) the old fast path produced garbage output on non-matching text of the right length (latent correctness bug) — now validates digit-ness and returns text unchanged when it doesn't match.
+- Microbench (best of 5): ES `(\d{3})(\d{2})(\d{2})(\d{2})` **559 → 180 ns (3.1x)**, US `(\d{3})(\d{3})(\d{4})` **535 → 150 ns (3.6x)**. Full `bench_engine` symmetric best-of-4 vs main: geo 1.042x, W/L/S 17/0/63; `sub_char_class` 1.18x, `sub_group_word_swap` 1.14x, `sub_digits` 1.10x.
+
 ### Hoist redundant `ast.get_value()` call in NFA `_match_range` (b0179a0)
 
 - `RANGE_KIND_COMPLEX_ALNUM` and `RANGE_KIND_OTHER` paths called `ast.get_value()` twice per character in the backtracking-NFA inner loop: once in the `elif` condition (coerced to Bool), once inside the branch to unwrap. `get_value` itself is not trivial (double pointer indirection + `Span`/`StringSlice`/`Optional` construction), and LLVM can't dedup through the `self.regex_ptr[]` indirection. Rewrote as `var opt = ast.get_value(); if opt: ...` to bind the first call's result and reuse it. Micro-cleanup; only affects patterns routing to backtracking NFA with custom bracket classes.
