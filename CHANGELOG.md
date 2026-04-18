@@ -2,6 +2,11 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Pattern + repl identity cache for module-level `sub()` (PR #144)
+
+- Closes the remainder of issue #142. Module-level `sub(pattern, repl, text)` re-did `hash(pattern)`, `_has_group_refs(repl)`, and `_parse_repl_template(repl)` on every call even when the caller passed the same `StaticString` pointers each time. Adds a one-slot `_LastSubCache` keyed on pointer-identity `(address, byte_length)` of pattern and repl: on hit, reuse the cached `hash(pattern)` and the parsed `_ReplSegment` template. `_sub_impl` split into a wrapper + `_sub_impl_with_repl` so the module-level `sub()` can feed in the cached template without recomputing per call.
+- Microbench (best of 5, module-level `sub()`, whole-text match): ES `(\d{3})(\d{2})(\d{2})(\d{2})` **559 → 192 ns (2.9x)**, US `(\d{3})(\d{3})(\d{4})` **535 → 166 ns (3.2x)**. Module-level path now nearly ties method-level `compiled.sub()` (180 ns) for the smith-phonenums `StaticString` usage.
+
 ### Precompute fixed-width `sub()` metadata; short-circuit whole-text matches (PR #143)
 
 - Closes half of issue #142 (smith-phonenums `format_number` bottleneck). For `sub()` on patterns that are concatenated fixed-width `(\d{N})` capture groups, `CompiledRegex` now precomputes per-match offsets/widths at construction time and `_sub_impl` short-circuits whole-text matches without invoking the regex engine.
