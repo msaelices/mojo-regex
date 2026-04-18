@@ -2,6 +2,10 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Hoist redundant `ast.get_value()` call in NFA `_match_range` (b0179a0)
+
+- `RANGE_KIND_COMPLEX_ALNUM` and `RANGE_KIND_OTHER` paths called `ast.get_value()` twice per character in the backtracking-NFA inner loop: once in the `elif` condition (coerced to Bool), once inside the branch to unwrap. `get_value` itself is not trivial (double pointer indirection + `Span`/`StringSlice`/`Optional` construction), and LLVM can't dedup through the `self.regex_ptr[]` indirection. Rewrote as `var opt = ast.get_value(); if opt: ...` to bind the first call's result and reuse it. Micro-cleanup; only affects patterns routing to backtracking NFA with custom bracket classes.
+
 ### OnePass NFA engine for `$`-anchored patterns (PR #140)
 
 - Adds a OnePass NFA in `src/regex/onepass.mojo` for patterns where at every state, for every input byte, at most one forward transition fires. Such patterns run in O(n) per byte with no backtracking, no state-set tracking, and no per-call setup. Unlike LazyDFA it compiles all transitions ahead of time and correctly handles `$` (keeps `OP_END_ANCHOR` in the set, fires it only at `pos == text_len`), so it fills the niche LazyDFA declines. `NFAMatcher` dispatches to OnePass whenever the pattern has `$` and the program is one-pass; LazyDFA stays preferred for `$`-free patterns where its first-byte SIMD prefilter wins.
