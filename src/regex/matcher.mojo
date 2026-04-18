@@ -901,11 +901,10 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     var compiled_at: Int
     """Timestamp when the regex was compiled, used for cache management."""
     var _fixed_sub_total_width: Int
-    """For patterns that are concatenated fixed-width `(\\d{N})` capture
-    groups with no literal separators: the total width of one match.
-    Negative means the pattern is not eligible for the `sub()` fast
-    path (has literals between groups, alternation, variable-width
-    quantifiers, etc.) and `sub()` falls back to the regex engine."""
+    """For patterns matching a sequence of fixed-width `(\\d{N})`
+    capture groups (with optional fixed-byte literal separators): the
+    total byte width of one match. Negative means the pattern isn't a
+    fixed-width form and `sub()` goes through the general NFA path."""
     var _fixed_sub_num_groups: Int
     """Number of capture groups in the fixed-width pattern (1..9)."""
     var _fixed_sub_offsets: InlineArray[Int, 10]
@@ -913,6 +912,11 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     Indexed by group number (1..num_groups)."""
     var _fixed_sub_widths: InlineArray[Int, 10]
     """Byte width of each capture group. Indexed by group number."""
+    var _fixed_sub_concat: Bool
+    """True when the fixed-width pattern has no literal separators (pure
+    concatenated `(\\d{N})` groups). Enables the whole-text-match
+    validate-and-emit fast path in `sub()`. False patterns keep the
+    DFA match_next + offset-slicing path."""
 
     def __init__(out self, pattern: String) raises:
         """Compile a regex pattern with automatic optimization.
@@ -927,6 +931,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_num_groups = 0
         self._fixed_sub_offsets = InlineArray[Int, 10](fill=0)
         self._fixed_sub_widths = InlineArray[Int, 10](fill=0)
+        self._fixed_sub_concat = False
         self._try_precompute_fixed_sub()
 
     def __copyinit__(out self, copy: Self):
@@ -938,6 +943,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_num_groups = copy._fixed_sub_num_groups
         self._fixed_sub_offsets = copy._fixed_sub_offsets
         self._fixed_sub_widths = copy._fixed_sub_widths
+        self._fixed_sub_concat = copy._fixed_sub_concat
 
     def __moveinit__(out self, deinit take: Self):
         """Move constructor."""
@@ -948,13 +954,16 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_num_groups = take._fixed_sub_num_groups
         self._fixed_sub_offsets = take._fixed_sub_offsets
         self._fixed_sub_widths = take._fixed_sub_widths
+        self._fixed_sub_concat = take._fixed_sub_concat
 
     def _try_precompute_fixed_sub(mut self):
-        """If `pattern` is a concatenated sequence of fixed-width
-        `(\\d{N})` capture groups (no literal separators, no
-        alternation, no variable quantifiers), precompute the
-        per-match offsets/widths so `sub()` can skip the NFA/DFA
-        entirely. Stays a no-op for other patterns."""
+        """If `pattern` is a sequence of fixed-width `(\\d{N})` capture
+        groups (with optional fixed-byte literal separators),
+        precompute offsets/widths/total_width so `sub()` can skip the
+        general NFA path. Sets `_fixed_sub_concat` when there are no
+        literal separators, enabling an additional whole-text-match
+        fast path that validates digits and emits the template
+        without any engine dispatch."""
         var pat_slice = rebind[ImmSlice](self.pattern.as_string_slice())
         var fixed = _detect_fixed_width_groups(pat_slice)
         if not fixed:
@@ -963,6 +972,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         var segs = fixed.value().copy()
         var num_groups = 0
         var total_width = 0
+        var has_literals = False
         for si in range(len(segs)):
             var s = segs[si]
             if s > 0:
@@ -973,16 +983,14 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
                 self._fixed_sub_widths[num_groups] = s
                 total_width += s
             else:
-                # Literal separator between groups; keep the fast path
-                # narrowly scoped to pure concatenated `(\\d{N})` for
-                # now since that matches the target workload and
-                # avoids the need for per-byte literal validation.
-                return
+                has_literals = True
+                total_width += -s
 
         if num_groups == 0:
             return
         self._fixed_sub_num_groups = num_groups
         self._fixed_sub_total_width = total_width
+        self._fixed_sub_concat = not has_literals
 
     # @always_inline
     # fn __del__(deinit self):
@@ -1515,13 +1523,11 @@ def _sub_impl(
                 else:
                     output_est += tseg.length
 
-            # FAST PATH: whole text is exactly one potential match.
-            # Validate digit-ness (the pattern is concatenated `\\d{N}`
-            # groups, so the text bytes must all be ASCII digits); if
-            # valid, emit the template at position 0 and return.
-            # Otherwise there can be no match anywhere (pattern is
-            # fixed-width == text width), so return the text unchanged.
-            if text_len == total_width:
+            # FAST PATH (no literal separators, whole-text match):
+            # validate digit-ness and emit the template at position 0
+            # without any engine dispatch. For patterns with literal
+            # separators the DFA path below still applies.
+            if compiled._fixed_sub_concat and text_len == total_width:
                 var all_digits = True
                 for i in range(total_width):
                     var b = Int(text_ptr[i])
