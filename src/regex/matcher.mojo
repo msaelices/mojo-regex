@@ -1141,6 +1141,60 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
         abort[prefix="ERROR:"](String(e))
 
 
+# One-slot identity cache for the module-level `sub()` hot path.
+#
+# When the same `pattern` and `repl` pointers come through sub() on
+# consecutive calls (the typical case for `StaticString` literals),
+# the cache lets us skip:
+#   1. `hash(pattern)` — the Dict probe still runs (pointers into the
+#      Dict can be invalidated by a rehash after an intervening
+#      compile_regex on a different pattern, so we can't cache the
+#      UnsafePointer safely) but we reuse the cached hash.
+#   2. `_has_group_refs(repl)` + `_parse_repl_template(repl)` — the
+#      parsed template is stored and reused verbatim.
+# The pattern cache is keyed on `(ptr_address, byte_length)`, not on
+# the bytes themselves; if two different `StaticString`s share the
+# same address they also share content, and if they differ in length
+# they trivially can't be equal.
+@fieldwise_init
+struct _LastSubCache(Copyable, Movable):
+    var pattern_addr: Int
+    """Byte address of the last `pattern` passed to sub(). 0 = empty
+    cache."""
+    var pattern_len: Int
+    var pattern_hash: UInt64
+
+    var repl_addr: Int
+    """Byte address of the last `repl` passed to sub(). 0 = empty
+    cache."""
+    var repl_len: Int
+    var repl_has_groups: Bool
+    var repl_template: List[_ReplSegment]
+
+
+comptime _LAST_SUB_CACHE_GLOBAL = _Global["LastSubCache", _init_last_sub_cache]
+
+
+def _init_last_sub_cache() -> _LastSubCache:
+    return _LastSubCache(
+        pattern_addr=0,
+        pattern_len=0,
+        pattern_hash=UInt64(0),
+        repl_addr=0,
+        repl_len=0,
+        repl_has_groups=False,
+        repl_template=List[_ReplSegment](),
+    )
+
+
+def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutAnyOrigin]:
+    """Returns a pointer to the one-slot sub() identity cache."""
+    try:
+        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
+    except e:
+        abort[prefix="ERROR:"](String(e))
+
+
 def _compile_and_cache(
     pattern: ImmSlice,
 ) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
@@ -1151,8 +1205,22 @@ def _compile_and_cache(
     must not store this pointer past the current call — the cache may
     rehash on a subsequent compile_regex() call.
     """
+    return _compile_and_cache_with_key(pattern, hash(pattern))
+
+
+@always_inline
+def _compile_and_cache_with_key(
+    pattern: ImmSlice,
+    key: UInt64,
+) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
+    """Variant of `_compile_and_cache` that takes a precomputed hash.
+
+    Used by `sub()` with a pointer-identity fast path so repeat calls
+    with the same `StaticString` pattern skip the `hash()` call
+    entirely. The Dict lookup itself is unavoidable (pointers into the
+    cache can rehash, so we cannot cache the resulting `UnsafePointer`
+    across calls without stale-pointer risk)."""
     var regex_cache_ptr = _get_regex_cache()
-    var key = hash(pattern)
 
     if key in regex_cache_ptr[]:
         try:
@@ -1483,15 +1551,38 @@ def _sub_impl(
 ) raises -> String:
     """Core sub() implementation operating on an already-compiled regex.
 
-    Bypasses the regex cache lookup. Three fast paths:
+    Parses the replacement string's group-ref structure and template,
+    then delegates to `_sub_impl_with_repl`. Module-level `sub()` caches
+    both and calls `_sub_impl_with_repl` directly.
+    """
+    var use_groups = _has_group_refs(repl)
+    var template: List[_ReplSegment]
+    if use_groups:
+        template = _parse_repl_template(repl)
+    else:
+        template = List[_ReplSegment]()
+    return _sub_impl_with_repl(
+        compiled, repl, text, count, use_groups, template
+    )
+
+
+@always_inline
+def _sub_impl_with_repl(
+    compiled: CompiledRegex,
+    repl: ImmSlice,
+    text: ImmSlice,
+    count: Int,
+    use_groups: Bool,
+    read template: List[_ReplSegment],
+) raises -> String:
+    """Core sub() body with pre-parsed repl info passed in.
+
+    Three fast paths:
     1. No group refs: literal replacement via optimized matcher chain.
     2. Fixed-width \\d{N} groups + len(text)==total_width: skip match entirely,
        slice at precomputed offsets.
     3. Fixed-width groups + search needed: DFA match_next + offset slicing.
     4. General: NFA match_next_with_groups for complex patterns.
-
-    All paths use a pre-parsed replacement template so the per-match
-    interpolation never re-scans the repl string.
     """
     var text_len = len(text)
     if text_len == 0:
@@ -1501,11 +1592,8 @@ def _sub_impl(
     var result = String(capacity=text_len + 64)
     var pos = 0
     var replacements = 0
-    var use_groups = _has_group_refs(repl)
 
     if use_groups:
-        # Pre-parse replacement template once (not per match)
-        var template = _parse_repl_template(repl)
         var repl_ptr = repl.unsafe_ptr()
 
         if compiled._fixed_sub_total_width >= 0:
@@ -1670,5 +1758,56 @@ def sub(
     Returns:
         New string with replacements applied.
     """
-    var compiled_ptr = _compile_and_cache(pattern)
-    return _sub_impl(compiled_ptr[], repl, text, count)
+    var cache = _get_last_sub_cache()
+    var pattern_addr = Int(pattern.unsafe_ptr())
+    var pattern_len = len(pattern)
+
+    # Pattern: skip the hash() call when the caller passes the same
+    # pointer-identity pattern as last time (typical for `StaticString`
+    # literals, e.g., phone-number format patterns reused per call).
+    var pattern_hash: UInt64
+    if (
+        cache[].pattern_addr == pattern_addr
+        and cache[].pattern_len == pattern_len
+    ):
+        pattern_hash = cache[].pattern_hash
+    else:
+        pattern_hash = hash(pattern)
+        cache[].pattern_addr = pattern_addr
+        cache[].pattern_len = pattern_len
+        cache[].pattern_hash = pattern_hash
+
+    var compiled_ptr = _compile_and_cache_with_key(pattern, pattern_hash)
+
+    # Repl: skip `_has_group_refs` + `_parse_repl_template` on pointer
+    # identity. The template stores byte offsets into `repl`, so it is
+    # only valid when the repl pointer is the same as when it was
+    # parsed — the pointer-identity check enforces that.
+    var repl_addr = Int(repl.unsafe_ptr())
+    var repl_len = len(repl)
+
+    if cache[].repl_addr == repl_addr and cache[].repl_len == repl_len:
+        return _sub_impl_with_repl(
+            compiled_ptr[],
+            repl,
+            text,
+            count,
+            cache[].repl_has_groups,
+            cache[].repl_template,
+        )
+
+    var use_groups = _has_group_refs(repl)
+    var template: List[_ReplSegment]
+    if use_groups:
+        template = _parse_repl_template(repl)
+    else:
+        template = List[_ReplSegment]()
+
+    cache[].repl_addr = repl_addr
+    cache[].repl_len = repl_len
+    cache[].repl_has_groups = use_groups
+    cache[].repl_template = template.copy()
+
+    return _sub_impl_with_repl(
+        compiled_ptr[], repl, text, count, use_groups, template
+    )
