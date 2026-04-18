@@ -945,8 +945,9 @@ struct NFAEngine(Copyable, Engine):
                 var opt = ast.get_value()
                 if opt:
                     ref range_pattern = opt.value()
-                    var inner = range_pattern[byte=1:-1]
-                    ch_found = byte_in_string(ch_code, inner)
+                    ch_found = byte_in_string(
+                        ch_code, range_pattern.as_bytes()[1:-1]
+                    )
         else:
             # RANGE_KIND_OTHER: use direct byte-level range matching.
             # _create_range_matcher returns None for all bracket patterns,
@@ -1508,7 +1509,7 @@ struct NFAEngine(Copyable, Engine):
                         max_matches,
                     )
             elif kind == RANGE_KIND_COMPLEX_ALNUM:
-                var inner = range_pattern[byte=1:-1]
+                var inner = range_pattern.as_bytes()[1:-1]
                 var pos = str_i
                 var match_count = 0
                 var actual_max = max_matches
@@ -1597,11 +1598,11 @@ struct NFAEngine(Copyable, Engine):
     ](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
-            var inner = range_pattern[byte=1:-1]
+            var inner = range_pattern.as_bytes()[1:-1]
+            var inner_ptr = inner.unsafe_ptr()
 
             # Handle simple ranges like [c-n]
-            if len(inner) == 3 and inner[byte=1] == "-":
-                var inner_ptr = inner.unsafe_ptr()
+            if len(inner) == 3 and inner_ptr[1] == ord("-"):
                 var start_char = Int(inner_ptr[0])
                 var end_char = Int(inner_ptr[2])
                 return ch_code >= start_char and ch_code <= end_char
@@ -1609,7 +1610,7 @@ struct NFAEngine(Copyable, Engine):
             # Direct byte scan instead of chr() + string `in`
             return byte_in_string(ch_code, inner)
         else:
-            return byte_in_string(ch_code, range_pattern)
+            return byte_in_string(ch_code, range_pattern.as_bytes())
 
     @always_inline
     def _quantifier_negated_loop(

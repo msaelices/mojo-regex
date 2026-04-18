@@ -44,8 +44,14 @@ comptime ALL_EXCEPT_NEWLINE = _all_except_newline()
 
 
 @always_inline
-def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
-    """Check if a byte value exists in a string slice without allocating."""
+def byte_in_string[O: Origin](ch_code: Int, s: Span[Byte, O]) -> Bool:
+    """Check if a byte value exists in a byte span without allocating.
+
+    Takes `Span[Byte]` rather than `StringSlice` so callers can construct
+    a slice via `as_bytes()[a:b]` (free pointer+length arithmetic)
+    instead of `[byte=a:b]`, which pays two UTF-8 start-byte debug asserts
+    and `normalize_index` bounds checks.
+    """
     var ptr = s.unsafe_ptr()
     var target = UInt8(ch_code)
     for i in range(len(s)):

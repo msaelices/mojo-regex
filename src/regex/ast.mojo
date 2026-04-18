@@ -469,7 +469,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return self._char_code_matches_range(ch_code, inner_pattern)
         else:
             # Expanded string, check if char is in it
-            return byte_in_string(ch_code, range_pattern)
+            return byte_in_string(ch_code, range_pattern.as_bytes())
 
     def _char_code_matches_range(
         self,
