@@ -60,15 +60,14 @@ fn _epsilon_close(
     read start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
     at_start: Bool,
+    at_end: Bool = False,
 ) -> SIMD[DType.uint8, MAX_STATES]:
     """Compute the set of PCs reachable from `start_pcs` via epsilon
     transitions only. Byte-consuming ops (OP_BYTE, OP_CLASS, OP_ANY,
-    OP_RANGE) and `OP_END_ANCHOR` are kept in the closure (they are
-    "waiting for input" or "waiting for end of text"); all other ops
-    are traversed.
-
-    `at_start` controls whether `OP_START_ANCHOR` is fired (true at
-    position 0, false elsewhere).
+    OP_RANGE) are kept in the closure (they are "waiting for input");
+    `OP_START_ANCHOR` fires when `at_start`, `OP_END_ANCHOR` fires when
+    `at_end`. Other ops are either traversed (OP_SPLIT, OP_JUMP) or
+    retained in the set.
     """
     var result = SIMD[DType.uint8, MAX_STATES](0)
     var stack = InlineArray[Int, MAX_STATES](uninitialized=True)
@@ -95,8 +94,12 @@ fn _epsilon_close(
             if at_start:
                 stack[stack_len] = pc + 1
                 stack_len += 1
-        # OP_END_ANCHOR, OP_BYTE, OP_CLASS, OP_ANY, OP_RANGE, OP_MATCH:
-        # do not advance past; remain in the closure.
+        elif inst.opcode == OP_END_ANCHOR:
+            if at_end:
+                stack[stack_len] = pc + 1
+                stack_len += 1
+        # OP_BYTE, OP_CLASS, OP_ANY, OP_RANGE, OP_MATCH: retain in
+        # closure, do not advance past.
     return result
 
 
@@ -111,6 +114,25 @@ fn _set_contains_match(
             if program.instructions[pc].opcode == OP_MATCH:
                 return True
     return False
+
+
+fn _closure_reaches_match_with_end_anchor(
+    program: Program,
+    nfa_set: SIMD[DType.uint8, MAX_STATES],
+) -> Bool:
+    """True iff the epsilon closure of `nfa_set` with `OP_END_ANCHOR`
+    fired reaches OP_MATCH. Used at compile time to precompute the
+    per-state answer; at match time the cached Bool is a single load."""
+    var start_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var count = 0
+    for pc in range(len(program)):
+        if nfa_set[pc] != 0:
+            start_pcs[count] = pc
+            count += 1
+    var end_set = _epsilon_close(
+        program, start_pcs, count, at_start=False, at_end=True
+    )
+    return _set_contains_match(program, end_set)
 
 
 @always_inline
@@ -288,6 +310,14 @@ def compile_onepass(
 
         states[state_id].transitions = transitions
 
+    # Precompute the `$` end-of-text answer for each state so match_first
+    # can resolve the end-anchor fixup with a single field load.
+    if has_end_anchor:
+        for i in range(len(states)):
+            states[i].is_end_match = _closure_reaches_match_with_end_anchor(
+                program, states[i].nfa_set
+            )
+
     var ptr = alloc[OnePassNFA](1)
     ptr.init_pointee_move(
         OnePassNFA(program^, states^, has_start_anchor, has_end_anchor)
@@ -352,6 +382,11 @@ struct OnePassState(Copyable, Movable):
     var is_match: Bool
     """True when OP_MATCH is in `nfa_set` (the pattern can complete
     here without consuming more input, ignoring any pending `$`)."""
+    var is_end_match: Bool
+    """True when the `$`-anchor end-of-text fixup starting from this
+    state reaches OP_MATCH. Precomputed at compile_onepass time so the
+    per-call `match_first` end-of-text fixup is a single field load
+    instead of a state-set DFS walk."""
     var transitions: InlineArray[Int, 256]
     """Byte -> next OnePass state id. `ONEPASS_DEAD` for bytes that
     have no valid successor."""
@@ -363,6 +398,7 @@ struct OnePassState(Copyable, Movable):
     ):
         self.nfa_set = nfa_set
         self.is_match = is_match
+        self.is_end_match = False
         self.transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD)
 
 
@@ -421,9 +457,10 @@ struct OnePassNFA(Copyable, Movable):
             pos += 1
             if states_ptr[state_id].is_match:
                 match_end = pos
-        # End-of-text fixup for `$` anchors.
+        # End-of-text fixup for `$` anchors: cached per-state at compile
+        # time, so no per-call state-set DFS walk.
         if self.has_end_anchor and pos == text_len:
-            if self._fire_end_anchor(states_ptr[state_id].nfa_set, text_len):
+            if states_ptr[state_id].is_end_match:
                 match_end = pos
         if match_end >= 0:
             return Match(0, start, match_end, text)
@@ -468,44 +505,3 @@ struct OnePassNFA(Copyable, Movable):
             else:
                 pos += 1
         return matches^
-
-    @always_inline
-    def _fire_end_anchor(
-        self, nfa_set: SIMD[DType.uint8, MAX_STATES], text_len: Int
-    ) -> Bool:
-        var pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
-        var count = 0
-        for pc in range(len(self.program)):
-            if nfa_set[pc] != 0:
-                pcs[count] = pc
-                count += 1
-        # Epsilon-close at at_start=False but with end-anchor firing.
-        # Only `OP_END_ANCHOR` needs special handling versus
-        # `_epsilon_close`; reuse the helper by walking OP_END_ANCHOR
-        # manually first.
-        var end_set = SIMD[DType.uint8, MAX_STATES](0)
-        var stack = InlineArray[Int, MAX_STATES](uninitialized=True)
-        var stack_len = count
-        for i in range(count):
-            stack[i] = pcs[i]
-        var prog_len = len(self.program)
-        while stack_len > 0:
-            stack_len -= 1
-            var pc = stack[stack_len]
-            if pc < 0 or pc >= prog_len or end_set[pc] != 0:
-                continue
-            end_set[pc] = 1
-            ref inst = self.program.instructions[pc]
-            if inst.opcode == OP_SPLIT:
-                stack[stack_len] = inst.arg0
-                stack_len += 1
-                stack[stack_len] = inst.arg1
-                stack_len += 1
-            elif inst.opcode == OP_JUMP:
-                stack[stack_len] = inst.arg0
-                stack_len += 1
-            elif inst.opcode == OP_END_ANCHOR:
-                stack[stack_len] = pc + 1
-                stack_len += 1
-            # OP_START_ANCHOR does not fire here (at_start=False).
-        return _set_contains_match(self.program, end_set)
