@@ -572,7 +572,12 @@ struct CharacterClassSIMD(
     def find_first_nibble_match(
         self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
     ) -> Int:
-        """Find first matching character using nibble-based SIMD scan.
+        """Find first matching character using a SIMD scan.
+
+        For 1/2/3 contiguous-range classes (`[0-9]`, `[a-z]`, `[a-zA-Z]`,
+        `[a-zA-Z0-9]`, `\\d`, `\\w`, ...), uses unsigned-subtract +
+        range-compare — cheaper per iter than the nibble-table shuffle
+        path used for non-contiguous classes.
 
         Args:
             text_ptr: Pointer to text bytes.
@@ -580,16 +585,73 @@ struct CharacterClassSIMD(
             text_len: Total length of text.
 
         Returns:
-            Position of first matching character, or -1 if not found.
+            Position of first matching byte, or -1 if not found.
         """
-        return find_first_in_nibble_tables(
-            self.lo_nibble_table,
-            self.hi_nibble_table,
-            self.lookup_table,
-            text_ptr,
-            start,
-            text_len,
-        )
+        var pos = start
+        if self.num_ranges == 1:
+            var lo = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var in_range = _in_range_1(chunk, lo, span)
+                if in_range.reduce_or():
+                    return pos + _first_true(in_range)
+                pos += SIMD_WIDTH
+        elif self.num_ranges == 2:
+            var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span1 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            var lo2 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range2_start))
+            var span2 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range2_end - self.range2_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var in_range = _in_range_2(chunk, lo1, span1, lo2, span2)
+                if in_range.reduce_or():
+                    return pos + _first_true(in_range)
+                pos += SIMD_WIDTH
+        elif self.num_ranges == 3:
+            var lo1 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range_start))
+            var span1 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range_end - self.range_start)
+            )
+            var lo2 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range2_start))
+            var span2 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range2_end - self.range2_start)
+            )
+            var lo3 = SIMD[DType.uint8, SIMD_WIDTH](UInt8(self.range3_start))
+            var span3 = SIMD[DType.uint8, SIMD_WIDTH](
+                UInt8(self.range3_end - self.range3_start)
+            )
+            while pos + SIMD_WIDTH <= text_len:
+                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var in_range = _in_range_3(
+                    chunk, lo1, span1, lo2, span2, lo3, span3
+                )
+                if in_range.reduce_or():
+                    return pos + _first_true(in_range)
+                pos += SIMD_WIDTH
+        else:
+            return find_first_in_nibble_tables(
+                self.lo_nibble_table,
+                self.hi_nibble_table,
+                self.lookup_table,
+                text_ptr,
+                start,
+                text_len,
+            )
+
+        # Scalar tail (reached for range paths only; the nibble fallback
+        # handles its own tail internally).
+        while pos < text_len:
+            if self.lookup_table[Int(text_ptr[pos])] != 0:
+                return pos
+            pos += 1
+        return -1
 
     @always_inline
     def count_consecutive_matches(
