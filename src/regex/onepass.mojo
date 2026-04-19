@@ -60,15 +60,14 @@ fn _epsilon_close(
     read start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
     at_start: Bool,
+    at_end: Bool = False,
 ) -> SIMD[DType.uint8, MAX_STATES]:
     """Compute the set of PCs reachable from `start_pcs` via epsilon
     transitions only. Byte-consuming ops (OP_BYTE, OP_CLASS, OP_ANY,
-    OP_RANGE) and `OP_END_ANCHOR` are kept in the closure (they are
-    "waiting for input" or "waiting for end of text"); all other ops
-    are traversed.
-
-    `at_start` controls whether `OP_START_ANCHOR` is fired (true at
-    position 0, false elsewhere).
+    OP_RANGE) are kept in the closure (they are "waiting for input");
+    `OP_START_ANCHOR` fires when `at_start`, `OP_END_ANCHOR` fires when
+    `at_end`. Other ops are either traversed (OP_SPLIT, OP_JUMP) or
+    retained in the set.
     """
     var result = SIMD[DType.uint8, MAX_STATES](0)
     var stack = InlineArray[Int, MAX_STATES](uninitialized=True)
@@ -95,8 +94,12 @@ fn _epsilon_close(
             if at_start:
                 stack[stack_len] = pc + 1
                 stack_len += 1
-        # OP_END_ANCHOR, OP_BYTE, OP_CLASS, OP_ANY, OP_RANGE, OP_MATCH:
-        # do not advance past; remain in the closure.
+        elif inst.opcode == OP_END_ANCHOR:
+            if at_end:
+                stack[stack_len] = pc + 1
+                stack_len += 1
+        # OP_BYTE, OP_CLASS, OP_ANY, OP_RANGE, OP_MATCH: retain in
+        # closure, do not advance past.
     return result
 
 
@@ -120,32 +123,15 @@ fn _closure_reaches_match_with_end_anchor(
     """True iff the epsilon closure of `nfa_set` with `OP_END_ANCHOR`
     fired reaches OP_MATCH. Used at compile time to precompute the
     per-state answer; at match time the cached Bool is a single load."""
-    var end_set = SIMD[DType.uint8, MAX_STATES](0)
-    var stack = InlineArray[Int, MAX_STATES](uninitialized=True)
-    var stack_len = 0
-    var prog_len = len(program)
-    for pc in range(prog_len):
+    var start_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var count = 0
+    for pc in range(len(program)):
         if nfa_set[pc] != 0:
-            stack[stack_len] = pc
-            stack_len += 1
-    while stack_len > 0:
-        stack_len -= 1
-        var pc = stack[stack_len]
-        if pc < 0 or pc >= prog_len or end_set[pc] != 0:
-            continue
-        end_set[pc] = 1
-        ref inst = program.instructions[pc]
-        if inst.opcode == OP_SPLIT:
-            stack[stack_len] = inst.arg0
-            stack_len += 1
-            stack[stack_len] = inst.arg1
-            stack_len += 1
-        elif inst.opcode == OP_JUMP:
-            stack[stack_len] = inst.arg0
-            stack_len += 1
-        elif inst.opcode == OP_END_ANCHOR:
-            stack[stack_len] = pc + 1
-            stack_len += 1
+            start_pcs[count] = pc
+            count += 1
+    var end_set = _epsilon_close(
+        program, start_pcs, count, at_start=False, at_end=True
+    )
     return _set_contains_match(program, end_set)
 
 
