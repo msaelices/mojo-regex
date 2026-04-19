@@ -2,6 +2,13 @@
 
 ## v0.11.0 (2026-04-17)
 
+### Perf deep-dive: range-path find_first + precomputed OnePass end-anchor (PR #145)
+
+- Two independent hot-path wins from a profiling pass.
+- **Range fast path in `CharacterClassSIMD.find_first_nibble_match`**: for 1/2/3-range character classes (`[0-9]`, `[a-z]`, `[a-zA-Z]`, `[a-zA-Z0-9]`, `\d`, `\w`, ...), the previous code always went through the nibble-table `pshufb` scan (2x `_dynamic_shuffle` + AND + cmp per 32-byte chunk). Contiguous byte ranges can use one unsigned subtract + one range compare per chunk — ~2x fewer SIMD instructions. Mirrors the existing specialization in `count_consecutive_matches`.
+- **Precompute OnePass end-anchor fixup per state**: `OnePassNFA.match_first` previously ran `_fire_end_anchor(nfa_set, text_len)` for every `$`-anchored match — and the method took `nfa_set` (SIMD[uint8, 512] = 512 bytes) **by value**, copying the whole state set to the stack per call on top of doing a DFS closure walk. The answer is fully determined by the state's `nfa_set` and the program graph, so precompute it at `compile_onepass` time and store a `Bool is_end_match` on `OnePassState`. Match-time fixup is now a single byte load.
+- Measurements (best-of-3 vs v0.11.0 baseline): `phone_validation` **315 → 28 ns (11.2x, now faster than Rust's `regex`)**, `predefined_digits` 874 → 421 ns (2.08x), `sparse_phone_search` 6044 → 3238 ns (1.87x), `range_digits` 596 → 342 ns (1.74x), `multi_format_phone` 150 → 95 μs (1.58x), `complex_email` 8.2 → 5.5 μs (1.50x), `range_lowercase` 368 → 266 ns (1.38x). Full-bench geo vs Rust lifted from 2.93x to ~3.16x; vs Python from 21.7x to ~23.8x.
+
 ### Pattern + repl identity cache for module-level `sub()` (PR #144)
 
 - Closes the remainder of issue #142. Module-level `sub(pattern, repl, text)` re-did `hash(pattern)`, `_has_group_refs(repl)`, and `_parse_repl_template(repl)` on every call even when the caller passed the same `StaticString` pointers each time. Adds a one-slot `_LastSubCache` keyed on pointer-identity `(address, byte_length)` of pattern and repl: on hit, reuse the cached `hash(pattern)` and the parsed `_ReplSegment` template. `_sub_impl` split into a wrapper + `_sub_impl_with_repl` so the module-level `sub()` can feed in the cached template without recomputing per call.
