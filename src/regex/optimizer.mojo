@@ -30,6 +30,11 @@ from regex.literal_optimizer import (
 )
 
 
+comptime MAX_LITERAL_QUANT_REPETITIONS = 10
+"""Cap on `c{N}` repetitions still treated as a flat literal for DFA
+routing. Patterns above this cap keep the MEDIUM/NFA classification."""
+
+
 struct PatternComplexity(Copyable, TrivialRegisterPassable, Writable):
     """Classification of regex pattern complexity for optimal execution strategy.
     """
@@ -463,7 +468,7 @@ struct PatternAnalyzer:
                 var is_literal_element = (
                     child.type == ELEMENT
                     and child.min == child.max
-                    and 1 <= child.min <= 10
+                    and 1 <= child.min <= MAX_LITERAL_QUANT_REPETITIONS
                 )
                 if not (
                     is_literal_element
@@ -872,10 +877,8 @@ def _is_literal_sequence(ast: ASTNode) -> Bool:
         if ast.min == 1 and ast.max == 1:
             return True
         # Fixed-bounded quantifier `c{N}` is also literal: it expands to
-        # `cccc...` of length N. Cap N to keep the expanded literal
-        # bounded; matches `_classify_quantifier` which itself caps fixed
-        # quantifiers at <= 10 for SIMPLE.
-        if ast.min == ast.max and 1 <= ast.min <= 10:
+        # `cccc...` of length N, capped at MAX_LITERAL_QUANT_REPETITIONS.
+        if ast.min == ast.max and 1 <= ast.min <= MAX_LITERAL_QUANT_REPETITIONS:
             return True
         return False
     elif ast.type == START or ast.type == END:

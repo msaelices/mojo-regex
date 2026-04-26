@@ -2017,8 +2017,6 @@ struct DFAEngine(Engine):
         if self.is_pure_literal:
             var pattern_bytes = self.literal_pattern.as_bytes()
             var pattern_len = len(self.literal_pattern)
-            if pattern_len == 0:
-                return matches^
             while pos <= text_len - pattern_len:
                 var hit = simd_search(pattern_bytes, text, pos)
                 if hit == -1:
