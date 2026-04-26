@@ -2008,6 +2008,23 @@ struct DFAEngine(Engine):
         var text_ptr = text.unsafe_ptr()
         var num_states = len(self.states)
 
+        # Fast path: pure literal patterns. The general loop below would
+        # call `_try_match_at_position` per byte; for a literal pattern,
+        # each call falls into `simd_search` and rescans the rest of the
+        # text — O(N^2) on non-matching input. A single forward scan is
+        # all that's needed: jump to the next occurrence, append, advance
+        # past the match.
+        if self.is_pure_literal:
+            var pattern_bytes = self.literal_pattern.as_bytes()
+            var pattern_len = len(self.literal_pattern)
+            while pos <= text_len - pattern_len:
+                var hit = simd_search(pattern_bytes, text, pos)
+                if hit == -1:
+                    break
+                matches.append(Match(0, hit, hit + pattern_len, text))
+                pos = hit + pattern_len
+            return matches^
+
         # Fast path: use SIMD matcher to skip non-matching positions
         if self._has_simd_matcher and num_states > 0:
             if self._simd_scan_eligible:
