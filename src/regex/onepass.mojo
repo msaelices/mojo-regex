@@ -44,15 +44,20 @@ from regex.pikevm import (
 )
 
 
-comptime ONEPASS_DEAD = -1
-"""Special state id: no match can start from here."""
+comptime ONEPASS_DEAD: Int16 = -1
+"""Special state id: no match can start from here. Stored as Int16 in
+the runtime transitions table; the conversion is implicit."""
+
+comptime ONEPASS_DEAD_INT = -1
+"""Same as ONEPASS_DEAD but typed Int for use during the build phase
+where transitions are accumulated as Int before projection to Int16."""
 
 comptime ONEPASS_MAX_STATES = 512
 """Upper bound on compiled OnePass state count. Beyond this the engine
 declines to build (returns `None` from `compile_onepass`); the caller
 falls back to `LazyDFA` or the backtracking NFA. Realistic one-pass
 patterns compile to tens of states; the limit guards against pathological
-blow-ups."""
+blow-ups. ONEPASS_MAX_STATES is comfortably within Int16 range."""
 
 
 fn _epsilon_close(
@@ -231,7 +236,7 @@ def compile_onepass(
         var state_id = worklist[len(worklist) - 1]
         _ = worklist.pop()
         var cur_set = states[state_id].nfa_set
-        var transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD)
+        var transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD_INT)
 
         # Collect byte-consuming PCs once per state.
         var active_count = 0
@@ -318,9 +323,33 @@ def compile_onepass(
                 program, states[i].nfa_set
             )
 
+    # Project the compile-time states (which carry the bulky ~512B
+    # `nfa_set` and 8B/cell transitions) into the runtime SoA layout:
+    # tight `Int16` transitions tables and parallel flag arrays. The
+    # cold `nfa_set` is dropped from runtime so the per-byte hot loop
+    # touches only ~512B per state instead of ~2576B.
+    var num_states = len(states)
+    var runtime_transitions = List[InlineArray[Int16, 256]](capacity=num_states)
+    var is_match_flags = List[Bool](capacity=num_states)
+    var is_end_match_flags = List[Bool](capacity=num_states)
+    for i in range(num_states):
+        var compact = InlineArray[Int16, 256](fill=ONEPASS_DEAD)
+        ref src = states[i].transitions
+        for b in range(256):
+            compact[b] = Int16(src[b])
+        runtime_transitions.append(compact^)
+        is_match_flags.append(states[i].is_match)
+        is_end_match_flags.append(states[i].is_end_match)
+
     var ptr = alloc[OnePassNFA](1)
     ptr.init_pointee_move(
-        OnePassNFA(program^, states^, has_start_anchor, has_end_anchor)
+        OnePassNFA(
+            runtime_transitions^,
+            is_match_flags^,
+            is_end_match_flags^,
+            has_start_anchor,
+            has_end_anchor,
+        )
     )
     return ptr
 
@@ -399,17 +428,27 @@ struct OnePassState(Copyable, Movable):
         self.nfa_set = nfa_set
         self.is_match = is_match
         self.is_end_match = False
-        self.transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD)
+        self.transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD_INT)
 
 
 struct OnePassNFA(Copyable, Movable):
-    """Compiled OnePass NFA. Ready to match in O(n) per byte."""
+    """Compiled OnePass NFA. Ready to match in O(n) per byte.
 
-    var program: Program
-    """The underlying PikeVM program, kept for end-of-text anchor
-    fixup."""
-    var states: List[OnePassState]
-    """Compiled states. Index = state id; state 0 = start state."""
+    Runtime layout is struct-of-arrays so the hot per-byte loop touches
+    only the ~512B transitions table for the current state. The cold
+    `nfa_set` from compilation is dropped; `is_match` / `is_end_match`
+    live in their own dense `List[Bool]` arrays."""
+
+    var transitions: List[InlineArray[Int16, 256]]
+    """Per-state byte -> next-state-id table. Int16 since
+    `ONEPASS_MAX_STATES = 512` and `ONEPASS_DEAD = -1` both fit. Each
+    entry is 512B vs the compile-time 2KB table — 4x denser, 4x more
+    states per L1."""
+    var is_match_flags: List[Bool]
+    """Per-state accept flag (no pending `$` required)."""
+    var is_end_match_flags: List[Bool]
+    """Per-state end-of-text accept flag. Read once at pos == text_len
+    when the pattern carries a `$` anchor."""
     var has_start_anchor: Bool
     """Pattern pins matches to position 0."""
     var has_end_anchor: Bool
@@ -418,13 +457,15 @@ struct OnePassNFA(Copyable, Movable):
 
     def __init__(
         out self,
-        var program: Program,
-        var states: List[OnePassState],
+        var transitions: List[InlineArray[Int16, 256]],
+        var is_match_flags: List[Bool],
+        var is_end_match_flags: List[Bool],
         has_start_anchor: Bool,
         has_end_anchor: Bool,
     ):
-        self.program = program^
-        self.states = states^
+        self.transitions = transitions^
+        self.is_match_flags = is_match_flags^
+        self.is_end_match_flags = is_end_match_flags^
         self.has_start_anchor = has_start_anchor
         self.has_end_anchor = has_end_anchor
 
@@ -445,22 +486,23 @@ struct OnePassNFA(Copyable, Movable):
         var text_len = len(text)
         var state_id = 0
         var match_end = -1
-        if self.states[0].is_match:
+        var trans_ptr = self.transitions.unsafe_ptr()
+        var match_ptr = self.is_match_flags.unsafe_ptr()
+        if match_ptr[0]:
             match_end = start
         var pos = start
-        var states_ptr = self.states.unsafe_ptr()
         while pos < text_len:
-            var next_id = states_ptr[state_id].transitions[Int(text_ptr[pos])]
-            if next_id == ONEPASS_DEAD:
+            var next_id = Int(trans_ptr[state_id][Int(text_ptr[pos])])
+            if next_id == Int(ONEPASS_DEAD):
                 break
             state_id = next_id
             pos += 1
-            if states_ptr[state_id].is_match:
+            if match_ptr[state_id]:
                 match_end = pos
         # End-of-text fixup for `$` anchors: cached per-state at compile
         # time, so no per-call state-set DFS walk.
         if self.has_end_anchor and pos == text_len:
-            if states_ptr[state_id].is_end_match:
+            if self.is_end_match_flags.unsafe_ptr()[state_id]:
                 match_end = pos
         if match_end >= 0:
             return Match(0, start, match_end, text)
