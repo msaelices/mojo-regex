@@ -453,16 +453,20 @@ struct PatternAnalyzer:
             and quantifier_complexity.value == PatternComplexity.SIMPLE
         ):
             # For literal groups (like "hello" parsed as group of chars), be more generous
-            # Check if all children are literal elements or anchors
+            # Check if all children are literal elements or anchors. ELEMENTs
+            # with fixed bounded quantifiers (`c{N}` with N == max <= 10) also
+            # count: they expand to a flat literal sequence in DFA compilation
+            # (see `_is_literal_sequence` and `_extract_literal_chars`).
             var all_literal = True
             for i in range(ast.get_children_len()):
                 ref child = ast.get_child(i)
+                var is_literal_element = (
+                    child.type == ELEMENT
+                    and child.min == child.max
+                    and 1 <= child.min <= 10
+                )
                 if not (
-                    (
-                        child.type == ELEMENT
-                        and child.min == 1
-                        and child.max == 1
-                    )
+                    is_literal_element
                     or child.type == START
                     or child.type == END
                 ):
@@ -864,8 +868,16 @@ def _is_literal_sequence(ast: ASTNode) -> Bool:
         True if node represents literal characters only
     """
     if ast.type == ELEMENT:
-        # Must be a single character with no quantifier
-        return ast.min == 1 and ast.max == 1
+        # Single character (no quantifier) — always literal.
+        if ast.min == 1 and ast.max == 1:
+            return True
+        # Fixed-bounded quantifier `c{N}` is also literal: it expands to
+        # `cccc...` of length N. Cap N to keep the expanded literal
+        # bounded; matches `_classify_quantifier` which itself caps fixed
+        # quantifiers at <= 10 for SIMPLE.
+        if ast.min == ast.max and 1 <= ast.min <= 10:
+            return True
+        return False
     elif ast.type == START or ast.type == END:
         # Anchors are fine in literal patterns
         return True
@@ -913,7 +925,19 @@ def _extract_literal_chars(ast: ASTNode) -> String:
         String containing the literal characters
     """
     if ast.type == ELEMENT:
-        return String(ast.get_value().value()) if ast.get_value() else ""
+        var v = ast.get_value()
+        if not v:
+            return EMPTY_STRING
+        ref ch = v.value()
+        # Fixed-bounded `c{N}` expands to `cccc...` of length N. Single
+        # char (min=max=1) hits the same code path with one repeat.
+        var repeats = ast.min
+        if repeats <= 1:
+            return String(ch)
+        var out = String(capacity=repeats * len(ch))
+        for _ in range(repeats):
+            out += ch
+        return out
     elif ast.type == GROUP:
         var result = String(capacity=String.INLINE_CAPACITY)
         for i in range(ast.get_children_len()):
