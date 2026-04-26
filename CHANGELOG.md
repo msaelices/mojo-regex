@@ -2,6 +2,13 @@
 
 ## v0.12.0 (2026-04-26)
 
+### Route fixed-bounded literal quantifiers to DFA + fix O(N^2) literal findall (PR #147)
+
+- Two coordinated fixes that close `optimize_extreme_quantifiers` (the worst remaining Mojo-vs-Rust gap, 11.7x slower) and a latent O(N^2) DFA bug they exposed.
+- **DFA `match_all` O(N^2) fix**: when `is_pure_literal` was True, `match_all` fell through to the generic loop that calls `_try_match_at_position` per byte. Each call ended up in `simd_search`, which scans from `pos` to end of text — so on non-matching input the outer `pos += 1` loop rescanned the whole remaining tail every iteration. Added a literal fast path: a single forward `simd_search` loop that advances past each match by `pattern_len`. One pass, O(N).
+- **Routing extension**: patterns like `a{1}b{2}c{3}d{4}e{5}f{6}g{7}h{8}` were classified MEDIUM/NFA even though they expand to a fixed-width literal the DFA already handles. Extended `_is_literal_sequence`, `_extract_literal_chars`, and the inline literal check in `_analyze_group` to accept `ELEMENT`s with `min == max <= MAX_LITERAL_QUANT_REPETITIONS = 10` (cap matches the existing `_classify_quantifier` SIMPLE cap; longer fixed quantifiers stay MEDIUM/NFA).
+- Stable best-of-3: `optimize_extreme_quantifiers` 2427 → 382 ns (**6.35x**, closes the 11.7x Mojo-vs-Rust gap to ~2.0x), `pure_dfa_dash` 1231 → 117 ns (**10.5x**, the latent O(N^2) bug was hurting this one too), `sub_literal` / `range_alphanumeric` / `datetime_quantifiers` small but real wins. Mojo-vs-Rust geomean 3.44x → 3.86x (+12%).
+
 ### Shrink OnePass NFA runtime: SoA + Int16 transitions (PR #146)
 
 - The hot `OnePassNFA.match_first` per-byte loop touched a 2576-byte `OnePassState` per step (512B `nfa_set` + 8B/cell transitions + flags), busting L1 for any pattern with more than ~12 states. Refactored the runtime layout into struct-of-arrays: `transitions: List[InlineArray[Int16, 256]]` (512B/state, 4x denser; state ids fit in `Int16` since `ONEPASS_MAX_STATES = 512`), `is_match_flags` / `is_end_match_flags` as parallel `List[Bool]`. The cold compile-time `nfa_set` is dropped from runtime entirely, along with the unused `program` field on `OnePassNFA`.
