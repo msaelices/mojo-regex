@@ -1,5 +1,13 @@
 # Changelog
 
+## v0.12.0 (2026-04-26)
+
+### Shrink OnePass NFA runtime: SoA + Int16 transitions (PR #146)
+
+- The hot `OnePassNFA.match_first` per-byte loop touched a 2576-byte `OnePassState` per step (512B `nfa_set` + 8B/cell transitions + flags), busting L1 for any pattern with more than ~12 states. Refactored the runtime layout into struct-of-arrays: `transitions: List[InlineArray[Int16, 256]]` (512B/state, 4x denser; state ids fit in `Int16` since `ONEPASS_MAX_STATES = 512`), `is_match_flags` / `is_end_match_flags` as parallel `List[Bool]`. The cold compile-time `nfa_set` is dropped from runtime entirely, along with the unused `program` field on `OnePassNFA`.
+- For `phone_validation` (27 OnePass states), pre-change working set was 27 × 2576 ≈ 70KB (busts L1); post-change ≈ 14KB (fits in L1).
+- Stable best-of-3 vs v0.11.0 main: `phone_validation` 18.1 → 15.4 ns (1.18x), `literal_match_short` 703 → 464 ns (1.51x), `literal_match_long` 6.55 → 4.44 us (1.48x), `sparse_email_findall` 1.19 us → 856 ns (1.39x), `large_8_alternations` 53.6 → 44.7 us (1.20x), `sub_digits` 82.6 → 70.3 us (1.18x). Geomean across 80 benches +2.5% (W/L/N 21/14/45). Top losses are 5–18% on small sub-µs benches where code-layout side effects exceed the OnePass win.
+
 ## v0.11.0 (2026-04-17)
 
 ### Perf deep-dive: range-path find_first + precomputed OnePass end-anchor (PR #145)
