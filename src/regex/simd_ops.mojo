@@ -934,43 +934,6 @@ def _create_word_chars() -> CharacterClassSIMD:
     return CharacterClassSIMD(WORD_CHARS)
 
 
-def _search_short_pattern(
-    pattern: Span[Byte, _], text: ImmSlice, start: Int
-) -> Int:
-    """Optimized search for very short patterns (1-2 characters).
-
-    Args:
-        pattern: Pattern span of bytes.
-        text: Text to search in.
-        start: Starting position.
-
-    Returns:
-        Position of first match, or -1 if not found.
-    """
-    var pattern_len = len(pattern)
-    var text_len = len(text)
-    var text_ptr = text.unsafe_ptr()
-
-    if pattern_len == 1:
-        # Single character - simple scan
-        var target_char = pattern[0]
-        for i in range(start, text_len):
-            if Int(text_ptr[i]) == Int(target_char):
-                return i
-    elif pattern_len == 2:
-        # Two characters - check pairs
-        if text_len - start < 2:
-            return -1
-        var first_char = pattern[0]
-        var second_char = pattern[1]
-        for i in range(start, text_len - 1):
-            if Int(text_ptr[i]) == Int(first_char) and Int(
-                text_ptr[i + 1]
-            ) == Int(second_char):
-                return i
-    return -1
-
-
 def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
@@ -1002,6 +965,14 @@ def simd_search(
 ) -> Int:
     """Search for pattern in text using SIMD acceleration.
 
+    Two-byte memchr-style scan: compares text[pos] to pattern[0] AND
+    text[pos+last] to pattern[last] in parallel via SIMD. Positions where
+    BOTH match advance to verify_match; positions where only the first
+    byte matches (the common false-positive case for the old single-byte
+    scan) are filtered out without a verify call. For "hello" the
+    discrimination factor is roughly the alphabet size (~26x fewer
+    verifies on alphabet text).
+
     Args:
         pattern: Pattern slice of bytes.
         text: Text to search in.
@@ -1015,34 +986,34 @@ def simd_search(
         return start  # Empty pattern matches at any position
 
     var text_len = len(text)
+    var text_ptr = text.unsafe_ptr()
+
+    # Single-byte literal: pure memchr-style SIMD scan.
+    if pattern_len == 1:
+        return simd_find_byte(text_ptr, start, text_len, pattern[0])
+
+    # Two-byte anchored SIMD scan for pattern_len >= 2.
+    var first_byte = pattern[0]
+    var last_offset = pattern_len - 1
+    var last_byte = pattern[last_offset]
+    var first_splat = SIMD[DType.uint8, SIMD_WIDTH](first_byte)
+    var last_splat = SIMD[DType.uint8, SIMD_WIDTH](last_byte)
     var pos = start
 
-    # For very short patterns (1-2 chars), use simpler approach
-    if pattern_len <= 2:
-        return _search_short_pattern(pattern, text, start)
-
-    # Use SIMD to quickly find potential matches by first character
-    while pos + SIMD_WIDTH <= text_len:
-        # Load chunk of text
-        var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
-
-        # Compare with first character of pattern
-        var first_char = pattern[0]
-        var first_char_simd = SIMD[DType.uint8, SIMD_WIDTH](first_char)
-        var matches = chunk.eq(first_char_simd)
-
-        if matches.reduce_or():
-            # Found potential match, check each position
+    while pos + SIMD_WIDTH + last_offset <= text_len:
+        var chunk_a = text_ptr.load[width=SIMD_WIDTH](pos)
+        var chunk_b = text_ptr.load[width=SIMD_WIDTH](pos + last_offset)
+        var both = chunk_a.eq(first_splat) & chunk_b.eq(last_splat)
+        if both.reduce_or():
             for i in range(SIMD_WIDTH):
-                if matches[i]:
+                if both[i]:
                     var candidate_pos = pos + i
                     if verify_match(pattern, text, candidate_pos):
                         return candidate_pos
-
         pos += SIMD_WIDTH
 
-    # Handle remaining characters
-    while pos <= text_len - pattern_len:
+    # Scalar tail: handles up to SIMD_WIDTH + pattern_len - 1 bytes.
+    while pos + pattern_len <= text_len:
         if verify_match(pattern, text, pos):
             return pos
         pos += 1
