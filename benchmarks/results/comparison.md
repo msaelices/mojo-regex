@@ -1,6 +1,6 @@
 # Benchmark Results
 
-Comparison of mojo-regex 0.12.0 (post PRs #140/#143/#144/#145/#146), Python `re`, and Rust `regex` crate.
+Comparison of mojo-regex 0.13.0 (post PRs #140/#143/#144/#145/#146/#147/#148), Python `re`, and Rust `regex` crate.
 
 - **Mojo**: 0.26.2 stable, default optimization
 - **Python**: CPython 3.12, `re` module (C implementation)
@@ -11,100 +11,100 @@ Comparison of mojo-regex 0.12.0 (post PRs #140/#143/#144/#145/#146), Python `re`
 
 | Benchmark | Python | Mojo | Rust | Mojo vs Python | Mojo vs Rust |
 |---|---|---|---|---|---|
-| alternation_common_prefix | 143.093 ns | 8.739 ns | 2.623 us | **16.4x faster** | **300x faster** |
-| alternation_quantifiers | 284.706 us | 37.372 us | 89.414 us | **7.6x faster** | **2.4x faster** |
-| alternation_simple | 139.310 ns | 3.967 ns | 27.124 ns | **35.1x faster** | **6.8x faster** |
-| alternation_words | - | - | 30.666 ns |  |  |
-| anchor_end | - | - | 28.327 ns |  |  |
-| anchor_start | 220.797 ns | 5.108 ns | 50.817 ns | **43.2x faster** | **9.9x faster** |
-| complex_email | 12.023 us | 3.729 us | - | **3.2x faster** |  |
-| complex_email_extraction | - | - | 488.003 ns |  |  |
-| complex_group_5_children | 227.622 ns | 45.242 ns | 77.750 ns | **5.0x faster** | **1.7x faster** |
-| complex_number | 94.695 us | 7.917 us | - | **12.0x faster** |  |
-| complex_number_extraction | - | - | 142.553 us |  |  |
-| datetime_quantifiers | 75.680 us | 34.069 us | 73.237 us | **2.2x faster** | **2.1x faster** |
-| deep_nested_groups_depth4 | 293.432 ns | 7.784 ns | 47.604 ns | **37.7x faster** | **6.1x faster** |
-| dense_quantifiers | 155.496 us | 8.570 us | 24.311 us | **18.1x faster** | **2.8x faster** |
-| dfa_digits_only | 687.724 us | 214.123 us | 63.870 us | **3.2x faster** | 3.4x slower |
-| dfa_dot_phone | 728.399 us | 27.647 us | 50.038 us | **26.3x faster** | **1.8x faster** |
-| dfa_paren_phone | 46.525 us | 4.431 us | 27.188 us | **10.5x faster** | **6.1x faster** |
-| dfa_simple_phone | 797.759 us | 21.889 us | 79.016 us | **36.4x faster** | **3.6x faster** |
-| dual_quantifiers | 75.292 us | 18.029 us | 19.159 us | **4.2x faster** | **1.1x faster** |
-| flexible_datetime | 78.170 us | 16.334 us | 60.012 us | **4.8x faster** | **3.7x faster** |
-| flexible_phone | 1.763 ms | 59.977 us | 193.999 us | **29.4x faster** | **3.2x faster** |
-| group_alternation | 125.485 ns | 4.450 ns | 70.046 ns | **28.2x faster** | **15.7x faster** |
-| group_quantified | - | - | 50.728 us |  |  |
-| grouped_quantifiers | 162.851 us | 4.335 us | 11.393 us | **37.6x faster** | **2.6x faster** |
-| is_match_alphanumeric | 20.403 us | 1.678 ns | 20.164 ns | **12,160x faster** | **12.0x faster** |
-| is_match_digits | 8.824 us | 1.979 ns | 50.568 ns | **4,459x faster** | **25.6x faster** |
-| is_match_lowercase | 9.415 us | 1.798 ns | 20.133 ns | **5,235x faster** | **11.2x faster** |
-| is_match_predefined_digits | 24.607 us | 1.446 ns | 25.839 ns | **17,020x faster** | **17.9x faster** |
-| is_match_predefined_word | 22.916 us | 1.383 ns | 22.567 ns | **16,570x faster** | **16.3x faster** |
-| large_8_alternations | 292.339 ns | 52.058 ns | 77.081 ns | **5.6x faster** | **1.5x faster** |
-| literal_heavy_alternation | 377.308 ns | 65.967 ns | 128.205 ns | **5.7x faster** | **1.9x faster** |
-| literal_match_long | 7.145 us | 9.564 us | 3.679 us | 1.3x slower | 2.6x slower |
-| literal_match_short | 891.116 ns | 716.639 ns | 534.164 ns | **1.2x faster** | 1.3x slower |
-| literal_prefix_long | 18.195 us | 2.135 us | 29.969 us | **8.5x faster** | **14.0x faster** |
-| literal_prefix_medium | - | - | 4.172 us |  |  |
-| literal_prefix_short | 151.064 ns | 97.948 ns | 379.098 ns | **1.5x faster** | **3.9x faster** |
-| match_all_digits | 818.731 us | 3.030 us | - | **270x faster** |  |
-| match_all_pattern | - | - | 65.129 us |  |  |
-| match_all_simple | 13.214 us | 5.388 us | 7.588 us | **2.5x faster** | **1.4x faster** |
-| mixed_range_quantifiers | 64.154 us | 3.792 us | 4.370 us | **16.9x faster** | **1.2x faster** |
-| multi_format_phone | 3.417 ms | 59.361 us | 212.262 us | **57.6x faster** | **3.6x faster** |
-| nanpa_findall | 28.841 us | 7.388 us | 23.211 us | **3.9x faster** | **3.1x faster** |
-| nanpa_match_first | 291.699 ns | 16.006 ns | 77.845 ns | **18.2x faster** | **4.9x faster** |
-| nanpa_search | 301.288 ns | 23.799 ns | 75.952 ns | **12.7x faster** | **3.2x faster** |
-| national_phone_validation | 579.915 us | 29.285 us | 57.597 us | **19.8x faster** | **2.0x faster** |
-| no_literal_baseline | 180.076 ns | 7.204 ns | 7.587 us | **25.0x faster** | **1,053x faster** |
-| optimize_extreme_quantifiers | 7.091 us | 609.941 ns | 311.834 ns | **11.6x faster** | 2.0x slower |
-| optimize_large_quantifiers | 7.809 us | 3.551 us | 13.190 us | **2.2x faster** | **3.7x faster** |
-| optimize_multiple_quantifiers | 236.902 us | 9.567 us | 18.658 us | **24.8x faster** | **2.0x faster** |
-| optimize_phone_quantifiers | 102.221 us | 28.518 us | 68.858 us | **3.6x faster** | **2.4x faster** |
-| optimize_range_quantifier | 83.611 us | 12.731 us | 44.237 us | **6.6x faster** | **3.5x faster** |
-| phone_validation | 272.242 ns | 23.013 ns | 31.958 ns | **11.8x faster** | **1.4x faster** |
-| predefined_digits | 109.368 us | 370.572 ns | 80.868 ns | **295x faster** | 4.6x slower |
-| predefined_word | 22.321 us | 14.878 us | 56.520 us | **1.5x faster** | **3.8x faster** |
-| pure_dfa_dash | - | 204.479 ns | - |  |  |
-| pure_dfa_dot | - | 100.129 ns | - |  |  |
-| pure_dfa_paren | - | 61.914 ns | - |  |  |
-| quad_quantifiers | 78.479 us | 6.935 us | 12.406 us | **11.3x faster** | **1.8x faster** |
-| quantifier_one_or_more | 147.971 ns | 4.012 ns | 63.062 ns | **36.9x faster** | **15.7x faster** |
-| quantifier_zero_or_more | 200.374 ns | 3.830 ns | 53.528 ns | **52.3x faster** | **14.0x faster** |
-| quantifier_zero_or_one | 162.328 ns | 4.429 ns | 58.091 ns | **36.7x faster** | **13.1x faster** |
-| range_alphanumeric | 11.955 us | 728.513 ns | 68.006 us | **16.4x faster** | **93.3x faster** |
-| range_digits | 105.518 us | 262.909 ns | 65.296 ns | **401x faster** | 4.0x slower |
-| range_lowercase | 9.028 us | 236.412 ns | 64.323 ns | **38.2x faster** | 3.7x slower |
-| range_quantifiers | 81.893 us | 24.335 us | 44.866 us | **3.4x faster** | **1.8x faster** |
-| required_literal_long | - | - | 1.379 us |  |  |
-| required_literal_short | 1.568 us | 196.240 ns | 303.513 ns | **8.0x faster** | **1.5x faster** |
-| simd_alphanumeric_large | - | - | 97.502 ns |  |  |
-| simd_alphanumeric_xlarge | - | - | 82.638 ns |  |  |
-| simd_multi_char_class | - | - | 61.445 ns |  |  |
-| simd_negated_alphanumeric | - | - | 52.210 ns |  |  |
-| simple_phone | 1.290 ms | 23.710 us | 202.575 us | **54.4x faster** | **8.5x faster** |
-| single_quantifier_alpha | 86.708 us | 9.671 us | 47.438 us | **9.0x faster** | **4.9x faster** |
-| single_quantifier_digits | 75.287 us | 27.576 us | 17.409 us | **2.7x faster** | 1.6x slower |
-| smart_phone_primary | - | 41.675 us | - |  |  |
-| sparse_email_findall | 273.446 us | 905.243 ns | 2.540 us | **302x faster** | **2.8x faster** |
-| sparse_flex_phone_findall | 369.402 us | 1.226 us | 63.478 us | **301x faster** | **51.8x faster** |
-| sparse_phone_findall | 512.715 us | 2.101 us | 3.929 us | **244x faster** | **1.9x faster** |
-| sparse_phone_search | 30.307 us | 4.900 us | 2.902 us | **6.2x faster** | 1.7x slower |
-| sub_char_class | 911.644 us | 108.858 us | 315.988 us | **8.4x faster** | **2.9x faster** |
-| sub_digits | 1.812 ms | 95.665 us | 156.545 us | **18.9x faster** | **1.6x faster** |
-| sub_group_date_fmt | 64.747 us | 11.729 us | 46.654 us | **5.5x faster** | **4.0x faster** |
-| sub_group_phone_fmt | 162.322 us | 23.506 us | 48.232 us | **6.9x faster** | **2.1x faster** |
-| sub_group_word_swap | 41.076 us | 60.397 us | 35.658 us | 1.5x slower | 1.7x slower |
-| sub_limited_count | 16.752 us | 12.597 us | 10.405 us | **1.3x faster** | 1.2x slower |
-| sub_literal | 5.354 us | 2.571 us | 1.542 us | **2.1x faster** | 1.7x slower |
-| sub_whitespace | 72.653 us | 14.501 us | 34.937 us | **5.0x faster** | **2.4x faster** |
-| toll_free_complex | 54.902 us | 7.308 us | - | **7.5x faster** |  |
-| toll_free_simple | 63.613 us | 8.620 us | - | **7.4x faster** |  |
-| triple_quantifiers | 86.005 us | 3.678 us | 14.493 us | **23.4x faster** | **3.9x faster** |
-| ultra_dense_quantifiers | 199.011 us | 7.148 us | 56.857 us | **27.8x faster** | **8.0x faster** |
-| wildcard_match_any | 4.776 us | 0.747 ns | 51.430 us | **6,391x faster** | **68,815x faster** |
+| alternation_common_prefix | 130.921 ns | 10.588 ns | 1.883 us | **12.4x faster** | **177.9x faster** |
+| alternation_quantifiers | 408.447 us | 29.521 us | 55.781 us | **13.8x faster** | **1.9x faster** |
+| alternation_simple | 123.908 ns | 3.223 ns | 15.495 ns | **38.4x faster** | **4.8x faster** |
+| alternation_words | - | - | 21.998 ns |  |  |
+| anchor_end | - | - | 21.371 ns |  |  |
+| anchor_start | 129.855 ns | 4.845 ns | 28.636 ns | **26.8x faster** | **5.9x faster** |
+| complex_email | 10.270 us | 3.074 us | - | **3.3x faster** |  |
+| complex_email_extraction | - | - | 342.703 ns |  |  |
+| complex_group_5_children | 202.591 ns | 33.036 ns | 63.862 ns | **6.1x faster** | **1.9x faster** |
+| complex_number | 77.827 us | 6.213 us | - | **12.5x faster** |  |
+| complex_number_extraction | - | - | 57.744 us |  |  |
+| datetime_quantifiers | 58.372 us | 36.068 us | 45.130 us | **1.6x faster** | **1.3x faster** |
+| deep_nested_groups_depth4 | 184.619 ns | 6.371 ns | 31.873 ns | **29.0x faster** | **5.0x faster** |
+| dense_quantifiers | 122.684 us | 6.375 us | 17.458 us | **19.2x faster** | **2.7x faster** |
+| dfa_digits_only | 632.848 us | 85.944 us | 49.814 us | **7.4x faster** | 1.7x slower |
+| dfa_dot_phone | 625.342 us | 25.397 us | 41.064 us | **24.6x faster** | **1.6x faster** |
+| dfa_paren_phone | 37.601 us | 3.983 us | 10.018 us | **9.4x faster** | **2.5x faster** |
+| dfa_simple_phone | 674.530 us | 19.990 us | 56.233 us | **33.7x faster** | **2.8x faster** |
+| dual_quantifiers | 70.641 us | 16.868 us | 16.274 us | **4.2x faster** | ~equal |
+| flexible_datetime | 77.442 us | 11.569 us | 31.949 us | **6.7x faster** | **2.8x faster** |
+| flexible_phone | 1.368 ms | 51.657 us | 143.550 us | **26.5x faster** | **2.8x faster** |
+| group_alternation | 124.508 ns | 3.034 ns | 46.907 ns | **41.0x faster** | **15.5x faster** |
+| group_quantified | - | - | 36.927 us |  |  |
+| grouped_quantifiers | 73.842 us | 3.357 us | 8.366 us | **22.0x faster** | **2.5x faster** |
+| is_match_alphanumeric | 11.009 us | 1.235 ns | 11.731 ns | **8912.3x faster** | **9.5x faster** |
+| is_match_digits | 9.300 us | 1.223 ns | 23.553 ns | **7607.3x faster** | **19.3x faster** |
+| is_match_lowercase | 8.765 us | 1.179 ns | 11.561 ns | **7434.2x faster** | **9.8x faster** |
+| is_match_predefined_digits | 23.895 us | 1.614 ns | 12.395 ns | **14802.4x faster** | **7.7x faster** |
+| is_match_predefined_word | 21.190 us | 1.176 ns | 16.287 ns | **18013.0x faster** | **13.8x faster** |
+| large_8_alternations | 271.383 ns | 54.554 ns | 50.212 ns | **5.0x faster** | 1.1x slower |
+| literal_heavy_alternation | 303.619 ns | 64.758 ns | 56.122 ns | **4.7x faster** | 1.2x slower |
+| literal_match_long | 6.044 us | 387.406 ns | 2.811 us | **15.6x faster** | **7.3x faster** |
+| literal_match_short | 720.878 ns | 69.085 ns | 280.957 ns | **10.4x faster** | **4.1x faster** |
+| literal_prefix_long | 16.886 us | 1.103 us | 22.859 us | **15.3x faster** | **20.7x faster** |
+| literal_prefix_medium | - | - | 2.922 us |  |  |
+| literal_prefix_short | 145.387 ns | 86.372 ns | 214.475 ns | **1.7x faster** | **2.5x faster** |
+| match_all_digits | 767.612 us | 2.568 us | - | **298.9x faster** |  |
+| match_all_pattern | - | - | 41.034 us |  |  |
+| match_all_simple | 12.206 us | 4.399 us | 4.903 us | **2.8x faster** | **1.1x faster** |
+| mixed_range_quantifiers | 62.236 us | 3.369 us | 3.955 us | **18.5x faster** | **1.2x faster** |
+| multi_format_phone | 3.355 ms | 56.674 us | 148.654 us | **59.2x faster** | **2.6x faster** |
+| nanpa_findall | 22.552 us | 5.139 us | 9.053 us | **4.4x faster** | **1.8x faster** |
+| nanpa_match_first | 252.181 ns | 13.860 ns | 40.279 ns | **18.2x faster** | **2.9x faster** |
+| nanpa_search | 212.889 ns | 19.280 ns | 46.527 ns | **11.0x faster** | **2.4x faster** |
+| national_phone_validation | 457.786 us | 27.319 us | 43.108 us | **16.8x faster** | **1.6x faster** |
+| no_literal_baseline | 139.892 ns | 6.001 ns | 5.069 us | **23.3x faster** | **844.7x faster** |
+| optimize_extreme_quantifiers | 7.833 us | 57.580 ns | 158.951 ns | **136.0x faster** | **2.8x faster** |
+| optimize_large_quantifiers | 4.281 us | 2.683 us | 8.776 us | **1.6x faster** | **3.3x faster** |
+| optimize_multiple_quantifiers | 184.556 us | 8.556 us | 13.220 us | **21.6x faster** | **1.5x faster** |
+| optimize_phone_quantifiers | 114.648 us | 20.993 us | 38.549 us | **5.5x faster** | **1.8x faster** |
+| optimize_range_quantifier | 90.078 us | 10.442 us | 27.687 us | **8.6x faster** | **2.7x faster** |
+| phone_validation | 246.764 ns | 14.362 ns | 17.357 ns | **17.2x faster** | **1.2x faster** |
+| predefined_digits | 114.919 us | 201.038 ns | 56.446 ns | **571.6x faster** | 3.6x slower |
+| predefined_word | 20.381 us | 19.756 us | 43.442 us | ~equal | **2.2x faster** |
+| pure_dfa_dash | - | 74.068 ns | - |  |  |
+| pure_dfa_dot | - | 82.826 ns | - |  |  |
+| pure_dfa_paren | - | 76.881 ns | - |  |  |
+| quad_quantifiers | 77.705 us | 3.357 us | 10.165 us | **23.1x faster** | **3.0x faster** |
+| quantifier_one_or_more | 132.994 ns | 3.158 ns | 42.459 ns | **42.1x faster** | **13.4x faster** |
+| quantifier_zero_or_more | 161.218 ns | 3.017 ns | 42.008 ns | **53.4x faster** | **13.9x faster** |
+| quantifier_zero_or_one | 132.249 ns | 3.013 ns | 43.298 ns | **43.9x faster** | **14.4x faster** |
+| range_alphanumeric | 10.993 us | 400.240 ns | 39.385 us | **27.5x faster** | **98.4x faster** |
+| range_digits | 83.693 us | 201.643 ns | 65.279 ns | **415.1x faster** | 3.1x slower |
+| range_lowercase | 9.625 us | 170.975 ns | 45.214 ns | **56.3x faster** | 3.8x slower |
+| range_quantifiers | 74.485 us | 16.049 us | 30.637 us | **4.6x faster** | **1.9x faster** |
+| required_literal_long | - | - | 781.430 ns |  |  |
+| required_literal_short | 1.391 us | 156.753 ns | 201.375 ns | **8.9x faster** | **1.3x faster** |
+| simd_alphanumeric_large | - | - | 51.990 ns |  |  |
+| simd_alphanumeric_xlarge | - | - | 51.850 ns |  |  |
+| simd_multi_char_class | - | - | 43.088 ns |  |  |
+| simd_negated_alphanumeric | - | - | 39.201 ns |  |  |
+| simple_phone | 802.904 us | 19.980 us | 106.452 us | **40.2x faster** | **5.3x faster** |
+| single_quantifier_alpha | 83.255 us | 8.752 us | 28.365 us | **9.5x faster** | **3.2x faster** |
+| single_quantifier_digits | 92.499 us | 13.455 us | 15.104 us | **6.9x faster** | **1.1x faster** |
+| smart_phone_primary | - | 20.352 us | - |  |  |
+| sparse_email_findall | 255.481 us | 1.102 us | 981.520 ns | **231.8x faster** | 1.1x slower |
+| sparse_flex_phone_findall | 345.756 us | 1.228 us | 43.520 us | **281.5x faster** | **35.4x faster** |
+| sparse_phone_findall | 366.213 us | 1.479 us | 1.741 us | **247.6x faster** | **1.2x faster** |
+| sparse_phone_search | 25.257 us | 1.934 us | 1.201 us | **13.1x faster** | 1.6x slower |
+| sub_char_class | 1.346 ms | 88.489 us | 186.327 us | **15.2x faster** | **2.1x faster** |
+| sub_digits | 955.194 us | 67.036 us | 111.132 us | **14.2x faster** | **1.7x faster** |
+| sub_group_date_fmt | 60.867 us | 10.671 us | 26.757 us | **5.7x faster** | **2.5x faster** |
+| sub_group_phone_fmt | 82.271 us | 13.686 us | 34.672 us | **6.0x faster** | **2.5x faster** |
+| sub_group_word_swap | 39.936 us | 47.943 us | 25.547 us | 1.2x slower | 1.9x slower |
+| sub_limited_count | 15.460 us | 9.924 us | 5.422 us | **1.6x faster** | 1.8x slower |
+| sub_literal | 3.765 us | 2.099 us | 1.345 us | **1.8x faster** | 1.6x slower |
+| sub_whitespace | 70.868 us | 11.418 us | 23.963 us | **6.2x faster** | **2.1x faster** |
+| toll_free_complex | 26.430 us | 6.736 us | - | **3.9x faster** |  |
+| toll_free_simple | 49.527 us | 7.920 us | - | **6.3x faster** |  |
+| triple_quantifiers | 62.760 us | 3.366 us | 7.931 us | **18.6x faster** | **2.4x faster** |
+| ultra_dense_quantifiers | 207.470 us | 6.307 us | 52.397 us | **32.9x faster** | **8.3x faster** |
+| wildcard_match_any | 4.571 us | 0.838 ns | 38.319 us | **5454.2x faster** | **45718.5x faster** |
 
 ## Aggregate
 
-- **Mojo vs Python** (76 shared benches): geomean **20.70x**, Mojo wins 74, Python wins 2.
-- **Mojo vs Rust** (71 shared benches): geomean **3.86x**, Mojo wins 59, Rust wins 12.
+- **Mojo vs Python** (76 shared benches): geomean **24.54x**, Mojo wins 74, Python wins 1.
+- **Mojo vs Rust** (71 shared benches): geomean **3.47x**, Mojo wins 59, Rust wins 11.

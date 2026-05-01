@@ -2,623 +2,623 @@
   "summary": {
     "baseline_engine": "python",
     "test_engine": "mojo",
-    "baseline_timestamp": "2026-04-26T21:59:28.090218",
-    "test_timestamp": "2026-04-26T22:00:31.739323",
+    "baseline_timestamp": "2026-05-01T23:06:53.105666",
+    "test_timestamp": "2026-05-01T23:04:58.509531",
     "baseline_name": "Python",
     "test_name": "Mojo",
     "total_benchmarks": 76,
-    "test_faster_count": 74,
-    "baseline_faster_count": 2,
-    "average_speedup": 850.5665966480277,
-    "geometric_mean_speedup": 20.700323442687456
+    "test_faster_count": 75,
+    "baseline_faster_count": 1,
+    "average_speedup": 861.1837240745284,
+    "geometric_mean_speedup": 24.54112219911745
   },
   "benchmarks": {
     "alternation_common_prefix": {
-      "python_time_ms": 0.0001430929487179487,
-      "mojo_time_ms": 8.739033927206444e-06,
-      "speedup": 16.37400082318829,
-      "python_iterations": 3142464,
-      "mojo_iterations": 53538036,
+      "python_time_ms": 0.00013092088316467342,
+      "mojo_time_ms": 1.0587698305477284e-05,
+      "speedup": 12.36537719411071,
+      "python_iterations": 3590361,
+      "mojo_iterations": 46943484,
       "engine": "DFA,"
     },
     "alternation_quantifiers": {
-      "python_time_ms": 0.2847062,
-      "mojo_time_ms": 0.03737152444444445,
-      "speedup": 7.618265624225122,
-      "python_iterations": 1575,
-      "mojo_iterations": 13275,
+      "python_time_ms": 0.40844741333333334,
+      "mojo_time_ms": 0.029521195,
+      "speedup": 13.835734404834673,
+      "python_iterations": 1275,
+      "mojo_iterations": 16800,
       "engine": "NFA,"
     },
     "alternation_simple": {
-      "python_time_ms": 0.0001393104,
-      "mojo_time_ms": 3.9671807250865364e-06,
-      "speedup": 35.11571810153953,
-      "python_iterations": 3780000,
-      "mojo_iterations": 115269000,
+      "python_time_ms": 0.000123907875,
+      "mojo_time_ms": 3.223148642047675e-06,
+      "speedup": 38.443115338695954,
+      "python_iterations": 3936000,
+      "mojo_iterations": 143304000,
       "engine": "DFA,"
     },
     "anchor_start": {
-      "python_time_ms": 0.0002207966666666667,
-      "mojo_time_ms": 5.108366146848602e-06,
-      "speedup": 43.22256085791309,
-      "python_iterations": 2196000,
-      "mojo_iterations": 101574000,
+      "python_time_ms": 0.0001298550625,
+      "mojo_time_ms": 4.844976250702642e-06,
+      "speedup": 26.802001863511258,
+      "python_iterations": 3680000,
+      "mojo_iterations": 92508000,
       "engine": "DFA,"
     },
     "complex_email": {
-      "python_time_ms": 0.012022641666666667,
-      "mojo_time_ms": 0.0037294324999999997,
-      "speedup": 3.2237188008273825,
-      "python_iterations": 39600,
-      "mojo_iterations": 132000,
+      "python_time_ms": 0.010269858333333333,
+      "mojo_time_ms": 0.00307381234375,
+      "speedup": 3.341081752832145,
+      "python_iterations": 47640,
+      "mojo_iterations": 166400,
       "engine": "DFA,"
     },
     "complex_group_5_children": {
-      "python_time_ms": 0.00022762150000000002,
-      "mojo_time_ms": 4.5241535545023695e-05,
-      "speedup": 5.031250536876109,
-      "python_iterations": 2190000,
-      "mojo_iterations": 11183000,
+      "python_time_ms": 0.0002025915,
+      "mojo_time_ms": 3.30356687763713e-05,
+      "speedup": 6.132507907480389,
+      "python_iterations": 2270000,
+      "mojo_iterations": 15168000,
       "engine": "DFA,"
     },
     "complex_number": {
-      "python_time_ms": 0.09469454399999999,
-      "mojo_time_ms": 0.007916745,
-      "speedup": 11.961297730317195,
-      "python_iterations": 5500,
-      "mojo_iterations": 62000,
+      "python_time_ms": 0.07782665,
+      "mojo_time_ms": 0.006212583,
+      "speedup": 12.527261205202409,
+      "python_iterations": 6000,
+      "mojo_iterations": 72000,
       "engine": "DFA,"
     },
     "datetime_quantifiers": {
-      "python_time_ms": 0.07568002,
-      "mojo_time_ms": 0.034068818333333334,
-      "speedup": 2.2213867020434277,
-      "python_iterations": 6500,
-      "mojo_iterations": 13200,
+      "python_time_ms": 0.0583722,
+      "mojo_time_ms": 0.036068367500000004,
+      "speedup": 1.6183765455977455,
+      "python_iterations": 8500,
+      "mojo_iterations": 13600,
       "engine": "DFA,"
     },
     "deep_nested_groups_depth4": {
-      "python_time_ms": 0.00029343174999999996,
-      "mojo_time_ms": 7.784350324374421e-06,
-      "speedup": 37.6950853664954,
-      "python_iterations": 1664000,
-      "mojo_iterations": 57187000,
+      "python_time_ms": 0.00018461933333333334,
+      "mojo_time_ms": 6.3714055459272095e-06,
+      "speedup": 28.97623326635478,
+      "python_iterations": 2820000,
+      "mojo_iterations": 78472000,
       "engine": "DFA,"
     },
     "dense_quantifiers": {
-      "python_time_ms": 0.15549622000000002,
-      "mojo_time_ms": 0.00856956103448276,
-      "speedup": 18.145179125780675,
-      "python_iterations": 3200,
-      "mojo_iterations": 60900,
+      "python_time_ms": 0.12268429,
+      "mojo_time_ms": 0.0063751075,
+      "speedup": 19.244269998584336,
+      "python_iterations": 4100,
+      "mojo_iterations": 72000,
       "engine": "DFA,"
     },
     "dfa_digits_only": {
-      "python_time_ms": 0.68772352,
-      "mojo_time_ms": 0.21412296,
-      "speedup": 3.2118158650524915,
+      "python_time_ms": 0.63284823,
+      "mojo_time_ms": 0.08594424,
+      "speedup": 7.363474620288689,
       "python_iterations": 700,
-      "mojo_iterations": 2600,
+      "mojo_iterations": 5500,
       "engine": "DFA,"
     },
     "dfa_dot_phone": {
-      "python_time_ms": 0.7283990899999999,
-      "mojo_time_ms": 0.02764658625,
-      "speedup": 26.346800411931504,
-      "python_iterations": 700,
-      "mojo_iterations": 18400,
-      "engine": "DFA,"
-    },
-    "dfa_paren_phone": {
-      "python_time_ms": 0.0465251,
-      "mojo_time_ms": 0.0044307192000000006,
-      "speedup": 10.500575166216805,
-      "python_iterations": 10300,
-      "mojo_iterations": 110000,
-      "engine": "DFA,"
-    },
-    "dfa_simple_phone": {
-      "python_time_ms": 0.79775886,
-      "mojo_time_ms": 0.02188900333333333,
-      "speedup": 36.44564569027888,
-      "python_iterations": 700,
-      "mojo_iterations": 21600,
-      "engine": "DFA,"
-    },
-    "dual_quantifiers": {
-      "python_time_ms": 0.07529158999999999,
-      "mojo_time_ms": 0.018029378333333335,
-      "speedup": 4.1760502557538715,
-      "python_iterations": 6300,
-      "mojo_iterations": 28200,
-      "engine": "DFA,"
-    },
-    "flexible_datetime": {
-      "python_time_ms": 0.078170075,
-      "mojo_time_ms": 0.016334366,
-      "speedup": 4.78562039077611,
-      "python_iterations": 5800,
-      "mojo_iterations": 32000,
-      "engine": "DFA,"
-    },
-    "flexible_phone": {
-      "python_time_ms": 1.7625646499999998,
-      "mojo_time_ms": 0.0599767,
-      "speedup": 29.3874896418109,
-      "python_iterations": 300,
-      "mojo_iterations": 8400,
-      "engine": "NFA,"
-    },
-    "group_alternation": {
-      "python_time_ms": 0.00012548542857142856,
-      "mojo_time_ms": 4.450099386503067e-06,
-      "speedup": 28.198342929602806,
-      "python_iterations": 4039000,
-      "mojo_iterations": 119805000,
-      "engine": "DFA,"
-    },
-    "grouped_quantifiers": {
-      "python_time_ms": 0.162850775,
-      "mojo_time_ms": 0.004335131785714286,
-      "speedup": 37.56535742157781,
-      "python_iterations": 3000,
-      "mojo_iterations": 114800,
-      "engine": "DFA,"
-    },
-    "is_match_alphanumeric": {
-      "python_time_ms": 0.020403466000000002,
-      "mojo_time_ms": 1.6779704761904762e-06,
-      "speedup": 12159.609653158097,
-      "python_iterations": 26000,
-      "mojo_iterations": 299250000,
-      "engine": "DFA,"
-    },
-    "is_match_digits": {
-      "python_time_ms": 0.008824216,
-      "mojo_time_ms": 1.979116217242689e-06,
-      "speedup": 4458.664894522427,
-      "python_iterations": 54000,
-      "mojo_iterations": 258034000,
-      "engine": "DFA,"
-    },
-    "is_match_lowercase": {
-      "python_time_ms": 0.009414866000000003,
-      "mojo_time_ms": 1.7983141615326188e-06,
-      "speedup": 5235.3844513887125,
-      "python_iterations": 50000,
-      "mojo_iterations": 284376000,
-      "engine": "DFA,"
-    },
-    "is_match_predefined_digits": {
-      "python_time_ms": 0.024606962,
-      "mojo_time_ms": 1.4457289996877277e-06,
-      "speedup": 17020.452661124607,
-      "python_iterations": 20000,
-      "mojo_iterations": 345852000,
-      "engine": "DFA,"
-    },
-    "is_match_predefined_word": {
-      "python_time_ms": 0.022915927500000002,
-      "mojo_time_ms": 1.3829733750381447e-06,
-      "speedup": 16570.04242714936,
-      "python_iterations": 22000,
-      "mojo_iterations": 353916000,
-      "engine": "DFA,"
-    },
-    "large_8_alternations": {
-      "python_time_ms": 0.000292339125,
-      "mojo_time_ms": 5.2057691860465125e-05,
-      "speedup": 5.615675888657965,
-      "python_iterations": 1280000,
-      "mojo_iterations": 9288000,
-      "engine": "DFA,"
-    },
-    "literal_heavy_alternation": {
-      "python_time_ms": 0.0003773085,
-      "mojo_time_ms": 6.59672972972973e-05,
-      "speedup": 5.719629505201185,
-      "python_iterations": 1224000,
-      "mojo_iterations": 7178000,
-      "engine": "DFA,"
-    },
-    "literal_match_long": {
-      "python_time_ms": 0.007144761249999999,
-      "mojo_time_ms": 0.0095637915,
-      "speedup": 0.7470636776219974,
-      "python_iterations": 72000,
-      "mojo_iterations": 54000,
-      "engine": "DFA,"
-    },
-    "literal_match_short": {
-      "python_time_ms": 0.0008911165,
-      "mojo_time_ms": 0.0007166391071428571,
-      "speedup": 1.2434661897712513,
-      "python_iterations": 518000,
-      "mojo_iterations": 644000,
-      "engine": "DFA,"
-    },
-    "literal_prefix_long": {
-      "python_time_ms": 0.018194760869565216,
-      "mojo_time_ms": 0.0021354430220356766,
-      "speedup": 8.520368224210685,
-      "python_iterations": 22494,
-      "mojo_iterations": 243015,
-      "engine": "NFA,"
-    },
-    "literal_prefix_short": {
-      "python_time_ms": 0.00015106370523415978,
-      "mojo_time_ms": 9.794759393539882e-05,
-      "speedup": 1.5422911290071466,
-      "python_iterations": 3278616,
-      "mojo_iterations": 4271872,
-      "engine": "NFA,"
-    },
-    "match_all_digits": {
-      "python_time_ms": 0.818730545,
-      "mojo_time_ms": 0.003030260294117647,
-      "speedup": 270.184890251614,
+      "python_time_ms": 0.6253415449999999,
+      "mojo_time_ms": 0.02539740375,
+      "speedup": 24.622262620052254,
       "python_iterations": 800,
-      "mojo_iterations": 159800,
-      "engine": "DFA,"
-    },
-    "match_all_simple": {
-      "python_time_ms": 0.013213774999999999,
-      "mojo_time_ms": 0.0053881691666666665,
-      "speedup": 2.452368251862916,
-      "python_iterations": 29800,
-      "mojo_iterations": 90000,
-      "engine": "DFA,"
-    },
-    "mixed_range_quantifiers": {
-      "python_time_ms": 0.06415445333333333,
-      "mojo_time_ms": 0.003792398888888889,
-      "speedup": 16.91658900156717,
-      "python_iterations": 7125,
-      "mojo_iterations": 127800,
-      "engine": "DFA,"
-    },
-    "multi_format_phone": {
-      "python_time_ms": 3.41684547,
-      "mojo_time_ms": 0.059360963333333336,
-      "speedup": 57.560478774799755,
-      "python_iterations": 200,
-      "mojo_iterations": 8100,
-      "engine": "NFA,"
-    },
-    "nanpa_findall": {
-      "python_time_ms": 0.02884093181818182,
-      "mojo_time_ms": 0.007387779515640767,
-      "speedup": 3.9038701354205685,
-      "python_iterations": 16412,
-      "mojo_iterations": 73334,
-      "engine": "NFA,"
-    },
-    "nanpa_match_first": {
-      "python_time_ms": 0.00029169916666666666,
-      "mojo_time_ms": 1.6006013179571664e-05,
-      "speedup": 18.224348774056978,
-      "python_iterations": 1692000,
-      "mojo_iterations": 30957000,
-      "engine": "NFA,"
-    },
-    "nanpa_search": {
-      "python_time_ms": 0.0003012877966101695,
-      "mojo_time_ms": 2.379883483833382e-05,
-      "speedup": 12.659770894534388,
-      "python_iterations": 1631350,
-      "mojo_iterations": 19224800,
-      "engine": "NFA,"
-    },
-    "national_phone_validation": {
-      "python_time_ms": 0.5799153,
-      "mojo_time_ms": 0.029284963157894736,
-      "speedup": 19.802493753305768,
-      "python_iterations": 810,
-      "mojo_iterations": 15580,
-      "engine": "NFA,"
-    },
-    "no_literal_baseline": {
-      "python_time_ms": 0.0001800756183745583,
-      "mojo_time_ms": 7.20389272807963e-06,
-      "speedup": 24.996987763664514,
-      "python_iterations": 2537095,
-      "mojo_iterations": 67271845,
-      "engine": "DFA,"
-    },
-    "optimize_extreme_quantifiers": {
-      "python_time_ms": 0.00709087,
-      "mojo_time_ms": 0.0006099409655172414,
-      "speedup": 11.625502140173204,
-      "python_iterations": 68000,
-      "mojo_iterations": 826500,
-      "engine": "DFA,"
-    },
-    "optimize_large_quantifiers": {
-      "python_time_ms": 0.00780899,
-      "mojo_time_ms": 0.0035507051999999996,
-      "speedup": 2.199278610908053,
-      "python_iterations": 63400,
-      "mojo_iterations": 140000,
-      "engine": "DFA,"
-    },
-    "optimize_multiple_quantifiers": {
-      "python_time_ms": 0.2369016525,
-      "mojo_time_ms": 0.009566811500000001,
-      "speedup": 24.76286404305133,
-      "python_iterations": 2000,
-      "mojo_iterations": 52000,
-      "engine": "DFA,"
-    },
-    "optimize_phone_quantifiers": {
-      "python_time_ms": 0.10222085666666668,
-      "mojo_time_ms": 0.02851831,
-      "speedup": 3.5843939092697523,
-      "python_iterations": 5100,
-      "mojo_iterations": 17400,
-      "engine": "DFA,"
-    },
-    "optimize_range_quantifier": {
-      "python_time_ms": 0.083610608,
-      "mojo_time_ms": 0.012731054,
-      "speedup": 6.567453723784378,
-      "python_iterations": 6000,
-      "mojo_iterations": 40000,
-      "engine": "NFA,"
-    },
-    "phone_validation": {
-      "python_time_ms": 0.000272242,
-      "mojo_time_ms": 2.3012839402850033e-05,
-      "speedup": 11.830004774042967,
-      "python_iterations": 1637500,
-      "mojo_iterations": 26526000,
-      "engine": "NFA,"
-    },
-    "predefined_digits": {
-      "python_time_ms": 0.10936805599999999,
-      "mojo_time_ms": 0.000370571775,
-      "speedup": 295.1332599467404,
-      "python_iterations": 5000,
-      "mojo_iterations": 1240000,
-      "engine": "DFA,"
-    },
-    "predefined_word": {
-      "python_time_ms": 0.022321084999999997,
-      "mojo_time_ms": 0.014877721,
-      "speedup": 1.5003027009311438,
-      "python_iterations": 18000,
-      "mojo_iterations": 31000,
-      "engine": "DFA,"
-    },
-    "quad_quantifiers": {
-      "python_time_ms": 0.07847898,
-      "mojo_time_ms": 0.006935194615384615,
-      "speedup": 11.316045814476063,
-      "python_iterations": 6200,
-      "mojo_iterations": 71500,
-      "engine": "DFA,"
-    },
-    "quantifier_one_or_more": {
-      "python_time_ms": 0.0001479706,
-      "mojo_time_ms": 4.011843084731425e-06,
-      "speedup": 36.88344655431756,
-      "python_iterations": 2965000,
-      "mojo_iterations": 127674000,
-      "engine": "DFA,"
-    },
-    "quantifier_zero_or_more": {
-      "python_time_ms": 0.00020037366666666667,
-      "mojo_time_ms": 3.829549019607843e-06,
-      "speedup": 52.32304525695444,
-      "python_iterations": 2544000,
-      "mojo_iterations": 133110000,
-      "engine": "DFA,"
-    },
-    "quantifier_zero_or_one": {
-      "python_time_ms": 0.0001623275714285714,
-      "mojo_time_ms": 4.428777925531916e-06,
-      "speedup": 36.652903838946756,
-      "python_iterations": 3143000,
-      "mojo_iterations": 117312000,
-      "engine": "DFA,"
-    },
-    "range_alphanumeric": {
-      "python_time_ms": 0.01195533,
-      "mojo_time_ms": 0.0007285131764705882,
-      "speedup": 16.4105885605525,
-      "python_iterations": 42000,
-      "mojo_iterations": 680000,
-      "engine": "DFA,"
-    },
-    "range_digits": {
-      "python_time_ms": 0.105517659,
-      "mojo_time_ms": 0.000262909375,
-      "speedup": 401.3461254472192,
-      "python_iterations": 5000,
-      "mojo_iterations": 1856000,
-      "engine": "DFA,"
-    },
-    "range_lowercase": {
-      "python_time_ms": 0.009027581,
-      "mojo_time_ms": 0.0002364121666666667,
-      "speedup": 38.18577160086938,
-      "python_iterations": 51000,
-      "mojo_iterations": 2220000,
-      "engine": "DFA,"
-    },
-    "range_quantifiers": {
-      "python_time_ms": 0.08189262,
-      "mojo_time_ms": 0.024334601249999997,
-      "speedup": 3.3652747854251364,
-      "python_iterations": 6000,
       "mojo_iterations": 19200,
       "engine": "DFA,"
     },
+    "dfa_paren_phone": {
+      "python_time_ms": 0.037600635,
+      "mojo_time_ms": 0.003983305555555556,
+      "speedup": 9.439555784907844,
+      "python_iterations": 13200,
+      "mojo_iterations": 115200,
+      "engine": "DFA,"
+    },
+    "dfa_simple_phone": {
+      "python_time_ms": 0.67453023,
+      "mojo_time_ms": 0.019989872,
+      "speedup": 33.74359925866459,
+      "python_iterations": 700,
+      "mojo_iterations": 25000,
+      "engine": "DFA,"
+    },
+    "dual_quantifiers": {
+      "python_time_ms": 0.07064118,
+      "mojo_time_ms": 0.016867606666666667,
+      "speedup": 4.1879788517715015,
+      "python_iterations": 6450,
+      "mojo_iterations": 28350,
+      "engine": "DFA,"
+    },
+    "flexible_datetime": {
+      "python_time_ms": 0.07744192999999999,
+      "mojo_time_ms": 0.011568830833333333,
+      "speedup": 6.694015248011593,
+      "python_iterations": 6000,
+      "mojo_iterations": 38400,
+      "engine": "DFA,"
+    },
+    "flexible_phone": {
+      "python_time_ms": 1.368003045,
+      "mojo_time_ms": 0.051656695,
+      "speedup": 26.482589430082587,
+      "python_iterations": 400,
+      "mojo_iterations": 8600,
+      "engine": "NFA,"
+    },
+    "group_alternation": {
+      "python_time_ms": 0.000124507875,
+      "mojo_time_ms": 3.0335151889355397e-06,
+      "speedup": 41.04409150616114,
+      "python_iterations": 3800000,
+      "mojo_iterations": 170058000,
+      "engine": "DFA,"
+    },
+    "grouped_quantifiers": {
+      "python_time_ms": 0.07384191999999999,
+      "mojo_time_ms": 0.003356813225806452,
+      "speedup": 21.997625436029427,
+      "python_iterations": 6700,
+      "mojo_iterations": 136400,
+      "engine": "DFA,"
+    },
+    "is_match_alphanumeric": {
+      "python_time_ms": 0.011008696,
+      "mojo_time_ms": 1.2352238360029878e-06,
+      "speedup": 8912.308586614234,
+      "python_iterations": 43000,
+      "mojo_iterations": 373519000,
+      "engine": "DFA,"
+    },
+    "is_match_digits": {
+      "python_time_ms": 0.009300112999999999,
+      "mojo_time_ms": 1.2225268292682926e-06,
+      "speedup": 7607.287445434885,
+      "python_iterations": 52000,
+      "mojo_iterations": 367770000,
+      "engine": "DFA,"
+    },
+    "is_match_lowercase": {
+      "python_time_ms": 0.008764728,
+      "mojo_time_ms": 1.1789679812277647e-06,
+      "speedup": 7434.2375192178715,
+      "python_iterations": 55000,
+      "mojo_iterations": 435963000,
+      "engine": "DFA,"
+    },
+    "is_match_predefined_digits": {
+      "python_time_ms": 0.0238954315,
+      "mojo_time_ms": 1.6142919377964045e-06,
+      "speedup": 14802.422622898404,
+      "python_iterations": 20000,
+      "mojo_iterations": 299211000,
+      "engine": "DFA,"
+    },
+    "is_match_predefined_word": {
+      "python_time_ms": 0.021190333,
+      "mojo_time_ms": 1.176392885202968e-06,
+      "speedup": 18012.972763214173,
+      "python_iterations": 22000,
+      "mojo_iterations": 435290000,
+      "engine": "DFA,"
+    },
+    "large_8_alternations": {
+      "python_time_ms": 0.000271383125,
+      "mojo_time_ms": 5.455439090909091e-05,
+      "speedup": 4.974542295820534,
+      "python_iterations": 1624000,
+      "mojo_iterations": 8360000,
+      "engine": "DFA,"
+    },
+    "literal_heavy_alternation": {
+      "python_time_ms": 0.000303618625,
+      "mojo_time_ms": 6.475776923076923e-05,
+      "speedup": 4.688528165910595,
+      "python_iterations": 1592000,
+      "mojo_iterations": 7098000,
+      "engine": "DFA,"
+    },
+    "literal_match_long": {
+      "python_time_ms": 0.00604407725,
+      "mojo_time_ms": 0.00038740635416666667,
+      "speedup": 15.601389045363382,
+      "python_iterations": 76000,
+      "mojo_iterations": 1296000,
+      "engine": "DFA,"
+    },
+    "literal_match_short": {
+      "python_time_ms": 0.000720878,
+      "mojo_time_ms": 6.90850974025974e-05,
+      "speedup": 10.434638251995821,
+      "python_iterations": 614000,
+      "mojo_iterations": 6930000,
+      "engine": "DFA,"
+    },
+    "literal_prefix_long": {
+      "python_time_ms": 0.016886116279069767,
+      "mojo_time_ms": 0.0011033707207767957,
+      "speedup": 15.304118517103294,
+      "python_iterations": 28595,
+      "mojo_iterations": 457881,
+      "engine": "NFA,"
+    },
+    "literal_prefix_short": {
+      "python_time_ms": 0.00014538742690058478,
+      "mojo_time_ms": 8.637242361236667e-05,
+      "speedup": 1.683262097091003,
+      "python_iterations": 3262680,
+      "mojo_iterations": 5265512,
+      "engine": "NFA,"
+    },
+    "match_all_digits": {
+      "python_time_ms": 0.7676124975,
+      "mojo_time_ms": 0.0025677842500000003,
+      "speedup": 298.9396393018611,
+      "python_iterations": 800,
+      "mojo_iterations": 196000,
+      "engine": "DFA,"
+    },
+    "match_all_simple": {
+      "python_time_ms": 0.012205955,
+      "mojo_time_ms": 0.004399399545454545,
+      "speedup": 2.7744593037954868,
+      "python_iterations": 39800,
+      "mojo_iterations": 103400,
+      "engine": "DFA,"
+    },
+    "mixed_range_quantifiers": {
+      "python_time_ms": 0.06223572,
+      "mojo_time_ms": 0.0033686103703703704,
+      "speedup": 18.47519100083912,
+      "python_iterations": 7275,
+      "mojo_iterations": 143775,
+      "engine": "DFA,"
+    },
+    "multi_format_phone": {
+      "python_time_ms": 3.3551422000000004,
+      "mojo_time_ms": 0.056674245000000005,
+      "speedup": 59.200474571827115,
+      "python_iterations": 150,
+      "mojo_iterations": 9000,
+      "engine": "NFA,"
+    },
+    "nanpa_findall": {
+      "python_time_ms": 0.022551895833333332,
+      "mojo_time_ms": 0.00513889023162135,
+      "speedup": 4.38847588036884,
+      "python_iterations": 20016,
+      "mojo_iterations": 89370,
+      "engine": "NFA,"
+    },
+    "nanpa_match_first": {
+      "python_time_ms": 0.0002521805454545455,
+      "mojo_time_ms": 1.38598899545684e-05,
+      "speedup": 18.19498901370595,
+      "python_iterations": 1919500,
+      "mojo_iterations": 32686500,
+      "engine": "NFA,"
+    },
+    "nanpa_search": {
+      "python_time_ms": 0.00021288916666666667,
+      "mojo_time_ms": 1.928018686131387e-05,
+      "speedup": 11.0418622079765,
+      "python_iterations": 2352000,
+      "mojo_iterations": 26030000,
+      "engine": "NFA,"
+    },
+    "national_phone_validation": {
+      "python_time_ms": 0.45778604999999994,
+      "mojo_time_ms": 0.02731893947368421,
+      "speedup": 16.75709448534692,
+      "python_iterations": 1080,
+      "mojo_iterations": 17480,
+      "engine": "NFA,"
+    },
+    "no_literal_baseline": {
+      "python_time_ms": 0.00013989238095238094,
+      "mojo_time_ms": 6.000646792497207e-06,
+      "speedup": 23.31288372568315,
+      "python_iterations": 3439800,
+      "mojo_iterations": 77194773,
+      "engine": "DFA,"
+    },
+    "optimize_extreme_quantifiers": {
+      "python_time_ms": 0.007832595,
+      "mojo_time_ms": 5.757968333333334e-05,
+      "speedup": 136.0305327602531,
+      "python_iterations": 62000,
+      "mojo_iterations": 8100000,
+      "engine": "DFA,"
+    },
+    "optimize_large_quantifiers": {
+      "python_time_ms": 0.004280833333333333,
+      "mojo_time_ms": 0.0026825386842105263,
+      "speedup": 1.5958142033628067,
+      "python_iterations": 115800,
+      "mojo_iterations": 190000,
+      "engine": "DFA,"
+    },
+    "optimize_multiple_quantifiers": {
+      "python_time_ms": 0.18455553749999998,
+      "mojo_time_ms": 0.008556448333333334,
+      "speedup": 21.569175703548332,
+      "python_iterations": 2800,
+      "mojo_iterations": 58800,
+      "engine": "DFA,"
+    },
+    "optimize_phone_quantifiers": {
+      "python_time_ms": 0.11464842,
+      "mojo_time_ms": 0.020992843333333334,
+      "speedup": 5.46130975111677,
+      "python_iterations": 4500,
+      "mojo_iterations": 21600,
+      "engine": "DFA,"
+    },
+    "optimize_range_quantifier": {
+      "python_time_ms": 0.090078137,
+      "mojo_time_ms": 0.010441569,
+      "speedup": 8.626877531528068,
+      "python_iterations": 6000,
+      "mojo_iterations": 43000,
+      "engine": "NFA,"
+    },
+    "phone_validation": {
+      "python_time_ms": 0.00024676375000000003,
+      "mojo_time_ms": 1.4361903055555555e-05,
+      "speedup": 17.18182813555098,
+      "python_iterations": 2048000,
+      "mojo_iterations": 32400000,
+      "engine": "NFA,"
+    },
+    "predefined_digits": {
+      "python_time_ms": 0.114919042,
+      "mojo_time_ms": 0.00020103818,
+      "speedup": 571.6279464925518,
+      "python_iterations": 5000,
+      "mojo_iterations": 2500000,
+      "engine": "DFA,"
+    },
+    "predefined_word": {
+      "python_time_ms": 0.020380548999999998,
+      "mojo_time_ms": 0.019755586,
+      "speedup": 1.0316347487743467,
+      "python_iterations": 24000,
+      "mojo_iterations": 27000,
+      "engine": "DFA,"
+    },
+    "quad_quantifiers": {
+      "python_time_ms": 0.07770508999999999,
+      "mojo_time_ms": 0.0033574129545454546,
+      "speedup": 23.144334954327995,
+      "python_iterations": 5900,
+      "mojo_iterations": 145200,
+      "engine": "DFA,"
+    },
+    "quantifier_one_or_more": {
+      "python_time_ms": 0.000132994,
+      "mojo_time_ms": 3.158496083865526e-06,
+      "speedup": 42.106748423520365,
+      "python_iterations": 3660000,
+      "mojo_iterations": 141083000,
+      "engine": "DFA,"
+    },
+    "quantifier_zero_or_more": {
+      "python_time_ms": 0.0001612175714285714,
+      "mojo_time_ms": 3.0173825641707677e-06,
+      "speedup": 53.42960927225911,
+      "python_iterations": 3290000,
+      "mojo_iterations": 165418000,
+      "engine": "DFA,"
+    },
+    "quantifier_zero_or_one": {
+      "python_time_ms": 0.00013224949999999998,
+      "mojo_time_ms": 3.0129337498183934e-06,
+      "speedup": 43.89392896806025,
+      "python_iterations": 3444000,
+      "mojo_iterations": 165192000,
+      "engine": "DFA,"
+    },
+    "range_alphanumeric": {
+      "python_time_ms": 0.010993191000000001,
+      "mojo_time_ms": 0.0004002405,
+      "speedup": 27.466463288947523,
+      "python_iterations": 45000,
+      "mojo_iterations": 1144000,
+      "engine": "DFA,"
+    },
+    "range_digits": {
+      "python_time_ms": 0.08369291200000001,
+      "mojo_time_ms": 0.00020164316666666668,
+      "speedup": 415.0545410663557,
+      "python_iterations": 6000,
+      "mojo_iterations": 2496000,
+      "engine": "DFA,"
+    },
+    "range_lowercase": {
+      "python_time_ms": 0.0096252135,
+      "mojo_time_ms": 0.00017097485185185184,
+      "speedup": 56.29607743915556,
+      "python_iterations": 46000,
+      "mojo_iterations": 2700000,
+      "engine": "DFA,"
+    },
+    "range_quantifiers": {
+      "python_time_ms": 0.07448479,
+      "mojo_time_ms": 0.016049104285714287,
+      "speedup": 4.641055891592703,
+      "python_iterations": 6700,
+      "mojo_iterations": 28700,
+      "engine": "DFA,"
+    },
     "required_literal_short": {
-      "python_time_ms": 0.0015680422960725076,
-      "mojo_time_ms": 0.00019623989735202053,
-      "speedup": 7.990435773922721,
-      "python_iterations": 288632,
-      "mojo_iterations": 2304965,
+      "python_time_ms": 0.0013913079096045198,
+      "mojo_time_ms": 0.00015675339783932266,
+      "speedup": 8.87577512693317,
+      "python_iterations": 339840,
+      "mojo_iterations": 2926860,
       "engine": "NFA+Prefilter,"
     },
     "simple_phone": {
-      "python_time_ms": 1.28960177,
-      "mojo_time_ms": 0.023709545,
-      "speedup": 54.391670949400336,
-      "python_iterations": 400,
-      "mojo_iterations": 18600,
+      "python_time_ms": 0.802903665,
+      "mojo_time_ms": 0.019979732,
+      "speedup": 40.1859076488113,
+      "python_iterations": 600,
+      "mojo_iterations": 25000,
       "engine": "DFA,"
     },
     "single_quantifier_alpha": {
-      "python_time_ms": 0.08670812,
-      "mojo_time_ms": 0.0096715,
-      "speedup": 8.965322855813472,
-      "python_iterations": 5800,
-      "mojo_iterations": 49600,
+      "python_time_ms": 0.08325463250000001,
+      "mojo_time_ms": 0.008752244166666666,
+      "speedup": 9.512375445040622,
+      "python_iterations": 6000,
+      "mojo_iterations": 52800,
       "engine": "DFA,"
     },
     "single_quantifier_digits": {
-      "python_time_ms": 0.075286615,
-      "mojo_time_ms": 0.027576375,
-      "speedup": 2.7301128230233305,
-      "python_iterations": 6000,
-      "mojo_iterations": 18600,
+      "python_time_ms": 0.09249910750000001,
+      "mojo_time_ms": 0.013454875000000002,
+      "speedup": 6.874765280242292,
+      "python_iterations": 5200,
+      "mojo_iterations": 36000,
       "engine": "DFA,"
     },
     "sparse_email_findall": {
-      "python_time_ms": 0.27344559999999996,
-      "mojo_time_ms": 0.0009052429490930368,
-      "speedup": 302.06874328484434,
-      "python_iterations": 1775,
-      "mojo_iterations": 538335,
+      "python_time_ms": 0.2554811,
+      "mojo_time_ms": 0.001102012787964269,
+      "speedup": 231.83133879230772,
+      "python_iterations": 1920,
+      "mojo_iterations": 457305,
       "engine": "DFA,"
     },
     "sparse_flex_phone_findall": {
-      "python_time_ms": 0.36940175,
-      "mojo_time_ms": 0.0012256008935219657,
-      "speedup": 301.40460238933355,
-      "python_iterations": 1344,
-      "mojo_iterations": 386784,
+      "python_time_ms": 0.345756,
+      "mojo_time_ms": 0.001228182537120723,
+      "speedup": 281.5184140384942,
+      "python_iterations": 1436,
+      "mojo_iterations": 377956,
       "engine": "NFA,"
     },
     "sparse_phone_findall": {
-      "python_time_ms": 0.5127152,
-      "mojo_time_ms": 0.002100914111498258,
-      "speedup": 244.04386509373265,
-      "python_iterations": 990,
-      "mojo_iterations": 223860,
+      "python_time_ms": 0.3662132,
+      "mojo_time_ms": 0.0014793133012820513,
+      "speedup": 247.55621387478925,
+      "python_iterations": 1300,
+      "mojo_iterations": 305760,
       "engine": "DFA,"
     },
     "sparse_phone_search": {
-      "python_time_ms": 0.03030705,
-      "mojo_time_ms": 0.004899743573667711,
-      "speedup": 6.185435940541192,
-      "python_iterations": 13860,
-      "mojo_iterations": 103675,
+      "python_time_ms": 0.025256833333333333,
+      "mojo_time_ms": 0.0019338995402298851,
+      "speedup": 13.060054469184589,
+      "python_iterations": 18750,
+      "mojo_iterations": 261000,
       "engine": "DFA,"
     },
     "sub_char_class": {
-      "python_time_ms": 0.9116444,
-      "mojo_time_ms": 0.10885822,
-      "speedup": 8.374603222430055,
-      "python_iterations": 550,
-      "mojo_iterations": 4500,
+      "python_time_ms": 1.34592035,
+      "mojo_time_ms": 0.08848925384615385,
+      "speedup": 15.209986427730513,
+      "python_iterations": 380,
+      "mojo_iterations": 5070,
       "engine": "N/A"
     },
     "sub_digits": {
-      "python_time_ms": 1.8122395,
-      "mojo_time_ms": 0.09566528,
-      "speedup": 18.94354461723208,
-      "python_iterations": 290,
-      "mojo_iterations": 5300,
+      "python_time_ms": 0.95519435,
+      "mojo_time_ms": 0.06703565333333333,
+      "speedup": 14.249049610217368,
+      "python_iterations": 540,
+      "mojo_iterations": 7500,
       "engine": "N/A"
     },
     "sub_group_date_fmt": {
-      "python_time_ms": 0.06474715,
-      "mojo_time_ms": 0.011729129054054054,
-      "speedup": 5.520201005685141,
-      "python_iterations": 7480,
-      "mojo_iterations": 42920,
+      "python_time_ms": 0.060867,
+      "mojo_time_ms": 0.010670568627450982,
+      "speedup": 5.704194605282258,
+      "python_iterations": 7900,
+      "mojo_iterations": 42840,
       "engine": "N/A"
     },
     "sub_group_phone_fmt": {
-      "python_time_ms": 0.1623216,
-      "mojo_time_ms": 0.023506316279069767,
-      "speedup": 6.905446096823457,
-      "python_iterations": 3410,
-      "mojo_iterations": 21070,
+      "python_time_ms": 0.08227095,
+      "mojo_time_ms": 0.013686375675675676,
+      "speedup": 6.011156784642213,
+      "python_iterations": 5780,
+      "mojo_iterations": 37000,
       "engine": "N/A"
     },
     "sub_group_word_swap": {
-      "python_time_ms": 0.0410756875,
-      "mojo_time_ms": 0.06039701666666667,
-      "speedup": 0.6800946431956766,
-      "python_iterations": 12080,
-      "mojo_iterations": 8100,
+      "python_time_ms": 0.039935925000000004,
+      "mojo_time_ms": 0.04794322045454545,
+      "speedup": 0.8329837800083311,
+      "python_iterations": 11880,
+      "mojo_iterations": 10560,
       "engine": "N/A"
     },
     "sub_limited_count": {
-      "python_time_ms": 0.016751529999999997,
-      "mojo_time_ms": 0.012597444444444444,
-      "speedup": 1.3297562115773038,
-      "python_iterations": 23400,
-      "mojo_iterations": 32400,
+      "python_time_ms": 0.015459955000000001,
+      "mojo_time_ms": 0.0099243215,
+      "speedup": 1.5577845800340104,
+      "python_iterations": 30200,
+      "mojo_iterations": 46000,
       "engine": "N/A"
     },
     "sub_literal": {
-      "python_time_ms": 0.005354444999999999,
-      "mojo_time_ms": 0.0025707678947368418,
-      "speedup": 2.08281930506531,
-      "python_iterations": 80200,
-      "mojo_iterations": 167200,
+      "python_time_ms": 0.003765113333333333,
+      "mojo_time_ms": 0.0020986765116279074,
+      "speedup": 1.7940417746481563,
+      "python_iterations": 126600,
+      "mojo_iterations": 215000,
       "engine": "N/A"
     },
     "sub_whitespace": {
-      "python_time_ms": 0.07265328,
-      "mojo_time_ms": 0.014500639999999999,
-      "speedup": 5.010349888004944,
-      "python_iterations": 6950,
-      "mojo_iterations": 33750,
+      "python_time_ms": 0.07086836999999999,
+      "mojo_time_ms": 0.011417689411764704,
+      "speedup": 6.206892431929155,
+      "python_iterations": 6800,
+      "mojo_iterations": 44200,
       "engine": "N/A"
     },
     "toll_free_complex": {
-      "python_time_ms": 0.0549017,
-      "mojo_time_ms": 0.007308203333333333,
-      "speedup": 7.5123388739868115,
-      "python_iterations": 9000,
-      "mojo_iterations": 67500,
+      "python_time_ms": 0.026430215,
+      "mojo_time_ms": 0.0067362484375,
+      "speedup": 3.9235807950410084,
+      "python_iterations": 19200,
+      "mojo_iterations": 70400,
       "engine": "DFA,"
     },
     "toll_free_simple": {
-      "python_time_ms": 0.0636134,
-      "mojo_time_ms": 0.0086203475,
-      "speedup": 7.37944729026295,
-      "python_iterations": 8100,
-      "mojo_iterations": 57600,
+      "python_time_ms": 0.04952735,
+      "mojo_time_ms": 0.007919632499999999,
+      "speedup": 6.253743466000475,
+      "python_iterations": 8900,
+      "mojo_iterations": 59200,
       "engine": "DFA,"
     },
     "triple_quantifiers": {
-      "python_time_ms": 0.08600467999999999,
-      "mojo_time_ms": 0.0036783292857142857,
-      "speedup": 23.38145209946829,
-      "python_iterations": 5300,
-      "mojo_iterations": 126000,
+      "python_time_ms": 0.06275962,
+      "mojo_time_ms": 0.003365767931034483,
+      "speedup": 18.646448978646774,
+      "python_iterations": 8000,
+      "mojo_iterations": 139200,
       "engine": "DFA,"
     },
     "ultra_dense_quantifiers": {
-      "python_time_ms": 0.19901094000000003,
-      "mojo_time_ms": 0.0071476000000000005,
-      "speedup": 27.84304381890425,
-      "python_iterations": 2100,
-      "mojo_iterations": 69000,
+      "python_time_ms": 0.20746952,
+      "mojo_time_ms": 0.006307348679245283,
+      "speedup": 32.893301219051224,
+      "python_iterations": 2325,
+      "mojo_iterations": 78175,
       "engine": "DFA,"
     },
     "wildcard_match_any": {
-      "python_time_ms": 0.004776496,
-      "mojo_time_ms": 7.473596437968023e-07,
-      "speedup": 6391.161256358484,
-      "python_iterations": 107000,
-      "mojo_iterations": 612684000,
+      "python_time_ms": 0.004571469,
+      "mojo_time_ms": 8.381487405159333e-07,
+      "speedup": 5454.245504426784,
+      "python_iterations": 113000,
+      "mojo_iterations": 593100000,
       "engine": "NFA,"
     }
   }
