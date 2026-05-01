@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.13.0 (2026-05-01)
+
+### Two-byte memchr-style SIMD scan in simd_search (PR #148)
+
+- `simd_search` previously compared each text byte to `pattern[0]` and called `verify_match` on every hit. For `"hello"` on alphabet text every `'h'` triggered a verify, dominating the inner loop on long no-match prefixes.
+- New scan loads two SIMD chunks per iteration: one at `pos` and one at `pos + (pattern_len - 1)`, ANDing the byte-equality results. Only positions where both the first and last bytes match advance to `verify_match`. Discrimination factor is roughly the alphabet size (~26x fewer verifies on alphabet text), so the loop becomes bound by the SIMD scan rather than per-hit verification. `pattern_len == 1` now dispatches to the existing `simd_find_byte` SIMD memchr helper instead of a scalar fallback. The dead `_search_short_pattern` was removed.
+- Stable bench (full 80-bench geomean post-change vs pre-change): **1.089x faster**. Targeted benches (3-median verified): `literal_match_long` 9169 → 565 ns (**16.2x**), `literal_match_short` 927 → 83 ns (**11.1x**), `optimize_extreme_quantifiers` 628 → 76 ns (**8.2x**), `sub_digits` 132 → 94 us (1.41x), `toll_free_simple` 15.0 → 11.2 us (1.34x). Apparent single-run regressions on `toll_free_complex`, `sub_char_class`, `dfa_dot_phone`, `simple_phone` all returned equal-or-faster on 3-median re-runs.
+- vs Rust on the targeted bench: `literal_match_long` was 2.6x slower; with this change Mojo (565 ns) is **6.5x faster** than Rust (3679 ns) on the same machine state. The published v0.13.0 numbers reflect a fresher Rust toolchain (~1.5x faster than the v0.12.0 measurement) so the headline ratio is closer; the underlying Mojo improvement is the same.
+
 ## v0.12.0 (2026-04-26)
 
 ### Route fixed-bounded literal quantifiers to DFA + fix O(N^2) literal findall (PR #147)
