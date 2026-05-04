@@ -296,7 +296,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     #     print("Deleting ASTNode:", self, "in ", call_location)
 
     @always_inline
-    def __copyinit__(out self, copy: ASTNode[Self.regex_origin]):
+    def __init__(out self, *, copy: ASTNode[Self.regex_origin]):
         """Copy constructor for ASTNode."""
         self.type = copy.type
         self.regex_ptr = copy.regex_ptr

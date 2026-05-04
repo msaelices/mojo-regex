@@ -77,13 +77,13 @@ struct OptimizedLiteralInfo(Copyable, Movable):
         self.has_anchors = has_anchors
         self.is_exact_match = is_exact_match
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy constructor."""
         self.best_literal = copy.best_literal
         self.has_anchors = copy.has_anchors
         self.is_exact_match = copy.is_exact_match
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move constructor."""
         self.best_literal = take.best_literal^
         self.has_anchors = take.has_anchors
@@ -226,7 +226,7 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
         self.engine_ptr = alloc[DFAEngine](1)
         self.engine_ptr.init_pointee_move(engine^)
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy constructor."""
         self.engine_ptr = copy.engine_ptr
 
@@ -302,7 +302,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         else:
             self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy constructor. Deep-copies owned engines."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
@@ -317,7 +317,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         else:
             self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move constructor. Transfers ownership of the heap-allocated
         engines from `take` to `self`."""
         self.engine = take.engine^
@@ -660,7 +660,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
                 self.dfa_matcher.engine_ptr[]._simd_char_matcher.lookup_table,
             )
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy constructor."""
         self.dfa_matcher = copy.dfa_matcher.copy()
         self.nfa_matcher = copy.nfa_matcher.copy()
@@ -673,7 +673,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self._use_dfa = copy._use_dfa
         self._required_byte = copy._required_byte
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move constructor."""
         self.dfa_matcher = take.dfa_matcher^
         self.nfa_matcher = take.nfa_matcher^
@@ -934,7 +934,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_concat = False
         self._try_precompute_fixed_sub()
 
-    def __copyinit__(out self, copy: Self):
+    def __init__(out self, *, copy: Self):
         """Copy constructor."""
         self.matcher = copy.matcher.copy()
         self.pattern = copy.pattern
@@ -945,7 +945,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_widths = copy._fixed_sub_widths
         self._fixed_sub_concat = copy._fixed_sub_concat
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move constructor."""
         self.matcher = take.matcher^
         self.pattern = take.pattern^

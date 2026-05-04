@@ -291,7 +291,7 @@ struct DFAEngine(Engine):
         self._simd_scan_eligible = False
         self.literal_pattern = ""
 
-    def __moveinit__(out self, deinit take: Self):
+    def __init__(out self, *, deinit take: Self):
         """Move constructor."""
         self.states = take.states^
         self.start_state = take.start_state

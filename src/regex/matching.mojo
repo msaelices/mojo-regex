@@ -69,8 +69,9 @@ struct MatchList(Copyable, Movable, Sized):
             self._realloc(capacity)
 
     @always_inline
-    def __copyinit__(
+    def __init__(
         out self,
+        *,
         copy: Self,
     ):
         """Copy constructor."""
