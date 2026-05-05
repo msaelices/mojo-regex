@@ -135,3 +135,36 @@ To extend the trace, instrument the same way on the additional types.
 The pattern is: add `@always_inline` to the copy ctor (if missing),
 import `call_location` from `std.reflection.location`, and add
 `print("COPY_TRACE <Type>", call_location())` at the top of the body.
+
+## Failed attempt: pre-allocate `result` buffer (2026-05-05)
+
+Hypothesis: `_sub_impl_with_repl` creates the result buffer at
+`String(capacity=text_len + 64)`. If the output exceeds this (e.g.
+group references that expand the text), the buffer grows via
+realloc + memcpy. Bumping the initial capacity to `text_len * 4 +
+256` should eliminate any growth realloc and speed up the per-match
+append path.
+
+**Result**: `sub_group_word_swap` regressed **52%** in 3-median
+stable mode (median 0.067 ms baseline → 0.102 ms with bump). The
+3-run variance also expanded sharply: with-bump runs spread from
+0.076 to 0.129 ms (70% range) vs baseline 0.056 to 0.071 ms (27%
+range).
+
+**Best guess on why**: a larger initial heap allocation moves
+`result` to a different memory region with worse cache locality.
+The 4x-larger buffer evicts more of the surrounding hot data
+(NFA state, capture-group lists, template segments) from L1 / L2,
+and the higher run-to-run variance is consistent with cache
+thrashing.
+
+**Implication**: the existing `text_len + 64` capacity is at or
+near a sweet spot. The original code probably never grows `result`
+for typical workloads, so there is nothing to save by pre-allocating
+more. A larger buffer purely costs cache footprint with no
+realloc-elimination upside.
+
+This invalidates the prerequisite suggested in the prior failed
+attempt section ("pre-allocate `result` then re-test the `mut out`
+refactor"). Both attempts on the `_apply_template_groups` path
+regressed; the win, if any, lies elsewhere.
