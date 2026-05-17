@@ -50,7 +50,7 @@ def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
     """Check if a byte value exists in a string slice without allocating."""
     var ptr = s.unsafe_ptr()
     var target = UInt8(ch_code)
-    for i in range(len(s)):
+    for i in range(s.byte_length()):
         if ptr[i] == target:
             return True
     return False

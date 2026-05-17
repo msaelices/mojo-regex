@@ -101,7 +101,7 @@ def create_optimized_prefilter(
     if literal_info.best_literal:
         var literal = literal_info.best_literal.value()
         # Only use literals that are long enough to be effective
-        if len(literal) >= 2:
+        if literal.byte_length() >= 2:
             return MemchrPrefilter(literal, False)
     return None
 
@@ -155,7 +155,7 @@ def _find_rare_required_byte(
         if not val:
             continue
         ref s = val.value()
-        if len(s) != 1:
+        if s.byte_length() != 1:
             continue
         var byte = Int(s.unsafe_ptr()[0])
         if first_class_lookup[byte] == 0:
@@ -424,7 +424,7 @@ def _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     Returns:
         True if prefilter analysis should be skipped for performance.
     """
-    var pattern_len = len(pattern)
+    var pattern_len = pattern.byte_length()
 
     # Skip very short patterns entirely - unlikely to yield useful prefilters
     if pattern_len <= 4:
@@ -587,7 +587,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             var best_literal_info = literal_set.get_best_literal()
             if best_literal_info:
                 var literal = best_literal_info.value().get_literal(literal_set)
-                if len(literal) > 0:
+                if literal.byte_length() > 0:
                     best_literal_opt = literal
                     # Simple heuristic: if we have a required literal and no complex regex constructs
                     # Must also check that the pattern doesn't contain regex operators
@@ -690,7 +690,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         if self.is_wildcard_match_any:
-            return start <= len(text)
+            return start <= text.byte_length()
 
         if self._use_dfa:
             return self.dfa_matcher.is_match(text, start)
@@ -705,8 +705,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
-            if start <= len(text):
-                return Match(0, start, len(text), text)
+            if start <= text.byte_length():
+                return Match(0, start, text.byte_length(), text)
             else:
                 return None
 
@@ -724,8 +724,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
-            if start <= len(text):
-                return Match(0, start, len(text), text)
+            if start <= text.byte_length():
+                return Match(0, start, text.byte_length(), text)
             else:
                 return None
         # Fast path: Exact literal bypass (only for non-anchored patterns)
@@ -734,13 +734,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             if best_literal:
                 var literal = best_literal.value()
                 # Simple bounds check to avoid issues
-                if start >= len(text):
+                if start >= text.byte_length():
                     return None
                 var pos = text.find(literal, start)
                 if pos != -1:
                     # Ensure we don't exceed text bounds
-                    var end_pos = pos + len(literal)
-                    if end_pos <= len(text):
+                    var end_pos = pos + literal.byte_length()
+                    if end_pos <= text.byte_length():
                         return Match(0, pos, end_pos, text)
                 return None
 
@@ -770,20 +770,20 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
             var matches = MatchList(capacity=1)
-            if len(text) >= 0:  # .* matches even empty strings
-                matches.append(Match(0, 0, len(text), text))
+            if text.byte_length() >= 0:  # .* matches even empty strings
+                matches.append(Match(0, 0, text.byte_length(), text))
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var text_len = len(text)
+            var text_len = text.byte_length()
             var matches = MatchList(
                 capacity=text_len >> 7 if text_len >= 1024 else 0
             )
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
-                var literal_len = len(literal)
-                var text_len = len(text)
+                var literal_len = literal.byte_length()
+                var text_len = text.byte_length()
 
                 # Bounds check to avoid issues
                 if literal_len > text_len:
@@ -825,7 +825,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     def _match_all_required_byte(self, text: ImmSlice) raises -> MatchList:
         """findall fast path for patterns with a rare required byte."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
@@ -1352,7 +1352,7 @@ def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
     walks the pre-parsed template without re-scanning repl.
     """
     var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
     var segments = List[_ReplSegment](capacity=8)
     var i = 0
     var literal_start = 0
@@ -1382,7 +1382,7 @@ def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
 def _has_group_refs(repl: ImmSlice) -> Bool:
     """Check if repl contains \\1..\\9 backreferences."""
     var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
     for i in range(repl_len - 1):
         if Int(repl_ptr[i]) == CHAR_SLASH:
             var next_ch = Int(repl_ptr[i + 1])
@@ -1407,7 +1407,7 @@ def _detect_fixed_width_groups(
     quantifiers, nested groups, non-\\d groups, character classes).
     """
     var p = pattern.unsafe_ptr()
-    var plen = len(pattern)
+    var plen = pattern.byte_length()
     var segments = List[Int]()
     var i = 0
     var literal_run = 0  # track bytes of literal content between groups
@@ -1586,7 +1586,7 @@ def _sub_impl_with_repl(
     3. Fixed-width groups + search needed: DFA match_next + offset slicing.
     4. General: NFA match_next_with_groups for complex patterns.
     """
-    var text_len = len(text)
+    var text_len = text.byte_length()
     if text_len == 0:
         return String(text)
 
@@ -1762,7 +1762,7 @@ def sub(
     """
     var cache = _get_last_sub_cache()
     var pattern_addr = Int(pattern.unsafe_ptr())
-    var pattern_len = len(pattern)
+    var pattern_len = pattern.byte_length()
 
     var pattern_hash: UInt64
     if (
@@ -1779,7 +1779,7 @@ def sub(
     var compiled_ptr = _compile_and_cache_with_key(pattern, pattern_hash)
 
     var repl_addr = Int(repl.unsafe_ptr())
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
 
     if cache[].repl_addr != repl_addr or cache[].repl_len != repl_len:
         # Cache miss: parse into the cache slot directly so the template

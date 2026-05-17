@@ -483,7 +483,7 @@ struct OnePassNFA(Copyable, Movable):
         if self.has_start_anchor and start > 0:
             return None
         var text_ptr = text.unsafe_ptr()
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var state_id = 0
         var match_end = -1
         var trans_ptr = self.transitions.unsafe_ptr()
@@ -516,7 +516,7 @@ struct OnePassNFA(Copyable, Movable):
             if start > 0:
                 return None
             return self.match_first(text, 0)
-        var text_len = len(text)
+        var text_len = text.byte_length()
         for try_pos in range(start, text_len + 1):
             var m = self.match_first(text, try_pos)
             if m:
@@ -525,7 +525,7 @@ struct OnePassNFA(Copyable, Movable):
 
     @always_inline
     def match_all(self, text: ImmSlice) -> MatchList:
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )

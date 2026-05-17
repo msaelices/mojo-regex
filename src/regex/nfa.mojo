@@ -91,7 +91,7 @@ struct NFAEngine(Copyable, Engine):
         self.pattern = pattern
         self.literal_prefix = ""
         self.has_literal_optimization = False
-        self.pattern_len = len(pattern)
+        self.pattern_len = pattern.byte_length()
         self.ends_with_dotstar = False
         self.starts_with_dotstar = False
         self.is_prefix_literal = False
@@ -138,9 +138,10 @@ struct NFAEngine(Copyable, Engine):
                 if third == "?" or third == "*" or third == "+":
                     _swd = False
         self.starts_with_dotstar = _swd
-        self.is_prefix_literal = len(
-            self.literal_prefix
-        ) > 0 and pattern.startswith(self.literal_prefix)
+        self.is_prefix_literal = (
+            self.literal_prefix.byte_length() > 0
+            and pattern.startswith(self.literal_prefix)
+        )
 
     @always_inline
     def get_pattern(self) -> String:
@@ -194,7 +195,7 @@ struct NFAEngine(Copyable, Engine):
         """
         # Pre-allocate for long-text findall. Skip the hint on short texts
         # where over-allocating wastes more than the grows cost.
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
@@ -221,7 +222,7 @@ struct NFAEngine(Copyable, Engine):
                     Match(
                         0,
                         current_pos,
-                        last_pos + len(self.literal_prefix),
+                        last_pos + self.literal_prefix.byte_length(),
                         text,
                     )
                 )
@@ -237,18 +238,18 @@ struct NFAEngine(Copyable, Engine):
         ):
             var literal_bytes = self.literal_prefix.as_bytes()
             var search = current_pos
-            while search < len(text):
+            while search < text.byte_length():
                 var pos = twoway_search(literal_bytes, text, search)
                 if pos == -1:
                     break
-                matches.append(Match(0, pos, len(text), text))
+                matches.append(Match(0, pos, text.byte_length(), text))
                 # Only one match since .* consumes everything to end
                 break
             return matches^
 
         # Use literal prefiltering if available
         if self.has_literal_optimization:
-            while current_pos <= len(text):
+            while current_pos <= text.byte_length():
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
                     self._get_search_literal_bytes(),
@@ -279,7 +280,7 @@ struct NFAEngine(Copyable, Engine):
 
                 while (
                     try_pos <= literal_pos
-                    and try_pos <= len(text)
+                    and try_pos <= text.byte_length()
                     and search_count < max_search_positions
                 ):
                     temp_matches.clear()
@@ -313,7 +314,7 @@ struct NFAEngine(Copyable, Engine):
                     current_pos = literal_pos + 1
         else:
             # No literal optimization, use standard approach
-            while current_pos <= len(text):
+            while current_pos <= text.byte_length():
                 temp_matches.clear()
                 var result = self._match_node(
                     ast,
@@ -417,7 +418,7 @@ struct NFAEngine(Copyable, Engine):
             var last_pos = self._find_last_literal(text, start)
             if last_pos >= 0:
                 return Match(
-                    0, start, last_pos + len(self.literal_prefix), text
+                    0, start, last_pos + self.literal_prefix.byte_length(), text
                 )
             return None
 
@@ -431,12 +432,12 @@ struct NFAEngine(Copyable, Engine):
             var literal_bytes = self.literal_prefix.as_bytes()
             var pos = twoway_search(literal_bytes, text, start)
             if pos >= 0:
-                return Match(0, pos, len(text), text)
+                return Match(0, pos, text.byte_length(), text)
             return None
 
         # Use literal prefiltering if available
         if self.has_literal_optimization:
-            while search_pos <= len(text):
+            while search_pos <= text.byte_length():
                 # Find next occurrence of literal
                 var literal_pos = twoway_search(
                     self._get_search_literal_bytes(),
@@ -451,7 +452,8 @@ struct NFAEngine(Copyable, Engine):
                     try_pos = max(0, literal_pos - self.pattern_len)
 
                 var end_pos = min(
-                    len(text), literal_pos + len(self.literal_prefix)
+                    text.byte_length(),
+                    literal_pos + self.literal_prefix.byte_length(),
                 )
                 while try_pos <= literal_pos:
                     matches.clear()
@@ -476,7 +478,7 @@ struct NFAEngine(Copyable, Engine):
                 search_pos = literal_pos + 1
         else:
             # No literal optimization, fall back to standard search
-            while search_pos <= len(text):
+            while search_pos <= text.byte_length():
                 matches.clear()
                 var result = self._match_node(
                     ast,
@@ -515,7 +517,7 @@ struct NFAEngine(Copyable, Engine):
 
         # Use literal prefiltering to skip positions when available
         if self.has_literal_optimization:
-            while search_pos <= len(text):
+            while search_pos <= text.byte_length():
                 var literal_pos = twoway_search(
                     self._get_search_literal_bytes(),
                     text,
@@ -551,7 +553,7 @@ struct NFAEngine(Copyable, Engine):
 
                 search_pos = literal_pos + 1
         else:
-            while search_pos <= len(text):
+            while search_pos <= text.byte_length():
                 matches.clear()
                 var result = self._match_node(
                     ast,
@@ -617,7 +619,8 @@ struct NFAEngine(Copyable, Engine):
                 # If it has alphanumeric ranges plus special chars, return None
                 # to signal specialized handling
                 if (
-                    has_alnum and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+                    has_alnum
+                    and inner.byte_length() > COMPLEX_CHAR_CLASS_THRESHOLD
                 ):  # e.g. "a-zA-Z0-9._%-+"
                     return None
 
@@ -632,12 +635,15 @@ struct NFAEngine(Copyable, Engine):
         self, text: ImmSlice, start: Int, end: Int
     ) -> Bool:
         """Verify that a match contains the required literal."""
-        if not self.has_literal_optimization or len(self.literal_prefix) == 0:
+        if (
+            not self.has_literal_optimization
+            or self.literal_prefix.byte_length() == 0
+        ):
             return True
 
         # Use twoway_search (already imported) with bounded range
         var pos = twoway_search(self.literal_prefix.as_bytes(), text, start)
-        return pos != -1 and pos + len(self.literal_prefix) <= end
+        return pos != -1 and pos + self.literal_prefix.byte_length() <= end
 
     @always_inline
     def _match_node(
@@ -747,7 +753,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match a literal character element."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
@@ -772,7 +778,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match wildcard (.) - any character except newline."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
@@ -794,7 +800,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match whitespace character (\\s)."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             return (False, str_i)
 
         # Inline range check avoids a per-character Dict lookup through
@@ -824,7 +830,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match digit character (\\d)."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             # End of string - check if quantifier allows zero matches
             if (
                 ast.min == 0
@@ -864,7 +870,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match word character (\\w)."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             # End of string - check if quantifier allows zero matches
             if (
                 ast.min == 0
@@ -909,7 +915,7 @@ struct NFAEngine(Copyable, Engine):
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
         """Match character range [abc] or [^abc]."""
-        if str_i >= len(str):
+        if str_i >= str.byte_length():
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
@@ -978,7 +984,7 @@ struct NFAEngine(Copyable, Engine):
         self, ast: ASTNode, str: ImmSlice, str_i: Int
     ) capturing -> Tuple[Bool, Int]:
         """Match end anchor ($)."""
-        if str_i == len(str):
+        if str_i == str.byte_length():
             return (True, str_i)
         else:
             return (False, str_i)
@@ -1081,10 +1087,10 @@ struct NFAEngine(Copyable, Engine):
         var group_matches = 0
 
         if max_matches == -1:
-            max_matches = len(str) - str_i
+            max_matches = str.byte_length() - str_i
 
         # Use regular greedy matching with conservative early termination
-        while group_matches < max_matches and current_pos <= len(str):
+        while group_matches < max_matches and current_pos <= str.byte_length():
             var group_result = self._match_sequence(
                 ast,
                 0,
@@ -1204,7 +1210,7 @@ struct NFAEngine(Copyable, Engine):
         var max_matches = quantified_node.max
 
         if max_matches == -1:
-            max_matches = len(str) - str_i
+            max_matches = str.byte_length() - str_i
 
         # Fast path for fixed quantifiers like {3} where min == max
         if min_matches == max_matches:
@@ -1281,7 +1287,7 @@ struct NFAEngine(Copyable, Engine):
         var pos = str_i
         var matched = 0
         var str_ptr = str.unsafe_ptr()
-        var str_len = len(str)
+        var str_len = str.byte_length()
 
         while matched < count and pos < str_len:
             # Conservative early termination for match_first_mode only in extreme cases
@@ -1342,7 +1348,7 @@ struct NFAEngine(Copyable, Engine):
         # print("DEBUG: _apply_quantifier str_i =", str_i, "min =", min_matches, "max =", max_matches)
 
         if max_matches == -1:  # Unlimited
-            max_matches = len(str) - str_i
+            max_matches = str.byte_length() - str_i
 
         # If we have a simple single match (min=1, max=1)
         if min_matches == 1 and max_matches == 1:
@@ -1367,7 +1373,7 @@ struct NFAEngine(Copyable, Engine):
         var matches_count = 0
         var current_pos = str_i
         var str_ptr = str.unsafe_ptr()
-        var str_len = len(str)
+        var str_len = str.byte_length()
 
         # Try to match as many times as possible (greedy)
         while matches_count < max_matches and current_pos < str_len:
@@ -1513,9 +1519,9 @@ struct NFAEngine(Copyable, Engine):
                 var match_count = 0
                 var actual_max = max_matches
                 if actual_max == -1:
-                    actual_max = len(str) - str_i
+                    actual_max = str.byte_length() - str_i
 
-                while pos < len(str) and match_count < actual_max:
+                while pos < str.byte_length() and match_count < actual_max:
                     var ch_code = Int(str_ptr[pos])
                     var is_match: Bool
                     if (
@@ -1553,8 +1559,10 @@ struct NFAEngine(Copyable, Engine):
                         var match_count = 0
                         var actual_max = max_matches
                         if actual_max == -1:
-                            actual_max = len(str) - str_i
-                        while pos < len(str) and match_count < actual_max:
+                            actual_max = str.byte_length() - str_i
+                        while (
+                            pos < str.byte_length() and match_count < actual_max
+                        ):
                             var ch_code = Int(str_ptr[pos])
                             if not matcher.contains(ch_code):
                                 match_count += 1
@@ -1571,9 +1579,9 @@ struct NFAEngine(Copyable, Engine):
                 var match_count = 0
                 var actual_max = max_matches
                 if actual_max == -1:
-                    actual_max = len(str) - str_i
+                    actual_max = str.byte_length() - str_i
 
-                while pos < len(str) and match_count < actual_max:
+                while pos < str.byte_length() and match_count < actual_max:
                     var ch_code = Int(str_ptr[pos])
                     var is_match = self._match_char_in_range(
                         range_pattern, ch_code
@@ -1600,7 +1608,7 @@ struct NFAEngine(Copyable, Engine):
             var inner = range_pattern[byte=1:-1]
 
             # Handle simple ranges like [c-n]
-            if len(inner) == 3 and inner[byte=1] == "-":
+            if inner.byte_length() == 3 and inner[byte=1] == "-":
                 var inner_ptr = inner.unsafe_ptr()
                 var start_char = Int(inner_ptr[0])
                 var end_char = Int(inner_ptr[2])
@@ -1626,8 +1634,8 @@ struct NFAEngine(Copyable, Engine):
         var match_count = 0
         var actual_max = max_matches
         if actual_max == -1:
-            actual_max = len(str) - str_i
-        while pos < len(str) and match_count < actual_max:
+            actual_max = str.byte_length() - str_i
+        while pos < str.byte_length() and match_count < actual_max:
             var ch_code = Int(str_ptr[pos])
             if not matcher.contains(ch_code):
                 match_count += 1
@@ -1655,8 +1663,8 @@ struct NFAEngine(Copyable, Engine):
         var match_count = 0
         var actual_max = max_matches
         if actual_max == -1:
-            actual_max = len(str) - str_i
-        while pos < len(str) and match_count < actual_max:
+            actual_max = str.byte_length() - str_i
+        while pos < str.byte_length() and match_count < actual_max:
             var ch_code = Int(str_ptr[pos])
             var is_match = range_start <= ch_code <= range_end
             if is_match == positive_logic:

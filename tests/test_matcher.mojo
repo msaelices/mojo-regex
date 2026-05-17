@@ -1238,7 +1238,7 @@ def test_regex_corruption_issue_39() raises:
         """Generate a test string of specified length."""
         var result = String()
         var pattern = String("abcdefghijklmnopqrstuvwxyz")
-        var pattern_len = len(pattern)
+        var pattern_len = pattern.byte_length()
         var full_repeats = length // pattern_len
         var remainder = length % pattern_len
         for _ in range(full_repeats):

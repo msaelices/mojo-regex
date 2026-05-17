@@ -298,7 +298,7 @@ struct CharacterClassSIMD(
             char_class: StringSlice containing all characters in the class (e.g., "abcdefg...").
         """
         self.lookup_table = SIMD[DType.uint8, 256](0)
-        self.size_hint = len(char_class)
+        self.size_hint = char_class.byte_length()
 
         # Use shuffle optimization for medium-sized character classes
         # For small classes (e.g., just "a" or "ab"), the simple lookup is faster
@@ -322,7 +322,7 @@ struct CharacterClassSIMD(
 
         # Set bits for each character in the class
         var cc_ptr = char_class.unsafe_ptr()
-        for i in range(len(char_class)):
+        for i in range(char_class.byte_length()):
             self.lookup_table[Int(cc_ptr[i])] = 1
 
         # Detect contiguous ranges from the lookup table
@@ -946,7 +946,7 @@ def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
         True if pattern matches at this position.
     """
     var pattern_len = len(pattern)
-    if pos + pattern_len > len(text):
+    if pos + pattern_len > text.byte_length():
         return False
 
     var text_ptr = text.unsafe_ptr()
@@ -985,7 +985,7 @@ def simd_search(
     if pattern_len == 0:
         return start  # Empty pattern matches at any position
 
-    var text_len = len(text)
+    var text_len = text.byte_length()
     var text_ptr = text.unsafe_ptr()
 
     # Single-byte literal: pure memchr-style SIMD scan.
@@ -1276,11 +1276,11 @@ def apply_quantifier_simd_generic[
     var match_count = 0
     var actual_max = max_matches
     if actual_max == -1:
-        actual_max = len(text) - start_pos
+        actual_max = text.byte_length() - start_pos
 
     # Count consecutive matching characters
     var text_ptr = text.unsafe_ptr()
-    while pos < len(text) and match_count < actual_max:
+    while pos < text.byte_length() and match_count < actual_max:
         if matcher.contains(Int(text_ptr[pos])):
             match_count += 1
             pos += 1
@@ -1357,7 +1357,7 @@ def twoway_search(
         Position of first match, or -1 if not found.
     """
     var n = len(pattern)
-    var m = len(text)
+    var m = text.byte_length()
 
     if n == 0:
         return start

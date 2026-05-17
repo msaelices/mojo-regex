@@ -643,7 +643,7 @@ struct PatternAnalyzer:
 
         # Check if there's a meaningful common prefix (at least 2 characters)
         var common_prefix = self._compute_common_prefix_in_optimizer(branches)
-        return len(common_prefix) >= 2
+        return common_prefix.byte_length() >= 2
 
     def _extract_literal_branches_from_tree(
         self, node: ASTNode, mut branches: List[String]
@@ -683,12 +683,12 @@ struct PatternAnalyzer:
 
         var prefix = String(capacity=String.INLINE_CAPACITY)
         ref first_branch = branches[0]
-        var min_length = len(first_branch)
+        var min_length = first_branch.byte_length()
 
         # Find minimum length
         for i in range(1, len(branches)):
-            if len(branches[i]) < min_length:
-                min_length = len(branches[i])
+            if branches[i].byte_length() < min_length:
+                min_length = branches[i].byte_length()
 
         # Find common prefix
         var fb_ptr = first_branch.unsafe_ptr()
@@ -937,7 +937,7 @@ def _extract_literal_chars(ast: ASTNode) -> String:
         var repeats = ast.min
         if repeats <= 1:
             return String(ch)
-        var out = String(capacity=repeats * len(ch))
+        var out = String(capacity=repeats * ch.byte_length())
         for _ in range(repeats):
             out += ch
         return out

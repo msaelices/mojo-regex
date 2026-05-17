@@ -404,7 +404,7 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         var candidates = List[Int]()
         var start = 0
 
-        while start < len(text):
+        while start < text.byte_length():
             var pos = text.find(self.literal, start)
             if pos == -1:
                 break
@@ -417,7 +417,7 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         self, text: StringSlice, start: Int = 0
     ) -> Optional[Int]:
         """Find the first occurrence of the literal at or after start."""
-        if start >= len(text):
+        if start >= text.byte_length():
             return None
 
         var pos = text.find(self.literal, start)

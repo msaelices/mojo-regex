@@ -99,9 +99,11 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     def get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
         """Get the length of the literal string."""
         if self.node_ptr and self.node_ptr[].get_value():
-            return len(self.node_ptr[].get_value().value())
+            return self.node_ptr[].get_value().value().byte_length()
         elif self.literal_string_idx >= 0:
-            return len(literal_set.literal_strings[self.literal_string_idx])
+            return literal_set.literal_strings[
+                self.literal_string_idx
+            ].byte_length()
         else:
             return 0
 
@@ -293,7 +295,7 @@ def _extract_from_node[
         # For alternation, literals are only required if they appear in ALL branches
         # Simplified: just check direct children of OR node
         var common_prefix = _find_common_prefix_simple(node)
-        if len(common_prefix) > 0:
+        if common_prefix.byte_length() > 0:
             _ = result.add(
                 literal=common_prefix,
                 start_offset=offset,
@@ -350,7 +352,7 @@ def _extract_sequence[
             current_literal += String(child.get_value().value())
         else:
             # End of literal sequence
-            if len(current_literal) > 0:
+            if current_literal.byte_length() > 0:
                 _ = literals.add(
                     literal=current_literal,
                     start_offset=current_offset,
@@ -358,7 +360,7 @@ def _extract_sequence[
                     is_suffix=False,
                     is_required=is_required,
                 )
-                current_offset += len(current_literal)
+                current_offset += current_literal.byte_length()
                 sequence_at_start = False
                 current_literal = ""
 
@@ -374,7 +376,7 @@ def _extract_sequence[
                     current_offset += 1  # At least one character
 
     # Don't forget the last literal sequence
-    if len(current_literal) > 0:
+    if current_literal.byte_length() > 0:
         _ = literals.add(
             literal=current_literal,
             start_offset=current_offset,
@@ -397,7 +399,7 @@ def _find_common_prefix_simple(or_node: ASTNode) -> String:
     var common = prefixes[0]
     for i in range(1, len(prefixes)):
         common = _longest_common_prefix(common, prefixes[i])
-        if len(common) == 0:
+        if common.byte_length() == 0:
             return String("")
 
     return common
@@ -408,7 +410,7 @@ def _collect_or_prefixes(node: ASTNode, mut prefixes: List[String]):
     if node.type != OR:
         # This is a leaf - get its prefix
         var prefix = _get_prefix_literal(node)
-        if len(prefix) > 0:
+        if prefix.byte_length() > 0:
             prefixes.append(prefix)
         return
 
@@ -439,7 +441,7 @@ def _get_prefix_literal(node: ASTNode) -> String:
 
 def _longest_common_prefix(s1: String, s2: String) -> String:
     """Find the longest common prefix of two strings."""
-    var min_len = min(len(s1), len(s2))
+    var min_len = min(s1.byte_length(), s2.byte_length())
     var i = 0
     var s1_ptr = s1.unsafe_ptr()
     var s2_ptr = s2.unsafe_ptr()

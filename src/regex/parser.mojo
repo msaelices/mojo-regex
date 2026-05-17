@@ -209,7 +209,7 @@ def parse_token_list[
                 left_child_index=left_index,
                 right_child_index=right_index,
                 start_idx=0,
-                end_idx=len(regex.pattern),
+                end_idx=regex.pattern.byte_length(),
             )
             return or_node
 
@@ -456,7 +456,7 @@ def parse_token_list[
         regex=regex,
         children_indexes=children_indexes,
         start_idx=0,
-        end_idx=len(regex.pattern),
+        end_idx=regex.pattern.byte_length(),
         capturing_group=True,
         group_id=0,
     )
@@ -504,7 +504,7 @@ def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
         type=RE,
         regex_ptr=regex_ptr,
         start_idx=0,
-        end_idx=len(pattern),
+        end_idx=pattern.byte_length(),
         children_indexes=_make_children_indexes(root_child_index),
     )
 
