@@ -2270,7 +2270,7 @@ struct BoyerMoore:
 
         # Set the last occurrence of each character in pattern
         var pattern_ptr = self.pattern.unsafe_ptr()
-        for i in range(len(self.pattern)):
+        for i in range(self.pattern.byte_length()):
             var char_code = Int(pattern_ptr[i])
             self.bad_char_table[char_code] = i
 
@@ -2284,8 +2284,8 @@ struct BoyerMoore:
         Returns:
             Position of first match, or -1 if not found.
         """
-        var m = len(self.pattern)
-        var n = len(text)
+        var m = self.pattern.byte_length()
+        var n = text.byte_length()
         var s = start  # shift of the pattern
         var text_ptr = text.unsafe_ptr()
         var pattern_ptr = self.pattern.unsafe_ptr()

@@ -432,7 +432,7 @@ struct CharacterClassSIMD(
             Position of first match, or -1 if not found.
         """
         var pos = start
-        var text_len = len(text)
+        var text_len = text.byte_length()
 
         # Process chunks using SIMD
         while pos + SIMD_WIDTH <= text_len:
@@ -464,7 +464,7 @@ struct CharacterClassSIMD(
         """
         var matches = List[Int]()
         var pos = 0
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var text_ptr = text.unsafe_ptr()
 
         def closure[
@@ -548,7 +548,7 @@ struct CharacterClassSIMD(
         Returns:
             Number of matching characters.
         """
-        var actual_end = end if end != -1 else len(text)
+        var actual_end = end if end != -1 else text.byte_length()
         var count = 0
         var pos = start
         var text_ptr = text.unsafe_ptr()
@@ -1039,7 +1039,9 @@ def simd_memcmp(
     if length == 0:
         return True
 
-    if (s1_offset + length > len(s1)) or (s2_offset + length > len(s2)):
+    if (s1_offset + length > s1.byte_length()) or (
+        s2_offset + length > s2.byte_length()
+    ):
         return False
 
     var pos = 0
@@ -1075,14 +1077,14 @@ def simd_count_char(text: String, target_char: StringSlice) -> Int:
     Returns:
         Number of occurrences.
     """
-    if len(target_char) != 1:
+    if target_char.byte_length() != 1:
         return 0
 
     var target_code = ord(target_char)
     var target_simd = SIMD[DType.uint8, SIMD_WIDTH](target_code)
     var count = 0
     var pos = 0
-    var text_len = len(text)
+    var text_len = text.byte_length()
 
     # Process chunks using SIMD
     while pos + SIMD_WIDTH <= text_len:
@@ -1454,10 +1456,10 @@ struct MultiLiteralSearcher(Copyable, Movable):
         # Initialize first bytes and find min/max lengths
         for i in range(self.literal_count):
             var lit = literals[i]
-            if len(lit) > 0:
+            if lit.byte_length() > 0:
                 self.first_bytes[i] = Int(lit.unsafe_ptr()[0])
-                self.max_len = max(self.max_len, len(lit))
-                self.min_len = min(self.min_len, len(lit))
+                self.max_len = max(self.max_len, lit.byte_length())
+                self.min_len = min(self.min_len, lit.byte_length())
         self.literals = literals^
 
     def search(self, text: String, start: Int = 0) -> Tuple[Int, Int]:
@@ -1473,7 +1475,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
         if self.literal_count == 0 or self.min_len == 0:
             return (-1, -1)
 
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var pos = start
         var text_ptr = text.unsafe_ptr()
 
@@ -1498,9 +1500,9 @@ struct MultiLiteralSearcher(Copyable, Movable):
                         # Check each literal
                         for lit_idx in range(self.literal_count):
                             var lit = self.literals[lit_idx]
-                            if len(lit) > 0 and Int(text_ptr[text_pos]) == Int(
-                                self.first_bytes[lit_idx]
-                            ):
+                            if lit.byte_length() > 0 and Int(
+                                text_ptr[text_pos]
+                            ) == Int(self.first_bytes[lit_idx]):
                                 # Verify full literal
                                 if self._verify_literal(text, text_pos, lit):
                                     return (text_pos, lit_idx)
@@ -1528,8 +1530,8 @@ struct MultiLiteralSearcher(Copyable, Movable):
         Returns:
             True if literal matches at position.
         """
-        var lit_len = len(literal)
-        if pos + lit_len > len(text):
+        var lit_len = literal.byte_length()
+        if pos + lit_len > text.byte_length():
             return False
 
         # Use SIMD comparison for longer literals

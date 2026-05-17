@@ -138,7 +138,7 @@ struct PatternAnalyzer:
         if has_literal_prefix(ast):
             info.has_literal_prefix = True
             var prefix = extract_literal_prefix(ast)
-            info.literal_prefix_length = len(prefix)
+            info.literal_prefix_length = prefix.byte_length()
 
         # Check for required literals
         if literal_set.get_best_literal():

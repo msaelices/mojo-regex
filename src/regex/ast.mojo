@@ -404,7 +404,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return str_i == 0
         elif self.type == END:
             return str_i == str_len
-        elif len(value) == 1:
+        elif value.byte_length() == 1:
             return self.is_match_char(ord(value), str_i, str_len)
         elif self.type == ELEMENT:
             return self.get_value() and (self.get_value().value() == value)

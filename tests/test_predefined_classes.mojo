@@ -134,7 +134,7 @@ def test_word_special_characters() raises:
     """Test \\w does not match special characters."""
     var special_chars = "@#$%^&*()-+=[]{}|\\:;\"'<>,.?/~`"
 
-    for i in range(len(special_chars)):
+    for i in range(special_chars.byte_length()):
         var char = String(special_chars[byte=i])
         var result = match_first("\\w", char)
         assert_false(result)
@@ -376,14 +376,14 @@ def test_performance_stress() raises:
     var result1 = match_first("\\d+", many_digits)
     assert_true(result1)
     var matched1 = result1.value()
-    assert_equal(len(matched1.get_match_text()), 100)
+    assert_equal(matched1.get_match_text().byte_length(), 100)
 
     # Test many word characters
     var many_words = String("a") * 100
     var result2 = match_first("\\w+", many_words)
     assert_true(result2)
     var matched2 = result2.value()
-    assert_equal(len(matched2.get_match_text()), 100)
+    assert_equal(matched2.get_match_text().byte_length(), 100)
 
 
 # ===== NFA SPECIFIC TESTS =====
