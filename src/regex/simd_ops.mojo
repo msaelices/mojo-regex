@@ -469,9 +469,7 @@ struct CharacterClassSIMD(
 
         def closure[
             width: Int
-        ](i: Int) unified {
-            mut matches, read self, read text, read text_ptr, read pos
-        }:
+        ](i: Int) {mut matches, read self, read text, read text_ptr, read pos}:
             if width != 1:
                 var chunk_matches = self._check_chunk_simd(
                     text.unsafe_ptr(), pos + i
@@ -555,9 +553,7 @@ struct CharacterClassSIMD(
 
         def closure[
             width: Int
-        ](i: Int) unified {
-            mut count, read self, read text, read text_ptr, read pos
-        }:
+        ](i: Int) {mut count, read self, read text, read text_ptr, read pos}:
             if width != 1:
                 var matches = self._check_chunk_simd(text.unsafe_ptr(), pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
