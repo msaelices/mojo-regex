@@ -179,21 +179,21 @@ def _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
 
 def compile_onepass(
     var program: Program,
-) -> UnsafePointer[OnePassNFA, MutAnyOrigin]:
+) -> Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]:
     # Compile a PikeVM program into a OnePass NFA and heap-allocate it.
-    # Returns a null pointer when the pattern is not one-pass (caller
-    # falls back to another engine).
+    # Returns None when the pattern is not one-pass (caller falls back
+    # to another engine).
     #
     # Walks the state-set graph starting from the epsilon closure of
     # PC 0 with at_start=True. For each state and each input byte,
     # collects the PCs whose byte-consuming op fires. If more than one
     # PC fires and their follow-up epsilon closures differ, the pattern
-    # is not one-pass and this function returns null. State dedup is by
-    # nfa_set equality; a linear scan suffices since typical programs
-    # produce <50 states.
+    # is not one-pass and this function returns None. State dedup is
+    # by nfa_set equality; a linear scan suffices since typical
+    # programs produce <50 states.
     var prog_len = len(program)
     if prog_len == 0 or prog_len > MAX_STATES:
-        return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+        return None
 
     var has_start_anchor = False
     var has_end_anchor = False
@@ -303,12 +303,12 @@ def compile_onepass(
                         one_pass = False
                         break
                 if not one_pass:
-                    return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+                    return None
                 idx = _find_or_add_state(
                     program, states, state_index, first_closure, is_new
                 )
             if idx < 0:
-                return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+                return None
             if is_new:
                 worklist.append(idx)
             transitions[byte] = idx
