@@ -213,10 +213,7 @@ def compile_onepass(
         OnePassState(start_set, _set_contains_match(program, start_set))
     )
     var state_index = Dict[UInt64, List[Int]]()
-    try:
-        state_index[_hash_set(start_set)] = [0]
-    except:
-        pass
+    state_index[_hash_set(start_set)] = [0]
 
     var worklist = List[Int](capacity=32)
     worklist.append(0)

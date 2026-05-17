@@ -362,7 +362,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     @always_inline
     def is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if LEAF_ELEMS.eq(self.type).reduce_or():
+        if LEAF_ELEMS.eq(SIMD[DType.int8, 8](self.type)).reduce_or():
             return True
         else:
             return False

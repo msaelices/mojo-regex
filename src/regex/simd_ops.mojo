@@ -1453,7 +1453,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
         for i in range(self.literal_count):
             var lit = literals[i]
             if lit.byte_length() > 0:
-                self.first_bytes[i] = Int(lit.unsafe_ptr()[0])
+                self.first_bytes[i] = lit.unsafe_ptr()[0]
                 self.max_len = max(self.max_len, lit.byte_length())
                 self.min_len = min(self.min_len, lit.byte_length())
         self.literals = literals^

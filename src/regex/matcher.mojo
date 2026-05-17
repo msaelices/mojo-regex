@@ -978,7 +978,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         literal separators, enabling an additional whole-text-match
         fast path that validates digits and emits the template
         without any engine dispatch."""
-        var pat_slice = rebind[ImmSlice](self.pattern.as_string_slice())
+        var pat_slice = rebind[ImmSlice](StringSlice(self.pattern))
         var fixed = _detect_fixed_width_groups(pat_slice)
         if not fixed:
             return
