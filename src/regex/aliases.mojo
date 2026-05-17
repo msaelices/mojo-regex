@@ -4,7 +4,9 @@ def _all_except_newline() -> String:
 
 
 comptime DIGITS: String = "0123456789"
-comptime WORD_CHARS: String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+comptime WORD_CHARS: String = (
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+)
 comptime CHAR_LIT_SPACE = ord("s")
 comptime CHAR_LIT_TAB = ord("t")
 comptime CHAR_TAB = ord("\t")

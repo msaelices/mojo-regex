@@ -60,7 +60,7 @@ patterns compile to tens of states; the limit guards against pathological
 blow-ups. ONEPASS_MAX_STATES is comfortably within Int16 range."""
 
 
-fn _epsilon_close(
+def _epsilon_close(
     program: Program,
     read start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
@@ -109,7 +109,7 @@ fn _epsilon_close(
 
 
 @always_inline
-fn _set_contains_match(
+def _set_contains_match(
     program: Program,
     nfa_set: SIMD[DType.uint8, MAX_STATES],
 ) -> Bool:
@@ -121,7 +121,7 @@ fn _set_contains_match(
     return False
 
 
-fn _closure_reaches_match_with_end_anchor(
+def _closure_reaches_match_with_end_anchor(
     program: Program,
     nfa_set: SIMD[DType.uint8, MAX_STATES],
 ) -> Bool:
@@ -141,7 +141,7 @@ fn _closure_reaches_match_with_end_anchor(
 
 
 @always_inline
-fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
+def _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
     """Hash of the state set bytes for O(1) dedup during subset
     construction. Bitcasts the 512-byte set to uint64 lanes, XORs against
     per-lane mixers (breaks lane symmetry), XOR-reduces to one u64 via
@@ -162,7 +162,7 @@ fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
     var u64_view = bitcast[DType.uint64, NUM_U64](nfa_set)
 
     @parameter
-    fn xor_op[
+    def xor_op[
         w: Int
     ](a: SIMD[DType.uint64, w], b: SIMD[DType.uint64, w]) -> SIMD[
         DType.uint64, w

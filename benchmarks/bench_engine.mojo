@@ -538,7 +538,10 @@ def main() raises:
     var large_alternation = (
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
     )
-    var fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
+    var fruit_text = (
+        "I love eating apple and banana and cherry and date and elderberry and"
+        " fig and grape with honey"
+    )
     benchmark_search(
         "large_8_alternations", large_alternation, fruit_text, 1000
     )
@@ -552,14 +555,21 @@ def main() raises:
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     var literal_heavy = "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)"
-    var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
+    var user_text = (
+        "Login attempts: user123 failed, admin456 success, guest789 failed,"
+        " root000 success, test111 pending, demo222 active, sample333 inactive,"
+        " client444 locked"
+    )
     benchmark_search(
         "literal_heavy_alternation", literal_heavy, user_text, 1000
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3->5)
     var complex_group = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
-    var mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    var mixed_text = (
+        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in"
+        " the data"
+    )
     benchmark_search(
         "complex_group_5_children", complex_group, mixed_text, 1000
     )
@@ -642,7 +652,10 @@ def main() raises:
     # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
 
     # Generate literal test data
-    var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
+    var literal_phone_text = (
+        "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is"
+        " 555.123.4567."
+    )
 
     benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
 

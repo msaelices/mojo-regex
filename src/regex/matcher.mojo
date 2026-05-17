@@ -106,7 +106,7 @@ def create_optimized_prefilter(
     return None
 
 
-fn _program_has_end_anchor(program: Program) -> Bool:
+def _program_has_end_anchor(program: Program) -> Bool:
     """True iff `program` contains an OP_END_ANCHOR instruction. Used to
     gate OnePass NFA compilation at NFAMatcher construction: only
     `$`-anchored patterns benefit, and skipping the compile for others
@@ -117,7 +117,7 @@ fn _program_has_end_anchor(program: Program) -> Bool:
     return False
 
 
-fn _find_rare_required_byte(
+def _find_rare_required_byte(
     ast: ASTNode[MutAnyOrigin],
     first_class_lookup: SIMD[DType.uint8, 256],
 ) -> Int:

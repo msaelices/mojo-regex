@@ -1124,7 +1124,10 @@ def test_us_toll_free_numbers_complex() raises:
 def test_us_toll_free_numbers_findall() raises:
     """Test finding all toll-free numbers in text."""
     var simple_pattern = "[89]00[0-9]+"
-    var test_text = "Call 8001234567 for sales, or 9005551234 for support. Emergency: 8779998877."
+    var test_text = (
+        "Call 8001234567 for sales, or 9005551234 for support. Emergency:"
+        " 8779998877."
+    )
 
     var matches = findall(simple_pattern, test_text)
     # Based on debug output, we're only finding 2 matches because 877 doesn't match [89]00 pattern

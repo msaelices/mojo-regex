@@ -143,7 +143,7 @@ comptime SHUFFLE_MAX_SIZE = 32
 
 
 @always_inline
-fn _in_range_1(
+def _in_range_1(
     c: SIMD[DType.uint8, SIMD_WIDTH],
     lo: SIMD[DType.uint8, SIMD_WIDTH],
     span: SIMD[DType.uint8, SIMD_WIDTH],
@@ -159,7 +159,7 @@ fn _in_range_1(
 
 
 @always_inline
-fn _in_range_2(
+def _in_range_2(
     c: SIMD[DType.uint8, SIMD_WIDTH],
     lo1: SIMD[DType.uint8, SIMD_WIDTH],
     span1: SIMD[DType.uint8, SIMD_WIDTH],
@@ -172,7 +172,7 @@ fn _in_range_2(
 
 
 @always_inline
-fn _in_range_3(
+def _in_range_3(
     c: SIMD[DType.uint8, SIMD_WIDTH],
     lo1: SIMD[DType.uint8, SIMD_WIDTH],
     span1: SIMD[DType.uint8, SIMD_WIDTH],
@@ -191,7 +191,7 @@ fn _in_range_3(
 
 
 @always_inline
-fn _first_false(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
+def _first_false(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
     """Return the lane index of the first False in `r`.
 
     Precondition: `not r.reduce_and()`. Used after a SIMD-wide compare
@@ -203,7 +203,7 @@ fn _first_false(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
 
 
 @always_inline
-fn _first_true(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
+def _first_true(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
     """Return the lane index of the first True in `r`.
 
     Precondition: `r.reduce_or()`. Used to locate the first hit after
@@ -215,7 +215,7 @@ fn _first_true(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
 
 
 @always_inline
-fn simd_find_byte(
+def simd_find_byte(
     text_ptr: UnsafePointer[Byte, _],
     start: Int,
     text_len: Int,
@@ -243,7 +243,7 @@ fn simd_find_byte(
 
 
 @always_inline
-fn _first_false_in_two(
+def _first_false_in_two(
     r1: SIMD[DType.bool, SIMD_WIDTH],
     r2: SIMD[DType.bool, SIMD_WIDTH],
 ) -> Int:
