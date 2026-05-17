@@ -106,7 +106,7 @@ struct NFAEngine(Copyable, Engine):
 
                 var literal_set = extract_literals(ast)
 
-                ref best_literal = literal_set.get_best_literal()
+                var best_literal = literal_set.get_best_literal()
                 if best_literal:
                     ref best = best_literal.value()
                     if (
