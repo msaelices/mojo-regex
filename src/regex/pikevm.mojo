@@ -930,8 +930,10 @@ struct LazyDFA(Copyable, Movable):
         var pcs = InlineArray[Int, MAX_STATES](fill=0)
         var count = 0
         var seen = SIMD[DType.uint8, MAX_STATES](0)
-        # Use a dummy text_ptr for epsilon closure (no bytes consumed)
-        var dummy = UnsafePointer[UInt8, MutAnyOrigin]()
+        # Dummy text_ptr for epsilon closure (no bytes consumed). 1.0.0b1
+        # forbids constructing a null UnsafePointer; `unsafe_dangling` is
+        # the supported non-null placeholder.
+        var dummy = UnsafePointer[UInt8, MutAnyOrigin].unsafe_dangling()
         self.pikevm._add_state(pcs, count, seen, pc, dummy, pos, 0)
 
         if count == 0 and not self._has_match_in_set(seen):
