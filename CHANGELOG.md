@@ -5,7 +5,7 @@
 ### Compatibility with mojo 1.0.0b1 (PR #152)
 
 - Pins the toolchain to `mojo ==1.0.0b1` (up from `>=0.26.1,<0.27`). All 377 tests pass; no API changes.
-- Heads-up on perf: full `bench_engine` geomean is ~7% slower than v0.13.0 on the same hardware, with a handful of quantifier-heavy patterns 20-70% slower and another handful 20-50% faster. The pattern points to compiler-side codegen shifts in 1.0.0b1 rather than the source-level adaptations. Attribution and follow-up tracked in #153. If you're on the perf-critical path, consider staying on v0.13.0 / mojo 0.26.x until this is resolved.
+- Heads-up on perf: full `bench_engine` 3-median geomean is **~13% slower** than v0.13.0 on the same hardware (single-run inter-bench variance turned out to be high, so the earlier 7% number from a single run was optimistic). Attribution work in #153 confirms the regression is mojo-1.0.0b1 codegen, not the source adaptations: with the `Optional[UnsafePointer]` migration reverted the regression deepens to ~26%, so the migration actually *recovers* about half. Several DFA-routed patterns are 1.4-2.2x slower individually; a few are 10-25% faster. If you're on the perf-critical path, stay on v0.13.0 / mojo 0.26.x until upstream codegen catches back up.
 
 ## v0.13.0 (2026-05-01)
 
