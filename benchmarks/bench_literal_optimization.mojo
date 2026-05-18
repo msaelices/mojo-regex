@@ -11,13 +11,18 @@ from std.benchmark import Bench, BenchConfig, Bencher, BenchId, Unit, keep, run
 from regex import match_first, findall
 
 # Simple test texts
-alias SHORT_TEXT = "hello world this is a test with hello again and hello there"
-alias MEDIUM_TEXT = SHORT_TEXT * 10
-alias LONG_TEXT = SHORT_TEXT * 100
+comptime SHORT_TEXT = (
+    "hello world this is a test with hello again and hello there"
+)
+comptime MEDIUM_TEXT = SHORT_TEXT * 10
+comptime LONG_TEXT = SHORT_TEXT * 100
 
 # Email text
-alias EMAIL_TEXT = "test@example.com user@test.org admin@example.com support@example.com no-reply@example.com"
-alias EMAIL_LONG = EMAIL_TEXT * 20
+comptime EMAIL_TEXT = (
+    "test@example.com user@test.org admin@example.com support@example.com"
+    " no-reply@example.com"
+)
+comptime EMAIL_LONG = EMAIL_TEXT * 20
 
 
 @parameter
@@ -111,7 +116,7 @@ def bench_alternation_common_prefix(mut b: Bencher) raises:
     b.iter[call_fn]()
 
 
-def main():
+def main() raises:
     """Run literal optimization benchmarks."""
     print("=== Literal Optimization Benchmarks ===")
     print("Testing performance improvements from literal prefiltering")

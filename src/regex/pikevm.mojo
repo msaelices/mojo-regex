@@ -259,7 +259,7 @@ def _compile_element(node: ASTNode, mut program: Program):
     var val = node.get_value()
     if val:
         var ch = val.value()
-        if len(ch) > 0:
+        if ch.byte_length() > 0:
             _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[0]))
 
 
@@ -277,19 +277,19 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
         # Use _expand_character_range which handles these via fast paths
         var expanded = _expand_character_range(node.type, "")
         var ptr = expanded.unsafe_ptr()
-        for i in range(len(expanded)):
+        for i in range(expanded.byte_length()):
             table[Int(ptr[i])] = 1
     elif node.type == RANGE and node.get_value():
         var raw = node.get_value().value()
         # Strip brackets if present
         var inner = raw
         if raw.startswith("[") and raw.endswith("]"):
-            inner = raw[byte = 1 : len(raw) - 1]
+            inner = raw[byte = 1 : raw.byte_length() - 1]
         # Parse the inner content handling \s, \d, \w and ranges
         var inner_ptr = inner.unsafe_ptr()
         var j = 0
-        while j < len(inner):
-            if j + 1 < len(inner) and Int(inner_ptr[j]) == ord("\\"):
+        while j < inner.byte_length():
+            if j + 1 < inner.byte_length() and Int(inner_ptr[j]) == ord("\\"):
                 var next_ch = Int(inner_ptr[j + 1])
                 if next_ch == ord("s"):
                     table[ord(" ")] = 1
@@ -311,7 +311,9 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
                 else:
                     table[next_ch] = 1
                 j += 2
-            elif j + 2 < len(inner) and Int(inner_ptr[j + 1]) == ord("-"):
+            elif j + 2 < inner.byte_length() and Int(inner_ptr[j + 1]) == ord(
+                "-"
+            ):
                 var lo = Int(inner_ptr[j])
                 var hi = Int(inner_ptr[j + 2])
                 for c in range(lo, hi + 1):
@@ -739,7 +741,7 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def match_next(mut self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search using cached DFA with SIMD first-byte prefilter."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         if self.pikevm.has_filter:
             var text_ptr = text.unsafe_ptr()
             var pos = start
@@ -765,7 +767,7 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def match_all(mut self, text: ImmSlice) -> MatchList:
         """Find all matches using cached DFA."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
@@ -803,7 +805,7 @@ struct LazyDFA(Copyable, Movable):
     def _run_lazy(mut self, text: ImmSlice, start: Int) -> Optional[Match]:
         """Run the lazy DFA from a start position."""
         var text_ptr = text.unsafe_ptr()
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var state_id = self.start_state_id
         var match_end = -1
 
@@ -928,8 +930,10 @@ struct LazyDFA(Copyable, Movable):
         var pcs = InlineArray[Int, MAX_STATES](fill=0)
         var count = 0
         var seen = SIMD[DType.uint8, MAX_STATES](0)
-        # Use a dummy text_ptr for epsilon closure (no bytes consumed)
-        var dummy = UnsafePointer[UInt8, MutAnyOrigin]()
+        # Dummy text_ptr for epsilon closure (no bytes consumed). 1.0.0b1
+        # forbids constructing a null UnsafePointer; `unsafe_dangling` is
+        # the supported non-null placeholder.
+        var dummy = UnsafePointer[UInt8, MutAnyOrigin].unsafe_dangling()
         self.pikevm._add_state(pcs, count, seen, pc, dummy, pos, 0)
 
         if count == 0 and not self._has_match_in_set(seen):

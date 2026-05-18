@@ -27,7 +27,13 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     """Information about a literal substring found in a regex pattern."""
 
     var node_ptr: UnsafePointer[ASTNode[ImmutAnyOrigin], ImmutAnyOrigin]
-    """Pointer to the AST node containing the literal (for single nodes)."""
+    """Pointer to the AST node containing the literal (for single nodes).
+    Only meaningful when `has_node` is True; otherwise dangling."""
+    var has_node: Bool
+    """True when `node_ptr` references a real AST node. Tracked
+    separately because 1.0.0b1 forbids null UnsafePointer, and
+    LiteralInfo must stay TrivialRegisterPassable (which rules out
+    `Optional[UnsafePointer[...]]` here)."""
     var literal_string_idx: Int
     """Index into LiteralSet.literal_strings for the literal string (for concatenated literals or computed values). -1 if not used."""
     var start_offset: Int
@@ -49,6 +55,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
     ):
         """Initialize a LiteralInfo with a string literal."""
         self.node_ptr = UnsafePointer(to=node).as_any_origin()
+        self.has_node = True
         self.literal_string_idx = -1
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -64,7 +71,10 @@ struct LiteralInfo[node_origin: ImmutOrigin](
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal index."""
-        self.node_ptr = UnsafePointer[ASTNode[ImmutAnyOrigin], ImmutAnyOrigin]()
+        self.node_ptr = UnsafePointer[
+            ASTNode[ImmutAnyOrigin], ImmutAnyOrigin
+        ].unsafe_dangling()
+        self.has_node = False
         self.literal_string_idx = literal_string_idx
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -86,7 +96,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
 
     def get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
-        if self.node_ptr and self.node_ptr[].get_value():
+        if self.has_node and self.node_ptr[].get_value():
             # If we have an AST node, use its value
             return String(self.node_ptr[].get_value().value())
         elif self.literal_string_idx >= 0:
@@ -98,10 +108,12 @@ struct LiteralInfo[node_origin: ImmutOrigin](
 
     def get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
         """Get the length of the literal string."""
-        if self.node_ptr and self.node_ptr[].get_value():
-            return len(self.node_ptr[].get_value().value())
+        if self.has_node and self.node_ptr[].get_value():
+            return self.node_ptr[].get_value().value().byte_length()
         elif self.literal_string_idx >= 0:
-            return len(literal_set.literal_strings[self.literal_string_idx])
+            return literal_set.literal_strings[
+                self.literal_string_idx
+            ].byte_length()
         else:
             return 0
 
@@ -293,7 +305,7 @@ def _extract_from_node[
         # For alternation, literals are only required if they appear in ALL branches
         # Simplified: just check direct children of OR node
         var common_prefix = _find_common_prefix_simple(node)
-        if len(common_prefix) > 0:
+        if common_prefix.byte_length() > 0:
             _ = result.add(
                 literal=common_prefix,
                 start_offset=offset,
@@ -350,7 +362,7 @@ def _extract_sequence[
             current_literal += String(child.get_value().value())
         else:
             # End of literal sequence
-            if len(current_literal) > 0:
+            if current_literal.byte_length() > 0:
                 _ = literals.add(
                     literal=current_literal,
                     start_offset=current_offset,
@@ -358,7 +370,7 @@ def _extract_sequence[
                     is_suffix=False,
                     is_required=is_required,
                 )
-                current_offset += len(current_literal)
+                current_offset += current_literal.byte_length()
                 sequence_at_start = False
                 current_literal = ""
 
@@ -374,7 +386,7 @@ def _extract_sequence[
                     current_offset += 1  # At least one character
 
     # Don't forget the last literal sequence
-    if len(current_literal) > 0:
+    if current_literal.byte_length() > 0:
         _ = literals.add(
             literal=current_literal,
             start_offset=current_offset,
@@ -397,7 +409,7 @@ def _find_common_prefix_simple(or_node: ASTNode) -> String:
     var common = prefixes[0]
     for i in range(1, len(prefixes)):
         common = _longest_common_prefix(common, prefixes[i])
-        if len(common) == 0:
+        if common.byte_length() == 0:
             return String("")
 
     return common
@@ -408,7 +420,7 @@ def _collect_or_prefixes(node: ASTNode, mut prefixes: List[String]):
     if node.type != OR:
         # This is a leaf - get its prefix
         var prefix = _get_prefix_literal(node)
-        if len(prefix) > 0:
+        if prefix.byte_length() > 0:
             prefixes.append(prefix)
         return
 
@@ -439,7 +451,7 @@ def _get_prefix_literal(node: ASTNode) -> String:
 
 def _longest_common_prefix(s1: String, s2: String) -> String:
     """Find the longest common prefix of two strings."""
-    var min_len = min(len(s1), len(s2))
+    var min_len = min(s1.byte_length(), s2.byte_length())
     var i = 0
     var s1_ptr = s1.unsafe_ptr()
     var s2_ptr = s2.unsafe_ptr()

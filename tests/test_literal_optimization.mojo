@@ -120,7 +120,7 @@ def test_two_way_searcher() raises:
     # Test simple pattern
     var pattern1 = "fox"
     var pattern1_span = Span[Byte](
-        ptr=pattern1.unsafe_ptr(), length=len(pattern1)
+        ptr=pattern1.unsafe_ptr(), length=pattern1.byte_length()
     )
     var pos1 = twoway_search(pattern1_span, text)
     assert_equal(pos1, 16, "Should find 'fox' at position 16")
@@ -132,7 +132,7 @@ def test_two_way_searcher() raises:
     # Test pattern not found
     var pattern2 = "cat"
     var pattern2_span = Span[Byte](
-        ptr=pattern2.unsafe_ptr(), length=len(pattern2)
+        ptr=pattern2.unsafe_ptr(), length=pattern2.byte_length()
     )
     var pos3 = twoway_search(pattern2_span, text)
     assert_equal(pos3, -1, "Should return -1 when pattern not found")
@@ -140,7 +140,7 @@ def test_two_way_searcher() raises:
     # Test longer pattern
     var pattern3 = "quick brown"
     var pattern3_span = Span[Byte](
-        ptr=pattern3.unsafe_ptr(), length=len(pattern3)
+        ptr=pattern3.unsafe_ptr(), length=pattern3.byte_length()
     )
     var pos4 = twoway_search(pattern3_span, text)
     assert_equal(pos4, 4, "Should find 'quick brown' at position 4")
@@ -148,7 +148,7 @@ def test_two_way_searcher() raises:
     # Test pattern at end - use "quick" instead of "quick." to avoid regex metachar
     var pattern4 = "quick"
     var pattern4_span = Span[Byte](
-        ptr=pattern4.unsafe_ptr(), length=len(pattern4)
+        ptr=pattern4.unsafe_ptr(), length=pattern4.byte_length()
     )
     var pos5 = twoway_search(
         pattern4_span, text, 50
