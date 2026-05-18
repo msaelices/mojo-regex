@@ -1916,8 +1916,21 @@ struct DFAEngine(Engine):
                     return Match(0, pos, pos + pattern_len, text)
                 return None
 
-        # Try SIMD matching for simple character class patterns
-        if self._has_simd_matcher and len(self.states) > 0:
+        # Try SIMD matching for simple character class patterns.
+        # _try_match_simd returns None immediately when the start state
+        # is non-accepting AND the pattern isn't simd-scan-eligible
+        # (i.e., a bounded quantifier like {3} or {2,4}), so skip the
+        # function call in that common case. This is the hot path for
+        # bounded-quantifier patterns like `[0-9]{10}`, where every
+        # candidate position would otherwise pay the call overhead.
+        if (
+            self._has_simd_matcher
+            and len(self.states) > 0
+            and (
+                self._simd_scan_eligible
+                or self.states.unsafe_ptr()[self.start_state].is_accepting
+            )
+        ):
             var match_result = self._try_match_simd(text, start_pos)
             if match_result:
                 return match_result
@@ -2109,8 +2122,14 @@ struct DFAEngine(Engine):
         if len(self.states) == 0:
             return None
 
-        # Check if start state is accepting (for patterns like [a-z]*)
-        var start_accepting = self.states[self.start_state].is_accepting
+        # Check if start state is accepting (for patterns like [a-z]*).
+        # Use unsafe_ptr to bypass List bounds check (1.0.0b1 enables it
+        # by default on CPU); start_state is always within states bounds
+        # since we just checked len > 0 above and DFA construction
+        # guarantees the index is valid.
+        var start_accepting = self.states.unsafe_ptr()[
+            self.start_state
+        ].is_accepting
 
         # Bounded quantifiers like {3} or {2,4} can't use SIMD scan because
         # the match length is constrained. This flag is computed at compile time.
