@@ -946,9 +946,9 @@ def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
         return False
 
     var text_ptr = text.unsafe_ptr()
+    var pattern_ptr = pattern.unsafe_ptr()
     for i in range(pattern_len):
-        var c = pattern[i]
-        if Int(text_ptr[pos + i]) != Int(c):
+        if text_ptr[pos + i] != pattern_ptr[i]:
             return False
 
     return True
@@ -983,15 +983,16 @@ def simd_search(
 
     var text_len = text.byte_length()
     var text_ptr = text.unsafe_ptr()
+    var pattern_ptr = pattern.unsafe_ptr()
 
     # Single-byte literal: pure memchr-style SIMD scan.
     if pattern_len == 1:
-        return simd_find_byte(text_ptr, start, text_len, pattern[0])
+        return simd_find_byte(text_ptr, start, text_len, pattern_ptr[0])
 
     # Two-byte anchored SIMD scan for pattern_len >= 2.
-    var first_byte = pattern[0]
+    var first_byte = pattern_ptr[0]
     var last_offset = pattern_len - 1
-    var last_byte = pattern[last_offset]
+    var last_byte = pattern_ptr[last_offset]
     var first_splat = SIMD[DType.uint8, SIMD_WIDTH](first_byte)
     var last_splat = SIMD[DType.uint8, SIMD_WIDTH](last_byte)
     var pos = start
@@ -1272,13 +1273,14 @@ def apply_quantifier_simd_generic[
     """
     var pos = start_pos
     var match_count = 0
+    var text_len = text.byte_length()
     var actual_max = max_matches
     if actual_max == -1:
-        actual_max = text.byte_length() - start_pos
+        actual_max = text_len - start_pos
 
     # Count consecutive matching characters
     var text_ptr = text.unsafe_ptr()
-    while pos < text.byte_length() and match_count < actual_max:
+    while pos < text_len and match_count < actual_max:
         if matcher.contains(Int(text_ptr[pos])):
             match_count += 1
             pos += 1
@@ -1371,11 +1373,12 @@ def twoway_search(
             return simd_search(pattern, text, start)
 
         # For 2-4 byte patterns, use rolling comparison
+        var pattern_ptr = pattern.unsafe_ptr()
         var pos = start
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if Int(text_ptr[pos + i]) != Int(pattern[i]):
+                if text_ptr[pos + i] != pattern_ptr[i]:
                     matched = False
                     break
             if matched:
@@ -1394,10 +1397,11 @@ def twoway_search(
     var period = 1
 
     # Compute actual period of the pattern
+    var pattern_ptr = pattern.unsafe_ptr()
     for i in range(1, n):
         var is_period = True
         for j in range(n - i):
-            if Int(pattern[j]) != Int(pattern[j + i]):
+            if pattern_ptr[j] != pattern_ptr[j + i]:
                 is_period = False
                 break
         if is_period:
@@ -1408,7 +1412,7 @@ def twoway_search(
         # Simple forward comparison
         var matched = True
         for i in range(n):
-            if Int(text_ptr[pos + i]) != Int(pattern[i]):
+            if text_ptr[pos + i] != pattern_ptr[i]:
                 matched = False
                 break
 
