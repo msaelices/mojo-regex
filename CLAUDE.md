@@ -186,3 +186,10 @@ most often in this repo:
 - `sys.argv()` returns `Span[StaticString, StaticConstantOrigin]`.
 - SIMD bit-pattern reinterpretation uses the free function
   `bitcast[dtype, size](value)` from `std.memory`, not a method.
+- **1.0.0b1 turns CPU bounds checks on by default** for `List`, `Span`,
+  and (when called via `[i]`) `StringSlice`. The per-access check is
+  small but adds up in tight loops; index through `unsafe_ptr()` on
+  hot paths where bounds are already guaranteed (see `verify_match`
+  in `simd_ops.mojo` and the DFA start-state probe in `dfa.mojo`).
+  Global `-D ASSERT=none` is a sledgehammer; prefer per-callsite
+  `unsafe_ptr` so non-hot code keeps the safety net.
