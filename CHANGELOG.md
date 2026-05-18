@@ -1,5 +1,17 @@
 # Changelog
 
+## v0.20.0 (2026-05-18)
+
+### Upgrade to mojo 1.0.0b1 (PR #152)
+
+- Compatibility release: pins the toolchain to `mojo ==1.0.0b1` (up from `>=0.26.1,<0.27`) and adapts the source tree to compile cleanly under the new compiler (zero errors, zero warnings) with all 377 tests passing. No perf-targeted changes; the migration is mechanical except for the pointer refactor below.
+- **`fn` -> `def`**: 1.0.0b1 deprecates `fn`; `def` now has the same non-raising semantics. 14 module-level helpers in `onepass.mojo`, `simd_ops.mojo`, `matcher.mojo` were renamed. `mojo format` (mblack) in 1.0.0b1 refuses to parse `fn`, so this had to land before any other formatter-touching change.
+- **`len(String)` -> `String.byte_length()`**: ~220 call sites across `src/regex/`, `tests/`, and `benchmarks/`. mojo-regex is byte-oriented throughout (DFA / NFA / SIMD scans all index into raw bytes), so byte semantics are what the existing callers already assume.
+- **`UnsafePointer` non-null migration**: 1.0.0b1 deprecates the null constructor and `Bool(ptr)`. `DFAMatcher.engine_ptr`, `NFAMatcher._lazy_dfa_ptr`, `NFAMatcher._onepass_ptr`, and `compile_onepass`'s return type all moved to `Optional[UnsafePointer[...]]` (which shares the pointer's layout via the None niche, so it stays zero-overhead and FFI-safe per the release notes). `LiteralInfo.node_ptr` had to stay raw because the struct must remain `TrivialRegisterPassable` (which `Optional[UnsafePointer]` can't satisfy); used `unsafe_dangling()` + a `has_node: Bool` flag instead. `MatchList._data` switched to `unsafe_dangling()` with the existing `_capacity > 0` invariant as the alloc marker.
+- **Smaller deprecations**: removed the deleted `unified` closure keyword from `CharacterClassSIMD` (the explicit capture list now denotes unified-closure semantics on its own); `ref` -> `var` for `get_best_literal()`'s by-value return; explicit `SIMD[DType.int8, 8](x)` cast; `StringSlice(s)` instead of `s.as_string_slice()`; dropped one dead `try/except` around a now-non-raising dict assignment.
+- **Benchmarks**: `alias` -> `comptime` on fixture text in `bench_literal_optimization.mojo`, marked `main() raises` for the now-raising `Bench(...)` constructor, and a trailing `_ = engine^` after `b.iter[]` in `simd_focused_benchmark.mojo` to silence a 1.0.0b1 escape-analysis false positive on `@parameter def` closure captures.
+- No performance changes expected. The `Optional[UnsafePointer]` migration is documented as zero-overhead; pre/post benchmark comparison was not run for this release.
+
 ## v0.13.0 (2026-05-01)
 
 ### Two-byte memchr-style SIMD scan in simd_search (PR #148)
