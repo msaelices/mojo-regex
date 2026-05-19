@@ -1916,13 +1916,9 @@ struct DFAEngine(Engine):
                     return Match(0, pos, pos + pattern_len, text)
                 return None
 
-        # Try SIMD matching for simple character class patterns.
-        # _try_match_simd returns None immediately when the start state
-        # is non-accepting AND the pattern isn't simd-scan-eligible
-        # (i.e., a bounded quantifier like {3} or {2,4}), so skip the
-        # function call in that common case. This is the hot path for
-        # bounded-quantifier patterns like `[0-9]{10}`, where every
-        # candidate position would otherwise pay the call overhead.
+        # _try_match_simd returns None for bounded quantifiers with a
+        # non-accepting start state; inlining the guard avoids the
+        # call per candidate position.
         if (
             self._has_simd_matcher
             and len(self.states) > 0
@@ -2122,11 +2118,8 @@ struct DFAEngine(Engine):
         if len(self.states) == 0:
             return None
 
-        # Check if start state is accepting (for patterns like [a-z]*).
-        # Use unsafe_ptr to bypass List bounds check (1.0.0b1 enables it
-        # by default on CPU); start_state is always within states bounds
-        # since we just checked len > 0 above and DFA construction
-        # guarantees the index is valid.
+        # unsafe_ptr to skip the 1.0.0b1 default List bounds check;
+        # start_state is guaranteed in-range by the len check above.
         var start_accepting = self.states.unsafe_ptr()[
             self.start_state
         ].is_accepting
