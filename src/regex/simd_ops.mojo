@@ -321,9 +321,8 @@ struct CharacterClassSIMD(
         self.hi_nibble_table = SIMD[DType.uint8, 16](0)
 
         # Set bits for each character in the class
-        var cc_ptr = char_class.unsafe_ptr()
-        for i in range(char_class.byte_length()):
-            self.lookup_table[Int(cc_ptr[i])] = 1
+        for b in char_class.bytes():
+            self.lookup_table[Int(b)] = 1
 
         # Detect contiguous ranges from the lookup table
         self._detect_ranges()
