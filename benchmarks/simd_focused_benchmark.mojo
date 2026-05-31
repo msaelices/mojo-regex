@@ -23,7 +23,7 @@ def make_digit_heavy_text[length: Int]() -> String:
         return ""
 
     var base_pattern = "abc123def456ghi789jkl012mno345pqr678stu901vwx234yz567"
-    var pattern_len = len(base_pattern)
+    var pattern_len = base_pattern.byte_length()
     var result = String()
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
@@ -52,7 +52,7 @@ def make_space_heavy_text[length: Int]() -> String:
         return ""
 
     var base_pattern = "word1 \t word2\n\rword3   word4\t\t\nword5 word6"
-    var pattern_len = len(base_pattern)
+    var pattern_len = base_pattern.byte_length()
     var result = String()
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
@@ -83,7 +83,7 @@ def make_range_heavy_text[length: Int]() -> String:
     var base_pattern = (
         "abc123XYZ!@#def456GHI$%^jkl789MNO&*()pqr012STU+={}wxy345VWZ"
     )
-    var pattern_len = len(base_pattern)
+    var pattern_len = base_pattern.byte_length()
     var result = String()
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
@@ -119,6 +119,7 @@ def bench_nfa_simd_digits[text_length: Int](mut b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(Bool(test_text))
+    _ = engine^
 
 
 @parameter
@@ -136,6 +137,7 @@ def bench_nfa_simd_whitespace[text_length: Int](mut b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(Bool(test_text))
+    _ = engine^
 
 
 @parameter
@@ -153,6 +155,7 @@ def bench_nfa_simd_range[text_length: Int](mut b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(Bool(test_text))
+    _ = engine^
 
 
 @parameter
@@ -171,6 +174,7 @@ def bench_nfa_simd_negated_range[text_length: Int](mut b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(Bool(test_text))
+    _ = engine^
 
 
 @parameter
@@ -189,9 +193,10 @@ def bench_nfa_simd_quantified_range[text_length: Int](mut b: Bencher) raises:
 
     b.iter[call_fn]()
     keep(Bool(test_text))
+    _ = engine^
 
 
-def main():
+def main() raises:
     var m = Bench(BenchConfig(num_repetitions=1))
 
     print("=== SIMD-Focused NFA Engine Benchmarks ===")

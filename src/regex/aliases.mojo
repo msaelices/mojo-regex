@@ -4,7 +4,9 @@ def _all_except_newline() -> String:
 
 
 comptime DIGITS: String = "0123456789"
-comptime WORD_CHARS: String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+comptime WORD_CHARS: String = (
+    "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+)
 comptime CHAR_LIT_SPACE = ord("s")
 comptime CHAR_LIT_TAB = ord("t")
 comptime CHAR_TAB = ord("\t")
@@ -48,7 +50,7 @@ def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
     """Check if a byte value exists in a string slice without allocating."""
     var ptr = s.unsafe_ptr()
     var target = UInt8(ch_code)
-    for i in range(len(s)):
+    for i in range(s.byte_length()):
         if ptr[i] == target:
             return True
     return False

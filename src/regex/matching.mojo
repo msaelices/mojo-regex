@@ -53,7 +53,10 @@ struct MatchList(Copyable, Movable, Sized):
     """Default number of matches to reserve on first allocation."""
 
     var _data: UnsafePointer[Match, MutAnyOrigin]
-    """Internal list storing the matches."""
+    """Internal list storing the matches. Dangling (and never read
+    from) until the first allocation runs through `_realloc`; tracked
+    via `_capacity > 0` since 1.0.0b1 forbids null UnsafePointer
+    sentinels."""
     var _len: Int
     var _capacity: Int
 
@@ -62,8 +65,8 @@ struct MatchList(Copyable, Movable, Sized):
         capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._data = UnsafePointer[Match, MutAnyOrigin]()
-        self._capacity = capacity
+        self._data = UnsafePointer[Match, MutAnyOrigin].unsafe_dangling()
+        self._capacity = 0
         self._len = 0
         if capacity > 0:
             self._realloc(capacity)
@@ -75,7 +78,7 @@ struct MatchList(Copyable, Movable, Sized):
         copy: Self,
     ):
         """Copy constructor."""
-        self._data = UnsafePointer[Match, MutAnyOrigin]()
+        self._data = UnsafePointer[Match, MutAnyOrigin].unsafe_dangling()
         self._len = 0
         self._capacity = 0
         if copy._len > 0:
@@ -88,7 +91,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     def __del__(deinit self):
         """Destructor to free allocated memory."""
-        if self._data:
+        if self._capacity > 0:
             self._data.free()
 
     @always_inline
@@ -114,9 +117,8 @@ struct MatchList(Copyable, Movable, Sized):
     def _realloc(mut self, new_capacity: Int):
         var new_data = alloc[Match](new_capacity)
 
-        memcpy(dest=new_data, src=self._data, count=len(self))
-
-        if self._data:
+        if self._capacity > 0:
+            memcpy(dest=new_data, src=self._data, count=len(self))
             self._data.free()
         self._data = new_data
         self._capacity = new_capacity
@@ -126,7 +128,7 @@ struct MatchList(Copyable, Movable, Sized):
         m: Match,
     ):
         """Add a match to the container, reserving capacity on first use."""
-        if not self._data or self._len >= self._capacity:
+        if self._len >= self._capacity:
             var new_capacity = max(
                 self._capacity * 2, self.DEFAULT_RESERVE_SIZE
             )

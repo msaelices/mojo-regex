@@ -101,12 +101,12 @@ def create_optimized_prefilter(
     if literal_info.best_literal:
         var literal = literal_info.best_literal.value()
         # Only use literals that are long enough to be effective
-        if len(literal) >= 2:
+        if literal.byte_length() >= 2:
             return MemchrPrefilter(literal, False)
     return None
 
 
-fn _program_has_end_anchor(program: Program) -> Bool:
+def _program_has_end_anchor(program: Program) -> Bool:
     """True iff `program` contains an OP_END_ANCHOR instruction. Used to
     gate OnePass NFA compilation at NFAMatcher construction: only
     `$`-anchored patterns benefit, and skipping the compile for others
@@ -117,7 +117,7 @@ fn _program_has_end_anchor(program: Program) -> Bool:
     return False
 
 
-fn _find_rare_required_byte(
+def _find_rare_required_byte(
     ast: ASTNode[MutAnyOrigin],
     first_class_lookup: SIMD[DType.uint8, 256],
 ) -> Int:
@@ -155,7 +155,7 @@ fn _find_rare_required_byte(
         if not val:
             continue
         ref s = val.value()
-        if len(s) != 1:
+        if s.byte_length() != 1:
             continue
         var byte = Int(s.unsafe_ptr()[0])
         if first_class_lookup[byte] == 0:
@@ -206,12 +206,15 @@ trait RegexMatcher:
 struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine_ptr: UnsafePointer[DFAEngine, MutAnyOrigin]
-    """The underlying DFA engine for pattern matching."""
+    var engine_ptr: Optional[UnsafePointer[DFAEngine, MutAnyOrigin]]
+    """The underlying DFA engine for pattern matching. None when the
+    matcher was default-constructed and no AST has been compiled into
+    it (1.0.0b1 forbids null UnsafePointer, so absence goes through
+    Optional's None niche)."""
 
     def __init__(out self):
         """Default constructor for empty DFA matcher."""
-        self.engine_ptr = UnsafePointer[DFAEngine, MutAnyOrigin]()
+        self.engine_ptr = None
 
     def __init__(
         out self, var ast: ASTNode[MutAnyOrigin], pattern: String
@@ -223,8 +226,9 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
             pattern: The original regex pattern string.
         """
         engine = compile_dfa_pattern(ast)
-        self.engine_ptr = alloc[DFAEngine](1)
-        self.engine_ptr.init_pointee_move(engine^)
+        var ptr = alloc[DFAEngine](1)
+        ptr.init_pointee_move(engine^)
+        self.engine_ptr = ptr
 
     def __init__(out self, *, copy: Self):
         """Copy constructor."""
@@ -237,21 +241,21 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
     @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
-        return self.engine_ptr[].is_match(text, start)
+        return self.engine_ptr.value()[].is_match(text, start)
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.engine_ptr[].match_first(text, start)
+        return self.engine_ptr.value()[].match_first(text, start)
 
     @always_inline
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Find first match using DFA execution."""
-        return self.engine_ptr[].match_next(text, start)
+        return self.engine_ptr.value()[].match_next(text, start)
 
     def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches using DFA execution."""
-        return self.engine_ptr[].match_all(text)
+        return self.engine_ptr.value()[].match_all(text)
 
 
 struct NFAMatcher(Copyable, Movable, RegexMatcher):
@@ -261,21 +265,23 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     behind a nullable `UnsafePointer` rather than an `Optional[LazyDFA]`
     inline so that calling `mut self` methods on it (the lazy DFA caches
     transitions as it runs) is possible through the read-only `self` that
-    the `RegexMatcher` trait demands. A null pointer means no lazy DFA is
-    available; this collapses the previous `(ptr, has_dfa_bool)` pair into
-    a single source of truth and avoids the dead-store-elimination pitfall
-    that would fire when the bool was zeroed in `__moveinit__`.
+    the `RegexMatcher` trait demands. An empty `Optional` means no lazy
+    DFA is available; this collapses the previous `(ptr, has_dfa_bool)`
+    pair into a single source of truth and avoids the dead-store-
+    elimination pitfall that would fire when the bool was zeroed in
+    `__moveinit__`.
     """
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutAnyOrigin]
     """The parsed AST representation of the regex pattern."""
-    var _lazy_dfa_ptr: UnsafePointer[LazyDFA, MutAnyOrigin]
-    """Heap-allocated lazy DFA. Null when the pattern is not eligible for
-    lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES)."""
-    var _onepass_ptr: UnsafePointer[OnePassNFA, MutAnyOrigin]
-    """Heap-allocated OnePass NFA for unambiguous patterns. Null when
+    var _lazy_dfa_ptr: Optional[UnsafePointer[LazyDFA, MutAnyOrigin]]
+    """Heap-allocated lazy DFA. None when the pattern is not eligible
+    for lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES).
+    """
+    var _onepass_ptr: Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]
+    """Heap-allocated OnePass NFA for unambiguous patterns. None when
     the pattern failed the one-pass check. Preferred over the lazy DFA
     and the backtracking NFA when available since it does not pay per-
     call setup cost or rely on state-set caching."""
@@ -289,33 +295,36 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         # case LazyDFA mishandles). Skip the compile for other patterns
         # so non-anchored regexes don't pay a Program.copy() and a full
         # state-graph walk per NFAMatcher construction.
-        self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
+        self._onepass_ptr = None
         if vm.is_supported():
             if _program_has_end_anchor(vm.program):
                 self._onepass_ptr = compile_onepass(vm.program.copy())
-            self._lazy_dfa_ptr = alloc[LazyDFA](1)
+            var ptr = alloc[LazyDFA](1)
             # `init_pointee_move` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
             # move-assignment into garbage storage, which was the source
             # of the flaky double-free at process exit (issue #97).
-            self._lazy_dfa_ptr.init_pointee_move(LazyDFA(vm^))
+            ptr.init_pointee_move(LazyDFA(vm^))
+            self._lazy_dfa_ptr = ptr
         else:
-            self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+            self._lazy_dfa_ptr = None
 
     def __init__(out self, *, copy: Self):
         """Copy constructor. Deep-copies owned engines."""
         self.engine = copy.engine.copy()
         self.ast = copy.ast
         if copy._lazy_dfa_ptr:
-            self._lazy_dfa_ptr = alloc[LazyDFA](1)
-            self._lazy_dfa_ptr.init_pointee_move(copy._lazy_dfa_ptr[].copy())
+            var ptr = alloc[LazyDFA](1)
+            ptr.init_pointee_move(copy._lazy_dfa_ptr.value()[].copy())
+            self._lazy_dfa_ptr = ptr
         else:
-            self._lazy_dfa_ptr = UnsafePointer[LazyDFA, MutAnyOrigin]()
+            self._lazy_dfa_ptr = None
         if copy._onepass_ptr:
-            self._onepass_ptr = alloc[OnePassNFA](1)
-            self._onepass_ptr.init_pointee_move(copy._onepass_ptr[].copy())
+            var ptr = alloc[OnePassNFA](1)
+            ptr.init_pointee_move(copy._onepass_ptr.value()[].copy())
+            self._onepass_ptr = ptr
         else:
-            self._onepass_ptr = UnsafePointer[OnePassNFA, MutAnyOrigin]()
+            self._onepass_ptr = None
 
     def __init__(out self, *, deinit take: Self):
         """Move constructor. Transfers ownership of the heap-allocated
@@ -328,11 +337,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     def __del__(deinit self):
         """Free the heap-allocated engines if we still own them."""
         if self._lazy_dfa_ptr:
-            self._lazy_dfa_ptr.destroy_pointee()
-            self._lazy_dfa_ptr.free()
+            var ptr = self._lazy_dfa_ptr.value()
+            ptr.destroy_pointee()
+            ptr.free()
         if self._onepass_ptr:
-            self._onepass_ptr.destroy_pointee()
-            self._onepass_ptr.free()
+            var ptr = self._onepass_ptr.value()
+            ptr.destroy_pointee()
+            ptr.free()
 
     @always_inline
     def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
@@ -345,10 +356,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
           patterns stick with LazyDFA whose first-byte filter wins on
           long sparse text.
         - Backtracking NFA as the fallback."""
-        if self._lazy_dfa_ptr and not self._lazy_dfa_ptr[].has_end_anchor:
-            return self._lazy_dfa_ptr[].match_first(text, start)
+        if (
+            self._lazy_dfa_ptr
+            and not self._lazy_dfa_ptr.value()[].has_end_anchor
+        ):
+            return self._lazy_dfa_ptr.value()[].match_first(text, start)
         if self._onepass_ptr:
-            return self._onepass_ptr[].match_first(text, start)
+            return self._onepass_ptr.value()[].match_first(text, start)
         return self.engine.match_first(text, start)
 
     @always_inline
@@ -371,7 +385,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         return (
             Bool(self._onepass_ptr)
             and Bool(self._lazy_dfa_ptr)
-            and self._lazy_dfa_ptr[].has_end_anchor
+            and self._lazy_dfa_ptr.value()[].has_end_anchor
             and self._nfa_fast_paths_absent()
         )
 
@@ -384,18 +398,18 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
         """Search for match."""
         if self._use_lazy_dfa_for_search():
-            return self._lazy_dfa_ptr[].match_next(text, start)
+            return self._lazy_dfa_ptr.value()[].match_next(text, start)
         if self._use_onepass_for_search():
-            return self._onepass_ptr[].match_next(text, start)
+            return self._onepass_ptr.value()[].match_next(text, start)
         return self.engine.match_next(text, start)
 
     @always_inline
     def match_all(self, text: ImmSlice) raises -> MatchList:
         """Find all matches."""
         if self._use_lazy_dfa_for_search():
-            return self._lazy_dfa_ptr[].match_all(text)
+            return self._lazy_dfa_ptr.value()[].match_all(text)
         if self._use_onepass_for_search():
-            return self._onepass_ptr[].match_all(text)
+            return self._onepass_ptr.value()[].match_all(text)
         return self.engine.match_all(text)
 
 
@@ -424,7 +438,7 @@ def _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
     Returns:
         True if prefilter analysis should be skipped for performance.
     """
-    var pattern_len = len(pattern)
+    var pattern_len = pattern.byte_length()
 
     # Skip very short patterns entirely - unlikely to yield useful prefilters
     if pattern_len <= 4:
@@ -587,7 +601,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             var best_literal_info = literal_set.get_best_literal()
             if best_literal_info:
                 var literal = best_literal_info.value().get_literal(literal_set)
-                if len(literal) > 0:
+                if literal.byte_length() > 0:
                     best_literal_opt = literal
                     # Simple heuristic: if we have a required literal and no complex regex constructs
                     # Must also check that the pattern doesn't contain regex operators
@@ -653,11 +667,11 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         if (
             self._use_dfa
             and not self.literal_info.has_anchors
-            and self.dfa_matcher.engine_ptr[]._has_simd_matcher
+            and self.dfa_matcher.engine_ptr.value()[]._has_simd_matcher
         ):
             self._required_byte = _find_rare_required_byte(
                 ast,
-                self.dfa_matcher.engine_ptr[]._simd_char_matcher.lookup_table,
+                self.dfa_matcher.engine_ptr.value()[]._simd_char_matcher.lookup_table,
             )
 
     def __init__(out self, *, copy: Self):
@@ -690,7 +704,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
         """Check if pattern matches without computing boundaries."""
         if self.is_wildcard_match_any:
-            return start <= len(text)
+            return start <= text.byte_length()
 
         if self._use_dfa:
             return self.dfa_matcher.is_match(text, start)
@@ -705,8 +719,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
-            if start <= len(text):
-                return Match(0, start, len(text), text)
+            if start <= text.byte_length():
+                return Match(0, start, text.byte_length(), text)
             else:
                 return None
 
@@ -724,8 +738,8 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         """
         # Fast path: Wildcard match any (.* pattern) always matches from start to end
         if self.is_wildcard_match_any:
-            if start <= len(text):
-                return Match(0, start, len(text), text)
+            if start <= text.byte_length():
+                return Match(0, start, text.byte_length(), text)
             else:
                 return None
         # Fast path: Exact literal bypass (only for non-anchored patterns)
@@ -734,13 +748,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             if best_literal:
                 var literal = best_literal.value()
                 # Simple bounds check to avoid issues
-                if start >= len(text):
+                if start >= text.byte_length():
                     return None
                 var pos = text.find(literal, start)
                 if pos != -1:
                     # Ensure we don't exceed text bounds
-                    var end_pos = pos + len(literal)
-                    if end_pos <= len(text):
+                    var end_pos = pos + literal.byte_length()
+                    if end_pos <= text.byte_length():
                         return Match(0, pos, end_pos, text)
                 return None
 
@@ -770,20 +784,20 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         # Fast path: Wildcard match any (.* pattern) matches entire text once
         if self.is_wildcard_match_any:
             var matches = MatchList(capacity=1)
-            if len(text) >= 0:  # .* matches even empty strings
-                matches.append(Match(0, 0, len(text), text))
+            if text.byte_length() >= 0:  # .* matches even empty strings
+                matches.append(Match(0, 0, text.byte_length(), text))
             return matches^
         # Fast path: Exact literal patterns without anchors
         if self.is_exact_literal and not self.literal_info.has_anchors:
-            var text_len = len(text)
+            var text_len = text.byte_length()
             var matches = MatchList(
                 capacity=text_len >> 7 if text_len >= 1024 else 0
             )
             var best_literal = self.literal_info.get_best_required_literal()
             if best_literal:
                 var literal = best_literal.value()
-                var literal_len = len(literal)
-                var text_len = len(text)
+                var literal_len = literal.byte_length()
+                var text_len = text.byte_length()
 
                 # Bounds check to avoid issues
                 if literal_len > text_len:
@@ -825,13 +839,13 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     def _match_all_required_byte(self, text: ImmSlice) raises -> MatchList:
         """findall fast path for patterns with a rare required byte."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
         var text_ptr = text.unsafe_ptr()
         var needle = UInt8(self._required_byte)
-        ref cc = self.dfa_matcher.engine_ptr[]._simd_char_matcher
+        ref cc = self.dfa_matcher.engine_ptr.value()[]._simd_char_matcher
         var pos = 0
         while pos < text_len:
             var hit = simd_find_byte(text_ptr, pos, text_len, needle)
@@ -964,7 +978,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         literal separators, enabling an additional whole-text-match
         fast path that validates digits and emits the template
         without any engine dispatch."""
-        var pat_slice = rebind[ImmSlice](self.pattern.as_string_slice())
+        var pat_slice = rebind[ImmSlice](StringSlice(self.pattern))
         var fixed = _detect_fixed_width_groups(pat_slice)
         if not fixed:
             return
@@ -1233,14 +1247,12 @@ def _compile_and_cache_with_key(
     try:
         regex_cache_ptr[][key] = compiled
         return UnsafePointer(to=regex_cache_ptr[][key])
-    except:
-        pass
-    # Fallback: shouldn't reach here, but return a valid pointer
-    try:
-        regex_cache_ptr[][key] = compiled
-    except:
-        pass
-    return UnsafePointer[CompiledRegex, MutAnyOrigin]()
+    except e:
+        # Dict insertion must succeed (failure here would indicate an
+        # allocator bug). 1.0.0b1 forbids returning a null UnsafePointer
+        # sentinel, so propagate the error instead of silently producing
+        # a dangling pointer.
+        raise e
 
 
 def compile_regex(pattern: ImmSlice) raises -> CompiledRegex:
@@ -1352,7 +1364,7 @@ def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
     walks the pre-parsed template without re-scanning repl.
     """
     var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
     var segments = List[_ReplSegment](capacity=8)
     var i = 0
     var literal_start = 0
@@ -1382,7 +1394,7 @@ def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
 def _has_group_refs(repl: ImmSlice) -> Bool:
     """Check if repl contains \\1..\\9 backreferences."""
     var repl_ptr = repl.unsafe_ptr()
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
     for i in range(repl_len - 1):
         if Int(repl_ptr[i]) == CHAR_SLASH:
             var next_ch = Int(repl_ptr[i + 1])
@@ -1407,7 +1419,7 @@ def _detect_fixed_width_groups(
     quantifiers, nested groups, non-\\d groups, character classes).
     """
     var p = pattern.unsafe_ptr()
-    var plen = len(pattern)
+    var plen = pattern.byte_length()
     var segments = List[Int]()
     var i = 0
     var literal_run = 0  # track bytes of literal content between groups
@@ -1586,7 +1598,7 @@ def _sub_impl_with_repl(
     3. Fixed-width groups + search needed: DFA match_next + offset slicing.
     4. General: NFA match_next_with_groups for complex patterns.
     """
-    var text_len = len(text)
+    var text_len = text.byte_length()
     if text_len == 0:
         return String(text)
 
@@ -1762,7 +1774,7 @@ def sub(
     """
     var cache = _get_last_sub_cache()
     var pattern_addr = Int(pattern.unsafe_ptr())
-    var pattern_len = len(pattern)
+    var pattern_len = pattern.byte_length()
 
     var pattern_hash: UInt64
     if (
@@ -1779,7 +1791,7 @@ def sub(
     var compiled_ptr = _compile_and_cache_with_key(pattern, pattern_hash)
 
     var repl_addr = Int(repl.unsafe_ptr())
-    var repl_len = len(repl)
+    var repl_len = repl.byte_length()
 
     if cache[].repl_addr != repl_addr or cache[].repl_len != repl_len:
         # Cache miss: parse into the cache slot directly so the template

@@ -153,7 +153,9 @@ def test_whitespace() raises:
 def test_simd_string_search() raises:
     """Test SIMD-accelerated string search."""
     var pattern = "hello"
-    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
+    var pattern_span = Span[Byte](
+        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+    )
 
     # Test basic search
     assert_equal(simd_search(pattern_span, "hello world"), 0)
@@ -167,7 +169,9 @@ def test_simd_string_search() raises:
 def test_simd_string_search_all() raises:
     """Test finding all occurrences with SIMD string search."""
     var pattern = "ll"
-    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
+    var pattern_span = Span[Byte](
+        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+    )
     var text = "hello world, all well"
 
     # Find all non-overlapping occurrences manually using simd_search
@@ -180,7 +184,7 @@ def test_simd_string_search_all() raises:
             break
         positions.append(pos)
         # Move past this match to avoid overlapping matches
-        start = pos + len(pattern)
+        start = pos + pattern.byte_length()
 
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 2)  # "hello"
@@ -191,7 +195,9 @@ def test_simd_string_search_all() raises:
 def test_simd_string_search_empty() raises:
     """Test SIMD string search with empty pattern."""
     var pattern = ""
-    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
+    var pattern_span = Span[Byte](
+        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+    )
 
     # Empty pattern should match at any position
     assert_equal(simd_search(pattern_span, "hello"), 0)
@@ -201,7 +207,9 @@ def test_simd_string_search_empty() raises:
 def test_simd_string_search_single_char() raises:
     """Test SIMD string search with single character."""
     var pattern = "a"
-    var pattern_span = Span[Byte](ptr=pattern.unsafe_ptr(), length=len(pattern))
+    var pattern_span = Span[Byte](
+        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+    )
 
     assert_equal(simd_search(pattern_span, "banana"), 1)
     assert_equal(simd_search(pattern_span, "hello"), -1)
@@ -217,7 +225,7 @@ def test_simd_string_search_single_char() raises:
             break
         positions.append(pos)
         # Move past this match to avoid overlapping matches
-        start = pos + len(pattern)
+        start = pos + pattern.byte_length()
 
     assert_equal(len(positions), 3)
     assert_equal(positions[0], 1)
@@ -297,7 +305,7 @@ def test_nibble_table_high_nibble_chars() raises:
     var matcher_89 = CharacterClassSIMD("89")
     var text_89 = String("Call 8001234567")
     var pos_89 = matcher_89.find_first_nibble_match(
-        text_89.unsafe_ptr(), 0, len(text_89)
+        text_89.unsafe_ptr(), 0, text_89.byte_length()
     )
     assert_equal(pos_89, 5)  # '8' at position 5
 
@@ -305,7 +313,7 @@ def test_nibble_table_high_nibble_chars() raises:
     var matcher_paren = CharacterClassSIMD("(")
     var text_paren = String("hello (world)")
     var pos_paren = matcher_paren.find_first_nibble_match(
-        text_paren.unsafe_ptr(), 0, len(text_paren)
+        text_paren.unsafe_ptr(), 0, text_paren.byte_length()
     )
     assert_equal(pos_paren, 6)  # '(' at position 6
 

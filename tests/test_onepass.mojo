@@ -10,9 +10,9 @@ from regex.aliases import ImmSlice
 
 def _build_onepass(
     pattern: String,
-) raises -> UnsafePointer[OnePassNFA, MutAnyOrigin]:
+) raises -> Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]:
     """Parse a pattern, compile to PikeVM bytecode, attempt OnePass
-    compilation, and return the heap pointer (null if not one-pass)."""
+    compilation, and return the heap pointer (None if not one-pass)."""
     var ast = parse(pattern)
     var program = compile_ast(ast)
     return compile_onepass(program^)
@@ -20,9 +20,10 @@ def _build_onepass(
 
 def test_onepass_compiles_simple_literal() raises:
     """The simplest possible one-pass pattern: a literal sequence."""
-    var ptr = _build_onepass("abc")
-    assert_true(Bool(ptr))
-    if ptr:
+    var opt_ptr = _build_onepass("abc")
+    assert_true(Bool(opt_ptr))
+    if opt_ptr:
+        var ptr = opt_ptr.value()
         ptr.destroy_pointee()
         ptr.free()
 
@@ -30,19 +31,21 @@ def test_onepass_compiles_simple_literal() raises:
 def test_onepass_compiles_phone_validation() raises:
     """The motivating pattern: an anchored phone-number validator with
     optional groups whose branches are distinguishable byte-by-byte."""
-    var ptr = _build_onepass(
+    var opt_ptr = _build_onepass(
         "^\\+?1?[\\s.-]?\\(?([2-9]\\d{2})\\)?[\\s.-]?([2-9]\\d{2})[\\s.-]?(\\d{4})$"
     )
-    assert_true(Bool(ptr))
-    if ptr:
+    assert_true(Bool(opt_ptr))
+    if opt_ptr:
+        var ptr = opt_ptr.value()
         ptr.destroy_pointee()
         ptr.free()
 
 
 def test_onepass_literal_matches() raises:
     """Execute the compiled automaton against matching and non-matching text."""
-    var ptr = _build_onepass("abc")
-    assert_true(Bool(ptr))
+    var opt_ptr = _build_onepass("abc")
+    assert_true(Bool(opt_ptr))
+    var ptr = opt_ptr.value()
     var text_good = String("abc")
     var text_bad = String("abd")
     var m_good = ptr[].match_first(text_good, 0)
@@ -59,8 +62,9 @@ def test_onepass_literal_matches() raises:
 def test_onepass_end_anchor() raises:
     """A dollar-anchored pattern should only match when the match
     coincides with the end of the text."""
-    var ptr = _build_onepass("ab$")
-    assert_true(Bool(ptr))
+    var opt_ptr = _build_onepass("ab$")
+    assert_true(Bool(opt_ptr))
+    var ptr = opt_ptr.value()
     var hit = String("xxab")
     var miss = String("xxab ")
     var m_hit = ptr[].match_next(hit, 0)

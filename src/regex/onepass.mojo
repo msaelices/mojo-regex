@@ -60,7 +60,7 @@ patterns compile to tens of states; the limit guards against pathological
 blow-ups. ONEPASS_MAX_STATES is comfortably within Int16 range."""
 
 
-fn _epsilon_close(
+def _epsilon_close(
     program: Program,
     read start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
@@ -109,7 +109,7 @@ fn _epsilon_close(
 
 
 @always_inline
-fn _set_contains_match(
+def _set_contains_match(
     program: Program,
     nfa_set: SIMD[DType.uint8, MAX_STATES],
 ) -> Bool:
@@ -121,7 +121,7 @@ fn _set_contains_match(
     return False
 
 
-fn _closure_reaches_match_with_end_anchor(
+def _closure_reaches_match_with_end_anchor(
     program: Program,
     nfa_set: SIMD[DType.uint8, MAX_STATES],
 ) -> Bool:
@@ -141,7 +141,7 @@ fn _closure_reaches_match_with_end_anchor(
 
 
 @always_inline
-fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
+def _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
     """Hash of the state set bytes for O(1) dedup during subset
     construction. Bitcasts the 512-byte set to uint64 lanes, XORs against
     per-lane mixers (breaks lane symmetry), XOR-reduces to one u64 via
@@ -162,7 +162,7 @@ fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
     var u64_view = bitcast[DType.uint64, NUM_U64](nfa_set)
 
     @parameter
-    fn xor_op[
+    def xor_op[
         w: Int
     ](a: SIMD[DType.uint64, w], b: SIMD[DType.uint64, w]) -> SIMD[
         DType.uint64, w
@@ -179,21 +179,21 @@ fn _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
 
 def compile_onepass(
     var program: Program,
-) -> UnsafePointer[OnePassNFA, MutAnyOrigin]:
+) -> Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]:
     # Compile a PikeVM program into a OnePass NFA and heap-allocate it.
-    # Returns a null pointer when the pattern is not one-pass (caller
-    # falls back to another engine).
+    # Returns None when the pattern is not one-pass (caller falls back
+    # to another engine).
     #
     # Walks the state-set graph starting from the epsilon closure of
     # PC 0 with at_start=True. For each state and each input byte,
     # collects the PCs whose byte-consuming op fires. If more than one
     # PC fires and their follow-up epsilon closures differ, the pattern
-    # is not one-pass and this function returns null. State dedup is by
-    # nfa_set equality; a linear scan suffices since typical programs
-    # produce <50 states.
+    # is not one-pass and this function returns None. State dedup is
+    # by nfa_set equality; a linear scan suffices since typical
+    # programs produce <50 states.
     var prog_len = len(program)
     if prog_len == 0 or prog_len > MAX_STATES:
-        return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+        return None
 
     var has_start_anchor = False
     var has_end_anchor = False
@@ -213,10 +213,7 @@ def compile_onepass(
         OnePassState(start_set, _set_contains_match(program, start_set))
     )
     var state_index = Dict[UInt64, List[Int]]()
-    try:
-        state_index[_hash_set(start_set)] = [0]
-    except:
-        pass
+    state_index[_hash_set(start_set)] = [0]
 
     var worklist = List[Int](capacity=32)
     worklist.append(0)
@@ -303,12 +300,12 @@ def compile_onepass(
                         one_pass = False
                         break
                 if not one_pass:
-                    return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+                    return None
                 idx = _find_or_add_state(
                     program, states, state_index, first_closure, is_new
                 )
             if idx < 0:
-                return UnsafePointer[OnePassNFA, MutAnyOrigin]()
+                return None
             if is_new:
                 worklist.append(idx)
             transitions[byte] = idx
@@ -483,7 +480,7 @@ struct OnePassNFA(Copyable, Movable):
         if self.has_start_anchor and start > 0:
             return None
         var text_ptr = text.unsafe_ptr()
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var state_id = 0
         var match_end = -1
         var trans_ptr = self.transitions.unsafe_ptr()
@@ -516,7 +513,7 @@ struct OnePassNFA(Copyable, Movable):
             if start > 0:
                 return None
             return self.match_first(text, 0)
-        var text_len = len(text)
+        var text_len = text.byte_length()
         for try_pos in range(start, text_len + 1):
             var m = self.match_first(text, try_pos)
             if m:
@@ -525,7 +522,7 @@ struct OnePassNFA(Copyable, Movable):
 
     @always_inline
     def match_all(self, text: ImmSlice) -> MatchList:
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList(
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )

@@ -12,7 +12,7 @@ def make_test_string(length: Int) -> String:
     """Generate test string by repeating alphabet."""
     var result = String()
     var pattern = String("abcdefghijklmnopqrstuvwxyz")
-    var pattern_len = len(pattern)
+    var pattern_len = pattern.byte_length()
     var full_repeats = length // pattern_len
     var remainder = length % pattern_len
 
@@ -112,10 +112,10 @@ def _arg_has(flag: StaticString) -> Bool:
 def _arg_value(prefix: StaticString) -> String:
     """Return the suffix of an argv entry starting with `prefix`, or empty."""
     var args = argv()
-    var plen = len(prefix)
+    var plen = prefix.byte_length()
     for i in range(1, len(args)):
         var a = args[i]
-        if len(a) >= plen and a[byte=0:plen] == prefix:
+        if a.byte_length() >= plen and a[byte=0:plen] == prefix:
             return String(a[byte=plen:])
     return ""
 
@@ -137,7 +137,7 @@ def _target_runtime_ns() -> UInt:
 def _bench_skip(name: String) -> Bool:
     """True if --filter=<substr> is set and `name` does not contain it."""
     var f = _arg_value("--filter=")
-    return len(f) > 0 and f not in name
+    return f.byte_length() > 0 and f not in name
 
 
 def _find_median(mut times: List[Float64]) -> Float64:
@@ -160,16 +160,16 @@ def _find_median(mut times: List[Float64]) -> Float64:
 
 def _print_result(name: String, median_ms: Float64, total_iters: Int):
     """Print benchmark result in table format."""
-    var padded_name = name + " " * (25 - len(name))
+    var padded_name = name + " " * (25 - name.byte_length())
     print(
         "| "
         + padded_name
         + " | "
         + String(median_ms)[byte=:24]
-        + " " * (25 - len(String(median_ms)[byte=:24]))
+        + " " * (25 - String(median_ms)[byte=:24].byte_length())
         + " | "
         + String(total_iters)
-        + " " * (6 - len(String(total_iters)))
+        + " " * (6 - String(total_iters).byte_length())
         + " |"
     )
 
@@ -431,7 +431,7 @@ def benchmark_sub(
 
         for _ in range(iters):
             var result = sub(pattern, repl, text)
-            if len(result) == 0 and len(text) > 0:
+            if result.byte_length() == 0 and text.byte_length() > 0:
                 print("ERROR: Empty result in", name)
                 return
 
@@ -464,7 +464,7 @@ def main() raises:
             " time"
         )
     var filter = _arg_value("--filter=")
-    if len(filter) > 0:
+    if filter.byte_length() > 0:
         print("Filter: only running benchmarks matching '" + filter + "'")
     print()
 
@@ -538,7 +538,10 @@ def main() raises:
     var large_alternation = (
         "(apple|banana|cherry|date|elderberry|fig|grape|honey)"
     )
-    var fruit_text = "I love eating apple and banana and cherry and date and elderberry and fig and grape with honey"
+    var fruit_text = (
+        "I love eating apple and banana and cherry and date and elderberry and"
+        " fig and grape with honey"
+    )
     benchmark_search(
         "large_8_alternations", large_alternation, fruit_text, 1000
     )
@@ -552,14 +555,21 @@ def main() raises:
 
     # Test case 3: Literal-heavy alternation - benefits from 80% threshold detection
     var literal_heavy = "(user123|admin456|guest789|root000|test111|demo222|sample333|client444)"
-    var user_text = "Login attempts: user123 failed, admin456 success, guest789 failed, root000 success, test111 pending, demo222 active, sample333 inactive, client444 locked"
+    var user_text = (
+        "Login attempts: user123 failed, admin456 success, guest789 failed,"
+        " root000 success, test111 pending, demo222 active, sample333 inactive,"
+        " client444 locked"
+    )
     benchmark_search(
         "literal_heavy_alternation", literal_heavy, user_text, 1000
     )
 
     # Test case 4: Complex group with 5 children - benefits from increased children limit (3->5)
     var complex_group = "(hello|world|test|demo|sample)[0-9]{3}[a-z]{2}"
-    var mixed_text = "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in the data"
+    var mixed_text = (
+        "Found: hello123ab, world456cd, test789ef, demo012gh, sample345ij in"
+        " the data"
+    )
     benchmark_search(
         "complex_group_5_children", complex_group, mixed_text, 1000
     )
@@ -642,7 +652,10 @@ def main() raises:
     # ===== Pure DFA Phone Number Benchmarks (Literal Patterns) =====
 
     # Generate literal test data
-    var literal_phone_text = "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is 555.123.4567."
+    var literal_phone_text = (
+        "Contact us at 555-123-4567 or call (555) 123-4567. Our fax is"
+        " 555.123.4567."
+    )
 
     benchmark_findall("pure_dfa_dash", "555-123-4567", literal_phone_text, 1000)
 

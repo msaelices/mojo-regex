@@ -67,12 +67,12 @@ def scan(regex: String) raises -> List[Token]:
     Returns:
         A list of tokens parsed from the regex string.
     """
-    var tokens = List[Token](capacity=len(regex))
+    var tokens = List[Token](capacity=regex.byte_length())
     var i = 0
     var escape_found = False
     var regex_bytes = regex.as_bytes()
 
-    while i < len(regex):
+    while i < regex.byte_length():
         var ch_codepoint = Int(regex_bytes[i])
 
         if escape_found:
@@ -131,7 +131,7 @@ def scan(regex: String) raises -> List[Token]:
             token.start_pos = i
             tokens.append(token)
             i += 1
-            while i < len(regex):
+            while i < regex.byte_length():
                 var inner_ch_codepoint = Int(regex_bytes[i])
                 if inner_ch_codepoint == CHAR_COMMA:
                     var comma_token = Comma()

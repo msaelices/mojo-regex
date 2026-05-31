@@ -92,7 +92,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         self.pattern = pattern
         self.children_len = 0
         self.children_ptr = alloc[ASTNode[ImmutAnyOrigin]](
-            len(pattern) * 2
+            pattern.byte_length() * 2
         )  # Allocate enough space for children
 
     @always_inline
@@ -362,7 +362,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
     @always_inline
     def is_leaf(self) -> Bool:
         """Check if the AST node is a leaf node."""
-        if LEAF_ELEMS.eq(self.type).reduce_or():
+        if LEAF_ELEMS.eq(SIMD[DType.int8, 8](self.type)).reduce_or():
             return True
         else:
             return False
@@ -393,7 +393,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         elif self.type == RANGE and self.get_value():
             # Complex character classes benefit more from SIMD
             return (
-                len(self.get_value().value()) > 8
+                self.get_value().value().byte_length() > 8
             )  # Complex patterns like [a-zA-Z0-9._%+-]
         else:
             return False  # Simple quantifiers use regular matching
@@ -404,7 +404,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
             return str_i == 0
         elif self.type == END:
             return str_i == str_len
-        elif len(value) == 1:
+        elif value.byte_length() == 1:
             return self.is_match_char(ord(value), str_i, str_len)
         elif self.type == ELEMENT:
             return self.get_value() and (self.get_value().value() == value)
@@ -419,7 +419,10 @@ struct ASTNode[regex_origin: ImmutOrigin](
             var value = self.get_value()
             if value:
                 ref val = value.value()
-                return len(val) == 1 and Int(val.unsafe_ptr()[0]) == ch_code
+                return (
+                    val.byte_length() == 1
+                    and Int(val.unsafe_ptr()[0]) == ch_code
+                )
             return False
         elif self.type == WILDCARD:
             return ch_code != CHAR_NEWLINE
@@ -479,11 +482,14 @@ struct ASTNode[regex_origin: ImmutOrigin](
         """Check if a character code matches range syntax like 'a-z'."""
         var rs_ptr = range_syntax.unsafe_ptr()
         var i = 0
-        if len(range_syntax) > 0 and Int(rs_ptr[0]) == CHAR_CIRCUMFLEX:
+        if range_syntax.byte_length() > 0 and Int(rs_ptr[0]) == CHAR_CIRCUMFLEX:
             i = 1
 
-        while i < len(range_syntax):
-            if i + 2 < len(range_syntax) and Int(rs_ptr[i + 1]) == CHAR_DASH:
+        while i < range_syntax.byte_length():
+            if (
+                i + 2 < range_syntax.byte_length()
+                and Int(rs_ptr[i + 1]) == CHAR_DASH
+            ):
                 var start_code = Int(rs_ptr[i])
                 var end_code = Int(rs_ptr[i + 2])
                 if start_code <= ch_code <= end_code:
@@ -668,7 +674,7 @@ def classify_range_kind(pattern: StringSlice) -> Int:
             "a-z" in inner
             and "A-Z" in inner
             and "0-9" in inner
-            and len(inner) > COMPLEX_CHAR_CLASS_THRESHOLD
+            and inner.byte_length() > COMPLEX_CHAR_CLASS_THRESHOLD
         ):
             return RANGE_KIND_COMPLEX_ALNUM
     return RANGE_KIND_OTHER
