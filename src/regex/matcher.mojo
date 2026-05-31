@@ -13,6 +13,7 @@ from std.time import monotonic
 
 from regex.aliases import (
     ImmSlice,
+    imm_slice_from_ptr,
     CHAR_SLASH,
     CHAR_ZERO,
     CHAR_NINE,
@@ -1524,9 +1525,9 @@ def _apply_template_fixed(
         if seg.group_ref > 0 and seg.group_ref <= num_groups:
             var gs = match_start + group_offsets[seg.group_ref]
             var gw = group_widths[seg.group_ref]
-            out += ImmSlice(ptr=text_ptr + gs, length=gw)
+            out += imm_slice_from_ptr(text_ptr + gs, gw)
         else:
-            out += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
+            out += imm_slice_from_ptr(repl_ptr + seg.start, seg.length)
     return out
 
 
@@ -1549,7 +1550,7 @@ def _apply_template_groups(
             if idx >= 0:
                 out += groups[idx].get_match_text()
         else:
-            out += ImmSlice(ptr=repl_ptr + seg.start, length=seg.length)
+            out += imm_slice_from_ptr(repl_ptr + seg.start, seg.length)
     return out
 
 
@@ -1658,8 +1659,8 @@ def _sub_impl_with_repl(
                 var match_end = m.value().end_idx
 
                 if match_start > pos:
-                    result += ImmSlice(
-                        ptr=text_ptr + pos, length=match_start - pos
+                    result += imm_slice_from_ptr(
+                        text_ptr + pos, match_start - pos
                     )
 
                 result += _apply_template_fixed(
@@ -1676,7 +1677,7 @@ def _sub_impl_with_repl(
 
                 if match_end == match_start:
                     if pos < text_len:
-                        result += ImmSlice(ptr=text_ptr + pos, length=1)
+                        result += imm_slice_from_ptr(text_ptr + pos, 1)
                     pos = match_end + 1
                 else:
                     pos = match_end
@@ -1696,8 +1697,8 @@ def _sub_impl_with_repl(
                 var m = mg[0].value()
 
                 if m.start_idx > pos:
-                    result += ImmSlice(
-                        ptr=text_ptr + pos, length=m.start_idx - pos
+                    result += imm_slice_from_ptr(
+                        text_ptr + pos, m.start_idx - pos
                     )
 
                 # Build group index for this match
@@ -1714,7 +1715,7 @@ def _sub_impl_with_repl(
 
                 if m.end_idx == m.start_idx:
                     if pos < text_len:
-                        result += ImmSlice(ptr=text_ptr + pos, length=1)
+                        result += imm_slice_from_ptr(text_ptr + pos, 1)
                     pos = m.end_idx + 1
                 else:
                     pos = m.end_idx
@@ -1731,14 +1732,14 @@ def _sub_impl_with_repl(
             var match_end = m.value().end_idx
 
             if match_start > pos:
-                result += ImmSlice(ptr=text_ptr + pos, length=match_start - pos)
+                result += imm_slice_from_ptr(text_ptr + pos, match_start - pos)
 
             result += repl
             replacements += 1
 
             if match_end == match_start:
                 if pos < text_len:
-                    result += ImmSlice(ptr=text_ptr + pos, length=1)
+                    result += imm_slice_from_ptr(text_ptr + pos, 1)
                 pos = match_end + 1
             else:
                 pos = match_end
@@ -1747,7 +1748,7 @@ def _sub_impl_with_repl(
                 break
 
     if pos < text_len:
-        result += ImmSlice(ptr=text_ptr + pos, length=text_len - pos)
+        result += imm_slice_from_ptr(text_ptr + pos, text_len - pos)
 
     return result
 

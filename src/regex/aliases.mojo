@@ -64,6 +64,19 @@ comptime ImmSlice = StringSlice[ImmutAnyOrigin]
 the matcher/engine chain so callers can pass string literals or views
 without allocating a `String`."""
 
+
+@always_inline
+def imm_slice_from_ptr(
+    ptr: UnsafePointer[Byte, ImmutAnyOrigin], length: Int
+) -> ImmSlice:
+    """Construct an `ImmSlice` over `[ptr, ptr+length)`. Thin wrapper
+    around the 1.0.0b2 `StringSlice(unsafe_from_utf8=Span(...))`
+    constructor so call sites stay compact."""
+    return ImmSlice(
+        unsafe_from_utf8=Span[Byte, ImmutAnyOrigin](ptr=ptr, length=length)
+    )
+
+
 # SIMD matcher type constants
 comptime SIMD_MATCHER_NONE = 0
 comptime SIMD_MATCHER_WHITESPACE = 1
