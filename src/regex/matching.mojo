@@ -1,6 +1,6 @@
 from std.memory import UnsafePointer, memcpy, alloc
 
-from regex.aliases import ImmSlice
+from regex.aliases import ImmSlice, imm_slice_from_ptr
 
 
 struct Match(Copyable, Movable, TrivialRegisterPassable):
@@ -35,9 +35,9 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
 
     def get_match_text(self) -> ImmSlice:
         """Returns the text that was matched."""
-        return ImmSlice(
-            ptr=self.text_ptr + self.start_idx,
-            length=self.end_idx - self.start_idx,
+        return imm_slice_from_ptr(
+            self.text_ptr + self.start_idx,
+            self.end_idx - self.start_idx,
         )
 
 

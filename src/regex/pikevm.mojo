@@ -276,9 +276,8 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
     if node.type == DIGIT or node.type == WORD or node.type == SPACE:
         # Use _expand_character_range which handles these via fast paths
         var expanded = _expand_character_range(node.type, "")
-        var ptr = expanded.unsafe_ptr()
-        for i in range(expanded.byte_length()):
-            table[Int(ptr[i])] = 1
+        for b in expanded.bytes():
+            table[Int(b)] = 1
     elif node.type == RANGE and node.get_value():
         var raw = node.get_value().value()
         # Strip brackets if present

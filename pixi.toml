@@ -1,6 +1,6 @@
 [workspace]
 authors = ["Manuel Saelices <msaelices@gmail.com>"]
-channels = ["conda-forge", "https://conda.modular.com/max"]
+channels = ["conda-forge", "https://conda.modular.com/max-nightly"]
 description = "Library for dealing with regular expressions in Mojo"
 homepage = "https://github.com/msaelices/mojo-regex"
 repository = "https://github.com/msaelices/mojo-regex"
@@ -19,7 +19,7 @@ version = "0.20.0"
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-mojo = "==1.0.0b1"
+mojo = "==1.0.0b2.dev2026053106"
 
 [tasks]
 test = "bash -c 'status=0; for f in tests/test_*.mojo; do echo \"Running $f...\"; out=$(mktemp -d); mojo build -I ./src -debug-level=line-tables \"$f\" -o \"$out/exe\" && \"$out/exe\" || status=1; rm -rf \"$out\"; done; exit $status'"
