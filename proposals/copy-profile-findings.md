@@ -131,6 +131,40 @@ allocations may hide:
   (15-20 dispatches per match). This is structural Mojo compilation
   cost, not copy cost.
 
+## Failed attempt: `mut out: String` for template appliers (2026-05-05)
+
+Tried refactoring `_apply_template_fixed` and `_apply_template_groups`
+to take `mut out: String` and append directly into the caller's
+`result` buffer instead of allocating a fresh `String(capacity=32)`
+per match and being `+=`'d. Tests passed.
+
+**Result**: `sub_group_word_swap` regressed **31%** in 3-median
+stable mode (median 0.067 ms baseline → 0.088 ms with change). Same
+failure shape as a prior session's `_into` overload attempt.
+
+**Best guess on why**: the temp-String pattern is cache-friendlier
+than direct append. Each match writes to a fresh 32-byte buffer hot
+in L1 then bulk-`memcpy`s into `result`. Direct append on the larger
+`result` (sized at `text_len + 64`) probably triggers
+capacity-grow reallocs and may also disturb register allocation /
+inlining of the surrounding NFA loop. The fixed-width path
+(`_apply_template_fixed`, used by `sub_group_phone_fmt` /
+`sub_group_date_fmt`) showed a modest improvement in single-stable
+runs, but that signal was never confirmed with a 3-median pass.
+
+**Implication**: simple "skip the alloc" refactors do not win here.
+The `result` buffer's capacity-growth behavior dominates over the
+saved temp-alloc. A future attempt would need to:
+
+1. Pre-allocate `result` at a much larger capacity (e.g., `text_len *
+   4` or sum of template widths × max_matches) so it never grows.
+2. Then re-test the `mut out: String` refactor — it may flip
+   positive once growth reallocs are eliminated.
+
+Branch with the failed attempt is *not* preserved; the diff is
+trivial to recreate. The lesson — "don't redo this without first
+fixing `result` growth" — is the load-bearing part.
+
 To extend the trace, instrument the same way on the additional types.
 The pattern is: add `@always_inline` to the copy ctor (if missing),
 import `call_location` from `std.reflection.location`, and add
