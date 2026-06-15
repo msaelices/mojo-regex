@@ -54,7 +54,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal."""
-        self.node_ptr = UnsafePointer(to=node).as_any_origin()
+        self.node_ptr = UnsafePointer(to=node).as_unsafe_any_origin()
         self.has_node = True
         self.literal_string_idx = -1
         self.start_offset = start_offset

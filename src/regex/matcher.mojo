@@ -1151,7 +1151,7 @@ def _init_regex_cache() -> RegexCache:
 def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
     """Returns an pointer to the global regex cache."""
     try:
-        return _CACHE_GLOBAL.get_or_create_ptr()
+        return _CACHE_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
     except e:
         abort[prefix="ERROR:"](String(e))
 
@@ -1204,7 +1204,7 @@ def _init_last_sub_cache() -> _LastSubCache:
 
 def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutAnyOrigin]:
     try:
-        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
+        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
     except e:
         abort[prefix="ERROR:"](String(e))
 

@@ -30,7 +30,7 @@ from regex.ast import (
 def test_ASTNode() raises:
     var pattern = String("")
     var regex = Regex[ImmutAnyOrigin](pattern)
-    var regex_ptr = UnsafePointer(to=regex)
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     var ast_node = ASTNode[ImmutAnyOrigin](
         type=ELEMENT, regex_ptr=regex_ptr, start_idx=0, end_idx=0
     )
