@@ -120,7 +120,7 @@ struct MatchList(Copyable, Movable, Sized):
         if self._capacity > 0:
             memcpy(dest=new_data, src=self._data, count=len(self))
             self._data.free()
-        self._data = new_data
+        self._data = new_data.as_unsafe_any_origin()
         self._capacity = new_capacity
 
     def append(

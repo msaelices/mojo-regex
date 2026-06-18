@@ -502,7 +502,7 @@ def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
     # Use the heap-allocated regex pointer directly
     var re_root = ASTNode[ImmutAnyOrigin](
         type=RE,
-        regex_ptr=regex_ptr,
+        regex_ptr=regex_ptr.as_unsafe_any_origin(),
         start_idx=0,
         end_idx=pattern.byte_length(),
         children_indexes=_make_children_indexes(root_child_index),

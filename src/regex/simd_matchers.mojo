@@ -390,7 +390,7 @@ def _init_range_matchers() -> RangeMatchers:
 def _get_range_matchers() -> UnsafePointer[RangeMatchers, MutAnyOrigin]:
     """Returns a pointer to the global range matchers dictionary."""
     try:
-        return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
+        return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
     except e:
         abort[prefix="ERROR:"](String(e))
 
@@ -411,7 +411,9 @@ def _init_nibble_matchers() -> NibbleMatchers:
 def _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutAnyOrigin]:
     """Returns a pointer to the global nibble matchers dictionary."""
     try:
-        return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()
+        return (
+            _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
+        )
     except e:
         abort[prefix="ERROR:"](String(e))
 

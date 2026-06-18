@@ -93,7 +93,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         self.children_len = 0
         self.children_ptr = alloc[ASTNode[ImmutAnyOrigin]](
             pattern.byte_length() * 2
-        )  # Allocate enough space for children
+        ).as_unsafe_any_origin()  # Allocate enough space for children
 
     @always_inline
     def __eq__[o: Origin](self, other: Regex[origin=o]) -> Bool:
@@ -559,7 +559,7 @@ def Element[
     end_idx: Int,
 ) -> ASTNode[ImmutAnyOrigin]:
     """Create an Element node with a value string."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[ImmutAnyOrigin](
         type=ELEMENT,
         regex_ptr=regex_ptr,
@@ -579,7 +579,7 @@ def WildcardElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a WildcardElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=WILDCARD,
         regex_ptr=regex_ptr,
@@ -599,7 +599,7 @@ def SpaceElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a SpaceElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=SPACE,
         regex_ptr=regex_ptr,
@@ -619,7 +619,7 @@ def DigitElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a DigitElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=DIGIT,
         regex_ptr=regex_ptr,
@@ -639,7 +639,7 @@ def WordElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a WordElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=WORD,
         regex_ptr=regex_ptr,
@@ -690,7 +690,7 @@ def RangeElement[
     is_positive_logic: Bool = True,
 ) -> ASTNode[regex_origin]:
     """Create a RangeElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     # Classify the range pattern once at build time.
     var kind = RANGE_KIND_OTHER
     if start_idx < end_idx:
@@ -722,7 +722,7 @@ def StartElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a StartElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=START,
         regex_ptr=regex_ptr,
@@ -742,7 +742,7 @@ def EndElement[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create an EndElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=END,
         regex_ptr=regex_ptr,
@@ -764,7 +764,7 @@ def OrNode[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create an OrNode with left and right children."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=OR,
         regex_ptr=regex_ptr,
@@ -788,7 +788,7 @@ def NotNode[
     end_idx: Int,
 ) -> ASTNode[regex_origin]:
     """Create a NotNode with a child."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     return ASTNode[regex_origin](
         type=NOT,
         regex_ptr=regex_ptr,
@@ -810,7 +810,7 @@ def GroupNode[
     group_id: Int = -1,
 ) -> ASTNode[regex_origin]:
     """Create a GroupNode with children."""
-    var regex_ptr = UnsafePointer(to=regex).as_any_origin()
+    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
     var node = ASTNode[regex_origin](
         type=GROUP,
         regex_ptr=regex_ptr,
