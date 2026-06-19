@@ -19,7 +19,7 @@ version = "0.20.0"
 backend = { name = "pixi-build-rattler-build", version = "*" }
 
 [dependencies]
-mojo = "==1.0.0b3.dev2026061506"
+mojo = "==1.0.0b3.dev2026061806"
 
 [tasks]
 test = "bash -c 'status=0; for f in tests/test_*.mojo; do echo \"Running $f...\"; out=$(mktemp -d); mojo build -I ./src -debug-level=line-tables \"$f\" -o \"$out/exe\" && \"$out/exe\" || status=1; rm -rf \"$out\"; done; exit $status'"
