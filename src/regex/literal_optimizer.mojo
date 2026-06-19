@@ -21,19 +21,19 @@ from regex.ast import (
 )
 
 
-struct LiteralInfo[node_origin: ImmutOrigin](
-    ImplicitlyCopyable, Movable, TrivialRegisterPassable
-):
-    """Information about a literal substring found in a regex pattern."""
+struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
+    """Information about a literal substring found in a regex pattern.
 
-    var node_ptr: UnsafePointer[ASTNode[ImmutAnyOrigin], ImmutAnyOrigin]
-    """Pointer to the AST node containing the literal (for single nodes).
-    Only meaningful when `has_node` is True; otherwise dangling."""
-    var has_node: Bool
-    """True when `node_ptr` references a real AST node. Tracked
-    separately because 1.0.0b1 forbids null UnsafePointer, and
-    LiteralInfo must stay TrivialRegisterPassable (which rules out
-    `Optional[UnsafePointer[...]]` here)."""
+    Built only during regex compilation (pattern analysis), never on the
+    per-match hot path, so it does not need to stay `TrivialRegisterPassable`;
+    that lets `node_ptr` be a safe `Optional[Pointer[...]]` borrow instead of
+    a raw `UnsafePointer`."""
+
+    var node_ptr: Optional[Pointer[ASTNode[ImmutAnyOrigin], Self.node_origin]]
+    """Origin-tracked borrow of the AST node containing the literal (for
+    single nodes). `None` when this LiteralInfo refers to a string-index
+    literal instead. The borrow rides `node_origin`, so the compiler keeps
+    the referenced node alive for us; no AnyOrigin escape hatch."""
     var literal_string_idx: Int
     """Index into LiteralSet.literal_strings for the literal string (for concatenated literals or computed values). -1 if not used."""
     var start_offset: Int
@@ -54,8 +54,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal."""
-        self.node_ptr = UnsafePointer(to=node).as_unsafe_any_origin()
-        self.has_node = True
+        self.node_ptr = Pointer(to=node)
         self.literal_string_idx = -1
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -71,10 +70,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](
         is_required: Bool = True,
     ):
         """Initialize a LiteralInfo with a string literal index."""
-        self.node_ptr = UnsafePointer[
-            ASTNode[ImmutAnyOrigin], ImmutAnyOrigin
-        ].unsafe_dangling()
-        self.has_node = False
+        self.node_ptr = None
         self.literal_string_idx = literal_string_idx
         self.start_offset = start_offset
         self.is_prefix = is_prefix
@@ -96,9 +92,9 @@ struct LiteralInfo[node_origin: ImmutOrigin](
 
     def get_literal(self, literal_set: LiteralSet[Self.node_origin]) -> String:
         """Get the literal string."""
-        if self.has_node and self.node_ptr[].get_value():
+        if self.node_ptr and self.node_ptr.value()[].get_value():
             # If we have an AST node, use its value
-            return String(self.node_ptr[].get_value().value())
+            return String(self.node_ptr.value()[].get_value().value())
         elif self.literal_string_idx >= 0:
             # If we have a literal string index, get it from the set
             return literal_set.literal_strings[self.literal_string_idx]
@@ -108,8 +104,8 @@ struct LiteralInfo[node_origin: ImmutOrigin](
 
     def get_literal_len(self, literal_set: LiteralSet[Self.node_origin]) -> Int:
         """Get the length of the literal string."""
-        if self.has_node and self.node_ptr[].get_value():
-            return self.node_ptr[].get_value().value().byte_length()
+        if self.node_ptr and self.node_ptr.value()[].get_value():
+            return self.node_ptr.value()[].get_value().value().byte_length()
         elif self.literal_string_idx >= 0:
             return literal_set.literal_strings[
                 self.literal_string_idx
