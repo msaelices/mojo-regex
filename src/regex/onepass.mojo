@@ -27,7 +27,6 @@ one distinct follow-up closure, the pattern is rejected.
 from std.memory import alloc, UnsafePointer
 
 from regex.matching import Match, MatchList
-from regex.aliases import ImmSlice
 from regex.pikevm import (
     Program,
     Instruction,
@@ -467,7 +466,9 @@ struct OnePassNFA(Copyable, Movable):
         self.has_end_anchor = has_end_anchor
 
     @always_inline
-    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_first[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Match the pattern starting exactly at `start`. Returns None
         if the pattern cannot match here (e.g. `^` anchor with start > 0,
         or no accepting state reached).
@@ -506,7 +507,9 @@ struct OnePassNFA(Copyable, Movable):
         return None
 
     @always_inline
-    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_next[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search for the first match at or after `start` (like
         `re.search`). Honours `^` by only trying position 0."""
         if self.has_start_anchor:
@@ -521,9 +524,9 @@ struct OnePassNFA(Copyable, Movable):
         return None
 
     @always_inline
-    def match_all(self, text: ImmSlice) -> MatchList:
+    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         var text_len = text.byte_length()
-        var matches = MatchList(
+        var matches = MatchList[O](
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
         if self.has_start_anchor:

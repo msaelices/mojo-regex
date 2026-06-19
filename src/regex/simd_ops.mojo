@@ -21,7 +21,6 @@ from std.sys.info import simd_width_of
 from std.ffi import _Global
 
 from regex.aliases import (
-    ImmSlice,
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_WHITESPACE,
     SIMD_MATCHER_DIGITS,
@@ -929,7 +928,9 @@ def _create_word_chars() -> CharacterClassSIMD:
     return CharacterClassSIMD(WORD_CHARS)
 
 
-def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
+def verify_match[
+    O: ImmutOrigin
+](pattern: Span[Byte, _], text: StringSlice[O], pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
     Args:
@@ -953,11 +954,9 @@ def verify_match(pattern: Span[Byte, _], text: ImmSlice, pos: Int) -> Bool:
     return True
 
 
-def simd_search(
-    pattern: Span[Byte, _],
-    text: ImmSlice,
-    start: Int = 0,
-) -> Int:
+def simd_search[
+    O: ImmutOrigin
+](pattern: Span[Byte, _], text: StringSlice[O], start: Int = 0,) -> Int:
     """Search for pattern in text using SIMD acceleration.
 
     Two-byte memchr-style scan: compares text[pos] to pattern[0] AND
@@ -1245,10 +1244,10 @@ def process_text_with_matcher[
 
 
 def apply_quantifier_simd_generic[
-    T: SIMDMatcher
+    T: SIMDMatcher, O: ImmutOrigin
 ](
     matcher: T,
-    text: ImmSlice,
+    text: StringSlice[O],
     start_pos: Int,
     min_matches: Int,
     max_matches: Int,
@@ -1337,11 +1336,9 @@ def find_in_text_simd[
     return -1
 
 
-def twoway_search(
-    pattern: Span[Byte, _],
-    text: ImmSlice,
-    start: Int = 0,
-) -> Int:
+def twoway_search[
+    O: ImmutOrigin
+](pattern: Span[Byte, _], text: StringSlice[O], start: Int = 0,) -> Int:
     """Search for pattern in text using Two-Way algorithm with SIMD.
 
     This is a standalone version of TwoWaySearcher.search() that doesn't require

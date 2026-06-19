@@ -1,4 +1,3 @@
-from regex.aliases import ImmSlice
 from regex.matching import Match, MatchList
 
 
@@ -11,7 +10,9 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_first[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -24,7 +25,7 @@ trait Engine(Copyable, Movable):
         """
         ...
 
-    def match_all(self, text: ImmSlice) -> MatchList:
+    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         """Find all non-overlapping matches using Engine.
 
         Args:

@@ -27,7 +27,6 @@ from regex.aliases import (
     CHAR_Z,
     CHAR_Z_UPPER,
     CHAR_ZERO,
-    ImmSlice,
     SIMD_MATCHER_DIGITS,
     SIMD_MATCHER_WHITESPACE,
     byte_in_string,
@@ -167,10 +166,9 @@ struct NFAEngine(Copyable, Engine):
             )
         return rebind[Span[Byte, ImmutAnyOrigin]](self.pattern.as_bytes())
 
-    def match_all(
-        self,
-        text: ImmSlice,
-    ) -> MatchList:
+    def match_all[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O],) -> MatchList[O]:
         """Searches a regex in a test string.
 
         Searches the passed regular expression in the passed test string and
@@ -196,7 +194,7 @@ struct NFAEngine(Copyable, Engine):
         # Pre-allocate for long-text findall. Skip the hint on short texts
         # where over-allocating wastes more than the grows cost.
         var text_len = text.byte_length()
-        var matches = MatchList(
+        var matches = MatchList[O](
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
         if not self.prev_ast and not self.regex:
@@ -207,7 +205,7 @@ struct NFAEngine(Copyable, Engine):
         var current_pos = 0
 
         # Smaller temp capacity since we clear frequently
-        var temp_matches = List[Match](capacity=3)
+        var temp_matches = List[Match[O]](capacity=3)
 
         # Fast path for .* prefix patterns in findall.
         # Only safe when no newlines in text (since .* doesn't match \n).
@@ -341,7 +339,9 @@ struct NFAEngine(Copyable, Engine):
 
         return matches^
 
-    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_first[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
 
@@ -355,7 +355,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match[O]]()
         var str_i = start
         if not self.regex:
             try:
@@ -388,7 +388,9 @@ struct NFAEngine(Copyable, Engine):
         return None
 
     @always_inline
-    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_next[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.
 
@@ -402,7 +404,7 @@ struct NFAEngine(Copyable, Engine):
             position contains the whole match, and the subsequent positions
             contain all the group and subgroups matched.
         """
-        var matches = List[Match]()
+        var matches = List[Match[O]]()
         if not self.regex:
             return None
 
@@ -495,9 +497,11 @@ struct NFAEngine(Copyable, Engine):
 
         return None
 
-    def match_next_with_groups(
-        self, text: ImmSlice, start: Int = 0
-    ) -> Tuple[Optional[Match], List[Match]]:
+    def match_next_with_groups[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Tuple[
+        Optional[Match[O]], List[Match[O]]
+    ]:
         """Like match_next but also returns capture group matches.
 
         Uses literal prefiltering when available to skip non-matching
@@ -507,13 +511,13 @@ struct NFAEngine(Copyable, Engine):
             Tuple of (overall_match, group_matches). group_matches contains
             Match objects with group_id set to the 1-based capture group index.
         """
-        var empty_groups = List[Match]()
+        var empty_groups = List[Match[O]]()
         if not self.prev_ast and not self.regex:
             return (None, empty_groups^)
         ref ast = self.prev_ast.value() if self.prev_ast else self.regex.value()
 
         var search_pos = start
-        var matches = List[Match](capacity=8)
+        var matches = List[Match[O]](capacity=8)
 
         # Use literal prefiltering to skip positions when available
         if self.has_literal_optimization:
@@ -570,7 +574,9 @@ struct NFAEngine(Copyable, Engine):
         return (None, empty_groups^)
 
     @always_inline
-    def _find_last_literal(self, text: ImmSlice, start: Int) -> Int:
+    def _find_last_literal[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
         # Use rfind for O(n) reverse search instead of repeated forward search
         var pos = text.rfind(self.literal_prefix)
@@ -631,9 +637,9 @@ struct NFAEngine(Copyable, Engine):
             return get_character_class_matcher(range_pattern)
 
     @always_inline
-    def _match_contains_literal(
-        self, text: ImmSlice, start: Int, end: Int
-    ) -> Bool:
+    def _match_contains_literal[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int, end: Int) -> Bool:
         """Verify that a match contains the required literal."""
         if (
             not self.has_literal_optimization
@@ -646,12 +652,14 @@ struct NFAEngine(Copyable, Engine):
         return pos != -1 and pos + self.literal_prefix.byte_length() <= end
 
     @always_inline
-    def _match_node(
+    def _match_node[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool = False,
         required_start_pos: Int = -1,
     ) capturing -> Tuple[Bool, Int]:
@@ -744,10 +752,12 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _match_element(
+    def _match_element[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -769,10 +779,12 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _match_wildcard(
+    def _match_wildcard[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -791,10 +803,12 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _match_space(
+    def _match_space[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -821,10 +835,12 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _match_digit(
+    def _match_digit[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -861,10 +877,12 @@ struct NFAEngine(Copyable, Engine):
                 return (False, str_i)
 
     @always_inline
-    def _match_word(
+    def _match_word[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -906,10 +924,12 @@ struct NFAEngine(Copyable, Engine):
                 return (False, str_i)
 
     @always_inline
-    def _match_range(
+    def _match_range[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         match_first_mode: Bool,
         required_start_pos: Int,
@@ -980,21 +1000,25 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _match_end(
-        self, ast: ASTNode, str: ImmSlice, str_i: Int
-    ) capturing -> Tuple[Bool, Int]:
+    def _match_end[
+        O: ImmutOrigin
+    ](self, ast: ASTNode, str: StringSlice[O], str_i: Int) capturing -> Tuple[
+        Bool, Int
+    ]:
         """Match end anchor ($)."""
         if str_i == str.byte_length():
             return (True, str_i)
         else:
             return (False, str_i)
 
-    def _match_or(
+    def _match_or[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1025,12 +1049,14 @@ struct NFAEngine(Copyable, Engine):
         )
         return right_result
 
-    def _match_group(
+    def _match_group[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1071,12 +1097,14 @@ struct NFAEngine(Copyable, Engine):
 
         return result
 
-    def _match_group_with_quantifier(
+    def _match_group_with_quantifier[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1122,13 +1150,15 @@ struct NFAEngine(Copyable, Engine):
         else:
             return (False, str_i)
 
-    def _match_sequence(
+    def _match_sequence[
+        O: ImmutOrigin
+    ](
         self,
         ast_parent: ASTNode,
         child_index: Int,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1193,14 +1223,16 @@ struct NFAEngine(Copyable, Engine):
         return ast.min != 1 or ast.max != 1
 
     @always_inline
-    def _match_with_backtracking(
+    def _match_with_backtracking[
+        O: ImmutOrigin
+    ](
         self,
         quantified_node: ASTNode,
         ast_parent: ASTNode,
         remaining_index: Int,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1273,10 +1305,12 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    def _try_match_count(
+    def _try_match_count[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         count: Int,
         match_first_mode: Bool,
@@ -1309,12 +1343,14 @@ struct NFAEngine(Copyable, Engine):
         else:
             return -1
 
-    def _match_re(
+    def _match_re[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
-        mut matches: List[Match],
+        mut matches: List[Match[O]],
         match_first_mode: Bool,
         required_start_pos: Int,
     ) capturing -> Tuple[Bool, Int]:
@@ -1331,10 +1367,12 @@ struct NFAEngine(Copyable, Engine):
             required_start_pos,
         )
 
-    def _apply_quantifier(
+    def _apply_quantifier[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         char_consumed: Int,
         match_first_mode: Bool,
@@ -1400,10 +1438,12 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     @always_inline
-    def _apply_quantifier_simd(
+    def _apply_quantifier_simd[
+        O: ImmutOrigin
+    ](
         self,
         ast: ASTNode,
-        str: ImmSlice,
+        str: StringSlice[O],
         str_i: Int,
         min_matches: Int,
         max_matches: Int,
@@ -1620,11 +1660,13 @@ struct NFAEngine(Copyable, Engine):
             return byte_in_string(ch_code, range_pattern)
 
     @always_inline
-    def _quantifier_negated_loop(
+    def _quantifier_negated_loop[
+        O: ImmutOrigin
+    ](
         self,
         matcher: RangeBasedMatcher,
-        str_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
-        str: ImmSlice,
+        str_ptr: UnsafePointer[Byte, O],
+        str: StringSlice[O],
         str_i: Int,
         min_matches: Int,
         max_matches: Int,
@@ -1647,13 +1689,15 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
     @always_inline
-    def _quantifier_range_loop(
+    def _quantifier_range_loop[
+        O: ImmutOrigin
+    ](
         self,
         range_start: Int,
         range_end: Int,
         positive_logic: Bool,
-        str_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
-        str: ImmSlice,
+        str_ptr: UnsafePointer[Byte, O],
+        str: StringSlice[O],
         str_i: Int,
         min_matches: Int,
         max_matches: Int,
@@ -1677,7 +1721,9 @@ struct NFAEngine(Copyable, Engine):
         return (False, str_i)
 
 
-def findall(pattern: String, text: ImmSlice) raises -> MatchList:
+def findall[
+    O: ImmutOrigin
+](pattern: String, text: StringSlice[O]) raises -> MatchList[O]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
     Args:
@@ -1691,7 +1737,9 @@ def findall(pattern: String, text: ImmSlice) raises -> MatchList:
     return engine.match_all(text)
 
 
-def match_first(pattern: String, text: ImmSlice) raises -> Optional[Match]:
+def match_first[
+    O: ImmutOrigin
+](pattern: String, text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
     Args:

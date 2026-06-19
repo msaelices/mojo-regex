@@ -5,7 +5,7 @@ This module provides O(n) time complexity regex matching for simple patterns tha
 compiled to DFA, as opposed to the exponential worst-case of NFA backtracking.
 """
 
-from regex.aliases import ALL_EXCEPT_NEWLINE, ImmSlice, WORD_CHARS
+from regex.aliases import ALL_EXCEPT_NEWLINE, WORD_CHARS
 from regex.ast import (
     ASTNode,
     DIGIT,
@@ -1786,7 +1786,9 @@ struct DFAEngine(Engine):
         return self.literal_pattern
 
     @always_inline
-    def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
+    def is_match[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Bool:
         """Check if pattern matches at the given position without computing
         match boundaries. Much faster than match_first for simple checks.
 
@@ -1821,7 +1823,9 @@ struct DFAEngine(Engine):
         )
 
     @always_inline
-    def match_first(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_first[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
 
@@ -1842,7 +1846,9 @@ struct DFAEngine(Engine):
         )
 
     @always_inline
-    def match_next(self, text: ImmSlice, start: Int = 0) -> Optional[Match]:
+    def match_next[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Execute DFA matching against input text. It will match from the given start
         position.
 
@@ -1871,12 +1877,14 @@ struct DFAEngine(Engine):
         return None
 
     @always_inline
-    def _try_match_at_position(
+    def _try_match_at_position[
+        O: ImmutOrigin
+    ](
         self,
-        text: ImmSlice,
+        text: StringSlice[O],
         start_pos: Int,
         require_exact_position: Bool = False,
-    ) -> Optional[Match]:
+    ) -> Optional[Match[O]]:
         """Try to match pattern starting at a specific position.
 
         Args:
@@ -1989,7 +1997,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    def match_all(self, text: ImmSlice) -> MatchList:
+    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -2002,7 +2010,7 @@ struct DFAEngine(Engine):
         # Skip the hint on short texts where over-allocating wastes more
         # than the grows cost.
         var text_len = text.byte_length()
-        var matches = MatchList(
+        var matches = MatchList[O](
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
 
@@ -2094,9 +2102,9 @@ struct DFAEngine(Engine):
         return matches^
 
     @always_inline
-    def _try_match_simd(
-        self, text: ImmSlice, start_pos: Int
-    ) -> Optional[Match]:
+    def _try_match_simd[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start_pos: Int) -> Optional[Match[O]]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 
         This hybrid approach uses SIMD for fast character matching while respecting
@@ -2161,9 +2169,9 @@ struct DFAEngine(Engine):
         return None
 
     @always_inline
-    def _optimized_simd_search(
-        self, text: ImmSlice, start: Int
-    ) -> Optional[Match]:
+    def _optimized_simd_search[
+        O: ImmutOrigin
+    ](self, text: StringSlice[O], start: Int) -> Optional[Match[O]]:
         """Optimized SIMD-based search for character class patterns.
 
         Args:
@@ -2216,8 +2224,10 @@ struct DFAEngine(Engine):
 
         return None
 
-    def _find_next_matching_char(
-        self, text: ImmSlice, start: Int, simd_matcher: CharacterClassSIMD
+    def _find_next_matching_char[
+        O: ImmutOrigin
+    ](
+        self, text: StringSlice[O], start: Int, simd_matcher: CharacterClassSIMD
     ) -> Int:
         """Use SIMD to find the next character that matches the character class.
 
