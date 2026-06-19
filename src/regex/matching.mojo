@@ -1,10 +1,12 @@
 from std.memory import UnsafePointer, memcpy, alloc
 
-from regex.aliases import ImmSlice, imm_slice_from_ptr
 
+struct Match[origin: ImmutOrigin](Copyable, Movable, TrivialRegisterPassable):
+    """Contains the information of a match in a regular expression.
 
-struct Match(Copyable, Movable, TrivialRegisterPassable):
-    """Contains the information of a match in a regular expression."""
+    Parameterized on the origin of the backing text, so the borrow into
+    that text is compiler-tracked: a `Match` cannot outlive the string it
+    points into. No AnyOrigin escape hatch."""
 
     # Trivially copyable in lists
     comptime __copy_ctor_is_trivial = True
@@ -15,44 +17,49 @@ struct Match(Copyable, Movable, TrivialRegisterPassable):
     """Starting position of the match in the text."""
     var end_idx: Int
     """Ending position of the match in the text (exclusive)."""
-    var text_ptr: UnsafePointer[Byte, ImmutAnyOrigin]
-    """Pointer to the start of the backing text bytes. Does not own memory;
-    the caller must keep the backing storage alive for the lifetime of the
-    match. We only store the base pointer (not a full slice) to keep Match
-    at the same 32-byte footprint as before the StringSlice refactor."""
+    var text_ptr: UnsafePointer[Byte, Self.origin]
+    """Origin-tracked pointer to the start of the backing text bytes. Does
+    not own memory; the `origin` parameter ties its lifetime to the source
+    text. We store the base pointer (not a full slice) to keep Match at a
+    32-byte footprint."""
 
     def __init__(
         out self,
         group_id: Int,
         start_idx: Int,
         end_idx: Int,
-        text: ImmSlice,
+        text: StringSlice[Self.origin],
     ):
         self.group_id = group_id
         self.start_idx = start_idx
         self.end_idx = end_idx
         self.text_ptr = text.unsafe_ptr()
 
-    def get_match_text(self) -> ImmSlice:
+    def get_match_text(self) -> StringSlice[Self.origin]:
         """Returns the text that was matched."""
-        return imm_slice_from_ptr(
-            self.text_ptr + self.start_idx,
-            self.end_idx - self.start_idx,
+        return StringSlice[Self.origin](
+            unsafe_from_utf8=Span[Byte, Self.origin](
+                ptr=self.text_ptr + self.start_idx,
+                length=self.end_idx - self.start_idx,
+            )
         )
 
 
-struct MatchList(Copyable, Movable, Sized):
+struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
     """Smart container for regex matches with lazy allocation and optimal reservation.
 
     This struct provides zero allocation until the first match is added, then
     reserves a small amount of capacity to avoid malloc churn for common cases.
     Provides List-compatible interface for easy integration with existing code.
+
+    Parameterized on the backing-text origin it shares with the `Match`
+    elements it stores.
     """
 
     comptime DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _data: UnsafePointer[Match, MutAnyOrigin]
+    var _data: UnsafePointer[Match[Self.origin], MutAnyOrigin]
     """Internal list storing the matches. Dangling (and never read
     from) until the first allocation runs through `_realloc`; tracked
     via `_capacity > 0` since 1.0.0b1 forbids null UnsafePointer
@@ -65,7 +72,9 @@ struct MatchList(Copyable, Movable, Sized):
         capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._data = UnsafePointer[Match, MutAnyOrigin].unsafe_dangling()
+        self._data = UnsafePointer[
+            Match[Self.origin], MutAnyOrigin
+        ].unsafe_dangling()
         self._capacity = 0
         self._len = 0
         if capacity > 0:
@@ -78,7 +87,9 @@ struct MatchList(Copyable, Movable, Sized):
         copy: Self,
     ):
         """Copy constructor."""
-        self._data = UnsafePointer[Match, MutAnyOrigin].unsafe_dangling()
+        self._data = UnsafePointer[
+            Match[Self.origin], MutAnyOrigin
+        ].unsafe_dangling()
         self._len = 0
         self._capacity = 0
         if copy._len > 0:
@@ -99,7 +110,9 @@ struct MatchList(Copyable, Movable, Sized):
         """Return the number of matches."""
         return self._len
 
-    def __getitem__[I: Indexer](ref self, idx: I) -> ref[self] Match:
+    def __getitem__[
+        I: Indexer
+    ](ref self, idx: I) -> ref[self] Match[Self.origin]:
         """Gets the list element at the given index.
 
         Args:
@@ -115,7 +128,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     @no_inline
     def _realloc(mut self, new_capacity: Int):
-        var new_data = alloc[Match](new_capacity)
+        var new_data = alloc[Match[Self.origin]](new_capacity)
 
         if self._capacity > 0:
             memcpy(dest=new_data, src=self._data, count=len(self))
@@ -125,7 +138,7 @@ struct MatchList(Copyable, Movable, Sized):
 
     def append(
         mut self,
-        m: Match,
+        m: Match[Self.origin],
     ):
         """Add a match to the container, reserving capacity on first use."""
         if self._len >= self._capacity:
