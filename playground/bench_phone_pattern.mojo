@@ -1,6 +1,6 @@
 #!/usr/bin/env mojo
 
-from time import perf_counter_ns
+from std.time import perf_counter_ns
 from regex.matcher import compile_regex
 
 
@@ -15,9 +15,9 @@ def benchmark_pattern(
     var end_time: Int
 
     for _ in range(iterations):
-        start_time = perf_counter_ns()
+        start_time = Int(perf_counter_ns())
         _ = regex.test(text)
-        end_time = perf_counter_ns()
+        end_time = Int(perf_counter_ns())
         total_time += end_time - start_time
 
     return (
@@ -50,12 +50,13 @@ def main() raises:
 
     var valid_phone: String
     var invalid_phone: String
+    var phone_pattern: String
 
     for i in range(len(phone_patterns)):
         phone_pattern = phone_patterns[i]
         valid_phone = valid_phones[i]
         invalid_phone = invalid_phones[i]
-        print("Pattern:", phone_pattern[:50] + "...")
+        print("Pattern:", phone_pattern[byte=:50] + "...")
         print("Iterations per test:", iterations)
         print()
 

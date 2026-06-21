@@ -1,11 +1,20 @@
 """Simple test to demonstrate SIMD optimizations in regex engines."""
 
-from src.regex.simd_ops import (
+from regex.simd_ops import (
     CharacterClassSIMD,
     _create_ascii_digits,
     _create_whitespace,
 )
-from src.regex.simd_matchers import create_hex_digit_matcher, RangeBasedMatcher
+from regex.simd_matchers import RangeBasedMatcher
+
+
+def create_hex_digit_matcher() -> RangeBasedMatcher:
+    """Create a matcher for hex digits [0-9A-Fa-f]."""
+    var matcher = RangeBasedMatcher()
+    matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
+    matcher.add_range(UInt8(ord("A")), UInt8(ord("F")))
+    matcher.add_range(UInt8(ord("a")), UInt8(ord("f")))
+    return matcher
 
 
 def test_simd_operations():
@@ -21,15 +30,15 @@ def test_simd_operations():
 
     print("  Checking digits:")
     for i in range(len(test_digits)):
-        var ch = ord(test_digits[i])
+        var ch = ord(test_digits[byte=i])
         if digit_matcher.contains(ch):
-            print("    ✓", test_digits[i], "is a digit")
+            print("    ✓", test_digits[byte=i], "is a digit")
 
     print("  Checking non-digits:")
     for i in range(len(test_non_digits)):
-        var ch = ord(test_non_digits[i])
+        var ch = ord(test_non_digits[byte=i])
         if not digit_matcher.contains(ch):
-            print("    ✓", test_non_digits[i], "is not a digit")
+            print("    ✓", test_non_digits[byte=i], "is not a digit")
 
     # Test whitespace matcher
     print("\n2. Testing whitespace matcher:")
@@ -39,11 +48,13 @@ def test_simd_operations():
 
     print("  Checking whitespace:")
     for i in range(len(test_ws)):
-        var ch = ord(test_ws[i])
+        var ch = ord(test_ws[byte=i])
         if ws_matcher.contains(ch):
-            var char_name = "space" if test_ws[i] == " " else (
-                "tab" if test_ws[i]
-                == "\t" else ("newline" if test_ws[i] == "\n" else "return")
+            var char_name = "space" if test_ws[byte=i] == " " else (
+                "tab" if test_ws[byte=i]
+                == "\t" else (
+                    "newline" if test_ws[byte=i] == "\n" else "return"
+                )
             )
             print("    ✓", char_name, "is whitespace")
 
@@ -55,44 +66,44 @@ def test_simd_operations():
 
     print("  Checking hex digits:")
     for i in range(len(test_hex)):
-        var ch = ord(test_hex[i])
+        var ch = ord(test_hex[byte=i])
         if hex_matcher.contains(ch):
-            print("    ✓", test_hex[i], "is a hex digit")
+            print("    ✓", test_hex[byte=i], "is a hex digit")
 
     print("  Checking non-hex characters:")
     for i in range(len(test_non_hex)):
-        var ch = ord(test_non_hex[i])
+        var ch = ord(test_non_hex[byte=i])
         if not hex_matcher.contains(ch):
-            print("    ✓", test_non_hex[i], "is not a hex digit")
+            print("    ✓", test_non_hex[byte=i], "is not a hex digit")
 
     # Test custom range matcher
     print("\n4. Testing custom range matcher (vowels):")
     var vowel_matcher = RangeBasedMatcher()
-    vowel_matcher.add_single(ord("a"))
-    vowel_matcher.add_single(ord("e"))
-    vowel_matcher.add_single(ord("i"))
-    vowel_matcher.add_single(ord("o"))
-    vowel_matcher.add_single(ord("u"))
-    vowel_matcher.add_single(ord("A"))
-    vowel_matcher.add_single(ord("E"))
-    vowel_matcher.add_single(ord("I"))
-    vowel_matcher.add_single(ord("O"))
-    vowel_matcher.add_single(ord("U"))
+    vowel_matcher.add_range(UInt8(ord("a")), UInt8(ord("a")))
+    vowel_matcher.add_range(UInt8(ord("e")), UInt8(ord("e")))
+    vowel_matcher.add_range(UInt8(ord("i")), UInt8(ord("i")))
+    vowel_matcher.add_range(UInt8(ord("o")), UInt8(ord("o")))
+    vowel_matcher.add_range(UInt8(ord("u")), UInt8(ord("u")))
+    vowel_matcher.add_range(UInt8(ord("A")), UInt8(ord("A")))
+    vowel_matcher.add_range(UInt8(ord("E")), UInt8(ord("E")))
+    vowel_matcher.add_range(UInt8(ord("I")), UInt8(ord("I")))
+    vowel_matcher.add_range(UInt8(ord("O")), UInt8(ord("O")))
+    vowel_matcher.add_range(UInt8(ord("U")), UInt8(ord("U")))
 
     var test_vowels = "aeiouAEIOU"
     var test_consonants = "bcdfg"
 
     print("  Checking vowels:")
     for i in range(len(test_vowels)):
-        var ch = ord(test_vowels[i])
+        var ch = ord(test_vowels[byte=i])
         if vowel_matcher.contains(ch):
-            print("    ✓", test_vowels[i], "is a vowel")
+            print("    ✓", test_vowels[byte=i], "is a vowel")
 
     print("  Checking consonants:")
     for i in range(len(test_consonants)):
-        var ch = ord(test_consonants[i])
+        var ch = ord(test_consonants[byte=i])
         if not vowel_matcher.contains(ch):
-            print("    ✓", test_consonants[i], "is not a vowel")
+            print("    ✓", test_consonants[byte=i], "is not a vowel")
 
 
 def test_performance():

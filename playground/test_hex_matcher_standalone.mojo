@@ -1,5 +1,5 @@
-from time import perf_counter_ns as now
-from sys.info import simd_width_of
+from std.time import perf_counter_ns as now
+from std.sys.info import simd_width_of
 
 alias SIMD_WIDTH = 16  # Test with 16-byte chunks for optimal performance
 
@@ -18,8 +18,9 @@ trait SIMDMatcher:
         ...
 
 
-@register_passable("trivial")
-struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
+struct NibbleBasedMatcher(
+    Copyable, Movable, SIMDMatcher, TrivialRegisterPassable
+):
     """Nibble-based SIMD matcher using shuffle operations."""
 
     var low_nibble_lut: SIMD[DType.uint8, 16]
@@ -50,7 +51,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
             # Fast path for 16-byte chunks
             var low_match = self.low_nibble_lut._dynamic_shuffle(low_nibbles)
             var high_match = self.high_nibble_lut._dynamic_shuffle(high_nibbles)
-            return (low_match & high_match) != 0
+            return (low_match & high_match).ne(0)
         else:
             # Process in 16-byte sub-chunks
             var result = SIMD[DType.bool, size](False)
@@ -68,7 +69,7 @@ struct NibbleBasedMatcher(Copyable, Movable, SIMDMatcher):
                     var high_match = self.high_nibble_lut._dynamic_shuffle(
                         sub_high
                     )
-                    var sub_result = (low_match & high_match) != 0
+                    var sub_result = (low_match & high_match).ne(0)
                     for i in range(16):
                         result[offset + i] = sub_result[i]
                 else:
@@ -155,14 +156,14 @@ def test_hex_matcher() raises:
     # Convert to SIMD chunk
     var chunk = SIMD[DType.uint8, SIMD_WIDTH](0)
     for i in range(min(len(test_data), SIMD_WIDTH)):
-        chunk[i] = ord(test_data[i])
+        chunk[i] = UInt8(ord(test_data[byte=i]))
 
     # Test matching
-    var matches = hex_matcher.match_chunk(chunk)
+    var matches = hex_matcher.match_chunk[SIMD_WIDTH](chunk)
 
     print("\nCharacter analysis:")
     for i in range(min(len(test_data), SIMD_WIDTH)):
-        var ch = test_data[i]
+        var ch = test_data[byte=i]
         var is_match = matches[i]
         var expected = (
             (ord(ch) >= ord("0") and ord(ch) <= ord("9"))
@@ -211,9 +212,9 @@ def test_performance_comparison() raises:
     for offset in range(0, len(test_data) - SIMD_WIDTH, SIMD_WIDTH):
         var chunk = SIMD[DType.uint8, SIMD_WIDTH](0)
         for i in range(SIMD_WIDTH):
-            chunk[i] = ord(test_data[offset + i])
+            chunk[i] = UInt8(ord(test_data[byte=offset + i]))
 
-        var matches = hex_matcher.match_chunk(chunk)
+        var matches = hex_matcher.match_chunk[SIMD_WIDTH](chunk)
         for i in range(SIMD_WIDTH):
             if matches[i]:
                 count += 1
@@ -224,7 +225,7 @@ def test_performance_comparison() raises:
     # Verify with manual count
     var manual_count = 0
     for i in range(len(test_data)):
-        var ch = test_data[i]
+        var ch = test_data[byte=i]
         if (
             (ord(ch) >= ord("0") and ord(ch) <= ord("9"))
             or (ord(ch) >= ord("A") and ord(ch) <= ord("F"))

@@ -1,11 +1,10 @@
-from time import perf_counter_ns as now
-from sys.info import simd_width_of
+from std.time import perf_counter_ns as now
+from std.sys.info import simd_width_of
 
 alias SIMD_WIDTH = simd_width_of[DType.uint8]()
 
 
-@register_passable("trivial")
-struct CharacterClassSIMD(Copyable, Movable):
+struct CharacterClassSIMD(Copyable, Movable, TrivialRegisterPassable):
     """SIMD-optimized character class matcher."""
 
     var lookup_table: SIMD[DType.uint8, 256]
@@ -13,7 +12,7 @@ struct CharacterClassSIMD(Copyable, Movable):
     def __init__(out self, var char_class: String):
         self.lookup_table = SIMD[DType.uint8, 256](0)
         for i in range(len(char_class)):
-            var char_code = ord(char_class[i])
+            var char_code = ord(char_class[byte=i])
             if char_code >= 0 and char_code < 256:
                 self.lookup_table[char_code] = 1
 
@@ -24,37 +23,16 @@ struct CharacterClassSIMD(Copyable, Movable):
         # Load chunk of characters
         var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
 
-        # For small chunks or when _dynamic_shuffle isn't optimal,
-        # we need to check if we can use the fast path
-        @parameter
-        if SIMD_WIDTH == 16:
-            # Fast path: use _dynamic_shuffle for 16-byte chunks
-            # The lookup table acts as our shuffle table
-            var result = self.lookup_table._dynamic_shuffle(chunk)
-            return result != 0
-        else:
-            # Fallback for other sizes - still avoid the loop by using vectorized operations
-            var matches = SIMD[DType.bool, SIMD_WIDTH](False)
-
-            # Process in 16-byte sub-chunks when possible
-            @parameter
-            for offset in range(0, SIMD_WIDTH, 16):
-
-                @parameter
-                if offset + 16 <= SIMD_WIDTH:
-                    var sub_chunk = chunk.slice[16, offset=offset]()
-                    var sub_result = self.lookup_table._dynamic_shuffle(
-                        sub_chunk
-                    )
-                    for i in range(16):
-                        matches[offset + i] = sub_result[i] != 0
-                else:
-                    # Handle remaining elements
-                    for i in range(offset, SIMD_WIDTH):
-                        var char_code = Int(chunk[i])
-                        matches[i] = self.lookup_table[char_code] == 1
-
-            return matches
+        # The 256-entry lookup table is too wide for a hardware shuffle
+        # (pshufb/vpshufb only support 16/32-byte tables), so gather each
+        # byte's membership from the table into a uint8 vector and turn it
+        # into a per-lane mask with `.eq` (constructing a bool SIMD and
+        # writing it lane-by-lane crashes codegen on this toolchain).
+        var gathered = SIMD[DType.uint8, SIMD_WIDTH](0)
+        for i in range(SIMD_WIDTH):
+            var char_code = Int(chunk[i])
+            gathered[i] = self.lookup_table[char_code]
+        return gathered.eq(SIMD[DType.uint8, SIMD_WIDTH](1))
 
 
 def test_simd_performance() raises:
@@ -88,7 +66,7 @@ def test_simd_performance() raises:
     # Verify correctness - count digits manually
     var manual_count = 0
     for i in range(len(test_data)):
-        var ch = test_data[i]
+        var ch = test_data[byte=i]
         if ord(ch) >= ord("0") and ord(ch) <= ord("9"):
             manual_count += 1
 
