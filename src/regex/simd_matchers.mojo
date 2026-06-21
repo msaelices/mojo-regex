@@ -157,9 +157,9 @@ def create_hex_digit_matcher() -> RangeBasedMatcher:
         Optimized matcher for hex digits.
     """
     var matcher = RangeBasedMatcher()
-    matcher.add_range(ord("0"), ord("9"))
-    matcher.add_range(ord("A"), ord("F"))
-    matcher.add_range(ord("a"), ord("f"))
+    matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
+    matcher.add_range(UInt8(ord("A")), UInt8(ord("F")))
+    matcher.add_range(UInt8(ord("a")), UInt8(ord("f")))
     return matcher
 
 
@@ -253,7 +253,7 @@ def create_digit_matcher() -> RangeBasedMatcher:
         Optimized matcher for digits.
     """
     var matcher = RangeBasedMatcher()
-    matcher.add_range(ord("0"), ord("9"))
+    matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
     return matcher
 
 
@@ -264,8 +264,8 @@ def create_alpha_matcher() -> RangeBasedMatcher:
         Optimized matcher for alphabetic characters.
     """
     var matcher = RangeBasedMatcher()
-    matcher.add_range(ord("a"), ord("z"))
-    matcher.add_range(ord("A"), ord("Z"))
+    matcher.add_range(UInt8(ord("a")), UInt8(ord("z")))
+    matcher.add_range(UInt8(ord("A")), UInt8(ord("Z")))
     return matcher
 
 
@@ -276,9 +276,9 @@ def create_alnum_matcher() -> RangeBasedMatcher:
         Optimized matcher for alphanumeric characters.
     """
     var matcher = RangeBasedMatcher()
-    matcher.add_range(ord("a"), ord("z"))
-    matcher.add_range(ord("A"), ord("Z"))
-    matcher.add_range(ord("0"), ord("9"))
+    matcher.add_range(UInt8(ord("a")), UInt8(ord("z")))
+    matcher.add_range(UInt8(ord("A")), UInt8(ord("Z")))
+    matcher.add_range(UInt8(ord("0")), UInt8(ord("9")))
     return matcher
 
 
