@@ -130,14 +130,14 @@ def get_range_str(start: String, end: String) -> String:
 def parse_token_list[
     regex_origin: Origin[mut=True]
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     var tokens: List[Token],
     mut group_counter: Int,
-) raises -> ASTNode[MutAnyOrigin]:
+) raises -> ASTNode[MutUntrackedOrigin]:
     """Parse a list of tokens into an AST node (used for recursive parsing of groups).
     """
     if len(tokens) == 0:
-        var group_node = GroupNode[ImmutAnyOrigin](
+        var group_node = GroupNode(
             regex=regex,
             children_indexes=ChildrenIndexes(),
             start_idx=0,
@@ -160,14 +160,14 @@ def parse_token_list[
             var right_tokens = List[Token](tokens[k + 1 :])
 
             # Parse both sides
-            var left_ast: ASTNode[MutAnyOrigin]
+            var left_ast: ASTNode[MutUntrackedOrigin]
             if len(left_tokens) > 0:
                 var left_result = parse_token_list(
                     regex, left_tokens^, group_counter
                 )
-                left_ast = rebind[ASTNode[MutAnyOrigin]](left_result)
+                left_ast = rebind[ASTNode[MutUntrackedOrigin]](left_result)
             else:
-                var empty_group = GroupNode[ImmutAnyOrigin](
+                var empty_group = GroupNode(
                     regex=regex,
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
@@ -175,16 +175,16 @@ def parse_token_list[
                     capturing_group=True,
                     group_id=0,
                 )
-                left_ast = rebind[ASTNode[MutAnyOrigin]](empty_group)
+                left_ast = rebind[ASTNode[MutUntrackedOrigin]](empty_group)
 
-            var right_ast: ASTNode[MutAnyOrigin]
+            var right_ast: ASTNode[MutUntrackedOrigin]
             if len(right_tokens) > 0:
                 var right_result = parse_token_list(
                     regex, right_tokens^, group_counter
                 )
-                right_ast = rebind[ASTNode[MutAnyOrigin]](right_result)
+                right_ast = rebind[ASTNode[MutUntrackedOrigin]](right_result)
             else:
-                var empty_group_2 = GroupNode[ImmutAnyOrigin](
+                var empty_group_2 = GroupNode(
                     regex=regex,
                     children_indexes=ChildrenIndexes(),
                     start_idx=0,
@@ -192,7 +192,7 @@ def parse_token_list[
                     capturing_group=True,
                     group_id=0,
                 )
-                right_ast = rebind[ASTNode[MutAnyOrigin]](empty_group_2)
+                right_ast = rebind[ASTNode[MutUntrackedOrigin]](empty_group_2)
 
             # Add children to regex and get their indices
             var left_index = UInt16(
@@ -204,7 +204,7 @@ def parse_token_list[
             )  # +1 because we use 1-based indexing
             regex.append_child(right_ast)
 
-            var or_node = OrNode[ImmutAnyOrigin](
+            var or_node = OrNode(
                 regex=regex,
                 left_child_index=left_index,
                 right_child_index=right_index,
@@ -238,7 +238,7 @@ def parse_token_list[
                 )
 
     # No OR found, parse elements sequentially
-    var elements = List[ASTNode[MutAnyOrigin]](capacity=len(tokens))
+    var elements = List[ASTNode[MutUntrackedOrigin]](capacity=len(tokens))
     var i = 0
 
     while i < len(tokens):
@@ -252,20 +252,20 @@ def parse_token_list[
             )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.WILDCARD:
-            var elem = WildcardElement[ImmutAnyOrigin](
+            var elem = WildcardElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos + 1,
             )
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.SPACE:
-            var elem = SpaceElement[ImmutAnyOrigin](
+            var elem = SpaceElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos
@@ -273,10 +273,10 @@ def parse_token_list[
             )
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.DIGIT:
-            var elem = DigitElement[ImmutAnyOrigin](
+            var elem = DigitElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos
@@ -284,10 +284,10 @@ def parse_token_list[
             )
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.WORD:
-            var elem = WordElement[ImmutAnyOrigin](
+            var elem = WordElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos
@@ -295,17 +295,17 @@ def parse_token_list[
             )
             # Check for quantifiers after the word
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.START:
-            var start_elem = StartElement[ImmutAnyOrigin](
+            var start_elem = StartElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos + 1,
             )
             elements.append(start_elem^)
         elif token.type == Token.END:
-            var end_elem = EndElement[ImmutAnyOrigin](
+            var end_elem = EndElement(
                 regex=regex,
                 start_idx=token.start_pos,
                 end_idx=token.start_pos + 1,
@@ -343,7 +343,7 @@ def parse_token_list[
             # Calculate proper end position - should be after the closing bracket
             var bracket_end_pos = tokens[i].start_pos + 1
 
-            var range_elem = RangeElement[ImmutAnyOrigin](
+            var range_elem = RangeElement(
                 regex=regex,
                 start_idx=bracket_start_pos,
                 end_idx=bracket_end_pos,
@@ -351,7 +351,9 @@ def parse_token_list[
             )
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, range_elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](
+                    i, range_elem, tokens
+                )
             elements.append(range_elem^)
         elif token.type == Token.DASH:
             # Dash outside brackets is a literal '-' character
@@ -361,7 +363,7 @@ def parse_token_list[
                 end_idx=token.start_pos + 1,
             )
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutAnyOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
@@ -412,23 +414,25 @@ def parse_token_list[
             var group_ast = parse_token_list(
                 regex, group_tokens^, group_counter
             )
-            var group: ASTNode[MutAnyOrigin]
+            var group: ASTNode[MutUntrackedOrigin]
             if group_ast.type == GROUP:
                 # If it's already a group, use it directly
-                group = rebind[ASTNode[MutAnyOrigin]](group_ast)
+                group = rebind[ASTNode[MutUntrackedOrigin]](group_ast)
                 group.capturing_group = is_capturing
                 group.group_id = gid
                 group.start_idx = group_content_start_pos
                 group.end_idx = paren_end_pos
             else:
                 # Otherwise wrap in a group - add to regex.get_children_len() and create group node
-                var group_ast_mut = rebind[ASTNode[MutAnyOrigin]](group_ast)
+                var group_ast_mut = rebind[ASTNode[MutUntrackedOrigin]](
+                    group_ast
+                )
                 var child_index = UInt16(
                     regex.get_children_len() + 1
                 )  # +1 because we use 1-based indexing
                 regex.append_child(group_ast_mut^)
 
-                var group_node = GroupNode[ImmutAnyOrigin](
+                var group_node = GroupNode(
                     regex=regex,
                     children_indexes=_make_children_indexes(child_index),
                     start_idx=group_content_start_pos,
@@ -436,10 +440,10 @@ def parse_token_list[
                     capturing_group=is_capturing,
                     group_id=gid,
                 )
-                group = rebind[ASTNode[MutAnyOrigin]](group_node)
+                group = rebind[ASTNode[MutUntrackedOrigin]](group_node)
             # Check for quantifiers after the group
             if i + 1 < len(tokens):
-                check_for_quantifiers[MutAnyOrigin](i, group, tokens)
+                check_for_quantifiers[MutUntrackedOrigin](i, group, tokens)
             elements.append(group)
 
         i += 1
@@ -452,7 +456,7 @@ def parse_token_list[
         )  # +1 because we use 1-based indexing
         regex.append_child(element)
 
-    var final_group = GroupNode[ImmutAnyOrigin](
+    var final_group = GroupNode(
         regex=regex,
         children_indexes=children_indexes,
         start_idx=0,
@@ -463,7 +467,7 @@ def parse_token_list[
     return final_group^
 
 
-def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
+def parse(pattern: String) raises -> ASTNode[ImmutUntrackedOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
@@ -477,32 +481,30 @@ def parse(pattern: String) raises -> ASTNode[ImmutAnyOrigin]:
     """
     # Create a persistent Regex object to hold the pattern and children
     # Allocate on heap to ensure it survives function return
-    var regex_ptr = alloc[Regex[ImmutAnyOrigin]](1)
-    regex_ptr.init_pointee_move(Regex[ImmutAnyOrigin](pattern))
+    var regex_ptr = alloc[Regex[ImmutUntrackedOrigin]](1)
+    regex_ptr.init_pointee_move(Regex[ImmutUntrackedOrigin](pattern))
 
     # Tokenize the pattern
     var tokens = scan(pattern)
 
     # Use parse_token_list to do the actual parsing
     var group_counter = 0
-    var parsed_ast = parse_token_list[MutAnyOrigin](
-        regex_ptr[], tokens^, group_counter
-    )
+    var parsed_ast = parse_token_list(regex_ptr[], tokens^, group_counter)
 
     var children_len = regex_ptr[].get_children_len()
 
     # Create a RE root node that wraps the parsed result
     # The tests expect the root to be of type RE with a GROUP child
-    var parsed_ast_immutable = rebind[ASTNode[ImmutAnyOrigin]](parsed_ast)
+    var parsed_ast_immutable = rebind[ASTNode[ImmutUntrackedOrigin]](parsed_ast)
     var root_child_index = UInt16(
         children_len + 1
     )  # +1 because we use 1-based indexing
     regex_ptr[].append_child(parsed_ast_immutable)
 
     # Use the heap-allocated regex pointer directly
-    var re_root = ASTNode[ImmutAnyOrigin](
+    var re_root = ASTNode[ImmutUntrackedOrigin](
         type=RE,
-        regex_ptr=regex_ptr.as_unsafe_any_origin(),
+        regex_ptr=regex_ptr,
         start_idx=0,
         end_idx=pattern.byte_length(),
         children_indexes=_make_children_indexes(root_child_index),

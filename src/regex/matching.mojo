@@ -59,7 +59,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
     comptime DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _data: UnsafePointer[Match[Self.origin], MutAnyOrigin]
+    var _data: UnsafePointer[Match[Self.origin], MutUntrackedOrigin]
     """Internal list storing the matches. Dangling (and never read
     from) until the first allocation runs through `_realloc`; tracked
     via `_capacity > 0` since 1.0.0b1 forbids null UnsafePointer
@@ -73,7 +73,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
     ):
         """Initialize empty Matches container."""
         self._data = UnsafePointer[
-            Match[Self.origin], MutAnyOrigin
+            Match[Self.origin], MutUntrackedOrigin
         ].unsafe_dangling()
         self._capacity = 0
         self._len = 0
@@ -88,7 +88,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
     ):
         """Copy constructor."""
         self._data = UnsafePointer[
-            Match[Self.origin], MutAnyOrigin
+            Match[Self.origin], MutUntrackedOrigin
         ].unsafe_dangling()
         self._len = 0
         self._capacity = 0
@@ -133,7 +133,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
         if self._capacity > 0:
             memcpy(dest=new_data, src=self._data, count=len(self))
             self._data.free()
-        self._data = new_data.as_unsafe_any_origin()
+        self._data = new_data
         self._capacity = new_capacity
 
     def append(

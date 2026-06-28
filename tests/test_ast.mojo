@@ -29,9 +29,13 @@ from regex.ast import (
 
 def test_ASTNode() raises:
     var pattern = String("")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    var ast_node = ASTNode[ImmutAnyOrigin](
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    var ast_node = ASTNode[ImmutUntrackedOrigin](
         type=ELEMENT, regex_ptr=regex_ptr, start_idx=0, end_idx=0
     )
     assert_true(ast_node.__bool__())
@@ -39,19 +43,20 @@ def test_ASTNode() raises:
 
 def test_Element() raises:
     var pattern = String("a")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var elem = Element[MutAnyOrigin](regex, start_idx=0, end_idx=1)
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var elem = Element(regex, start_idx=0, end_idx=1)
     assert_true(elem.__bool__())
     assert_equal(elem.type, ELEMENT)
     assert_equal(elem.get_value().value(), "a")
     assert_true(elem.is_match("a"))
     assert_false(elem.is_match("b"))
+    _ = regex^
 
 
 def test_WildcardElement() raises:
     var pattern = String(".")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var we = WildcardElement[MutAnyOrigin](regex, start_idx=0, end_idx=1)
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var we = WildcardElement(regex, start_idx=0, end_idx=1)
     assert_true(we.__bool__())
     assert_equal(we.type, WILDCARD)
     assert_true(we.is_match("a"))
@@ -61,8 +66,8 @@ def test_WildcardElement() raises:
 
 def test_SpaceElement() raises:
     var pattern = String("\\s")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var se = SpaceElement[MutAnyOrigin](regex, start_idx=0, end_idx=2)
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var se = SpaceElement(regex, start_idx=0, end_idx=2)
     assert_true(se.__bool__())
     assert_equal(se.type, SPACE)
     assert_true(se.is_match(" "))
@@ -75,10 +80,8 @@ def test_SpaceElement() raises:
 
 def test_RangeElement_positive_logic() raises:
     var pattern = String("[abc]")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var re = RangeElement[MutAnyOrigin](
-        regex, start_idx=1, end_idx=4, is_positive_logic=True
-    )
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var re = RangeElement(regex, start_idx=1, end_idx=4, is_positive_logic=True)
     assert_true(re.__bool__())
     assert_equal(re.type, RANGE)
     assert_equal(re.min, 1)
@@ -87,12 +90,13 @@ def test_RangeElement_positive_logic() raises:
     assert_true(re.is_match("b"))
     assert_true(re.is_match("c"))
     assert_false(re.is_match("x"))
+    _ = regex^
 
 
 def test_RangeElement_negative_logic() raises:
     var pattern = String("[^abc]")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var nre = RangeElement[MutAnyOrigin](
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var nre = RangeElement(
         regex, start_idx=2, end_idx=5, is_positive_logic=False
     )
     assert_true(nre.__bool__())
@@ -103,12 +107,13 @@ def test_RangeElement_negative_logic() raises:
     assert_false(nre.is_match("b"))
     assert_false(nre.is_match("c"))
     assert_true(nre.is_match("x"))
+    _ = regex^
 
 
 def test_StartElement() raises:
     var pattern = String("^")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var start = StartElement[MutAnyOrigin](regex, start_idx=0, end_idx=1)
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var start = StartElement(regex, start_idx=0, end_idx=1)
     assert_true(start.__bool__())
     assert_equal(start.type, START)
     assert_true(start.is_match("", 0, 10))
@@ -117,8 +122,8 @@ def test_StartElement() raises:
 
 def test_EndElement() raises:
     var pattern = String("$")
-    var regex = Regex[ImmutAnyOrigin](pattern)
-    var end = EndElement[MutAnyOrigin](regex, start_idx=0, end_idx=1)
+    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var end = EndElement(regex, start_idx=0, end_idx=1)
     assert_true(end.__bool__())
     assert_equal(end.type, END)
     assert_true(end.is_match("", 10, 10))
@@ -127,16 +132,16 @@ def test_EndElement() raises:
 
 def test_OrNode() raises:
     var pattern = String("a|b")
-    var mut_regex = Regex[MutAnyOrigin](pattern)
+    var mut_regex = Regex[MutUntrackedOrigin](pattern)
     var regex = mut_regex.get_immutable()
-    var left = Element[MutAnyOrigin](regex, start_idx=0, end_idx=1)
-    var right = Element[MutAnyOrigin](regex, start_idx=2, end_idx=3)
+    var left = Element(regex, start_idx=0, end_idx=1)
+    var right = Element(regex, start_idx=2, end_idx=3)
 
     # Add children to mutable regex
     mut_regex.append_child(left)
     mut_regex.append_child(right)
 
-    var or_node = OrNode[MutAnyOrigin](
+    var or_node = OrNode(
         regex,
         left_child_index=1,
         right_child_index=2,
@@ -156,16 +161,14 @@ def test_OrNode() raises:
 
 def test_NotNode() raises:
     var pattern = String("^e")
-    var mut_regex = Regex[MutAnyOrigin](pattern)
+    var mut_regex = Regex[MutUntrackedOrigin](pattern)
     var regex = mut_regex.get_immutable()
-    var element = Element[MutAnyOrigin](regex, start_idx=1, end_idx=2)
+    var element = Element(regex, start_idx=1, end_idx=2)
 
     # Add child to mutable regex
     mut_regex.append_child(element)
 
-    var not_node = NotNode[MutAnyOrigin](
-        regex, child_index=1, start_idx=0, end_idx=2
-    )
+    var not_node = NotNode(regex, child_index=1, start_idx=0, end_idx=2)
     assert_true(not_node.__bool__())
     assert_equal(not_node.type, NOT)
     assert_equal(not_node.get_children_len(), 1)
@@ -176,17 +179,17 @@ def test_NotNode() raises:
 
 def test_GroupNode() raises:
     var pattern = String("(ab)")
-    var mut_regex = Regex[MutAnyOrigin](pattern)
+    var mut_regex = Regex[MutUntrackedOrigin](pattern)
     var regex = mut_regex.get_immutable()
-    var elem1 = Element[MutAnyOrigin](regex, start_idx=1, end_idx=2)
-    var elem2 = Element[MutAnyOrigin](regex, start_idx=2, end_idx=3)
+    var elem1 = Element(regex, start_idx=1, end_idx=2)
+    var elem2 = Element(regex, start_idx=2, end_idx=3)
 
     # Add children to mutable regex
     mut_regex.append_child(elem1)
     mut_regex.append_child(elem2)
 
     var children_indexes = _make_children_indexes(UInt16(1), UInt16(2))
-    var group = GroupNode[MutAnyOrigin](
+    var group = GroupNode(
         regex,
         children_indexes=children_indexes,
         start_idx=0,
@@ -201,15 +204,15 @@ def test_GroupNode() raises:
 
 def test_GroupNode_default_name() raises:
     var pattern = String("(a)")
-    var mut_regex = Regex[MutAnyOrigin](pattern)
+    var mut_regex = Regex[MutUntrackedOrigin](pattern)
     var regex = mut_regex.get_immutable()
-    var elem = Element[MutAnyOrigin](regex, start_idx=1, end_idx=2)
+    var elem = Element(regex, start_idx=1, end_idx=2)
 
     # Add child to mutable regex
     mut_regex.append_child(elem)
 
     var children_indexes = _make_children_indexes(UInt16(1))
-    var group = GroupNode[MutAnyOrigin](
+    var group = GroupNode(
         regex,
         children_indexes=children_indexes,
         start_idx=0,
@@ -221,19 +224,19 @@ def test_GroupNode_default_name() raises:
 
 def test_is_leaf() raises:
     var pattern = String("a.^$[abc]a|b()")
-    var mut_regex = Regex[MutAnyOrigin](pattern)
+    var mut_regex = Regex[MutUntrackedOrigin](pattern)
     var regex = mut_regex.get_immutable()
-    var element = Element[MutAnyOrigin](regex, start_idx=0, end_idx=1)
-    var wildcard = WildcardElement[MutAnyOrigin](regex, start_idx=1, end_idx=2)
-    var start_elem = StartElement[MutAnyOrigin](regex, start_idx=2, end_idx=3)
-    var end_elem = EndElement[MutAnyOrigin](regex, start_idx=3, end_idx=4)
-    var range_elem = RangeElement[MutAnyOrigin](regex, start_idx=5, end_idx=8)
+    var element = Element(regex, start_idx=0, end_idx=1)
+    var wildcard = WildcardElement(regex, start_idx=1, end_idx=2)
+    var start_elem = StartElement(regex, start_idx=2, end_idx=3)
+    var end_elem = EndElement(regex, start_idx=3, end_idx=4)
+    var range_elem = RangeElement(regex, start_idx=5, end_idx=8)
 
     # Add children to mutable regex for complex nodes
     mut_regex.append_child(element)
     mut_regex.append_child(wildcard)
 
-    var or_node = OrNode[MutAnyOrigin](
+    var or_node = OrNode(
         regex,
         left_child_index=1,
         right_child_index=2,
@@ -241,7 +244,7 @@ def test_is_leaf() raises:
         end_idx=12,
     )
     var empty_children_indexes = ChildrenIndexes()
-    var group = GroupNode[MutAnyOrigin](
+    var group = GroupNode(
         regex,
         children_indexes=empty_children_indexes,
         start_idx=13,
