@@ -83,17 +83,19 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
     comptime ImmOrigin = ImmutOrigin(Self.origin)
     comptime Immutable = Regex[origin=Self.ImmOrigin]
     var pattern: String
-    var children_ptr: UnsafePointer[ASTNode[ImmutAnyOrigin], MutAnyOrigin]
+    var children_ptr: UnsafePointer[
+        ASTNode[ImmutUntrackedOrigin], MutUntrackedOrigin
+    ]
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 
-    def __init__(out self, ref[Self.origin] pattern: String):
+    def __init__(out self, pattern: String):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children_len = 0
-        self.children_ptr = alloc[ASTNode[ImmutAnyOrigin]](
+        self.children_ptr = alloc[ASTNode[ImmutUntrackedOrigin]](
             pattern.byte_length() * 2
-        ).as_unsafe_any_origin()  # Allocate enough space for children
+        )  # Allocate enough space for children
 
     @always_inline
     def __eq__[o: Origin](self, other: Regex[origin=o]) -> Bool:
@@ -142,7 +144,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         return rebind[Self.Immutable](self).copy()
 
     @always_inline
-    def get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
+    def get_child(self, i: Int) -> ASTNode[ImmutUntrackedOrigin]:
         """Get the child ASTNode at index `i`."""
         return self.children_ptr[i]
 
@@ -152,7 +154,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         return self.children_len
 
     @always_inline
-    def append_child(mut self, var child: ASTNode[ImmutAnyOrigin]):
+    def append_child(mut self, var child: ASTNode[ImmutUntrackedOrigin]):
         """Append a child ASTNode to the Regex."""
         # print(
         #     "Appending child to Regex at ",
@@ -179,7 +181,9 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     var type: Int
     """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
-    var regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin]
+    var regex_ptr: UnsafePointer[
+        Regex[ImmutUntrackedOrigin], ImmutUntrackedOrigin
+    ]
     """Pointer to the parent regex object containing the pattern string."""
     var start_idx: Int
     """Starting position of this node in the original pattern string."""
@@ -207,7 +211,9 @@ struct ASTNode[regex_origin: ImmutOrigin](
     def __init__(
         out self,
         type: Int,
-        regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
+        regex_ptr: UnsafePointer[
+            Regex[ImmutUntrackedOrigin], ImmutUntrackedOrigin
+        ],
         start_idx: Int,
         end_idx: Int,
         capturing_group: Bool = False,
@@ -234,7 +240,9 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     def __init__(
         out self,
-        regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
+        regex_ptr: UnsafePointer[
+            Regex[ImmutUntrackedOrigin], ImmutUntrackedOrigin
+        ],
         type: Int,
         child_index: UInt16,
         start_idx: Int,
@@ -262,7 +270,9 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
     def __init__(
         out self,
-        regex_ptr: UnsafePointer[Regex[ImmutAnyOrigin], ImmutAnyOrigin],
+        regex_ptr: UnsafePointer[
+            Regex[ImmutUntrackedOrigin], ImmutUntrackedOrigin
+        ],
         type: Int,
         children_indexes: ChildrenIndexes,
         start_idx: Int,
@@ -532,7 +542,7 @@ struct ASTNode[regex_origin: ImmutOrigin](
         return self.get_children_len() > 0
 
     @always_inline
-    def get_child(self, i: Int) -> ASTNode[ImmutAnyOrigin]:
+    def get_child(self, i: Int) -> ASTNode[ImmutUntrackedOrigin]:
         """Get the children of the AST node."""
         return self.regex_ptr[].get_child(Int(self.children_indexes[i] - 1))
 
@@ -552,15 +562,19 @@ struct ASTNode[regex_origin: ImmutOrigin](
 
 @always_inline
 def Element[
-    regex_origin: MutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[ImmutAnyOrigin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create an Element node with a value string."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[ImmutAnyOrigin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=ELEMENT,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -572,15 +586,19 @@ def Element[
 
 @always_inline
 def WildcardElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a WildcardElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=WILDCARD,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -592,15 +610,19 @@ def WildcardElement[
 
 @always_inline
 def SpaceElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a SpaceElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=SPACE,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -612,15 +634,19 @@ def SpaceElement[
 
 @always_inline
 def DigitElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a DigitElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=DIGIT,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -632,15 +658,19 @@ def DigitElement[
 
 @always_inline
 def WordElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a WordElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=WORD,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -682,26 +712,25 @@ def classify_range_kind(pattern: StringSlice) -> Int:
 
 @always_inline
 def RangeElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
     is_positive_logic: Bool = True,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a RangeElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
     # Classify the range pattern once at build time.
     var kind = RANGE_KIND_OTHER
     if start_idx < end_idx:
-        var pat = StringSlice(
-            unsafe_from_utf8=Span[Byte, origin_of(regex.pattern)](
-                ptr=regex.pattern.unsafe_ptr() + start_idx,
-                length=end_idx - start_idx,
-            )
-        )
+        var pat = StringSlice(regex.pattern)[byte=start_idx:end_idx]
         kind = classify_range_kind(pat)
-    return ASTNode[regex_origin](
+    return ASTNode[ImmutUntrackedOrigin](
         type=RANGE,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -715,15 +744,19 @@ def RangeElement[
 
 @always_inline
 def StartElement[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a StartElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=START,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -735,15 +768,19 @@ def StartElement[
 
 @always_inline
 def EndElement[
-    regex_origin: ImmutOrigin
+    regex_origin: Origin
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create an EndElement node."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=END,
         regex_ptr=regex_ptr,
         start_idx=start_idx,
@@ -755,17 +792,21 @@ def EndElement[
 
 @always_inline
 def OrNode[
-    regex_origin: ImmutOrigin
+    regex_origin: Origin
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     left_child_index: UInt16,
     right_child_index: UInt16,
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create an OrNode with left and right children."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=OR,
         regex_ptr=regex_ptr,
         children_indexes=_make_children_indexes(
@@ -780,16 +821,20 @@ def OrNode[
 
 @always_inline
 def NotNode[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     child_index: UInt16,
     start_idx: Int,
     end_idx: Int,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a NotNode with a child."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    return ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    return ASTNode[ImmutUntrackedOrigin](
         type=NOT,
         regex_ptr=regex_ptr,
         children_indexes=_make_children_indexes(child_index),
@@ -800,18 +845,22 @@ def NotNode[
 
 @always_inline
 def GroupNode[
-    regex_origin: ImmutOrigin,
+    regex_origin: Origin,
 ](
-    ref[regex_origin] regex: Regex[ImmutAnyOrigin],
+    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
     children_indexes: ChildrenIndexes,
     start_idx: Int,
     end_idx: Int,
     capturing_group: Bool = False,
     group_id: Int = -1,
-) -> ASTNode[regex_origin]:
+) -> ASTNode[ImmutUntrackedOrigin]:
     """Create a GroupNode with children."""
-    var regex_ptr = UnsafePointer(to=regex).as_unsafe_any_origin()
-    var node = ASTNode[regex_origin](
+    var regex_ptr = (
+        UnsafePointer(to=regex)
+        .as_immutable()
+        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+    )
+    var node = ASTNode[ImmutUntrackedOrigin](
         type=GROUP,
         regex_ptr=regex_ptr,
         start_idx=start_idx,

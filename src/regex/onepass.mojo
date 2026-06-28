@@ -178,7 +178,7 @@ def _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
 
 def compile_onepass(
     var program: Program,
-) -> Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]:
+) -> Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]:
     # Compile a PikeVM program into a OnePass NFA and heap-allocate it.
     # Returns None when the pattern is not one-pass (caller falls back
     # to another engine).

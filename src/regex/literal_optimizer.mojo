@@ -29,7 +29,9 @@ struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
     that lets `node_ptr` be a safe `Optional[Pointer[...]]` borrow instead of
     a raw `UnsafePointer`."""
 
-    var node_ptr: Optional[Pointer[ASTNode[ImmutAnyOrigin], Self.node_origin]]
+    var node_ptr: Optional[
+        Pointer[ASTNode[ImmutUntrackedOrigin], Self.node_origin]
+    ]
     """Origin-tracked borrow of the AST node containing the literal (for
     single nodes). `None` when this LiteralInfo refers to a string-index
     literal instead. The borrow rides `node_origin`, so the compiler keeps
@@ -47,7 +49,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
 
     def __init__(
         out self,
-        ref[Self.node_origin] node: ASTNode[ImmutAnyOrigin],
+        ref[Self.node_origin] node: ASTNode[ImmutUntrackedOrigin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -214,7 +216,9 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
 
 def extract_literals[
     node_origin: ImmutOrigin
-](ref[node_origin] ast: ASTNode[ImmutAnyOrigin]) -> LiteralSet[node_origin]:
+](ref[node_origin] ast: ASTNode[ImmutUntrackedOrigin]) -> LiteralSet[
+    node_origin
+]:
     """Extract all literals from a regex AST.
 
     Args:
@@ -239,7 +243,7 @@ def extract_literals[
 def _extract_from_node[
     node_origin: ImmutOrigin
 ](
-    node: ASTNode[ImmutAnyOrigin],
+    node: ASTNode[ImmutUntrackedOrigin],
     mut result: LiteralSet[node_origin],
     offset: Int,
     is_required: Bool,
@@ -456,7 +460,7 @@ def _longest_common_prefix(s1: String, s2: String) -> String:
     return String(s1[byte=:i])
 
 
-def has_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def has_literal_prefix(ast: ASTNode[MutUntrackedOrigin]) -> Bool:
     """Check if pattern starts with a literal that can be used for optimization.
 
     Args:
@@ -493,7 +497,7 @@ def _has_literal_prefix_node(node: ASTNode) -> Bool:
         return False
 
 
-def extract_literal_prefix(ast: ASTNode[MutAnyOrigin]) -> String:
+def extract_literal_prefix(ast: ASTNode[MutUntrackedOrigin]) -> String:
     """Extract the literal prefix from a pattern, if any.
 
     Args:

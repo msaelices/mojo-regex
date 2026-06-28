@@ -1111,10 +1111,10 @@ def _init_simd_matchers() -> SIMDMatchers:
     return matchers^
 
 
-def _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutAnyOrigin]:
+def _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutUntrackedOrigin]:
     """Returns a pointer to the global SIMD matchers dictionary."""
     try:
-        return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
+        return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
 

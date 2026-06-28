@@ -10,7 +10,7 @@ from regex.aliases import ImmSlice
 
 def _build_onepass(
     pattern: String,
-) raises -> Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]:
+) raises -> Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]:
     """Parse a pattern, compile to PikeVM bytecode, attempt OnePass
     compilation, and return the heap pointer (None if not one-pass)."""
     var ast = parse(pattern)

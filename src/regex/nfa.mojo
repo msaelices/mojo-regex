@@ -70,9 +70,9 @@ struct NFAEngine(Copyable, Engine):
     """The regex pattern string to match against."""
     var prev_re: String
     """Previously parsed regex pattern for caching."""
-    var prev_ast: Optional[ASTNode[MutAnyOrigin]]
+    var prev_ast: Optional[ASTNode[MutUntrackedOrigin]]
     """Cached AST from previous regex compilation."""
-    var regex: Optional[ASTNode[MutAnyOrigin]]
+    var regex: Optional[ASTNode[MutUntrackedOrigin]]
     """Compiled AST representation of the current regex pattern."""
     var literal_prefix: String
     """Extracted literal prefix for optimization."""
@@ -101,7 +101,7 @@ struct NFAEngine(Copyable, Engine):
             if self.regex:
                 ref ast = self.regex.value()
                 var analyzer = PatternAnalyzer()
-                var complexity = analyzer.classify(ast)
+                _ = analyzer.classify(ast)
 
                 var literal_set = extract_literals(ast)
 
@@ -453,7 +453,7 @@ struct NFAEngine(Copyable, Engine):
                 if self.literal_prefix and not self.is_prefix_literal:
                     try_pos = max(0, literal_pos - self.pattern_len)
 
-                var end_pos = min(
+                _ = min(
                     text.byte_length(),
                     literal_pos + self.literal_prefix.byte_length(),
                 )

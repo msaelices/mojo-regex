@@ -119,7 +119,7 @@ def _program_has_end_anchor(program: Program) -> Bool:
 
 
 def _find_rare_required_byte(
-    ast: ASTNode[MutAnyOrigin],
+    ast: ASTNode[MutUntrackedOrigin],
     first_class_lookup: SIMD[DType.uint8, 256],
 ) -> Int:
     """Walk the top-level sequence of `ast` looking for a required,
@@ -164,7 +164,7 @@ def _find_rare_required_byte(
     return -1
 
 
-def check_ast_for_anchors(ast: ASTNode[MutAnyOrigin]) -> Bool:
+def check_ast_for_anchors(ast: ASTNode[MutUntrackedOrigin]) -> Bool:
     """Check if AST contains start or end anchors."""
     from regex.ast import START, END, RE, GROUP
 
@@ -211,7 +211,7 @@ trait RegexMatcher:
 struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine_ptr: Optional[UnsafePointer[DFAEngine, MutAnyOrigin]]
+    var engine_ptr: Optional[UnsafePointer[DFAEngine, MutUntrackedOrigin]]
     """The underlying DFA engine for pattern matching. None when the
     matcher was default-constructed and no AST has been compiled into
     it (1.0.0b1 forbids null UnsafePointer, so absence goes through
@@ -222,7 +222,7 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
         self.engine_ptr = None
 
     def __init__(
-        out self, var ast: ASTNode[MutAnyOrigin], pattern: String
+        out self, var ast: ASTNode[MutUntrackedOrigin], pattern: String
     ) raises:
         """Initialize DFA matcher by compiling the AST.
 
@@ -285,19 +285,19 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     var engine: NFAEngine
     """The underlying NFA engine for pattern matching."""
-    var ast: ASTNode[MutAnyOrigin]
+    var ast: ASTNode[MutUntrackedOrigin]
     """The parsed AST representation of the regex pattern."""
-    var _lazy_dfa_ptr: Optional[UnsafePointer[LazyDFA, MutAnyOrigin]]
+    var _lazy_dfa_ptr: Optional[UnsafePointer[LazyDFA, MutUntrackedOrigin]]
     """Heap-allocated lazy DFA. None when the pattern is not eligible
     for lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES).
     """
-    var _onepass_ptr: Optional[UnsafePointer[OnePassNFA, MutAnyOrigin]]
+    var _onepass_ptr: Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]
     """Heap-allocated OnePass NFA for unambiguous patterns. None when
     the pattern failed the one-pass check. Preferred over the lazy DFA
     and the backtracking NFA when available since it does not pay per-
     call setup cost or rely on state-set caching."""
 
-    def __init__(out self, ast: ASTNode[MutAnyOrigin], pattern: String):
+    def __init__(out self, ast: ASTNode[MutUntrackedOrigin], pattern: String):
         """Initialize NFA matcher with OnePass and LazyDFA acceleration."""
         self.engine = NFAEngine(pattern)
         self.ast = ast
@@ -607,7 +607,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
         if should_analyze_prefilter:
             # Extract literal information using optimized implementation
-            # Use MutAnyOrigin since that's what the AST has
+            # Use MutUntrackedOrigin since that's what the AST has
             var literal_set = extract_literals(ast)
             var has_anchors = check_ast_for_anchors(ast)
 
@@ -1178,10 +1178,10 @@ def _init_regex_cache() -> RegexCache:
     return RegexCache()
 
 
-def _get_regex_cache() -> UnsafePointer[RegexCache, MutAnyOrigin]:
+def _get_regex_cache() -> UnsafePointer[RegexCache, MutUntrackedOrigin]:
     """Returns an pointer to the global regex cache."""
     try:
-        return _CACHE_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
+        return _CACHE_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
 
@@ -1232,16 +1232,16 @@ def _init_last_sub_cache() -> _LastSubCache:
     )
 
 
-def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutAnyOrigin]:
+def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutUntrackedOrigin]:
     try:
-        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr().as_unsafe_any_origin()
+        return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
     except e:
         abort[prefix="ERROR:"](String(e))
 
 
 def _compile_and_cache(
     pattern: ImmSlice,
-) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
+) raises -> UnsafePointer[CompiledRegex, MutUntrackedOrigin]:
     """Compile a regex pattern and return a pointer into the global cache.
 
     Returns an UnsafePointer to the cached CompiledRegex, avoiding the
@@ -1256,7 +1256,7 @@ def _compile_and_cache(
 def _compile_and_cache_with_key(
     pattern: ImmSlice,
     key: UInt64,
-) raises -> UnsafePointer[CompiledRegex, MutAnyOrigin]:
+) raises -> UnsafePointer[CompiledRegex, MutUntrackedOrigin]:
     """Variant of `_compile_and_cache` that takes a precomputed hash.
 
     Used by `sub()` with a pointer-identity fast path so repeat calls

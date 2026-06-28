@@ -104,7 +104,7 @@ struct LiteralExtractor:
         """Initialize the literal extractor."""
         pass
 
-    def extract(self, ast: ASTNode[MutAnyOrigin]) -> LiteralInfo:
+    def extract(self, ast: ASTNode[MutUntrackedOrigin]) -> LiteralInfo:
         """Extract literal information from an AST pattern.
 
         Args:
@@ -135,11 +135,13 @@ struct LiteralExtractor:
 
         return info^
 
-    def _has_anchors(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
+    def _has_anchors(self, ast: ASTNode[MutUntrackedOrigin]) -> Bool:
         """Check if pattern has start or end anchors."""
         return self._check_anchors_recursive(ast)
 
-    def _check_anchors_recursive(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
+    def _check_anchors_recursive(
+        self, ast: ASTNode[MutUntrackedOrigin]
+    ) -> Bool:
         """Recursively check for anchors in AST."""
         if ast.type == START or ast.type == END:
             return True
@@ -150,7 +152,7 @@ struct LiteralExtractor:
         return False
 
     def _extract_from_node(
-        self, ast: ASTNode[MutAnyOrigin], mut info: LiteralInfo
+        self, ast: ASTNode[MutUntrackedOrigin], mut info: LiteralInfo
     ):
         """Extract literals from a specific AST node."""
         if ast.type == RE:
@@ -190,7 +192,9 @@ struct LiteralExtractor:
                     if self._is_at_end(ast):
                         info.literal_suffixes.append(char_str)
 
-    def _extract_literal_sequence(self, ast: ASTNode[MutAnyOrigin]) -> String:
+    def _extract_literal_sequence(
+        self, ast: ASTNode[MutUntrackedOrigin]
+    ) -> String:
         """Extract literal string from a sequence of ELEMENT nodes."""
         if ast.type == ELEMENT:
             if ast.min == 1 and ast.max == 1:
@@ -213,7 +217,7 @@ struct LiteralExtractor:
         return EMPTY_STRING
 
     def _extract_alternation_literals(
-        self, ast: ASTNode[MutAnyOrigin], mut info: LiteralInfo
+        self, ast: ASTNode[MutUntrackedOrigin], mut info: LiteralInfo
     ):
         """Extract literals from alternation patterns (a|b|c)."""
         var branches = List[String]()
@@ -245,7 +249,7 @@ struct LiteralExtractor:
                 info.literal_suffixes.append(common_suffix)
 
     def _collect_alternation_branches(
-        self, ast: ASTNode[MutAnyOrigin], mut branches: List[String]
+        self, ast: ASTNode[MutUntrackedOrigin], mut branches: List[String]
     ):
         """Collect literal branches from alternation tree."""
         if ast.type == OR:
@@ -327,13 +331,13 @@ struct LiteralExtractor:
 
         return suffix^
 
-    def _is_at_beginning(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
+    def _is_at_beginning(self, ast: ASTNode[MutUntrackedOrigin]) -> Bool:
         """Check if this node is at the beginning of the pattern."""
         # Simplified check - in a full implementation, this would check
         # the position within the parent's children
         return True  # Conservative approach for now
 
-    def _is_at_end(self, ast: ASTNode[MutAnyOrigin]) -> Bool:
+    def _is_at_end(self, ast: ASTNode[MutUntrackedOrigin]) -> Bool:
         """Check if this node is at the end of the pattern."""
         # Simplified check - in a full implementation, this would check
         # the position within the parent's children
