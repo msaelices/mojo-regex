@@ -44,6 +44,33 @@ var formatted = sub("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3", "6502530000")
 print(formatted)  # "650-253-0000"
 ```
 
+## Compile-time patterns (experimental)
+
+When the pattern is known at compile time, pass it as a *parameter*
+instead of an argument and the regex is compiled while your program
+builds:
+
+```mojo
+from regex.comptime_regex import search, match_first, findall
+
+var m = search["hello"](text)          # DFA built at compile time
+var all = findall["(x|y)"](text)
+```
+
+- The parser and the DFA compiler run inside Mojo's comptime
+  interpreter; the automaton is embedded in the binary. Matching
+  needs no runtime compilation, no pattern hashing and no cache
+  lookup.
+- Invalid patterns fail the *build* instead of raising at runtime.
+- Patterns outside the compile-time envelope (currently: literals,
+  anchors, quantifiers and alternations) transparently fall back to
+  the runtime engine with identical semantics, so any pattern is
+  safe to use.
+
+See [proposals/comptime-regex.md](proposals/comptime-regex.md) for
+the design, the verified envelope and the roadmap (character classes
+are next).
+
 ## Performance
 
 See [benchmarks/results/comparison.md](benchmarks/results/comparison.md) for detailed results across 80 benchmarks comparing Mojo, Python, and Rust.

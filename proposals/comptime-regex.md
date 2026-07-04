@@ -1,8 +1,16 @@
 # Comptime regex: compile-time pattern specialization, revisited
 
 Date: 2026-07-04
-Status: proposal (validated by experiments below)
+Status: step 1 implemented (PR #167, `src/regex/comptime_regex.mojo`);
+steps 2-4 pending
 Supersedes: PR #54 (closed)
+
+> Implementation note (post step 1): the probe cannot try/except its
+> way through the char-class path. The `_Global` FFI call is a *hard*
+> comptime-interpreter error, not a catchable exception, so the probe
+> whitelists AST node types before attempting the comptime DFA build.
+> This makes the step-2 cache-free `CharacterClassSIMD` refactor a
+> prerequisite for widening the envelope, not just an optimization.
 
 ## TL;DR
 
