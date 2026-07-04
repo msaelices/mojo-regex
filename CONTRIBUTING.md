@@ -76,6 +76,12 @@ The regex library uses a hybrid DFA/NFA architecture with intelligent pattern ro
 - **Key functions**: `match_first()`, `match_node()`, `match_quantified()`
 - **Features**: Full regex support including groups, alternation, complex patterns
 
+#### 9. **Comptime Regex** (`src/regex/comptime_regex.mojo`)
+- **Purpose**: Compile-time pattern specialization when the pattern is a comptime parameter (`search["hello"](text)`)
+- **Strategy**: The parser and DFA compiler run inside Mojo's comptime interpreter; the resulting `DFAEngine` is embedded in the binary and materialized once per pattern per process into a `_Global` slot
+- **Dispatch**: `comptime assert` rejects invalid patterns at build time; a comptime AST probe selects the comptime engine for the supported envelope (literals, anchors, quantifiers, alternations) and falls back to the runtime engine for everything else
+- **Design doc**: `proposals/comptime-regex.md` (includes the envelope constraints and why character classes need a follow-up refactor)
+
 ### Data Flow Example
 
 ```mojo
