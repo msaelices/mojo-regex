@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.21.0 (2026-07-04)
+
+### Comptime regex: compile-time pattern specialization (PR #167)
+
+- New `regex.comptime_regex` module: pass the pattern as a comptime parameter (`search["hello"](text)`, plus `match_first` / `findall`) and the parser and DFA compiler run inside Mojo's comptime interpreter, embedding the automaton in the binary. Matching needs no runtime compilation, no pattern hashing and no cache probe; the engine is materialized once per pattern per process into a `_Global` slot. Invalid patterns fail the build via `comptime assert`. Patterns outside the verified envelope (literals, anchors, quantifiers, alternations) transparently fall back to the runtime engine with identical semantics.
+- Short-text literal search micro-benchmark (3-run medians): **69 ns/op comptime vs 89 ns/op runtime (~1.3x)**; the ~20 ns saved is the per-call hash + cache-probe cost.
+- Design doc and verified experiments in `proposals/comptime-regex.md` (PR #166); the char-class family is blocked only by the `_Global` SIMD-matcher cache FFI call (hard comptime-interpreter error) and is the next step.
+
+### Mojo 1.0.0b3.dev2026062806 + AnyOrigin to UntrackedOrigin migration (PR #163)
+
+- Bumps the pinned nightly and adapts to three breaking changes: struct fields may no longer expose `AnyOrigin`, `alloc` / `_Global.get_or_create_ptr` now return `*UntrackedOrigin` pointers, and `fn` is fully removed. AST/pointer types move to `UntrackedOrigin`; the string-slice family stays on `AnyOrigin` (only origin `String` still implicitly converts to). All 377 tests pass, zero compiler warnings.
+
+### Playground modernization + latent simd_matchers factory bug (PR #161)
+
+- Fixes `Int` vs `UInt8` type errors in the `create_*_matcher` range-factory functions (latent: imported but never instantiated by tests) and modernizes the playground examples for current Mojo.
+
+### Compiler-tracked match lifetimes (PRs #159, #160)
+
+- `LiteralInfo.node_ptr` becomes a safe origin-tracked borrow (`Optional[Pointer[..., node_origin]]`), and `Match[origin]` / `MatchList[origin]` are parameterized on the backing-text origin, threaded from the public API through every engine. A `Match` can no longer outlive the text it points into; the compiler enforces what a docstring used to ask for.
+
+### Toolchain bumps: 1.0.0b2 and 1.0.0b3 nightlies (PRs #155, #157, #158)
+
+- Migrates the deprecated `StringSlice(ptr=..., length=...)` constructor to `unsafe_from_utf8` behind a new `imm_slice_from_ptr` helper (#155), renames `as_any_origin()` to `as_unsafe_any_origin()` and makes implicit any-origin pointer conversions explicit (#157), and takes a no-source-change nightly bump (#158). Warning-free builds throughout.
+
+### Recover hot-path perf regressions under mojo 1.0.0b1 (PR #154)
+
+- 1.0.0b1 turned CPU bounds checks on by default for stdlib collections; the literal-search inner loops paid them per byte. Indexing through a hoisted `unsafe_ptr()` in `verify_match`, the two-byte `simd_search` probe and the two-way scan loops, plus two DFA fixes on the bounded-quantifier path, recovers most of it: `pure_dfa_paren` 110 -> 67 ns, `optimize_extreme_quantifiers` 86 -> 57 ns.
+
 ## v0.20.0 (2026-05-18)
 
 ### Compatibility with mojo 1.0.0b1 (PR #152)
