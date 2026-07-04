@@ -1,16 +1,23 @@
 # Comptime regex: compile-time pattern specialization, revisited
 
 Date: 2026-07-04
-Status: step 1 implemented (PR #167, `src/regex/comptime_regex.mojo`);
-steps 2-4 pending
+Status: steps 1-2 implemented (PRs #167, #168;
+`src/regex/comptime_regex.mojo`); steps 3-4 pending
 Supersedes: PR #54 (closed)
 
 > Implementation note (post step 1): the probe cannot try/except its
 > way through the char-class path. The `_Global` FFI call is a *hard*
-> comptime-interpreter error, not a catchable exception, so the probe
-> whitelists AST node types before attempting the comptime DFA build.
-> This makes the step-2 cache-free `CharacterClassSIMD` refactor a
-> prerequisite for widening the envelope, not just an optimization.
+> comptime-interpreter error, not a catchable exception, so step 1
+> whitelisted AST node types before attempting the comptime DFA build.
+>
+> Post step 2: `compile_dfa_pattern[use_matcher_cache=False]` constructs
+> SIMD matchers directly (no `_Global`), which removed the whitelist
+> entirely: char classes, negated classes, shorthands, wildcards,
+> bounded quantifiers and multi-class sequences all build at comptime,
+> and every remaining DFA rejection is a catchable raise that falls
+> back to the runtime engine. `is_compile_time()` exists in newer
+> nightlies (`kgen.is_compile_time` is unregistered on this pin) and
+> would let the cache branch internally; revisit on the next bump.
 
 ## TL;DR
 

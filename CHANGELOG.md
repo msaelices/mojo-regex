@@ -2,6 +2,11 @@
 
 ## v0.21.0 (2026-07-04)
 
+### Comptime regex step 2: character classes at compile time (PR #168)
+
+- `compile_dfa_pattern` gains a comptime `use_matcher_cache: Bool = True` parameter threaded to the two SIMD-matcher acquisition sites; `use_matcher_cache=False` constructs matchers directly via the new `create_character_class_matcher`, bypassing the `_Global` cache whose FFI call the comptime interpreter cannot execute. The comptime probe drops its AST whitelist: char classes (`[0-9]+`, `[^abc]+`), shorthands (`\d`, `\w`), wildcards, bounded quantifiers (`[0-9]{3}`) and multi-class sequences (`[a-z]+[0-9]+`) now build at compile time, verified across a 16-pattern matrix; remaining DFA rejections are catchable raises that fall back to the runtime engine.
+- Runtime path is provably unchanged: a normalized objdump diff of `bench_engine` with and without the change shows identical instruction counts and opcodes, differing only in source-line immediates on assert paths. 389 tests pass, zero warnings.
+
 ### Comptime regex: compile-time pattern specialization (PR #167)
 
 - New `regex.comptime_regex` module: pass the pattern as a comptime parameter (`search["hello"](text)`, plus `match_first` / `findall`) and the parser and DFA compiler run inside Mojo's comptime interpreter, embedding the automaton in the binary. Matching needs no runtime compilation, no pattern hashing and no cache probe; the engine is materialized once per pattern per process into a `_Global` slot. Invalid patterns fail the build via `comptime assert`. Patterns outside the verified envelope (literals, anchors, quantifiers, alternations) transparently fall back to the runtime engine with identical semantics.

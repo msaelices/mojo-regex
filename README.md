@@ -62,14 +62,15 @@ var all = findall["(x|y)"](text)
   needs no runtime compilation, no pattern hashing and no cache
   lookup.
 - Invalid patterns fail the *build* instead of raising at runtime.
-- Patterns outside the compile-time envelope (currently: literals,
-  anchors, quantifiers and alternations) transparently fall back to
-  the runtime engine with identical semantics, so any pattern is
-  safe to use.
+- The compile-time envelope covers everything the DFA compiler
+  accepts: literals, anchors, quantifiers, alternations, character
+  classes (`[a-z]`, `[^abc]`), shorthands (`\d`, `\w`), wildcards,
+  bounded quantifiers and multi-class sequences. Anything the DFA
+  rejects transparently falls back to the runtime engine with
+  identical semantics, so any pattern is safe to use.
 
 See [proposals/comptime-regex.md](proposals/comptime-regex.md) for
-the design, the verified envelope and the roadmap (character classes
-are next).
+the design and the verified envelope.
 
 ## Performance
 
