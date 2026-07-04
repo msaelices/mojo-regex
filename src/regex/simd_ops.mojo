@@ -1201,6 +1201,53 @@ def get_character_class_matcher(char_class: StringSlice) -> CharacterClassSIMD:
         return CharacterClassSIMD(char_class)
 
 
+@always_inline
+def create_character_class_matcher(
+    char_class: StringSlice,
+) -> CharacterClassSIMD:
+    """Construct a matcher for a character class string, bypassing the
+    `_Global` cache.
+
+    Same string-to-matcher mapping as `get_character_class_matcher`, but
+    every matcher is built directly. This exists for the comptime DFA
+    build path (`compile_dfa_pattern[use_matcher_cache=False]`): the
+    `_Global` storage bottoms out in an external runtime call
+    (`KGEN_CompilerRT_GetOrCreateGlobal`) that the comptime interpreter
+    cannot execute, and the failure is a hard interpreter error rather
+    than a catchable exception. Runtime callers should keep using the
+    cached getter.
+
+    Args:
+        char_class: Character class string (e.g., "0123456789", "[a-z]").
+
+    Returns:
+        A freshly constructed CharacterClassSIMD matcher.
+    """
+    if char_class == DIGITS:
+        return _create_ascii_digits()
+    elif char_class == WORD_CHARS:
+        return _create_word_chars()
+    elif char_class == " \t\n\r\f":  # Common whitespace pattern
+        return _create_whitespace()
+    elif char_class == " \t\n\r\f\v":  # Extended whitespace with vertical tab
+        return _create_whitespace()
+    elif char_class == "abcdefghijklmnopqrstuvwxyz":  # [a-z]
+        return _create_ascii_lowercase()
+    elif char_class == "ABCDEFGHIJKLMNOPQRSTUVWXYZ":  # [A-Z]
+        return _create_ascii_uppercase()
+    elif (
+        char_class == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    ):  # [a-zA-Z]
+        return _create_ascii_alpha()
+    elif (
+        char_class
+        == "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+    ):  # [a-zA-Z0-9]
+        return _create_ascii_alphanumeric()
+    else:
+        return CharacterClassSIMD(char_class)
+
+
 def process_text_with_matcher[
     T: SIMDMatcher
 ](matcher: T, text: String, start: Int = 0) -> List[Int]:

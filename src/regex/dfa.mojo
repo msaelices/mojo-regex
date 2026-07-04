@@ -38,6 +38,7 @@ from regex.tokens import (
 from regex.simd_ops import (
     CharacterClassSIMD,
     SIMD_WIDTH,
+    create_character_class_matcher,
     get_character_class_matcher,
     apply_quantifier_simd_generic,
     find_in_text_simd,
@@ -348,21 +349,30 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    def compile_character_class(
+    def compile_character_class[
+        use_matcher_cache: Bool = True
+    ](
         mut self, var char_class: String, min_matches: Int, max_matches: Int
     ) raises:
         """Compile a character class pattern like [a-z]+ into a DFA.
+
+        Parameters:
+            use_matcher_cache: When False, SIMD matchers are constructed
+                directly instead of through the `_Global` cache (comptime
+                interpreter compatibility).
 
         Args:
             char_class: Character class string (e.g., "abcdefghijklmnopqrstuvwxyz" for [a-z]).
             min_matches: Minimum number of matches required.
             max_matches: Maximum number of matches (-1 for unlimited).
         """
-        self.compile_character_class_with_logic(
+        self.compile_character_class_with_logic[use_matcher_cache](
             char_class^, min_matches, max_matches, True
         )
 
-    def compile_character_class_with_logic(
+    def compile_character_class_with_logic[
+        use_matcher_cache: Bool = True
+    ](
         mut self,
         var char_class: String,
         min_matches: Int,
@@ -370,6 +380,11 @@ struct DFAEngine(Engine):
         positive_logic: Bool,
     ) raises:
         """Compile a character class pattern like [a-z]+ or [^a-z]+ into a DFA.
+
+        Parameters:
+            use_matcher_cache: When False, SIMD matchers are constructed
+                directly instead of through the `_Global` cache, whose FFI
+                call the comptime interpreter cannot execute.
 
         Args:
             char_class: Character class string (e.g., "abcdefghijklmnopqrstuvwxyz" for [a-z]).
@@ -379,7 +394,14 @@ struct DFAEngine(Engine):
         """
         # Try to use SIMD optimization for simple character class patterns
         if min_matches >= 0 and positive_logic:
-            self._simd_char_matcher = get_character_class_matcher(char_class)
+            comptime if use_matcher_cache:
+                self._simd_char_matcher = get_character_class_matcher(
+                    char_class
+                )
+            else:
+                self._simd_char_matcher = create_character_class_matcher(
+                    char_class
+                )
             self._has_simd_matcher = True
             # Unlimited quantifiers (+ or *) are eligible for SIMD scan
             self._simd_scan_eligible = max_matches == -1
@@ -580,10 +602,15 @@ struct DFAEngine(Engine):
 
         self.start_state = 0
 
-    def compile_multi_character_class_sequence(
-        mut self, var sequence_info: SequentialPatternInfo
-    ) raises:
+    def compile_multi_character_class_sequence[
+        use_matcher_cache: Bool = True
+    ](mut self, var sequence_info: SequentialPatternInfo) raises:
         """Compile a multi-character class sequence like [a-z]+[0-9]+ into a DFA.
+
+        Parameters:
+            use_matcher_cache: When False, SIMD matchers are constructed
+                directly instead of through the `_Global` cache, whose FFI
+                call the comptime interpreter cannot execute.
 
         Args:
             sequence_info: Information about the character class sequence elements.
@@ -602,9 +629,14 @@ struct DFAEngine(Engine):
             len(sequence_info.elements[0].alternation_branches) == 0
             and sequence_info.elements[0].char_class.byte_length() > 0
         ):
-            self._simd_char_matcher = get_character_class_matcher(
-                sequence_info.elements[0].char_class
-            )
+            comptime if use_matcher_cache:
+                self._simd_char_matcher = get_character_class_matcher(
+                    sequence_info.elements[0].char_class
+                )
+            else:
+                self._simd_char_matcher = create_character_class_matcher(
+                    sequence_info.elements[0].char_class
+                )
             self._has_simd_matcher = True
             # Not scan eligible - this is a multi-element pattern that needs
             # the full DFA state machine, not just consecutive char counting
@@ -2351,8 +2383,17 @@ struct BoyerMoore:
         return positions^
 
 
-def compile_dfa_pattern(ast: ASTNode[MutUntrackedOrigin]) raises -> DFAEngine:
+def compile_dfa_pattern[
+    use_matcher_cache: Bool = True
+](ast: ASTNode[MutUntrackedOrigin]) raises -> DFAEngine:
     """Compile an AST pattern into a DFA engine.
+
+    Parameters:
+        use_matcher_cache: When False, SIMD char-class matchers are
+            constructed directly instead of through the `_Global` cache.
+            Required when running under the comptime interpreter, which
+            cannot execute the cache's external FFI call. Runtime callers
+            should keep the default.
 
     Args:
         ast: AST representing a pattern that may include character classes.
@@ -2383,7 +2424,7 @@ def compile_dfa_pattern(ast: ASTNode[MutUntrackedOrigin]) raises -> DFAEngine:
         var expanded_char_class = _expand_character_range(
             ast.type, char_class_str
         )
-        dfa.compile_character_class_with_logic(
+        dfa.compile_character_class_with_logic[use_matcher_cache](
             expanded_char_class,
             min_matches,
             max_matches,
@@ -2394,7 +2435,9 @@ def compile_dfa_pattern(ast: ASTNode[MutUntrackedOrigin]) raises -> DFAEngine:
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
         sequence_info = _extract_multi_class_sequence_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info^)
+        dfa.compile_multi_character_class_sequence[use_matcher_cache](
+            sequence_info^
+        )
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
         sequence_info = _extract_sequential_pattern_info(ast)
@@ -2402,7 +2445,9 @@ def compile_dfa_pattern(ast: ASTNode[MutUntrackedOrigin]) raises -> DFAEngine:
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
         sequence_info = _extract_mixed_sequential_pattern_info(ast)
-        dfa.compile_multi_character_class_sequence(sequence_info^)
+        dfa.compile_multi_character_class_sequence[use_matcher_cache](
+            sequence_info^
+        )
     elif _is_alternation_pattern(ast):
         # Handle alternation patterns like a|b, cat|dog, (a|b)
         dfa.compile_alternation(ast)

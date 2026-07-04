@@ -14,7 +14,9 @@ Dispatch happens at compile time:
 
 - Invalid patterns (parse errors) fail the build via `comptime assert`.
 - Patterns the DFA compiler supports (literals, anchors, quantifiers,
-  alternations) use the comptime-built engine.
+  alternations, character classes, `\\d`/`\\w` shorthands, wildcards,
+  bounded quantifiers, multi-class sequences) use the comptime-built
+  engine.
 - Everything else falls back to the runtime engine (`regex.matcher`),
   keeping full feature parity.
 
@@ -30,7 +32,6 @@ from std.collections.string.string_slice import get_static_string
 from std.os import abort
 
 from regex.aliases import ImmSlice, imm_slice_from_ptr
-from regex.ast import ASTNode, RE, ELEMENT, GROUP, OR, START, END
 from regex.dfa import DFAEngine, compile_dfa_pattern
 from regex.matching import Match, MatchList
 from regex.matcher import (
@@ -56,43 +57,17 @@ struct _CtProbe(Copyable, Movable):
     """True when the full comptime DFA pipeline is available."""
 
 
-def _ast_in_ct_envelope(ast: ASTNode[ImmutUntrackedOrigin]) -> Bool:
-    """True when every node is in the verified comptime envelope.
-
-    Whitelist: literals, groups, alternations and anchors (quantifiers
-    are node attributes, not node types). Everything else (character
-    classes, `\\d`/`\\s` shorthands, wildcard, negations) is excluded
-    because the char-class DFA path calls the `_Global` SIMD-matcher
-    cache, and that external FFI call is a *hard* comptime-interpreter
-    error, not a catchable exception: it cannot be probed with
-    try/except and must be rejected up front. See the proposal's
-    "Pattern envelope" section.
-    """
-    var t = ast.type
-    if not (
-        t == RE
-        or t == ELEMENT
-        or t == GROUP
-        or t == OR
-        or t == START
-        or t == END
-    ):
-        return False
-    for i in range(ast.get_children_len()):
-        if not _ast_in_ct_envelope(ast.get_child(i)):
-            return False
-    return True
-
-
 def _probe(pattern: StaticString) -> _CtProbe:
     """Classify a pattern at comptime.
 
-    Runs the real parser inside the comptime interpreter, checks the
-    AST against the envelope whitelist, and only then attempts the DFA
-    build (whose remaining failure mode, "pattern too complex", is a
-    regular catchable exception). The functions are `raises`, and
-    raising functions cannot initialize a `comptime` value, so failures
-    are folded into flags.
+    Runs the real parser and the real DFA compiler inside the comptime
+    interpreter. The DFA build uses `use_matcher_cache=False` so SIMD
+    char-class matchers are constructed directly: the `_Global` cache's
+    external FFI call is a hard comptime-interpreter error, while every
+    remaining failure mode ("pattern too complex") is a regular
+    catchable exception. The functions are `raises`, and raising
+    functions cannot initialize a `comptime` value, so failures are
+    folded into flags.
 
     Args:
         pattern: The regex pattern (comptime value).
@@ -102,14 +77,12 @@ def _probe(pattern: StaticString) -> _CtProbe:
     """
     try:
         var ast = parse(String(pattern))
-        if not _ast_in_ct_envelope(ast):
-            return _CtProbe(parse_ok=True, dfa_ok=False)
         try:
-            _ = compile_dfa_pattern(ast)
+            _ = compile_dfa_pattern[use_matcher_cache=False](ast)
             return _CtProbe(parse_ok=True, dfa_ok=True)
         except:
-            # Valid regex inside the envelope but still rejected by
-            # the DFA compiler; falls back to the runtime engine.
+            # Valid regex, but rejected by the DFA compiler; falls back
+            # to the runtime engine.
             return _CtProbe(parse_ok=True, dfa_ok=False)
     except:
         return _CtProbe(parse_ok=False, dfa_ok=False)
@@ -130,7 +103,7 @@ def _build_engine(pattern: StaticString) -> DFAEngine:
     """
     try:
         var ast = parse(String(pattern))
-        return compile_dfa_pattern(ast)
+        return compile_dfa_pattern[use_matcher_cache=False](ast)
     except e:
         abort(String(e))
 
