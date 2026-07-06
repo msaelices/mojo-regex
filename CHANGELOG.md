@@ -2,16 +2,12 @@
 
 ## v0.21.0 (2026-07-04)
 
-### Comptime regex step 2: character classes at compile time (PR #168)
+### Comptime regex: compile-time pattern specialization (PRs #167, #168)
 
-- `compile_dfa_pattern` gains a comptime `use_matcher_cache: Bool = True` parameter threaded to the two SIMD-matcher acquisition sites; `use_matcher_cache=False` constructs matchers directly via the new `create_character_class_matcher`, bypassing the `_Global` cache whose FFI call the comptime interpreter cannot execute. The comptime probe drops its AST whitelist: char classes (`[0-9]+`, `[^abc]+`), shorthands (`\d`, `\w`), wildcards, bounded quantifiers (`[0-9]{3}`) and multi-class sequences (`[a-z]+[0-9]+`) now build at compile time, verified across a 16-pattern matrix; remaining DFA rejections are catchable raises that fall back to the runtime engine.
-- Runtime path is provably unchanged: a normalized objdump diff of `bench_engine` with and without the change shows identical instruction counts and opcodes, differing only in source-line immediates on assert paths. 389 tests pass, zero warnings.
-
-### Comptime regex: compile-time pattern specialization (PR #167)
-
-- New `regex.comptime_regex` module: pass the pattern as a comptime parameter (`search["hello"](text)`, plus `match_first` / `findall`) and the parser and DFA compiler run inside Mojo's comptime interpreter, embedding the automaton in the binary. Matching needs no runtime compilation, no pattern hashing and no cache probe; the engine is materialized once per pattern per process into a `_Global` slot. Invalid patterns fail the build via `comptime assert`. Patterns outside the verified envelope (literals, anchors, quantifiers, alternations) transparently fall back to the runtime engine with identical semantics.
-- Short-text literal search micro-benchmark (3-run medians): **69 ns/op comptime vs 89 ns/op runtime (~1.3x)**; the ~20 ns saved is the per-call hash + cache-probe cost.
-- Design doc and verified experiments in `proposals/comptime-regex.md` (PR #166); the char-class family is blocked only by the `_Global` SIMD-matcher cache FFI call (hard comptime-interpreter error) and is the next step.
+- New `regex.comptime_regex` module: pass the pattern as a comptime parameter (`search["hello"](text)`, plus `match_first` / `findall`) and the parser and DFA compiler run inside Mojo's comptime interpreter, embedding the automaton in the binary. Matching needs no runtime compilation, no pattern hashing and no cache probe; the engine is materialized once per pattern per process into a `_Global` slot. Invalid patterns fail the build via `comptime assert`; anything the DFA compiler rejects transparently falls back to the runtime engine with identical semantics.
+- The compile-time envelope covers everything the DFA accepts: literals, anchors, quantifiers, alternations, and (via #168) char classes (`[0-9]+`, `[^abc]+`), shorthands (`\d`, `\w`), wildcards, bounded quantifiers (`[0-9]{3}`) and multi-class sequences (`[a-z]+[0-9]+`), verified across a 16-pattern matrix. Unlocking char classes required a comptime `use_matcher_cache: Bool = True` parameter on `compile_dfa_pattern`: with `False`, SIMD matchers are constructed directly via the new `create_character_class_matcher` instead of the `_Global` cache, whose FFI call is a hard comptime-interpreter error.
+- Short-text literal search micro-benchmark (3-run medians): **69 ns/op comptime vs 89 ns/op runtime (~1.3x)**; the ~20 ns saved is the per-call hash + cache-probe cost. The runtime path is provably unchanged by #168: a normalized objdump diff of `bench_engine` shows identical instruction counts and opcodes, differing only in source-line immediates on assert paths.
+- Design doc and verified experiments in `proposals/comptime-regex.md` (PR #166). 389 tests pass, zero warnings.
 
 ### Mojo 1.0.0b3.dev2026062806 + AnyOrigin to UntrackedOrigin migration (PR #163)
 
