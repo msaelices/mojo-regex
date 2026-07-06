@@ -1,6 +1,7 @@
 from std.sys import argv
 from std.time import perf_counter_ns
-from regex.matcher import compile_regex, sub
+from regex.matcher import compile_regex, search as runtime_search, sub
+from regex.comptime_regex import search as ct_search
 
 
 # ===-----------------------------------------------------------------------===#
@@ -285,6 +286,121 @@ def benchmark_search(
     _print_result(name, median_ms, actual_iterations * iters)
 
 
+def benchmark_search_comptime[
+    pattern: StaticString
+](name: String, text: String, internal_iterations: Int) raises:
+    """Benchmark the comptime API (`comptime_regex.search[pattern]`).
+
+    Unlike the pre-compiled benchmarks, each call goes through the full
+    public entry point: comptime dispatch plus the per-pattern `_Global`
+    engine-pointer fetch. Pair with `benchmark_search_runtime_api` on
+    the same pattern and text for an apples-to-apples per-call
+    comparison; the pre-compiled `benchmark_search` is the lower bound
+    (pure engine time).
+    """
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
+
+    print("[ENGINE] " + name + " -> Pattern: '" + pattern + "', comptime API")
+
+    for _ in range(WARMUP_ITERATIONS):
+        _ = ct_search[pattern](text)
+
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = ct_search[pattern](text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    var times = List[Float64]()
+    var total_time: UInt = 0
+    var actual_iterations = 0
+
+    while (
+        total_time < UInt(target_runtime_ns)
+        and actual_iterations < MAX_ITERATIONS
+    ):
+        var start_time = perf_counter_ns()
+
+        for _ in range(iters):
+            var result = ct_search[pattern](text)
+            if not result:
+                print(
+                    "ERROR: No search match in", name, "for pattern:", pattern
+                )
+                return
+
+        var end_time = perf_counter_ns()
+        var elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
+
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
+
+
+def benchmark_search_runtime_api(
+    name: String, pattern: String, text: String, internal_iterations: Int
+) raises:
+    """Benchmark the public runtime API (`regex.search(pattern, text)`).
+
+    Each call pays the pattern hash and the global cache probe, which is
+    what user code that does not hand-hoist `compile_regex` pays. This
+    is the honest baseline for the comptime API benchmarks.
+    """
+    if _bench_skip(name):
+        return
+    var min_sample_ns = _min_sample_ns()
+    var target_runtime_ns = _target_runtime_ns()
+
+    print("[ENGINE] " + name + " -> Pattern: '" + pattern + "', runtime API")
+
+    for _ in range(WARMUP_ITERATIONS):
+        _ = runtime_search(pattern, text)
+
+    var iters = internal_iterations
+    var cal_start = perf_counter_ns()
+    for _ in range(iters):
+        _ = runtime_search(pattern, text)
+    var cal_elapsed = perf_counter_ns() - cal_start
+    if cal_elapsed < min_sample_ns:
+        var multiplier = Int(min_sample_ns // cal_elapsed) + 1
+        iters = iters * multiplier
+
+    var times = List[Float64]()
+    var total_time: UInt = 0
+    var actual_iterations = 0
+
+    while (
+        total_time < UInt(target_runtime_ns)
+        and actual_iterations < MAX_ITERATIONS
+    ):
+        var start_time = perf_counter_ns()
+
+        for _ in range(iters):
+            var result = runtime_search(pattern, text)
+            if not result:
+                print(
+                    "ERROR: No search match in", name, "for pattern:", pattern
+                )
+                return
+
+        var end_time = perf_counter_ns()
+        var elapsed = end_time - start_time
+        total_time += elapsed
+        actual_iterations += 1
+        times.append(Float64(elapsed) / Float64(iters) / 1_000_000.0)
+
+    var median_ms = _find_median(times)
+    _print_result(name, median_ms, actual_iterations * iters)
+
+
 def benchmark_findall(
     name: String, pattern: String, text: String, internal_iterations: Int
 ) raises:
@@ -498,6 +614,36 @@ def main() raises:
     benchmark_search("literal_match_short", "hello", text_1000, 2000)
 
     benchmark_search("literal_match_long", "hello", text_10000, 2000)
+
+    # ===== Comptime Pattern Specialization Benchmarks =====
+    # Pairs of ct_* (comptime API: comptime dispatch + _Global engine
+    # fetch per call) vs rtapi_* (public runtime API: pattern hash +
+    # cache probe per call) on identical pattern and text. Short texts
+    # are where the per-call overhead dominates; the long-text pair
+    # should converge since the automaton walk dominates there.
+    var text_short = String("say hello world, order ab12 shipped, ref 1234")
+
+    benchmark_search_comptime["hello"]("ct_literal_short", text_short, 5000)
+    benchmark_search_runtime_api(
+        "rtapi_literal_short", "hello", text_short, 5000
+    )
+
+    benchmark_search_comptime["hello"]("ct_literal_long", text_10000, 2000)
+    benchmark_search_runtime_api(
+        "rtapi_literal_long", "hello", text_10000, 2000
+    )
+
+    benchmark_search_comptime["[0-9]+"]("ct_char_class_short", text_short, 5000)
+    benchmark_search_runtime_api(
+        "rtapi_char_class_short", "[0-9]+", text_short, 5000
+    )
+
+    benchmark_search_comptime["[a-z]+[0-9]+"](
+        "ct_multi_class_short", text_short, 5000
+    )
+    benchmark_search_runtime_api(
+        "rtapi_multi_class_short", "[a-z]+[0-9]+", text_short, 5000
+    )
 
     # ===== Wildcard and Quantifier Benchmarks =====
     benchmark_match_first("wildcard_match_any", ".*", text_10000, 1000)
