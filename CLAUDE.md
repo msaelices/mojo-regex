@@ -134,7 +134,9 @@ Workflow:
 2. Branch name convention: `regex-X.Y.Z-bump`. One PR per release.
 3. Edit `recipe.yaml`:
    - `context.version: X.Y.Z`
-   - `source[0].rev: <bump commit short SHA>` (7-char form is fine)
+   - `source[0].rev: <bump commit FULL 40-char SHA>` (short SHAs fail:
+     rattler-build fetches the rev as a git ref and GitHub only serves
+     full SHAs; the error is "couldn't find remote ref <sha>")
    - Update the description's Python/Rust win percentages if they
      materially shifted (refresh from `benchmarks/results/comparison.md`).
 4. Commit `Bump mojo-regex from <prev> to X.Y.Z`.
