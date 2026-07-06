@@ -1,8 +1,11 @@
 # Comptime regex: compile-time pattern specialization, revisited
 
 Date: 2026-07-04
-Status: steps 1-2 implemented (PRs #167, #168;
-`src/regex/comptime_regex.mojo`); steps 3-4 pending
+Status: steps 1-3 implemented (PRs #167, #168, #169;
+`src/regex/comptime_regex.mojo`, paired `ct_*`/`rtapi_*` benchmarks in
+`bench_engine.mojo`). Step 4 (re-probe the envelope on toolchain bumps)
+is ongoing maintenance. Measured (stable, 3-run medians): short-input
+matching 1.4-1.9x faster than the runtime API; long-input parity.
 Supersedes: PR #54 (closed)
 
 > Implementation note (post step 1): the probe cannot try/except its

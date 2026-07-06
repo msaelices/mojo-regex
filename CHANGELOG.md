@@ -2,11 +2,11 @@
 
 ## v0.21.0 (2026-07-04)
 
-### Comptime regex: compile-time pattern specialization (PRs #167, #168)
+### Comptime regex: compile-time pattern specialization (PRs #167, #168, #169)
 
 - New `regex.comptime_regex` module: pass the pattern as a comptime parameter (`search["hello"](text)`, plus `match_first` / `findall`) and the parser and DFA compiler run inside Mojo's comptime interpreter, embedding the automaton in the binary. Matching needs no runtime compilation, no pattern hashing and no cache probe; the engine is materialized once per pattern per process into a `_Global` slot. Invalid patterns fail the build via `comptime assert`; anything the DFA compiler rejects transparently falls back to the runtime engine with identical semantics.
 - The compile-time envelope covers everything the DFA accepts: literals, anchors, quantifiers, alternations, and (via #168) char classes (`[0-9]+`, `[^abc]+`), shorthands (`\d`, `\w`), wildcards, bounded quantifiers (`[0-9]{3}`) and multi-class sequences (`[a-z]+[0-9]+`), verified across a 16-pattern matrix. Unlocking char classes required a comptime `use_matcher_cache: Bool = True` parameter on `compile_dfa_pattern`: with `False`, SIMD matchers are constructed directly via the new `create_character_class_matcher` instead of the `_Global` cache, whose FFI call is a hard comptime-interpreter error.
-- Short-text literal search micro-benchmark (3-run medians): **69 ns/op comptime vs 89 ns/op runtime (~1.3x)**; the ~20 ns saved is the per-call hash + cache-probe cost. The runtime path is provably unchanged by #168: a normalized objdump diff of `bench_engine` shows identical instruction counts and opcodes, differing only in source-line immediates on assert paths.
+- Measured in the bench suite (PR #169 adds paired `ct_*` vs `rtapi_*` benchmarks; stable mode, 3-run medians, load < 2): short-text literal search **36 vs 53 ns/op (1.5x)**, short-text char class **49 vs 93 ns/op (~1.4-1.9x, runtime side noisy)**, long-text literal **546 vs 556 ns/op (parity, walk-dominated as expected)**, short multi-class **parity within noise**. The win is the per-call pattern-hash + cache-probe elimination (~17 ns), decisive when inputs are short. The runtime path is provably unchanged by #168: a normalized objdump diff of `bench_engine` shows identical instruction counts and opcodes, differing only in source-line immediates on assert paths.
 - Design doc and verified experiments in `proposals/comptime-regex.md` (PR #166). 389 tests pass, zero warnings.
 
 ### Mojo 1.0.0b3.dev2026062806 + AnyOrigin to UntrackedOrigin migration (PR #163)
