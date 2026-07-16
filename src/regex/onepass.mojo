@@ -338,7 +338,7 @@ def compile_onepass(
         is_end_match_flags.append(states[i].is_end_match)
 
     var ptr = alloc[OnePassNFA](1)
-    ptr.init_pointee_move(
+    ptr.unsafe_write(
         OnePassNFA(
             runtime_transitions^,
             is_match_flags^,

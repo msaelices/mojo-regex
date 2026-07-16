@@ -482,7 +482,7 @@ def parse(pattern: String) raises -> ASTNode[ImmutUntrackedOrigin]:
     # Create a persistent Regex object to hold the pattern and children
     # Allocate on heap to ensure it survives function return
     var regex_ptr = alloc[Regex[ImmutUntrackedOrigin]](1)
-    regex_ptr.init_pointee_move(Regex[ImmutUntrackedOrigin](pattern))
+    regex_ptr.unsafe_write(Regex[ImmutUntrackedOrigin](pattern))
 
     # Tokenize the pattern
     var tokens = scan(pattern)

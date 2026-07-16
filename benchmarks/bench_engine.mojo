@@ -125,12 +125,12 @@ def _dev_mode() -> Bool:
     return _arg_has("--dev")
 
 
-def _min_sample_ns() -> UInt:
-    return UInt(MIN_SAMPLE_NS_DEV) if _dev_mode() else UInt(MIN_SAMPLE_NS_PROD)
+def _min_sample_ns() -> Int:
+    return Int(MIN_SAMPLE_NS_DEV) if _dev_mode() else Int(MIN_SAMPLE_NS_PROD)
 
 
-def _target_runtime_ns() -> UInt:
-    return UInt(TARGET_RUNTIME_NS_DEV) if _dev_mode() else UInt(
+def _target_runtime_ns() -> Int:
+    return Int(TARGET_RUNTIME_NS_DEV) if _dev_mode() else Int(
         TARGET_RUNTIME_NS_PROD
     )
 
@@ -205,13 +205,10 @@ def benchmark_match_first(
 
     # Collect per-iteration times
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -259,13 +256,10 @@ def benchmark_search(
         iters = iters * multiplier
 
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -318,13 +312,10 @@ def benchmark_search_comptime[
         iters = iters * multiplier
 
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -374,13 +365,10 @@ def benchmark_search_runtime_api(
         iters = iters * multiplier
 
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -429,13 +417,10 @@ def benchmark_findall(
         iters = iters * multiplier
 
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -483,13 +468,10 @@ def benchmark_is_match(
 
     # Collect per-iteration times
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):
@@ -536,13 +518,10 @@ def benchmark_sub(
         iters = iters * multiplier
 
     var times = List[Float64]()
-    var total_time: UInt = 0
+    var total_time: Int = 0
     var actual_iterations = 0
 
-    while (
-        total_time < UInt(target_runtime_ns)
-        and actual_iterations < MAX_ITERATIONS
-    ):
+    while total_time < target_runtime_ns and actual_iterations < MAX_ITERATIONS:
         var start_time = perf_counter_ns()
 
         for _ in range(iters):

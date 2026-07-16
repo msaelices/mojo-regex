@@ -1,4 +1,4 @@
-from std.memory import Pointer, UnsafePointer, memcpy, alloc
+from std.memory import Pointer, UnsafePointer, unsafe_memcpy, alloc
 from std.os import abort
 
 from regex.aliases import (
@@ -162,7 +162,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         #     ": ",
         #     child,
         # )
-        (self.children_ptr + self.children_len).init_pointee_move(child^)
+        (self.children_ptr + self.children_len).unsafe_write(child^)
         self.children_len += 1
 
 

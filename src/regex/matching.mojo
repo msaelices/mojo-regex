@@ -1,4 +1,4 @@
-from std.memory import UnsafePointer, memcpy, alloc
+from std.memory import UnsafePointer, unsafe_memcpy, alloc
 
 
 struct Match[origin: ImmutOrigin](Copyable, Movable, TrivialRegisterPassable):
@@ -94,7 +94,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
         self._capacity = 0
         if copy._len > 0:
             self._realloc(copy._capacity)
-            memcpy(dest=self._data, src=copy._data, count=copy._len)
+            unsafe_memcpy(dest=self._data, src=copy._data, count=copy._len)
             self._len = copy._len
         # # Comment when debug is done
         # var call_location = __call_location()
@@ -131,7 +131,7 @@ struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
         var new_data = alloc[Match[Self.origin]](new_capacity)
 
         if self._capacity > 0:
-            memcpy(dest=new_data, src=self._data, count=len(self))
+            unsafe_memcpy(dest=new_data, src=self._data, count=len(self))
             self._data.free()
         self._data = new_data
         self._capacity = new_capacity
