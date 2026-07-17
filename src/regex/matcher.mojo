@@ -232,7 +232,7 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
         """
         engine = compile_dfa_pattern(ast)
         var ptr = alloc[DFAEngine](1)
-        ptr.init_pointee_move(engine^)
+        ptr.unsafe_write(engine^)
         self.engine_ptr = ptr
 
     def __init__(out self, *, copy: Self):
@@ -311,11 +311,11 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
             if _program_has_end_anchor(vm.program):
                 self._onepass_ptr = compile_onepass(vm.program.copy())
             var ptr = alloc[LazyDFA](1)
-            # `init_pointee_move` constructs into uninitialized memory.
+            # `unsafe_write` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
             # move-assignment into garbage storage, which was the source
             # of the flaky double-free at process exit (issue #97).
-            ptr.init_pointee_move(LazyDFA(vm^))
+            ptr.unsafe_write(LazyDFA(vm^))
             self._lazy_dfa_ptr = ptr
         else:
             self._lazy_dfa_ptr = None
@@ -326,13 +326,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.ast = copy.ast
         if copy._lazy_dfa_ptr:
             var ptr = alloc[LazyDFA](1)
-            ptr.init_pointee_move(copy._lazy_dfa_ptr.value()[].copy())
+            ptr.unsafe_write(copy._lazy_dfa_ptr.value()[].copy())
             self._lazy_dfa_ptr = ptr
         else:
             self._lazy_dfa_ptr = None
         if copy._onepass_ptr:
             var ptr = alloc[OnePassNFA](1)
-            ptr.init_pointee_move(copy._onepass_ptr.value()[].copy())
+            ptr.unsafe_write(copy._onepass_ptr.value()[].copy())
             self._onepass_ptr = ptr
         else:
             self._onepass_ptr = None
@@ -349,11 +349,11 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         """Free the heap-allocated engines if we still own them."""
         if self._lazy_dfa_ptr:
             var ptr = self._lazy_dfa_ptr.value()
-            ptr.destroy_pointee()
+            ptr.unsafe_deinit_pointee()
             ptr.free()
         if self._onepass_ptr:
             var ptr = self._onepass_ptr.value()
-            ptr.destroy_pointee()
+            ptr.unsafe_deinit_pointee()
             ptr.free()
 
     @always_inline
