@@ -69,7 +69,7 @@ comptime ALPHANUMERIC = LOWERCASE_LETTERS + UPPERCASE_LETTERS + DIGITS
 
 
 def _expand_character_range[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](node_type: Int, range_str: StringSlice[O],) -> String:
     """Expand a character range like '[a-z]' to 'abcdefghijklmnopqrstuvwxyz'.
 
@@ -1818,7 +1818,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def is_match[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Bool:
         """Check if pattern matches at the given position without computing
         match boundaries. Much faster than match_first for simple checks.
@@ -1855,7 +1855,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Execute DFA matching against input text. To be Python compatible,
         it will not match if the start position is not at the beginning of a line.
@@ -1878,7 +1878,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Execute DFA matching against input text. It will match from the given start
         position.
@@ -1909,7 +1909,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def _try_match_at_position[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         text: StringSlice[O],
@@ -2028,7 +2028,7 @@ struct DFAEngine(Engine):
 
         return None
 
-    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
+    def match_all[O: ImmOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         """Find all non-overlapping matches using DFA.
 
         Args:
@@ -2134,7 +2134,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def _try_match_simd[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start_pos: Int) -> Optional[Match[O]]:
         """SIMD-optimized matching for character class patterns with quantifier support.
 
@@ -2201,7 +2201,7 @@ struct DFAEngine(Engine):
 
     @always_inline
     def _optimized_simd_search[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int) -> Optional[Match[O]]:
         """Optimized SIMD-based search for character class patterns.
 
@@ -2256,7 +2256,7 @@ struct DFAEngine(Engine):
         return None
 
     def _find_next_matching_char[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self, text: StringSlice[O], start: Int, simd_matcher: CharacterClassSIMD
     ) -> Int:
@@ -2531,7 +2531,7 @@ def _is_simple_character_class_pattern(
 
 
 def _extract_character_class_info(
-    ast: ASTNode[ImmutUntrackedOrigin],
+    ast: ASTNode[ImmUntrackedOrigin],
 ) -> Tuple[Optional[String], Int, Int, Bool, Bool, Bool]:
     """Extract character class information from AST.
 
@@ -2551,7 +2551,7 @@ def _extract_character_class_info(
     var positive_logic = True
 
     # Find the character class node (DIGIT, WORD, or RANGE)
-    var class_node: ASTNode[ImmutUntrackedOrigin]
+    var class_node: ASTNode[ImmUntrackedOrigin]
     if ast.type == DIGIT or ast.type == WORD or ast.type == RANGE:
         class_node = ast
     elif ast.type == RE and ast.get_children_len() == 1:

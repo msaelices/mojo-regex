@@ -61,7 +61,7 @@ blow-ups. ONEPASS_MAX_STATES is comfortably within Int16 range."""
 
 def _epsilon_close(
     program: Program,
-    read start_pcs: InlineArray[Int, MAX_STATES],
+    imm start_pcs: InlineArray[Int, MAX_STATES],
     start_count: Int,
     at_start: Bool,
     at_end: Bool = False,
@@ -467,7 +467,7 @@ struct OnePassNFA(Copyable, Movable):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Match the pattern starting exactly at `start`. Returns None
         if the pattern cannot match here (e.g. `^` anchor with start > 0,
@@ -508,7 +508,7 @@ struct OnePassNFA(Copyable, Movable):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search for the first match at or after `start` (like
         `re.search`). Honours `^` by only trying position 0."""
@@ -524,7 +524,7 @@ struct OnePassNFA(Copyable, Movable):
         return None
 
     @always_inline
-    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
+    def match_all[O: ImmOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         var text_len = text.byte_length()
         var matches = MatchList[O](
             capacity=text_len >> 7 if text_len >= 1024 else 0

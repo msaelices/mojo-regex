@@ -21,7 +21,7 @@ from regex.ast import (
 )
 
 
-struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
+struct LiteralInfo[node_origin: ImmOrigin](ImplicitlyCopyable, Movable):
     """Information about a literal substring found in a regex pattern.
 
     Built only during regex compilation (pattern analysis), never on the
@@ -30,7 +30,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
     a raw `UnsafePointer`."""
 
     var node_ptr: Optional[
-        Pointer[ASTNode[ImmutUntrackedOrigin], Self.node_origin]
+        Pointer[ASTNode[ImmUntrackedOrigin], Self.node_origin]
     ]
     """Origin-tracked borrow of the AST node containing the literal (for
     single nodes). `None` when this LiteralInfo refers to a string-index
@@ -49,7 +49,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
 
     def __init__(
         out self,
-        ref[Self.node_origin] node: ASTNode[ImmutUntrackedOrigin],
+        ref[Self.node_origin] node: ASTNode[ImmUntrackedOrigin],
         start_offset: Int = 0,
         is_prefix: Bool = False,
         is_suffix: Bool = False,
@@ -117,7 +117,7 @@ struct LiteralInfo[node_origin: ImmutOrigin](ImplicitlyCopyable, Movable):
 
 
 @fieldwise_init
-struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
+struct LiteralSet[node_origin: ImmOrigin](Movable, Sized):
     """A set of literals extracted from a regex pattern."""
 
     var literals: List[LiteralInfo[Self.node_origin]]
@@ -215,10 +215,8 @@ struct LiteralSet[node_origin: ImmutOrigin](Movable, Sized):
 
 
 def extract_literals[
-    node_origin: ImmutOrigin
-](ref[node_origin] ast: ASTNode[ImmutUntrackedOrigin]) -> LiteralSet[
-    node_origin
-]:
+    node_origin: ImmOrigin
+](ref[node_origin] ast: ASTNode[ImmUntrackedOrigin]) -> LiteralSet[node_origin]:
     """Extract all literals from a regex AST.
 
     Args:
@@ -241,9 +239,9 @@ def extract_literals[
 
 
 def _extract_from_node[
-    node_origin: ImmutOrigin
+    node_origin: ImmOrigin
 ](
-    node: ASTNode[ImmutUntrackedOrigin],
+    node: ASTNode[ImmUntrackedOrigin],
     mut result: LiteralSet[node_origin],
     offset: Int,
     is_required: Bool,
@@ -333,7 +331,7 @@ def _extract_from_node[
 
 
 def _extract_sequence[
-    node_origin: ImmutOrigin
+    node_origin: ImmOrigin
 ](
     group: ASTNode,
     start_offset: Int,

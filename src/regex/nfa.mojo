@@ -167,7 +167,7 @@ struct NFAEngine(Copyable, Engine):
         return rebind[Span[Byte, ImmutAnyOrigin]](self.pattern.as_bytes())
 
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O],) -> MatchList[O]:
         """Searches a regex in a test string.
 
@@ -340,7 +340,7 @@ struct NFAEngine(Copyable, Engine):
         return matches^
 
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Same as match_all, but always returns after the first match.
         Equivalent to re.match in Python.
@@ -389,7 +389,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Same as match_all, but always returns after the first match.
         It's equivalent to re.search in Python.
@@ -498,7 +498,7 @@ struct NFAEngine(Copyable, Engine):
         return None
 
     def match_next_with_groups[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Tuple[
         Optional[Match[O]], List[Match[O]]
     ]:
@@ -575,7 +575,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _find_last_literal[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int) -> Int:
         """Find the last occurrence of the literal prefix in text from start."""
         # Use rfind for O(n) reverse search instead of repeated forward search
@@ -638,7 +638,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_contains_literal[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int, end: Int) -> Bool:
         """Verify that a match contains the required literal."""
         if (
@@ -653,7 +653,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_node[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -753,7 +753,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_element[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -780,7 +780,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_wildcard[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -804,7 +804,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_space[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -836,7 +836,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_digit[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -878,7 +878,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_word[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -925,7 +925,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_range[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1001,7 +1001,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_end[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, ast: ASTNode, str: StringSlice[O], str_i: Int) capturing -> Tuple[
         Bool, Int
     ]:
@@ -1012,7 +1012,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     def _match_or[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1050,7 +1050,7 @@ struct NFAEngine(Copyable, Engine):
         return right_result
 
     def _match_group[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1098,7 +1098,7 @@ struct NFAEngine(Copyable, Engine):
         return result
 
     def _match_group_with_quantifier[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1151,7 +1151,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
     def _match_sequence[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast_parent: ASTNode,
@@ -1224,7 +1224,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _match_with_backtracking[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         quantified_node: ASTNode,
@@ -1306,7 +1306,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _try_match_count[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1344,7 +1344,7 @@ struct NFAEngine(Copyable, Engine):
             return -1
 
     def _match_re[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1368,7 +1368,7 @@ struct NFAEngine(Copyable, Engine):
         )
 
     def _apply_quantifier[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1439,7 +1439,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _apply_quantifier_simd[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         ast: ASTNode,
@@ -1661,7 +1661,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _quantifier_negated_loop[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         matcher: RangeBasedMatcher,
@@ -1690,7 +1690,7 @@ struct NFAEngine(Copyable, Engine):
 
     @always_inline
     def _quantifier_range_loop[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](
         self,
         range_start: Int,
@@ -1722,7 +1722,7 @@ struct NFAEngine(Copyable, Engine):
 
 
 def findall[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: String, text: StringSlice[O]) raises -> MatchList[O]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
@@ -1738,7 +1738,7 @@ def findall[
 
 
 def match_first[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: String, text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 

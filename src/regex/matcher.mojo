@@ -181,7 +181,7 @@ trait RegexMatcher:
     """Interface for different regex matching engines."""
 
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find the first match in text starting from the given position.
 
@@ -195,7 +195,7 @@ trait RegexMatcher:
         ...
 
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """Find all non-overlapping matches in text.
 
@@ -250,20 +250,20 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match using DFA execution."""
         return self.engine_ptr.value()[].match_first(text, start)
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match using DFA execution."""
         return self.engine_ptr.value()[].match_next(text, start)
 
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """Find all matches using DFA execution."""
         return self.engine_ptr.value()[].match_all(text)
@@ -358,7 +358,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match. Routing order:
         - LazyDFA when available and the pattern has no `$` anchor
@@ -409,7 +409,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search for match."""
         if self._use_lazy_dfa_for_search():
@@ -420,7 +420,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """Find all matches."""
         if self._use_lazy_dfa_for_search():
@@ -731,7 +731,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match using optimal engine. This equivalent to re.match in Python.
         """
@@ -753,7 +753,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match using optimal engine. This is equivalent to re.search in Python.
         """
@@ -801,7 +801,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             return self.nfa_matcher.match_next(text, start)
 
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """Find all matches using optimal engine."""
         # Fast path: Wildcard match any (.* pattern) matches entire text once
@@ -861,7 +861,7 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             return self.nfa_matcher.match_all(text)
 
     def _match_all_required_byte[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """findall fast path for patterns with a rare required byte."""
         var text_len = text.byte_length()
@@ -1044,7 +1044,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match in text. This is equivalent to re.match in Python.
 
@@ -1059,7 +1059,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Find first match in text. This is equivalent to re.search in Python.
 
@@ -1073,7 +1073,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         return self.matcher.match_next(text, start)
 
     def match_all[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O]) raises -> MatchList[O]:
         """Find all matches in text.
 
@@ -1320,7 +1320,7 @@ def clear_regex_cache():
 
 # High-level convenience functions that match Python's re module interface
 def search[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: ImmSlice, text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Search for pattern in text (equivalent to re.search in Python).
 
@@ -1336,7 +1336,7 @@ def search[
 
 
 def findall[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: ImmSlice, text: StringSlice[O]) raises -> MatchList[O]:
     """Find all matches of pattern in text (equivalent to re.findall in Python).
 
@@ -1352,7 +1352,7 @@ def findall[
 
 
 def match_first[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: ImmSlice, text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Match pattern at beginning of text (equivalent to re.match in Python).
 
@@ -1569,7 +1569,7 @@ def _apply_template_fixed(
 
 @always_inline
 def _apply_template_groups[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](
     template: List[_ReplSegment],
     repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
@@ -1626,7 +1626,7 @@ def _sub_impl_with_repl(
     text: ImmSlice,
     count: Int,
     use_groups: Bool,
-    read template: List[_ReplSegment],
+    imm template: List[_ReplSegment],
 ) raises -> String:
     """Core sub() body with pre-parsed repl info passed in.
 

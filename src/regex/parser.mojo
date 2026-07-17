@@ -54,8 +54,8 @@ from regex.ast import (
 
 @always_inline
 def check_for_quantifiers[
-    regex_origin: ImmutOrigin
-](mut i: Int, mut elem: ASTNode[regex_origin], read tokens: List[Token]) raises:
+    regex_origin: ImmOrigin
+](mut i: Int, mut elem: ASTNode[regex_origin], imm tokens: List[Token]) raises:
     """Check for quantifiers after an element and set min/max accordingly."""
     ref next_token = tokens[i + 1]
     if next_token.type == Token.ASTERISK:
@@ -130,7 +130,7 @@ def get_range_str(start: String, end: String) -> String:
 def parse_token_list[
     regex_origin: Origin[mut=True]
 ](
-    ref[regex_origin] regex: Regex[ImmutUntrackedOrigin],
+    ref[regex_origin] regex: Regex[ImmUntrackedOrigin],
     var tokens: List[Token],
     mut group_counter: Int,
 ) raises -> ASTNode[MutUntrackedOrigin]:
@@ -252,7 +252,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the element
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.WILDCARD:
             var elem = WildcardElement(
@@ -262,7 +262,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the wildcard
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.SPACE:
             var elem = SpaceElement(
@@ -273,7 +273,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the space
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.DIGIT:
             var elem = DigitElement(
@@ -284,7 +284,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the digit
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.WORD:
             var elem = WordElement(
@@ -295,7 +295,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the word
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.START:
             var start_elem = StartElement(
@@ -351,9 +351,7 @@ def parse_token_list[
             )
             # Check for quantifiers after the range
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](
-                    i, range_elem, tokens
-                )
+                check_for_quantifiers[ImmUntrackedOrigin](i, range_elem, tokens)
             elements.append(range_elem^)
         elif token.type == Token.DASH:
             # Dash outside brackets is a literal '-' character
@@ -363,7 +361,7 @@ def parse_token_list[
                 end_idx=token.start_pos + 1,
             )
             if i + 1 < len(tokens):
-                check_for_quantifiers[ImmutUntrackedOrigin](i, elem, tokens)
+                check_for_quantifiers[ImmUntrackedOrigin](i, elem, tokens)
             elements.append(elem^)
         elif token.type == Token.LEFTPARENTHESIS:
             # Handle nested grouping - check for non-capturing group (?:...)
@@ -467,7 +465,7 @@ def parse_token_list[
     return final_group^
 
 
-def parse(pattern: String) raises -> ASTNode[ImmutUntrackedOrigin]:
+def parse(pattern: String) raises -> ASTNode[ImmUntrackedOrigin]:
     """Parses a regular expression.
 
     Parses a regex and returns the corresponding AST.
@@ -481,8 +479,8 @@ def parse(pattern: String) raises -> ASTNode[ImmutUntrackedOrigin]:
     """
     # Create a persistent Regex object to hold the pattern and children
     # Allocate on heap to ensure it survives function return
-    var regex_ptr = alloc[Regex[ImmutUntrackedOrigin]](1)
-    regex_ptr.unsafe_write(Regex[ImmutUntrackedOrigin](pattern))
+    var regex_ptr = alloc[Regex[ImmUntrackedOrigin]](1)
+    regex_ptr.unsafe_write(Regex[ImmUntrackedOrigin](pattern))
 
     # Tokenize the pattern
     var tokens = scan(pattern)
@@ -495,14 +493,14 @@ def parse(pattern: String) raises -> ASTNode[ImmutUntrackedOrigin]:
 
     # Create a RE root node that wraps the parsed result
     # The tests expect the root to be of type RE with a GROUP child
-    var parsed_ast_immutable = rebind[ASTNode[ImmutUntrackedOrigin]](parsed_ast)
+    var parsed_ast_immutable = rebind[ASTNode[ImmUntrackedOrigin]](parsed_ast)
     var root_child_index = UInt16(
         children_len + 1
     )  # +1 because we use 1-based indexing
     regex_ptr[].append_child(parsed_ast_immutable)
 
     # Use the heap-allocated regex pointer directly
-    var re_root = ASTNode[ImmutUntrackedOrigin](
+    var re_root = ASTNode[ImmUntrackedOrigin](
         type=RE,
         regex_ptr=regex_ptr,
         start_idx=0,

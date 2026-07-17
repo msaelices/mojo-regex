@@ -1,7 +1,7 @@
 from std.memory import UnsafePointer, unsafe_memcpy, alloc
 
 
-struct Match[origin: ImmutOrigin](Copyable, Movable, TrivialRegisterPassable):
+struct Match[origin: ImmOrigin](Copyable, Movable, TrivialRegisterPassable):
     """Contains the information of a match in a regular expression.
 
     Parameterized on the origin of the backing text, so the borrow into
@@ -45,7 +45,7 @@ struct Match[origin: ImmutOrigin](Copyable, Movable, TrivialRegisterPassable):
         )
 
 
-struct MatchList[origin: ImmutOrigin](Copyable, Movable, Sized):
+struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
     """Smart container for regex matches with lazy allocation and optimal reservation.
 
     This struct provides zero allocation until the first match is added, then
