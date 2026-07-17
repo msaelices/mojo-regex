@@ -414,14 +414,14 @@ struct PikeVMEngine(Copyable, Movable):
         self.has_filter = matching_bytes < 128
 
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Match pattern at the given position (like re.match)."""
         return self._run(text, start)
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search for pattern anywhere in text (like re.search)."""
         var text_len = len(text)
@@ -446,7 +446,7 @@ struct PikeVMEngine(Copyable, Movable):
                 return result
         return None
 
-    def match_all[O: ImmutOrigin](self, text: StringSlice[O]) -> MatchList[O]:
+    def match_all[O: ImmOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         """Find all non-overlapping matches (like re.findall)."""
         var text_len = len(text)
         var matches = MatchList[O](
@@ -487,7 +487,7 @@ struct PikeVMEngine(Copyable, Movable):
         return matches^
 
     def _run[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](self, text: StringSlice[O], start: Int) -> Optional[Match[O]]:
         """Run PikeVM with fixed-size SIMD state tracking.
         Zero heap allocations per step."""
@@ -738,14 +738,14 @@ struct LazyDFA(Copyable, Movable):
 
     @always_inline
     def match_first[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](mut self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Match at position using cached DFA transitions."""
         return self._run_lazy(text, start)
 
     @always_inline
     def match_next[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](mut self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search using cached DFA with SIMD first-byte prefilter."""
         var text_len = text.byte_length()
@@ -772,9 +772,7 @@ struct LazyDFA(Copyable, Movable):
         return None
 
     @always_inline
-    def match_all[
-        O: ImmutOrigin
-    ](mut self, text: StringSlice[O]) -> MatchList[O]:
+    def match_all[O: ImmOrigin](mut self, text: StringSlice[O]) -> MatchList[O]:
         """Find all matches using cached DFA."""
         var text_len = text.byte_length()
         var matches = MatchList[O](
@@ -812,7 +810,7 @@ struct LazyDFA(Copyable, Movable):
 
     @always_inline
     def _run_lazy[
-        O: ImmutOrigin
+        O: ImmOrigin
     ](mut self, text: StringSlice[O], start: Int) -> Optional[Match[O]]:
         """Run the lazy DFA from a start position."""
         var text_ptr = text.unsafe_ptr()

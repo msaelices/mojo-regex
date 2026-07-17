@@ -29,13 +29,13 @@ from regex.ast import (
 
 def test_ASTNode() raises:
     var pattern = String("")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var regex_ptr = (
         UnsafePointer(to=regex)
         .as_immutable()
-        .unsafe_origin_cast[ImmutUntrackedOrigin]()
+        .unsafe_origin_cast[ImmUntrackedOrigin]()
     )
-    var ast_node = ASTNode[ImmutUntrackedOrigin](
+    var ast_node = ASTNode[ImmUntrackedOrigin](
         type=ELEMENT, regex_ptr=regex_ptr, start_idx=0, end_idx=0
     )
     assert_true(ast_node.__bool__())
@@ -43,7 +43,7 @@ def test_ASTNode() raises:
 
 def test_Element() raises:
     var pattern = String("a")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var elem = Element(regex, start_idx=0, end_idx=1)
     assert_true(elem.__bool__())
     assert_equal(elem.type, ELEMENT)
@@ -55,7 +55,7 @@ def test_Element() raises:
 
 def test_WildcardElement() raises:
     var pattern = String(".")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var we = WildcardElement(regex, start_idx=0, end_idx=1)
     assert_true(we.__bool__())
     assert_equal(we.type, WILDCARD)
@@ -66,7 +66,7 @@ def test_WildcardElement() raises:
 
 def test_SpaceElement() raises:
     var pattern = String("\\s")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var se = SpaceElement(regex, start_idx=0, end_idx=2)
     assert_true(se.__bool__())
     assert_equal(se.type, SPACE)
@@ -80,7 +80,7 @@ def test_SpaceElement() raises:
 
 def test_RangeElement_positive_logic() raises:
     var pattern = String("[abc]")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var re = RangeElement(regex, start_idx=1, end_idx=4, is_positive_logic=True)
     assert_true(re.__bool__())
     assert_equal(re.type, RANGE)
@@ -95,7 +95,7 @@ def test_RangeElement_positive_logic() raises:
 
 def test_RangeElement_negative_logic() raises:
     var pattern = String("[^abc]")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var nre = RangeElement(
         regex, start_idx=2, end_idx=5, is_positive_logic=False
     )
@@ -112,7 +112,7 @@ def test_RangeElement_negative_logic() raises:
 
 def test_StartElement() raises:
     var pattern = String("^")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var start = StartElement(regex, start_idx=0, end_idx=1)
     assert_true(start.__bool__())
     assert_equal(start.type, START)
@@ -122,7 +122,7 @@ def test_StartElement() raises:
 
 def test_EndElement() raises:
     var pattern = String("$")
-    var regex = Regex[ImmutUntrackedOrigin](pattern)
+    var regex = Regex[ImmUntrackedOrigin](pattern)
     var end = EndElement(regex, start_idx=0, end_idx=1)
     assert_true(end.__bool__())
     assert_equal(end.type, END)

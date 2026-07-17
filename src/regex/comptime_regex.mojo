@@ -152,7 +152,7 @@ def _pattern_slice[pattern: StaticString]() -> ImmSlice:
 
 
 def search[
-    O: ImmutOrigin, //, pattern: StaticString
+    O: ImmOrigin, //, pattern: StaticString
 ](text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Search for `pattern` in `text` (equivalent to `re.search`).
 
@@ -178,7 +178,7 @@ def search[
 
 
 def match_first[
-    O: ImmutOrigin, //, pattern: StaticString
+    O: ImmOrigin, //, pattern: StaticString
 ](text: StringSlice[O]) raises -> Optional[Match[O]]:
     """Match `pattern` at the beginning of `text` (like `re.match`).
 
@@ -207,7 +207,7 @@ def match_first[
 
 
 def findall[
-    O: ImmutOrigin, //, pattern: StaticString
+    O: ImmOrigin, //, pattern: StaticString
 ](text: StringSlice[O]) raises -> MatchList[O]:
     """Find all matches of `pattern` in `text` (like `re.findall`).
 

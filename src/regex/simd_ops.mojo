@@ -467,7 +467,7 @@ struct CharacterClassSIMD(
 
         def closure[
             width: Int
-        ](i: Int) {mut matches, read self, read text, read text_ptr, read pos}:
+        ](i: Int) {mut matches, imm self, imm text, imm text_ptr, imm pos}:
             if width != 1:
                 var chunk_matches = self._check_chunk_simd(
                     text.unsafe_ptr(), pos + i
@@ -551,7 +551,7 @@ struct CharacterClassSIMD(
 
         def closure[
             width: Int
-        ](i: Int) {mut count, read self, read text, read text_ptr, read pos}:
+        ](i: Int) {mut count, imm self, imm text, imm text_ptr, imm pos}:
             if width != 1:
                 var matches = self._check_chunk_simd(text.unsafe_ptr(), pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
@@ -929,7 +929,7 @@ def _create_word_chars() -> CharacterClassSIMD:
 
 
 def verify_match[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: Span[Byte, _], text: StringSlice[O], pos: Int) -> Bool:
     """Verify that pattern matches at given position.
 
@@ -955,7 +955,7 @@ def verify_match[
 
 
 def simd_search[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: Span[Byte, _], text: StringSlice[O], start: Int = 0,) -> Int:
     """Search for pattern in text using SIMD acceleration.
 
@@ -1291,7 +1291,7 @@ def process_text_with_matcher[
 
 
 def apply_quantifier_simd_generic[
-    T: SIMDMatcher, O: ImmutOrigin
+    T: SIMDMatcher, O: ImmOrigin
 ](
     matcher: T,
     text: StringSlice[O],
@@ -1384,7 +1384,7 @@ def find_in_text_simd[
 
 
 def twoway_search[
-    O: ImmutOrigin
+    O: ImmOrigin
 ](pattern: Span[Byte, _], text: StringSlice[O], start: Int = 0,) -> Int:
     """Search for pattern in text using Two-Way algorithm with SIMD.
 
