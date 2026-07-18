@@ -1012,8 +1012,7 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         var num_groups = 0
         var total_width = 0
         var has_literals = False
-        for si in range(len(segs)):
-            var s = segs[si]
+        for s in segs:
             if s > 0:
                 num_groups += 1
                 if num_groups > 9:
@@ -1525,8 +1524,8 @@ def _detect_fixed_width_groups(
 
     # Check we found at least one group
     var has_group = False
-    for si in range(len(segments)):
-        if segments[si] > 0:
+    for seg in segments:
+        if seg > 0:
             has_group = True
             break
     if not has_group:
@@ -1657,8 +1656,7 @@ def _sub_impl_with_repl(
 
             # Estimate output size from template.
             var output_est = 0
-            for ti in range(len(template)):
-                ref tseg = template[ti]
+            for tseg in template:
                 if tseg.group_ref > 0 and tseg.group_ref <= num_groups:
                     output_est += group_widths[tseg.group_ref]
                 else:

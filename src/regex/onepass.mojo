@@ -314,9 +314,9 @@ def compile_onepass(
     # Precompute the `$` end-of-text answer for each state so match_first
     # can resolve the end-anchor fixup with a single field load.
     if has_end_anchor:
-        for i in range(len(states)):
-            states[i].is_end_match = _closure_reaches_match_with_end_anchor(
-                program, states[i].nfa_set
+        for ref state in states:
+            state.is_end_match = _closure_reaches_match_with_end_anchor(
+                program, state.nfa_set
             )
 
     # Project the compile-time states (which carry the bulky ~512B
@@ -374,8 +374,7 @@ def _find_or_add_state(
     try:
         if key in index:
             ref bucket = index[key]
-            for i in range(len(bucket)):
-                var sid = bucket[i]
+            for sid in bucket:
                 if states[sid].nfa_set.eq(nfa_set).reduce_and():
                     return sid
     except:
