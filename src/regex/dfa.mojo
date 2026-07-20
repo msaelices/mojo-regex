@@ -2781,7 +2781,13 @@ def _collect_alternation_branches(
 
     while len(stack) > 0:
         var idx = stack.pop()
-        ref current = nodes[idx]
+        # Copy the node handle out of `nodes` rather than holding a
+        # reference into it: the OR branch below appends to `nodes`,
+        # which may reallocate and would leave a borrow dangling.
+        # `ASTNode` is a trivially-copyable handle (regex pointer plus
+        # indices) whose data lives in the `Regex` arena, so this is
+        # cheap and keeps `current` valid across the appends.
+        var current = nodes[idx]
         if current.type == GROUP:
             var branch = String(capacity=current.get_children_len())
             for i in range(current.get_children_len()):
