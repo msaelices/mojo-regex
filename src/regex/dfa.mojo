@@ -670,8 +670,7 @@ struct DFAEngine(Engine):
                 var end_state_index = len(self.states) - 1
 
                 # Build chain of states for each branch
-                for branch_idx in range(len(element.alternation_branches)):
-                    ref branch = element.alternation_branches[branch_idx]
+                for branch in element.alternation_branches:
                     var branch_ptr = branch.unsafe_ptr()
                     var prev_state = current_state_index
 
@@ -903,8 +902,7 @@ struct DFAEngine(Engine):
         ref all_branches = _collect_all_alternation_branches(or_node)
 
         # Build trie-like DFA structure to handle shared prefixes
-        for i in range(len(all_branches)):
-            ref branch_text = all_branches[i]
+        for branch_text in all_branches:
             if branch_text.byte_length() == 0:
                 continue
 
@@ -1120,8 +1118,8 @@ struct DFAEngine(Engine):
 
         # Build the pattern string
         var pattern_text = String("")
-        for i in range(len(pattern_parts)):
-            pattern_text += pattern_parts[i]
+        for part in pattern_parts:
+            pattern_text += part
 
         if pattern_text.byte_length() == 0:
             raise Error("Empty quantifier pattern")
@@ -1437,8 +1435,7 @@ struct DFAEngine(Engine):
             current_state = next_state_index
 
         # Process each branch after common prefix
-        for i in range(len(branches)):
-            ref branch = branches[i]
+        for branch in branches:
             if branch.byte_length() == prefix_len:
                 # Branch ends at common prefix - make current state accepting
                 self.states[current_state].is_accepting = True
@@ -1595,8 +1592,7 @@ struct DFAEngine(Engine):
         var accepting_index = len(self.states) - 1
 
         # Add paths for each branch
-        for i in range(len(branches)):
-            ref branch = branches[i]
+        for branch in branches:
             var current_state = 0
             var branch_ptr = branch.unsafe_ptr()
 
@@ -1623,8 +1619,7 @@ struct DFAEngine(Engine):
         self.states[0].is_accepting = True
 
         # For each branch, create path that loops back to start
-        for i in range(len(branches)):
-            ref branch = branches[i]
+        for branch in branches:
             var current_state = 0
             var branch_ptr = branch.unsafe_ptr()
 
@@ -1651,8 +1646,7 @@ struct DFAEngine(Engine):
         var loop_index = len(self.states) - 1
 
         # For each branch, create path to loop state
-        for i in range(len(branches)):
-            ref branch = branches[i]
+        for branch in branches:
             var current_state = 0
             var branch_ptr = branch.unsafe_ptr()
 
@@ -1671,8 +1665,7 @@ struct DFAEngine(Engine):
                     )
 
         # From loop state, can match any branch again (loop back through each branch)
-        for i in range(len(branches)):
-            ref branch = branches[i]
+        for branch in branches:
             var current_state = loop_index
             var branch_ptr = branch.unsafe_ptr()
 
@@ -3278,8 +3271,8 @@ def _collect_all_alternation_branches(
         if branch.type == OR:
             # Nested OR - recursively collect its branches
             ref nested_branches = _collect_all_alternation_branches(branch)
-            for j in range(len(nested_branches)):
-                branches.append(nested_branches[j])
+            for nested_branch in nested_branches:
+                branches.append(nested_branch)
         elif branch.type == GROUP:
             # Unwrap nested GROUPs to find OR or literal content
             var inner = branch
@@ -3287,8 +3280,8 @@ def _collect_all_alternation_branches(
                 inner = inner.get_child(0)
             if inner.type == OR:
                 ref nested = _collect_all_alternation_branches(inner)
-                for j in range(len(nested)):
-                    branches.append(nested[j])
+                for nested_item in nested:
+                    branches.append(nested_item)
             else:
                 ref branch_text = _extract_branch_text(branch)
                 if branch_text.byte_length() > 0:

@@ -216,8 +216,7 @@ def parse_token_list[
     # Validate tokens for unescaped closing brackets and parentheses
     var bracket_depth = 0
     var paren_depth_validation = 0
-    for validation_i in range(len(tokens)):
-        ref validation_token = tokens[validation_i]
+    for validation_token in tokens:
         if validation_token.type == Token.LEFTBRACKET:
             bracket_depth += 1
         elif validation_token.type == Token.RIGHTBRACKET:

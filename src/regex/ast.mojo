@@ -74,8 +74,8 @@ comptime ChildrenIndexes = List[UInt16]
 def _make_children_indexes(*values: UInt16) -> ChildrenIndexes:
     """Helper to create a ChildrenIndexes list from variadic UInt16 values."""
     var result = ChildrenIndexes(capacity=len(values))
-    for i in range(len(values)):
-        result.append(values[i])
+    for value in values:
+        result.append(value)
     return result^
 
 

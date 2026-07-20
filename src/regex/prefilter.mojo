@@ -228,15 +228,15 @@ struct LiteralExtractor:
 
         # Check if all branches are literals
         var all_literal = True
-        for i in range(len(branches)):
-            if len(branches[i]) == 0:
+        for branch in branches:
+            if len(branch) == 0:
                 all_literal = False
                 break
 
         if all_literal:
             # All branches are literals, add them as required literals
-            for i in range(len(branches)):
-                info.required_literals.append(branches[i])
+            for branch in branches:
+                info.required_literals.append(branch)
 
             # Check for common prefix among all branches
             var common_prefix = self._compute_common_prefix(branches)
@@ -448,8 +448,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         """Find all positions where any of the literals match exactly."""
         var candidates = List[Int]()
 
-        for i in range(len(self.literals)):
-            var literal = self.literals[i]
+        for literal in self.literals:
             var start = 0
 
             while start <= len(text) - len(literal):
@@ -468,8 +467,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         """Find the first exact literal match at or after start."""
         var best_pos: Optional[Int] = None
 
-        for i in range(len(self.literals)):
-            var literal = self.literals[i]
+        for literal in self.literals:
             if start + len(literal) > len(text):
                 continue
 

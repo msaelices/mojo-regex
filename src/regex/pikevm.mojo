@@ -210,8 +210,8 @@ def _compile_quantified(node: ASTNode, mut program: Program):
             _compile_node(node, program)
         # Patch all splits to jump past the optional parts
         var after = len(program)
-        for i in range(len(splits)):
-            program.patch(splits[i], arg0=splits[i] + 1, arg1=after)
+        for split in splits:
+            program.patch(split, arg0=split + 1, arg1=after)
         return
 
     # {n,} = unbounded repetition (min then greedy loop)
