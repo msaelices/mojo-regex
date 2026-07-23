@@ -154,7 +154,7 @@ def test_simd_string_search() raises:
     """Test SIMD-accelerated string search."""
     var pattern = "hello"
     var pattern_span = Span[Byte](
-        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+        unsafe_ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
     )
 
     # Test basic search
@@ -170,7 +170,7 @@ def test_simd_string_search_all() raises:
     """Test finding all occurrences with SIMD string search."""
     var pattern = "ll"
     var pattern_span = Span[Byte](
-        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+        unsafe_ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
     )
     var text = "hello world, all well"
 
@@ -196,7 +196,7 @@ def test_simd_string_search_empty() raises:
     """Test SIMD string search with empty pattern."""
     var pattern = ""
     var pattern_span = Span[Byte](
-        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+        unsafe_ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
     )
 
     # Empty pattern should match at any position
@@ -208,7 +208,7 @@ def test_simd_string_search_single_char() raises:
     """Test SIMD string search with single character."""
     var pattern = "a"
     var pattern_span = Span[Byte](
-        ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
+        unsafe_ptr=pattern.unsafe_ptr(), length=pattern.byte_length()
     )
 
     assert_equal(simd_search(pattern_span, "banana"), 1)

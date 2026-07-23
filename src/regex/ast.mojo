@@ -546,7 +546,8 @@ struct ASTNode[regex_origin: ImmOrigin](
             return None
         return StringSlice(
             unsafe_from_utf8=Span[Byte, origin_of(self.regex_ptr[].pattern)](
-                ptr=self.regex_ptr[].pattern.unsafe_ptr() + self.start_idx,
+                unsafe_ptr=self.regex_ptr[].pattern.unsafe_ptr()
+                + self.start_idx,
                 length=self.end_idx - self.start_idx,
             )
         )

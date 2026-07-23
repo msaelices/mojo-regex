@@ -73,7 +73,9 @@ def imm_slice_from_ptr(
     around the 1.0.0b2 `StringSlice(unsafe_from_utf8=Span(...))`
     constructor so call sites stay compact."""
     return ImmSlice(
-        unsafe_from_utf8=Span[Byte, ImmutAnyOrigin](ptr=ptr, length=length)
+        unsafe_from_utf8=Span[Byte, ImmutAnyOrigin](
+            unsafe_ptr=ptr, length=length
+        )
     )
 
 

@@ -39,7 +39,7 @@ struct Match[origin: ImmOrigin](Copyable, Movable, TrivialRegisterPassable):
         """Returns the text that was matched."""
         return StringSlice[Self.origin](
             unsafe_from_utf8=Span[Byte, Self.origin](
-                ptr=self.text_ptr + self.start_idx,
+                unsafe_ptr=self.text_ptr + self.start_idx,
                 length=self.end_idx - self.start_idx,
             )
         )
