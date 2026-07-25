@@ -51,7 +51,7 @@ def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
     var ptr = s.unsafe_ptr()
     var target = UInt8(ch_code)
     for i in range(s.byte_length()):
-        if ptr[i] == target:
+        if ptr[unsafe_offset=i] == target:
             return True
     return False
 

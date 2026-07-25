@@ -260,7 +260,7 @@ def _compile_element(node: ASTNode, mut program: Program):
     if val:
         var ch = val.value()
         if ch.byte_length() > 0:
-            _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[0]))
+            _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[unsafe_offset=0]))
 
 
 def _compile_wildcard(node: ASTNode, mut program: Program):
@@ -288,8 +288,10 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
         var inner_ptr = inner.unsafe_ptr()
         var j = 0
         while j < inner.byte_length():
-            if j + 1 < inner.byte_length() and Int(inner_ptr[j]) == ord("\\"):
-                var next_ch = Int(inner_ptr[j + 1])
+            if j + 1 < inner.byte_length() and Int(
+                inner_ptr[unsafe_offset=j]
+            ) == ord("\\"):
+                var next_ch = Int(inner_ptr[unsafe_offset=j + 1])
                 if next_ch == ord("s"):
                     table[ord(" ")] = 1
                     table[ord("\t")] = 1
@@ -310,16 +312,16 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
                 else:
                     table[next_ch] = 1
                 j += 2
-            elif j + 2 < inner.byte_length() and Int(inner_ptr[j + 1]) == ord(
-                "-"
-            ):
-                var lo = Int(inner_ptr[j])
-                var hi = Int(inner_ptr[j + 2])
+            elif j + 2 < inner.byte_length() and Int(
+                inner_ptr[unsafe_offset=j + 1]
+            ) == ord("-"):
+                var lo = Int(inner_ptr[unsafe_offset=j])
+                var hi = Int(inner_ptr[unsafe_offset=j + 2])
                 for c in range(lo, hi + 1):
                     table[c] = 1
                 j += 3
             else:
-                table[Int(inner_ptr[j])] = 1
+                table[Int(inner_ptr[unsafe_offset=j])] = 1
                 j += 1
 
     # Handle negated classes
@@ -430,7 +432,10 @@ struct PikeVMEngine(Copyable, Movable):
             var pos = start
             while pos < text_len:
                 # Skip positions where first byte can't match
-                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                if (
+                    self.first_byte_filter[Int(text_ptr[unsafe_offset=pos])]
+                    == 0
+                ):
                     pos += 1
                     continue
                 var result = self._run(text, pos)
@@ -457,7 +462,10 @@ struct PikeVMEngine(Copyable, Movable):
         if self.has_filter:
             var text_ptr = text.unsafe_ptr()
             while pos < text_len:
-                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                if (
+                    self.first_byte_filter[Int(text_ptr[unsafe_offset=pos])]
+                    == 0
+                ):
                     pos += 1
                     continue
                 var result = self._run(text, pos)
@@ -528,7 +536,7 @@ struct PikeVMEngine(Copyable, Movable):
             if pos == text_len:
                 break
 
-            var ch = Int(text_ptr[pos])
+            var ch = Int(text_ptr[unsafe_offset=pos])
 
             # Process all current states
             for i in range(cur_count):
@@ -827,13 +835,13 @@ struct LazyDFA(Copyable, Movable):
         var pos = start
         while pos < text_len:
             # Check if current state is a match
-            if states_ptr[state_id].is_match:
+            if states_ptr[unsafe_offset=state_id].is_match:
                 match_end = pos
 
-            var ch = Int(text_ptr[pos])
+            var ch = Int(text_ptr[unsafe_offset=pos])
 
             # Look up cached transition
-            var next_id = states_ptr[state_id].transitions[ch]
+            var next_id = states_ptr[unsafe_offset=state_id].transitions[ch]
 
             if next_id == LAZY_DFA_UNKNOWN:
                 # Cache miss: compute via PikeVM one-step simulation
@@ -842,7 +850,7 @@ struct LazyDFA(Copyable, Movable):
                 )
                 # Re-fetch pointer in case _compute_transition grew the list
                 states_ptr = self.states.unsafe_ptr()
-                states_ptr[state_id].transitions[ch] = next_id
+                states_ptr[unsafe_offset=state_id].transitions[ch] = next_id
 
             if next_id == LAZY_DFA_DEAD:
                 break
@@ -851,7 +859,7 @@ struct LazyDFA(Copyable, Movable):
             pos += 1
 
         # Check final state at text_len (handles $ anchor)
-        if states_ptr[state_id].is_match:
+        if states_ptr[unsafe_offset=state_id].is_match:
             match_end = pos
 
         if match_end >= 0:

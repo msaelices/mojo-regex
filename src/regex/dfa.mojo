@@ -119,7 +119,7 @@ def _expand_character_range[
 
     # For simple single ranges, use slicing from pre-defined sets
     var inner_ptr = inner.unsafe_ptr()
-    if inner.byte_length() == 3 and Int(inner_ptr[1]) == ord("-"):
+    if inner.byte_length() == 3 and Int(inner_ptr[unsafe_offset=1]) == ord("-"):
         var start_char = inner[byte=0]
         var end_char = inner[byte=2]
 
@@ -147,7 +147,9 @@ def _expand_character_range[
     var result = String(capacity=estimated_capacity)
     var i = 0
     while i < inner.byte_length():
-        if i + 2 < inner.byte_length() and Int(inner_ptr[i + 1]) == ord("-"):
+        if i + 2 < inner.byte_length() and Int(
+            inner_ptr[unsafe_offset=i + 1]
+        ) == ord("-"):
             # Found a range like a-z
             var start_char = inner[byte=i]
             var end_char = inner[byte=i + 2]
@@ -291,17 +293,17 @@ struct DFAEngine(Engine):
         self._simd_scan_eligible = False
         self.literal_pattern = ""
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.states = take.states^
-        self.start_state = take.start_state
-        self.has_start_anchor = take.has_start_anchor
-        self.has_end_anchor = take.has_end_anchor
-        self.is_pure_literal = take.is_pure_literal
-        self._simd_char_matcher = take._simd_char_matcher
-        self._has_simd_matcher = take._has_simd_matcher
-        self._simd_scan_eligible = take._simd_scan_eligible
-        self.literal_pattern = take.literal_pattern^
+        self.states = move.states^
+        self.start_state = move.start_state
+        self.has_start_anchor = move.has_start_anchor
+        self.has_end_anchor = move.has_end_anchor
+        self.is_pure_literal = move.is_pure_literal
+        self._simd_char_matcher = move._simd_char_matcher
+        self._has_simd_matcher = move._has_simd_matcher
+        self._simd_scan_eligible = move._simd_scan_eligible
+        self.literal_pattern = move.literal_pattern^
 
     def compile_pattern(
         mut self,
@@ -339,7 +341,7 @@ struct DFAEngine(Engine):
         var pattern_ptr = pattern.unsafe_ptr()
         for i in range(len_pattern):
             var state = DFAState()
-            var char_code = Int(pattern_ptr[i])
+            var char_code = Int(pattern_ptr[unsafe_offset=i])
             state.add_transition(char_code, i + 1)
             self.states.append(state)
 
@@ -675,7 +677,7 @@ struct DFAEngine(Engine):
                     var prev_state = current_state_index
 
                     for ch_idx in range(branch.byte_length()):
-                        var char_code = Int(branch_ptr[ch_idx])
+                        var char_code = Int(branch_ptr[unsafe_offset=ch_idx])
                         if ch_idx == branch.byte_length() - 1:
                             # Last char in branch -> transition to shared end state
                             self.states[prev_state].add_transition(
@@ -911,7 +913,7 @@ struct DFAEngine(Engine):
             var branch_text_ptr = branch_text.unsafe_ptr()
 
             for j in range(branch_text.byte_length()):
-                var char_code = Int(branch_text_ptr[j])
+                var char_code = Int(branch_text_ptr[unsafe_offset=j])
 
                 if j == branch_text.byte_length() - 1:
                     # Last character - transition to accepting state
@@ -990,7 +992,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var group_text_ptr = group_text.unsafe_ptr()
         for i in range(group_text.byte_length()):
-            var char_code = Int(group_text_ptr[i])
+            var char_code = Int(group_text_ptr[unsafe_offset=i])
 
             if i == group_text.byte_length() - 1:
                 # Last character - go to accepting state
@@ -1021,7 +1023,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var group_text_ptr = group_text.unsafe_ptr()
         for i in range(group_text.byte_length()):
-            var char_code = Int(group_text_ptr[i])
+            var char_code = Int(group_text_ptr[unsafe_offset=i])
 
             if i == group_text.byte_length() - 1:
                 # Last character - loop back to start (for more matches) or stay accepting
@@ -1045,7 +1047,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var group_text_ptr = group_text.unsafe_ptr()
         for i in range(group_text.byte_length()):
-            var char_code = Int(group_text_ptr[i])
+            var char_code = Int(group_text_ptr[unsafe_offset=i])
 
             if i == group_text.byte_length() - 1:
                 # Last character - create accepting state that can loop back
@@ -1058,7 +1060,7 @@ struct DFAEngine(Engine):
 
                 # From loop state, can start pattern again or stay accepting
                 self.states[loop_index].add_transition(
-                    Int(group_text_ptr[0]),
+                    Int(group_text_ptr[unsafe_offset=0]),
                     1 if group_text.byte_length() > 1 else loop_index,
                 )
             else:
@@ -1157,7 +1159,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(pattern_text.byte_length()):
-            var char_code = Int(pattern_text_ptr[i])
+            var char_code = Int(pattern_text_ptr[unsafe_offset=i])
 
             if i == pattern_text.byte_length() - 1:
                 # Last character - go to accepting state
@@ -1189,7 +1191,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(pattern_text.byte_length()):
-            var char_code = Int(pattern_text_ptr[i])
+            var char_code = Int(pattern_text_ptr[unsafe_offset=i])
 
             if i == pattern_text.byte_length() - 1:
                 # Last character - loop back to start (for more matches) or stay accepting
@@ -1214,7 +1216,7 @@ struct DFAEngine(Engine):
         var current_state_index = 0
         var pattern_text_ptr = pattern_text.unsafe_ptr()
         for i in range(pattern_text.byte_length()):
-            var char_code = Int(pattern_text_ptr[i])
+            var char_code = Int(pattern_text_ptr[unsafe_offset=i])
 
             if i == pattern_text.byte_length() - 1:
                 # Last character - create accepting state that can loop back
@@ -1227,7 +1229,7 @@ struct DFAEngine(Engine):
 
                 # From loop state, can start pattern again or stay accepting
                 self.states[loop_index].add_transition(
-                    Int(pattern_text_ptr[0]),
+                    Int(pattern_text_ptr[unsafe_offset=0]),
                     1 if pattern_text.byte_length() > 1 else loop_index,
                 )
             else:
@@ -1428,7 +1430,7 @@ struct DFAEngine(Engine):
         var current_state = 0
         var common_prefix_ptr = common_prefix.unsafe_ptr()
         for i in range(prefix_len):
-            var char_code = Int(common_prefix_ptr[i])
+            var char_code = Int(common_prefix_ptr[unsafe_offset=i])
             var next_state_index = self._find_or_create_state(
                 current_state, char_code
             )
@@ -1446,7 +1448,7 @@ struct DFAEngine(Engine):
                 var suffix_ptr = suffix.unsafe_ptr()
 
                 for j in range(suffix.byte_length()):
-                    var char_code = Int(suffix_ptr[j])
+                    var char_code = Int(suffix_ptr[unsafe_offset=j])
 
                     if j == suffix.byte_length() - 1:
                         # Last character - create or mark accepting state
@@ -1479,12 +1481,12 @@ struct DFAEngine(Engine):
         # Find common prefix
         var first_branch_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = Int(first_branch_ptr[pos])
+            var char_at_pos = Int(first_branch_ptr[unsafe_offset=pos])
             var all_match = True
 
             for i in range(1, len(branches)):
                 var branch_ptr_i = branches[i].unsafe_ptr()
-                if Int(branch_ptr_i[pos]) != char_at_pos:
+                if Int(branch_ptr_i[unsafe_offset=pos]) != char_at_pos:
                     all_match = False
                     break
 
@@ -1597,7 +1599,7 @@ struct DFAEngine(Engine):
             var branch_ptr = branch.unsafe_ptr()
 
             for j in range(branch.byte_length()):
-                var char_code = Int(branch_ptr[j])
+                var char_code = Int(branch_ptr[unsafe_offset=j])
 
                 if j == branch.byte_length() - 1:
                     # Last character - go to accepting state
@@ -1624,7 +1626,7 @@ struct DFAEngine(Engine):
             var branch_ptr = branch.unsafe_ptr()
 
             for j in range(branch.byte_length()):
-                var char_code = Int(branch_ptr[j])
+                var char_code = Int(branch_ptr[unsafe_offset=j])
 
                 if j == branch.byte_length() - 1:
                     # Last character - loop back to start for more matches
@@ -1651,7 +1653,7 @@ struct DFAEngine(Engine):
             var branch_ptr = branch.unsafe_ptr()
 
             for j in range(branch.byte_length()):
-                var char_code = Int(branch_ptr[j])
+                var char_code = Int(branch_ptr[unsafe_offset=j])
 
                 if j == branch.byte_length() - 1:
                     # Last character - go to loop state
@@ -1670,7 +1672,7 @@ struct DFAEngine(Engine):
             var branch_ptr = branch.unsafe_ptr()
 
             for j in range(branch.byte_length()):
-                var char_code = Int(branch_ptr[j])
+                var char_code = Int(branch_ptr[unsafe_offset=j])
 
                 if j == branch.byte_length() - 1:
                     # Last character - back to loop state
@@ -1785,7 +1787,7 @@ struct DFAEngine(Engine):
             else:
                 # General case - iterate through each character
                 for i in range(char_class_len):
-                    var char_code = Int(cc_ptr[i])
+                    var char_code = Int(cc_ptr[unsafe_offset=i])
                     state.add_transition(char_code, to_state)
         else:
             # Negative logic: [^abc] - add transitions for all characters
@@ -1796,7 +1798,7 @@ struct DFAEngine(Engine):
             )
             # Remove transitions for excluded characters
             for i in range(char_class_len):
-                var char_code = Int(cc_ptr[i])
+                var char_code = Int(cc_ptr[unsafe_offset=i])
                 if char_code >= 0 and char_code < DEFAULT_DFA_TRANSITIONS:
                     state.transitions[char_code] = -1
 
@@ -1833,7 +1835,7 @@ struct DFAEngine(Engine):
                 # Only match empty if start state is accepting
                 return self.states[self.start_state].is_accepting
             # Check if the character at start matches
-            var ch_code = Int(text.unsafe_ptr()[start])
+            var ch_code = Int(text.unsafe_ptr()[unsafe_offset=start])
             if self._simd_char_matcher.contains(ch_code):
                 return True
             # No match at start - only valid if start state accepts
@@ -1956,7 +1958,9 @@ struct DFAEngine(Engine):
             and len(self.states) > 0
             and (
                 self._simd_scan_eligible
-                or self.states.unsafe_ptr()[self.start_state].is_accepting
+                or self.states.unsafe_ptr()[
+                    unsafe_offset=self.start_state
+                ].is_accepting
             )
         ):
             var match_result = self._try_match_simd(text, start_pos)
@@ -1985,14 +1989,14 @@ struct DFAEngine(Engine):
         # Check if start state is accepting (for patterns like a*)
         if (
             current_state < num_states
-            and states_ptr[current_state].is_accepting
+            and states_ptr[unsafe_offset=current_state].is_accepting
         ):
             last_accepting_pos = pos
 
         while pos < text_len:
-            var next_state = states_ptr[current_state].get_transition(
-                Int(text_ptr[pos])
-            )
+            var next_state = states_ptr[
+                unsafe_offset=current_state
+            ].get_transition(Int(text_ptr[unsafe_offset=pos]))
 
             if next_state == -1:
                 break
@@ -2001,14 +2005,14 @@ struct DFAEngine(Engine):
             pos += 1
 
             # Check if current state is accepting
-            if states_ptr[current_state].is_accepting:
+            if states_ptr[unsafe_offset=current_state].is_accepting:
                 last_accepting_pos = pos
 
         # Check final state at text end
         if (
             pos == text_len
             and current_state < num_states
-            and states_ptr[current_state].is_accepting
+            and states_ptr[unsafe_offset=current_state].is_accepting
         ):
             last_accepting_pos = pos
 
@@ -2153,7 +2157,7 @@ struct DFAEngine(Engine):
         # unsafe_ptr to skip the 1.0.0b1 default List bounds check;
         # start_state is guaranteed in-range by the len check above.
         var start_accepting = self.states.unsafe_ptr()[
-            self.start_state
+            unsafe_offset=self.start_state
         ].is_accepting
 
         # Bounded quantifiers like {3} or {2,4} can't use SIMD scan because
@@ -2282,7 +2286,7 @@ struct DFAEngine(Engine):
 
         # Handle remaining characters one by one
         while pos < text_len:
-            var char_code = Int(text_ptr[pos])
+            var char_code = Int(text_ptr[unsafe_offset=pos])
             if simd_matcher.contains(char_code):
                 return pos
             pos += 1
@@ -2317,7 +2321,7 @@ struct BoyerMoore:
         # Set the last occurrence of each character in pattern
         var pattern_ptr = self.pattern.unsafe_ptr()
         for i in range(self.pattern.byte_length()):
-            var char_code = Int(pattern_ptr[i])
+            var char_code = Int(pattern_ptr[unsafe_offset=i])
             self.bad_char_table[char_code] = i
 
     def search(self, text: String, start: Int = 0) -> Int:
@@ -2340,7 +2344,9 @@ struct BoyerMoore:
             var j = m - 1
 
             # Compare pattern from right to left
-            while j >= 0 and Int(pattern_ptr[j]) == Int(text_ptr[s + j]):
+            while j >= 0 and Int(pattern_ptr[unsafe_offset=j]) == Int(
+                text_ptr[unsafe_offset=s + j]
+            ):
                 j -= 1
 
             if j < 0:
@@ -2348,7 +2354,7 @@ struct BoyerMoore:
                 return s
             else:
                 # Mismatch occurred, use bad character heuristic
-                var bad_char = Int(text_ptr[s + j])
+                var bad_char = Int(text_ptr[unsafe_offset=s + j])
                 var shift = j - self.bad_char_table[bad_char]
                 s += max(1, shift)
 
@@ -3499,12 +3505,12 @@ def _compute_common_prefix(branches: List[String]) -> String:
     # Find common prefix
     var first_branch_ptr = first_branch.unsafe_ptr()
     for pos in range(min_length):
-        var char_at_pos = Int(first_branch_ptr[pos])
+        var char_at_pos = Int(first_branch_ptr[unsafe_offset=pos])
         var all_match = True
 
         for i in range(1, len(branches)):
             var branch_ptr_i = branches[i].unsafe_ptr()
-            if Int(branch_ptr_i[pos]) != char_at_pos:
+            if Int(branch_ptr_i[unsafe_offset=pos]) != char_at_pos:
                 all_match = False
                 break
 

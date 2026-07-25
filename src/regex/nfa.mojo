@@ -767,10 +767,11 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         if (
             ast.get_value()
-            and Int(ast.get_value().value().unsafe_ptr()[0]) == ch_code
+            and Int(ast.get_value().value().unsafe_ptr()[unsafe_offset=0])
+            == ch_code
         ):
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -794,7 +795,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         if ch_code != CHAR_NEWLINE:  # Exclude newline
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -820,7 +821,7 @@ struct NFAEngine(Copyable, Engine):
         # Inline range check avoids a per-character Dict lookup through
         # `get_whitespace_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         if (
             ch_code == CHAR_SPACE
             or ch_code == CHAR_TAB_CHAR
@@ -860,7 +861,7 @@ struct NFAEngine(Copyable, Engine):
         # Inline range check avoids a per-character Dict lookup through
         # `get_digit_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         if CHAR_ZERO <= ch_code <= CHAR_NINE:
             return self._apply_quantifier(
                 ast, str, str_i, 1, match_first_mode, required_start_pos
@@ -902,7 +903,7 @@ struct NFAEngine(Copyable, Engine):
         # Inline range check avoids a per-character Dict lookup through
         # `get_word_matcher()` (see ast.is_match_char for reference).
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         if (
             (CHAR_A <= ch_code <= CHAR_Z)
             or (CHAR_A_UPPER <= ch_code <= CHAR_Z_UPPER)
@@ -939,7 +940,7 @@ struct NFAEngine(Copyable, Engine):
             return (False, str_i)
 
         var str_ptr = str.unsafe_ptr()
-        var ch_code = Int(str_ptr[str_i])
+        var ch_code = Int(str_ptr[unsafe_offset=str_i])
         var ch_found = False
 
         var kind = ast.range_kind
@@ -1332,7 +1333,7 @@ struct NFAEngine(Copyable, Engine):
             ):
                 return -1  # Moved too far from required start position
 
-            if ast.is_match_char(Int(str_ptr[pos]), pos, str_len):
+            if ast.is_match_char(Int(str_ptr[unsafe_offset=pos]), pos, str_len):
                 matched += 1
                 pos += 1
             else:
@@ -1422,7 +1423,7 @@ struct NFAEngine(Copyable, Engine):
                     break
 
             if ast.is_match_char(
-                Int(str_ptr[current_pos]), current_pos, str_len
+                Int(str_ptr[unsafe_offset=current_pos]), current_pos, str_len
             ):
                 matches_count += 1
                 current_pos += 1
@@ -1562,7 +1563,7 @@ struct NFAEngine(Copyable, Engine):
                     actual_max = str.byte_length() - str_i
 
                 while pos < str.byte_length() and match_count < actual_max:
-                    var ch_code = Int(str_ptr[pos])
+                    var ch_code = Int(str_ptr[unsafe_offset=pos])
                     var is_match: Bool
                     if (
                         (CHAR_A <= ch_code <= CHAR_Z)
@@ -1603,7 +1604,7 @@ struct NFAEngine(Copyable, Engine):
                         while (
                             pos < str.byte_length() and match_count < actual_max
                         ):
-                            var ch_code = Int(str_ptr[pos])
+                            var ch_code = Int(str_ptr[unsafe_offset=pos])
                             if not matcher.contains(ch_code):
                                 match_count += 1
                                 pos += 1
@@ -1622,7 +1623,7 @@ struct NFAEngine(Copyable, Engine):
                     actual_max = str.byte_length() - str_i
 
                 while pos < str.byte_length() and match_count < actual_max:
-                    var ch_code = Int(str_ptr[pos])
+                    var ch_code = Int(str_ptr[unsafe_offset=pos])
                     var is_match = self._match_char_in_range(
                         range_pattern, ch_code
                     )
@@ -1650,8 +1651,8 @@ struct NFAEngine(Copyable, Engine):
             # Handle simple ranges like [c-n]
             if inner.byte_length() == 3 and inner[byte=1] == "-":
                 var inner_ptr = inner.unsafe_ptr()
-                var start_char = Int(inner_ptr[0])
-                var end_char = Int(inner_ptr[2])
+                var start_char = Int(inner_ptr[unsafe_offset=0])
+                var end_char = Int(inner_ptr[unsafe_offset=2])
                 return ch_code >= start_char and ch_code <= end_char
 
             # Direct byte scan instead of chr() + string `in`
@@ -1678,7 +1679,7 @@ struct NFAEngine(Copyable, Engine):
         if actual_max == -1:
             actual_max = str.byte_length() - str_i
         while pos < str.byte_length() and match_count < actual_max:
-            var ch_code = Int(str_ptr[pos])
+            var ch_code = Int(str_ptr[unsafe_offset=pos])
             if not matcher.contains(ch_code):
                 match_count += 1
                 pos += 1
@@ -1709,7 +1710,7 @@ struct NFAEngine(Copyable, Engine):
         if actual_max == -1:
             actual_max = str.byte_length() - str_i
         while pos < str.byte_length() and match_count < actual_max:
-            var ch_code = Int(str_ptr[pos])
+            var ch_code = Int(str_ptr[unsafe_offset=pos])
             var is_match = range_start <= ch_code <= range_end
             if is_match == positive_logic:
                 match_count += 1

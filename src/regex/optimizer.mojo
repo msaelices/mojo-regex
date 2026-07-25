@@ -693,12 +693,12 @@ struct PatternAnalyzer:
         # Find common prefix
         var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = Int(fb_ptr[pos])
+            var char_at_pos = Int(fb_ptr[unsafe_offset=pos])
             var all_match = True
 
             for i in range(1, len(branches)):
                 var br_ptr = branches[i].unsafe_ptr()
-                if Int(br_ptr[pos]) != char_at_pos:
+                if Int(br_ptr[unsafe_offset=pos]) != char_at_pos:
                     all_match = False
                     break
 

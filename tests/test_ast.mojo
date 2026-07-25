@@ -32,7 +32,7 @@ def test_ASTNode() raises:
     var regex = Regex[ImmUntrackedOrigin](pattern)
     var regex_ptr = (
         UnsafePointer(to=regex)
-        .as_immutable()
+        .as_imm()
         .unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     var ast_node = ASTNode[ImmUntrackedOrigin](

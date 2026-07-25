@@ -485,21 +485,25 @@ struct OnePassNFA(Copyable, Movable):
         var match_end = -1
         var trans_ptr = self.transitions.unsafe_ptr()
         var match_ptr = self.is_match_flags.unsafe_ptr()
-        if match_ptr[0]:
+        if match_ptr[unsafe_offset=0]:
             match_end = start
         var pos = start
         while pos < text_len:
-            var next_id = Int(trans_ptr[state_id][Int(text_ptr[pos])])
+            var next_id = Int(
+                trans_ptr[unsafe_offset=state_id][
+                    Int(text_ptr[unsafe_offset=pos])
+                ]
+            )
             if next_id == Int(ONEPASS_DEAD):
                 break
             state_id = next_id
             pos += 1
-            if match_ptr[state_id]:
+            if match_ptr[unsafe_offset=state_id]:
                 match_end = pos
         # End-of-text fixup for `$` anchors: cached per-state at compile
         # time, so no per-call state-set DFS walk.
         if self.has_end_anchor and pos == text_len:
-            if self.is_end_match_flags.unsafe_ptr()[state_id]:
+            if self.is_end_match_flags.unsafe_ptr()[unsafe_offset=state_id]:
                 match_end = pos
         if match_end >= 0:
             return Match(0, start, match_end, text)
