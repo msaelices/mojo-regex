@@ -949,10 +949,10 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     fixed-width form and `sub()` goes through the general NFA path."""
     var _fixed_sub_num_groups: Int
     """Number of capture groups in the fixed-width pattern (1..9)."""
-    var _fixed_sub_offsets: InlineArray[Int, 10]
+    var _fixed_sub_offsets: Array[Int, 10]
     """Byte offset of each capture group relative to the match start.
     Indexed by group number (1..num_groups)."""
-    var _fixed_sub_widths: InlineArray[Int, 10]
+    var _fixed_sub_widths: Array[Int, 10]
     """Byte width of each capture group. Indexed by group number."""
     var _fixed_sub_concat: Bool
     """True when the fixed-width pattern has no literal separators (pure
@@ -971,8 +971,8 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.compiled_at = Int(monotonic())
         self._fixed_sub_total_width = -1
         self._fixed_sub_num_groups = 0
-        self._fixed_sub_offsets = InlineArray[Int, 10](fill=0)
-        self._fixed_sub_widths = InlineArray[Int, 10](fill=0)
+        self._fixed_sub_offsets = Array[Int, 10](fill=0)
+        self._fixed_sub_widths = Array[Int, 10](fill=0)
         self._fixed_sub_concat = False
         self._try_precompute_fixed_sub()
 
@@ -1555,8 +1555,8 @@ def _apply_template_fixed(
     repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     match_start: Int,
-    group_offsets: InlineArray[Int, 10],
-    group_widths: InlineArray[Int, 10],
+    group_offsets: Array[Int, 10],
+    group_widths: Array[Int, 10],
     num_groups: Int,
     output_estimate: Int,
 ) -> String:
@@ -1588,7 +1588,7 @@ def _apply_template_groups[
     template: List[_ReplSegment],
     repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     groups: List[Match[O]],
-    group_idx: InlineArray[Int, 10],
+    group_idx: Array[Int, 10],
 ) -> String:
     """Apply pre-parsed template using NFA-extracted group matches."""
     var out = String(capacity=32)
@@ -1757,7 +1757,7 @@ def _sub_impl_with_repl(
                     )
 
                 # Build group index for this match
-                var group_idx = InlineArray[Int, 10](fill=-1)
+                var group_idx = Array[Int, 10](fill=-1)
                 for gi in range(len(mg[1])):
                     var gid = mg[1][gi].group_id
                     if 1 <= gid <= 9:

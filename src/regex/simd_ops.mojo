@@ -365,8 +365,8 @@ struct CharacterClassSIMD(
         """Detect up to 3 contiguous sub-ranges in the lookup table.
         For patterns like [a-zA-Z0-9], this finds ranges a-z, A-Z, 0-9
         enabling multi-range SIMD scan. Uses stack-local variables only."""
-        var starts = InlineArray[Int, 4](fill=-1)
-        var ends = InlineArray[Int, 4](fill=-1)
+        var starts = Array[Int, 4](fill=-1)
+        var ends = Array[Int, 4](fill=-1)
         var count = 0
         var in_range = False
         for c in range(256):

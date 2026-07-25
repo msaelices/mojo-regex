@@ -507,8 +507,8 @@ struct PikeVMEngine(Copyable, Movable):
             return None
 
         # Fixed-size state arrays on stack - zero allocation per step
-        var cur_pcs = InlineArray[Int, MAX_STATES](fill=0)
-        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var cur_pcs = Array[Int, MAX_STATES](fill=0)
+        var nxt_pcs = Array[Int, MAX_STATES](fill=0)
         var cur_count = 0
         var nxt_count = 0
 
@@ -603,7 +603,7 @@ struct PikeVMEngine(Copyable, Movable):
 
     def _add_state(
         self,
-        mut pcs: InlineArray[Int, MAX_STATES],
+        mut pcs: Array[Int, MAX_STATES],
         mut count: Int,
         mut seen: SIMD[DType.uint8, MAX_STATES],
         pc: Int,
@@ -668,7 +668,7 @@ struct CachedState(Copyable, Movable):
     """Which NFA PCs are active (byte per PC, 0/1)."""
     var is_match: Bool
     """Whether this state set contains the MATCH instruction."""
-    var transitions: InlineArray[Int, 256]
+    var transitions: Array[Int, 256]
     """Next DFA state ID per input byte. LAZY_DFA_UNKNOWN = not cached."""
 
     def __init__(
@@ -676,7 +676,7 @@ struct CachedState(Copyable, Movable):
     ):
         self.nfa_set = nfa_set
         self.is_match = is_match
-        self.transitions = InlineArray[Int, 256](fill=LAZY_DFA_UNKNOWN)
+        self.transitions = Array[Int, 256](fill=LAZY_DFA_UNKNOWN)
 
 
 struct LazyDFA(Copyable, Movable):
@@ -881,7 +881,7 @@ struct LazyDFA(Copyable, Movable):
         var prog_len = len(self.pikevm.program)
 
         # Collect active PCs from the NFA set
-        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var nxt_pcs = Array[Int, MAX_STATES](fill=0)
         var nxt_count = 0
         var nxt_seen = SIMD[DType.uint8, MAX_STATES](0)
 
@@ -944,7 +944,7 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def _get_or_create_state_for_pos(mut self, pc: Int, pos: Int) -> Int:
         """Create a DFA state from the epsilon closure of a given PC."""
-        var pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var pcs = Array[Int, MAX_STATES](fill=0)
         var count = 0
         var seen = SIMD[DType.uint8, MAX_STATES](0)
         # Dummy text_ptr for epsilon closure (no bytes consumed). 1.0.0b1
