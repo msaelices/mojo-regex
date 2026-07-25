@@ -45,13 +45,13 @@ struct LiteralInfo(Copyable, Movable):
         self.is_exact_match = copy.is_exact_match
         self.has_anchors = copy.has_anchors
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.required_literals = take.required_literals^
-        self.literal_prefixes = take.literal_prefixes^
-        self.literal_suffixes = take.literal_suffixes^
-        self.is_exact_match = take.is_exact_match
-        self.has_anchors = take.has_anchors
+        self.required_literals = move.required_literals^
+        self.literal_prefixes = move.literal_prefixes^
+        self.literal_suffixes = move.literal_suffixes^
+        self.is_exact_match = move.is_exact_match
+        self.has_anchors = move.has_anchors
 
     def has_prefilter_candidates(self) -> Bool:
         """Check if this pattern has candidates suitable for prefiltering."""
@@ -278,12 +278,12 @@ struct LiteralExtractor:
         # Find common prefix
         var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(min_length):
-            var char_at_pos = Int(fb_ptr[pos])
+            var char_at_pos = Int(fb_ptr[unsafe_offset=pos])
             var all_match = True
 
             for i in range(1, len(branches)):
                 var br_ptr = branches[i].unsafe_ptr()
-                if Int(br_ptr[pos]) != char_at_pos:
+                if Int(br_ptr[unsafe_offset=pos]) != char_at_pos:
                     all_match = False
                     break
 
@@ -314,13 +314,13 @@ struct LiteralExtractor:
         # Find common suffix (work backwards)
         var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(1, min_length + 1):
-            var char_at_pos = Int(fb_ptr[len(first_branch) - pos])
+            var char_at_pos = Int(fb_ptr[unsafe_offset=len(first_branch) - pos])
             var all_match = True
 
             for i in range(1, len(branches)):
                 var branch = branches[i]
                 var br_ptr = branch.unsafe_ptr()
-                if Int(br_ptr[len(branch) - pos]) != char_at_pos:
+                if Int(br_ptr[unsafe_offset=len(branch) - pos]) != char_at_pos:
                     all_match = False
                     break
 
@@ -398,10 +398,10 @@ struct MemchrPrefilter(Copyable, Movable, PrefilterMatcher):
         self.literal = copy.literal
         self.is_prefix = copy.is_prefix
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.literal = take.literal^
-        self.is_prefix = take.is_prefix
+        self.literal = move.literal^
+        self.is_prefix = move.is_prefix
 
     def find_candidates(self, text: StringSlice) -> List[Int]:
         """Find all candidate positions of the literal in text."""

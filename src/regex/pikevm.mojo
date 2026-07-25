@@ -260,7 +260,7 @@ def _compile_element(node: ASTNode, mut program: Program):
     if val:
         var ch = val.value()
         if ch.byte_length() > 0:
-            _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[0]))
+            _ = program.emit(OP_BYTE, Int(ch.unsafe_ptr()[unsafe_offset=0]))
 
 
 def _compile_wildcard(node: ASTNode, mut program: Program):
@@ -288,8 +288,10 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
         var inner_ptr = inner.unsafe_ptr()
         var j = 0
         while j < inner.byte_length():
-            if j + 1 < inner.byte_length() and Int(inner_ptr[j]) == ord("\\"):
-                var next_ch = Int(inner_ptr[j + 1])
+            if j + 1 < inner.byte_length() and Int(
+                inner_ptr[unsafe_offset=j]
+            ) == ord("\\"):
+                var next_ch = Int(inner_ptr[unsafe_offset=j + 1])
                 if next_ch == ord("s"):
                     table[ord(" ")] = 1
                     table[ord("\t")] = 1
@@ -310,16 +312,16 @@ def _compile_char_class_node(node: ASTNode, mut program: Program):
                 else:
                     table[next_ch] = 1
                 j += 2
-            elif j + 2 < inner.byte_length() and Int(inner_ptr[j + 1]) == ord(
-                "-"
-            ):
-                var lo = Int(inner_ptr[j])
-                var hi = Int(inner_ptr[j + 2])
+            elif j + 2 < inner.byte_length() and Int(
+                inner_ptr[unsafe_offset=j + 1]
+            ) == ord("-"):
+                var lo = Int(inner_ptr[unsafe_offset=j])
+                var hi = Int(inner_ptr[unsafe_offset=j + 2])
                 for c in range(lo, hi + 1):
                     table[c] = 1
                 j += 3
             else:
-                table[Int(inner_ptr[j])] = 1
+                table[Int(inner_ptr[unsafe_offset=j])] = 1
                 j += 1
 
     # Handle negated classes
@@ -430,7 +432,10 @@ struct PikeVMEngine(Copyable, Movable):
             var pos = start
             while pos < text_len:
                 # Skip positions where first byte can't match
-                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                if (
+                    self.first_byte_filter[Int(text_ptr[unsafe_offset=pos])]
+                    == 0
+                ):
                     pos += 1
                     continue
                 var result = self._run(text, pos)
@@ -457,7 +462,10 @@ struct PikeVMEngine(Copyable, Movable):
         if self.has_filter:
             var text_ptr = text.unsafe_ptr()
             while pos < text_len:
-                if self.first_byte_filter[Int(text_ptr[pos])] == 0:
+                if (
+                    self.first_byte_filter[Int(text_ptr[unsafe_offset=pos])]
+                    == 0
+                ):
                     pos += 1
                     continue
                 var result = self._run(text, pos)
@@ -499,8 +507,8 @@ struct PikeVMEngine(Copyable, Movable):
             return None
 
         # Fixed-size state arrays on stack - zero allocation per step
-        var cur_pcs = InlineArray[Int, MAX_STATES](fill=0)
-        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var cur_pcs = Array[Int, MAX_STATES](fill=0)
+        var nxt_pcs = Array[Int, MAX_STATES](fill=0)
         var cur_count = 0
         var nxt_count = 0
 
@@ -528,7 +536,7 @@ struct PikeVMEngine(Copyable, Movable):
             if pos == text_len:
                 break
 
-            var ch = Int(text_ptr[pos])
+            var ch = Int(text_ptr[unsafe_offset=pos])
 
             # Process all current states
             for i in range(cur_count):
@@ -595,7 +603,7 @@ struct PikeVMEngine(Copyable, Movable):
 
     def _add_state(
         self,
-        mut pcs: InlineArray[Int, MAX_STATES],
+        mut pcs: Array[Int, MAX_STATES],
         mut count: Int,
         mut seen: SIMD[DType.uint8, MAX_STATES],
         pc: Int,
@@ -660,7 +668,7 @@ struct CachedState(Copyable, Movable):
     """Which NFA PCs are active (byte per PC, 0/1)."""
     var is_match: Bool
     """Whether this state set contains the MATCH instruction."""
-    var transitions: InlineArray[Int, 256]
+    var transitions: Array[Int, 256]
     """Next DFA state ID per input byte. LAZY_DFA_UNKNOWN = not cached."""
 
     def __init__(
@@ -668,7 +676,7 @@ struct CachedState(Copyable, Movable):
     ):
         self.nfa_set = nfa_set
         self.is_match = is_match
-        self.transitions = InlineArray[Int, 256](fill=LAZY_DFA_UNKNOWN)
+        self.transitions = Array[Int, 256](fill=LAZY_DFA_UNKNOWN)
 
 
 struct LazyDFA(Copyable, Movable):
@@ -827,13 +835,13 @@ struct LazyDFA(Copyable, Movable):
         var pos = start
         while pos < text_len:
             # Check if current state is a match
-            if states_ptr[state_id].is_match:
+            if states_ptr[unsafe_offset=state_id].is_match:
                 match_end = pos
 
-            var ch = Int(text_ptr[pos])
+            var ch = Int(text_ptr[unsafe_offset=pos])
 
             # Look up cached transition
-            var next_id = states_ptr[state_id].transitions[ch]
+            var next_id = states_ptr[unsafe_offset=state_id].transitions[ch]
 
             if next_id == LAZY_DFA_UNKNOWN:
                 # Cache miss: compute via PikeVM one-step simulation
@@ -842,7 +850,7 @@ struct LazyDFA(Copyable, Movable):
                 )
                 # Re-fetch pointer in case _compute_transition grew the list
                 states_ptr = self.states.unsafe_ptr()
-                states_ptr[state_id].transitions[ch] = next_id
+                states_ptr[unsafe_offset=state_id].transitions[ch] = next_id
 
             if next_id == LAZY_DFA_DEAD:
                 break
@@ -851,7 +859,7 @@ struct LazyDFA(Copyable, Movable):
             pos += 1
 
         # Check final state at text_len (handles $ anchor)
-        if states_ptr[state_id].is_match:
+        if states_ptr[unsafe_offset=state_id].is_match:
             match_end = pos
 
         if match_end >= 0:
@@ -873,7 +881,7 @@ struct LazyDFA(Copyable, Movable):
         var prog_len = len(self.pikevm.program)
 
         # Collect active PCs from the NFA set
-        var nxt_pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var nxt_pcs = Array[Int, MAX_STATES](fill=0)
         var nxt_count = 0
         var nxt_seen = SIMD[DType.uint8, MAX_STATES](0)
 
@@ -936,7 +944,7 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def _get_or_create_state_for_pos(mut self, pc: Int, pos: Int) -> Int:
         """Create a DFA state from the epsilon closure of a given PC."""
-        var pcs = InlineArray[Int, MAX_STATES](fill=0)
+        var pcs = Array[Int, MAX_STATES](fill=0)
         var count = 0
         var seen = SIMD[DType.uint8, MAX_STATES](0)
         # Dummy text_ptr for epsilon closure (no bytes consumed). 1.0.0b1

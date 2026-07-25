@@ -115,7 +115,7 @@ def find_first_in_nibble_tables(
     var mask_0f = SIMD[DType.uint8, SIMD_WIDTH](0x0F)
 
     while pos + SIMD_WIDTH <= text_len:
-        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+        var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
         var lo_res = lo_nibble._dynamic_shuffle(chunk & mask_0f)
         var hi_res = hi_nibble._dynamic_shuffle((chunk >> 4) & mask_0f)
         var matches = (lo_res & hi_res).ne(0)
@@ -127,7 +127,7 @@ def find_first_in_nibble_tables(
 
     # Scalar tail
     while pos < text_len:
-        if filter[Int(text_ptr[pos])] != 0:
+        if filter[Int(text_ptr[unsafe_offset=pos])] != 0:
             return pos
         pos += 1
 
@@ -220,7 +220,7 @@ def simd_find_byte(
     text_len: Int,
     needle: UInt8,
 ) -> Int:
-    """Return the first position of `needle` in `text_ptr[start:text_len]`,
+    """Return the first position of `needle` in `text_ptr[unsafe_offset=start:text_len]`,
     or -1 if not found.
 
     memchr-style SIMD scan. Used as a prefilter when a rare required byte
@@ -229,13 +229,13 @@ def simd_find_byte(
     var pos = start
     var splat = SIMD[DType.uint8, SIMD_WIDTH](needle)
     while pos + SIMD_WIDTH <= text_len:
-        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+        var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
         var matches = chunk.eq(splat)
         if matches.reduce_or():
             return pos + _first_true(matches)
         pos += SIMD_WIDTH
     while pos < text_len:
-        if text_ptr[pos] == needle:
+        if text_ptr[unsafe_offset=pos] == needle:
             return pos
         pos += 1
     return -1
@@ -365,8 +365,8 @@ struct CharacterClassSIMD(
         """Detect up to 3 contiguous sub-ranges in the lookup table.
         For patterns like [a-zA-Z0-9], this finds ranges a-z, A-Z, 0-9
         enabling multi-range SIMD scan. Uses stack-local variables only."""
-        var starts = InlineArray[Int, 4](fill=-1)
-        var ends = InlineArray[Int, 4](fill=-1)
+        var starts = Array[Int, 4](fill=-1)
+        var ends = Array[Int, 4](fill=-1)
         var count = 0
         var in_range = False
         for c in range(256):
@@ -445,7 +445,7 @@ struct CharacterClassSIMD(
         # Handle remaining characters
         var text_ptr = text.unsafe_ptr()
         while pos < text_len:
-            if self.contains(Int(text_ptr[pos])):
+            if self.contains(Int(text_ptr[unsafe_offset=pos])):
                 return pos
             pos += 1
 
@@ -475,7 +475,7 @@ struct CharacterClassSIMD(
                 for j in range(width):
                     if chunk_matches[j]:
                         matches.append(pos + i + j)
-            elif self.contains(Int(text_ptr[pos + i])):
+            elif self.contains(Int(text_ptr[unsafe_offset=pos + i])):
                 matches.append(pos + i)
 
         vectorize[SIMD_WIDTH](text_len - pos, closure)
@@ -555,7 +555,7 @@ struct CharacterClassSIMD(
             if width != 1:
                 var matches = self._check_chunk_simd(text.unsafe_ptr(), pos + i)
                 count += Int(matches.cast[DType.uint8]().reduce_add())
-            elif self.contains(Int(text_ptr[pos + i])):
+            elif self.contains(Int(text_ptr[unsafe_offset=pos + i])):
                 count += 1
 
         vectorize[SIMD_WIDTH](actual_end - pos, closure)
@@ -588,7 +588,7 @@ struct CharacterClassSIMD(
                 UInt8(self.range_end - self.range_start)
             )
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_1(chunk, lo, span)
                 if in_range.reduce_or():
                     return pos + _first_true(in_range)
@@ -603,7 +603,7 @@ struct CharacterClassSIMD(
                 UInt8(self.range2_end - self.range2_start)
             )
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_2(chunk, lo1, span1, lo2, span2)
                 if in_range.reduce_or():
                     return pos + _first_true(in_range)
@@ -622,7 +622,7 @@ struct CharacterClassSIMD(
                 UInt8(self.range3_end - self.range3_start)
             )
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_3(
                     chunk, lo1, span1, lo2, span2, lo3, span3
                 )
@@ -642,7 +642,7 @@ struct CharacterClassSIMD(
         # Scalar tail (reached for range paths only; the nibble fallback
         # handles its own tail internally).
         while pos < text_len:
-            if self.lookup_table[Int(text_ptr[pos])] != 0:
+            if self.lookup_table[Int(text_ptr[unsafe_offset=pos])] != 0:
                 return pos
             pos += 1
         return -1
@@ -680,8 +680,10 @@ struct CharacterClassSIMD(
                 UInt8(self.range_end - self.range_start)
             )
             while pos + 2 * SIMD_WIDTH <= text_len:
-                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
-                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var c1 = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.unsafe_load[width=SIMD_WIDTH](
+                    pos + SIMD_WIDTH
+                )
                 var r1 = _in_range_1(c1, lo, span)
                 var r2 = _in_range_1(c2, lo, span)
                 if (r1 & r2).reduce_and():
@@ -689,7 +691,7 @@ struct CharacterClassSIMD(
                     continue
                 return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_1(chunk, lo, span)
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
@@ -707,8 +709,10 @@ struct CharacterClassSIMD(
                 UInt8(self.range2_end - self.range2_start)
             )
             while pos + 2 * SIMD_WIDTH <= text_len:
-                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
-                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var c1 = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.unsafe_load[width=SIMD_WIDTH](
+                    pos + SIMD_WIDTH
+                )
                 var r1 = _in_range_2(c1, lo1, span1, lo2, span2)
                 var r2 = _in_range_2(c2, lo1, span1, lo2, span2)
                 if (r1 & r2).reduce_and():
@@ -716,7 +720,7 @@ struct CharacterClassSIMD(
                     continue
                 return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_2(chunk, lo1, span1, lo2, span2)
                 if in_range.reduce_and():
                     pos += SIMD_WIDTH
@@ -738,8 +742,10 @@ struct CharacterClassSIMD(
                 UInt8(self.range3_end - self.range3_start)
             )
             while pos + 2 * SIMD_WIDTH <= text_len:
-                var c1 = text_ptr.load[width=SIMD_WIDTH](pos)
-                var c2 = text_ptr.load[width=SIMD_WIDTH](pos + SIMD_WIDTH)
+                var c1 = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
+                var c2 = text_ptr.unsafe_load[width=SIMD_WIDTH](
+                    pos + SIMD_WIDTH
+                )
                 var r1 = _in_range_3(c1, lo1, span1, lo2, span2, lo3, span3)
                 var r2 = _in_range_3(c2, lo1, span1, lo2, span2, lo3, span3)
                 if (r1 & r2).reduce_and():
@@ -747,7 +753,7 @@ struct CharacterClassSIMD(
                     continue
                 return pos + _first_false_in_two(r1, r2) - start
             while pos + SIMD_WIDTH <= text_len:
-                var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+                var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
                 var in_range = _in_range_3(
                     chunk, lo1, span1, lo2, span2, lo3, span3
                 )
@@ -758,22 +764,22 @@ struct CharacterClassSIMD(
         else:
             # Scalar 4-way unroll for non-contiguous character classes
             while pos + 4 <= text_len:
-                if self.lookup_table[Int(text_ptr[pos])] == 0:
+                if self.lookup_table[Int(text_ptr[unsafe_offset=pos])] == 0:
                     break
-                if self.lookup_table[Int(text_ptr[pos + 1])] == 0:
+                if self.lookup_table[Int(text_ptr[unsafe_offset=pos + 1])] == 0:
                     pos += 1
                     break
-                if self.lookup_table[Int(text_ptr[pos + 2])] == 0:
+                if self.lookup_table[Int(text_ptr[unsafe_offset=pos + 2])] == 0:
                     pos += 2
                     break
-                if self.lookup_table[Int(text_ptr[pos + 3])] == 0:
+                if self.lookup_table[Int(text_ptr[unsafe_offset=pos + 3])] == 0:
                     pos += 3
                     break
                 pos += 4
 
         # Scalar tail
         while pos < text_len:
-            if self.lookup_table[Int(text_ptr[pos])] == 0:
+            if self.lookup_table[Int(text_ptr[unsafe_offset=pos])] == 0:
                 break
             pos += 1
 
@@ -792,7 +798,7 @@ struct CharacterClassSIMD(
             SIMD vector of booleans indicating matches
         """
         # Load chunk of characters
-        var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+        var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
 
         # Use hybrid approach based on pattern characteristics
         if self.use_shuffle:
@@ -948,7 +954,7 @@ def verify_match[
     var text_ptr = text.unsafe_ptr()
     var pattern_ptr = pattern.unsafe_ptr()
     for i in range(pattern_len):
-        if text_ptr[pos + i] != pattern_ptr[i]:
+        if text_ptr[unsafe_offset=pos + i] != pattern_ptr[unsafe_offset=i]:
             return False
 
     return True
@@ -985,19 +991,21 @@ def simd_search[
 
     # Single-byte literal: pure memchr-style SIMD scan.
     if pattern_len == 1:
-        return simd_find_byte(text_ptr, start, text_len, pattern_ptr[0])
+        return simd_find_byte(
+            text_ptr, start, text_len, pattern_ptr[unsafe_offset=0]
+        )
 
     # Two-byte anchored SIMD scan for pattern_len >= 2.
-    var first_byte = pattern_ptr[0]
+    var first_byte = pattern_ptr[unsafe_offset=0]
     var last_offset = pattern_len - 1
-    var last_byte = pattern_ptr[last_offset]
+    var last_byte = pattern_ptr[unsafe_offset=last_offset]
     var first_splat = SIMD[DType.uint8, SIMD_WIDTH](first_byte)
     var last_splat = SIMD[DType.uint8, SIMD_WIDTH](last_byte)
     var pos = start
 
     while pos + SIMD_WIDTH + last_offset <= text_len:
-        var chunk_a = text_ptr.load[width=SIMD_WIDTH](pos)
-        var chunk_b = text_ptr.load[width=SIMD_WIDTH](pos + last_offset)
+        var chunk_a = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
+        var chunk_b = text_ptr.unsafe_load[width=SIMD_WIDTH](pos + last_offset)
         var both = chunk_a.eq(first_splat) & chunk_b.eq(last_splat)
         if both.reduce_or():
             for i in range(SIMD_WIDTH):
@@ -1043,8 +1051,12 @@ def simd_memcmp(
 
     # Compare chunks using SIMD
     while pos + SIMD_WIDTH <= length:
-        var chunk1 = s1.unsafe_ptr().load[width=SIMD_WIDTH](s1_offset + pos)
-        var chunk2 = s2.unsafe_ptr().load[width=SIMD_WIDTH](s2_offset + pos)
+        var chunk1 = s1.unsafe_ptr().unsafe_load[width=SIMD_WIDTH](
+            s1_offset + pos
+        )
+        var chunk2 = s2.unsafe_ptr().unsafe_load[width=SIMD_WIDTH](
+            s2_offset + pos
+        )
 
         if chunk1 != chunk2:
             return False
@@ -1055,7 +1067,10 @@ def simd_memcmp(
     var s1_ptr = s1.unsafe_ptr()
     var s2_ptr = s2.unsafe_ptr()
     while pos < length:
-        if s1_ptr[s1_offset + pos] != s2_ptr[s2_offset + pos]:
+        if (
+            s1_ptr[unsafe_offset=s1_offset + pos]
+            != s2_ptr[unsafe_offset=s2_offset + pos]
+        ):
             return False
         pos += 1
 
@@ -1083,7 +1098,7 @@ def simd_count_char(text: String, target_char: StringSlice) -> Int:
 
     # Process chunks using SIMD
     while pos + SIMD_WIDTH <= text_len:
-        var chunk = text.unsafe_ptr().load[width=SIMD_WIDTH](pos)
+        var chunk = text.unsafe_ptr().unsafe_load[width=SIMD_WIDTH](pos)
         var matches = chunk.eq(target_simd)
         count += Int(matches.cast[DType.uint8]().reduce_add())
         pos += SIMD_WIDTH
@@ -1091,7 +1106,7 @@ def simd_count_char(text: String, target_char: StringSlice) -> Int:
     # Handle remaining characters
     var text_ptr = text.unsafe_ptr()
     while pos < text_len:
-        if Int(text_ptr[pos]) == target_code:
+        if Int(text_ptr[unsafe_offset=pos]) == target_code:
             count += 1
         pos += 1
 
@@ -1271,7 +1286,7 @@ def process_text_with_matcher[
     var text_len = len(text)
 
     while pos + 16 <= text_len:
-        var chunk = text.unsafe_ptr().load[width=16](pos)
+        var chunk = text.unsafe_ptr().unsafe_load[width=16](pos)
         var chunk_matches = matcher.match_chunk(chunk)
 
         for i in range(16):
@@ -1283,7 +1298,7 @@ def process_text_with_matcher[
     # Handle remaining characters
     var text_ptr = text.unsafe_ptr()
     while pos < text_len:
-        if matcher.contains(Int(text_ptr[pos])):
+        if matcher.contains(Int(text_ptr[unsafe_offset=pos])):
             matches.append(pos)
         pos += 1
 
@@ -1326,7 +1341,7 @@ def apply_quantifier_simd_generic[
     # Count consecutive matching characters
     var text_ptr = text.unsafe_ptr()
     while pos < text_len and match_count < actual_max:
-        if matcher.contains(Int(text_ptr[pos])):
+        if matcher.contains(Int(text_ptr[unsafe_offset=pos])):
             match_count += 1
             pos += 1
         else:
@@ -1362,7 +1377,7 @@ def find_in_text_simd[
 
     # Process in SIMD chunks for speed
     while pos + 16 <= actual_end:
-        var chunk = text_ptr.load[width=16](pos)
+        var chunk = text_ptr.unsafe_load[width=16](pos)
         var matches = matcher.match_chunk(chunk)
 
         # Check if any match in chunk
@@ -1376,7 +1391,7 @@ def find_in_text_simd[
 
     # Handle remaining characters
     while pos < actual_end:
-        if matcher.contains(Int(text_ptr[pos])):
+        if matcher.contains(Int(text_ptr[unsafe_offset=pos])):
             return pos
         pos += 1
 
@@ -1421,7 +1436,10 @@ def twoway_search[
         while pos <= m - n:
             var matched = True
             for i in range(n):
-                if text_ptr[pos + i] != pattern_ptr[i]:
+                if (
+                    text_ptr[unsafe_offset=pos + i]
+                    != pattern_ptr[unsafe_offset=i]
+                ):
                     matched = False
                     break
             if matched:
@@ -1444,7 +1462,7 @@ def twoway_search[
     for i in range(1, n):
         var is_period = True
         for j in range(n - i):
-            if pattern_ptr[j] != pattern_ptr[j + i]:
+            if pattern_ptr[unsafe_offset=j] != pattern_ptr[unsafe_offset=j + i]:
                 is_period = False
                 break
         if is_period:
@@ -1455,7 +1473,7 @@ def twoway_search[
         # Simple forward comparison
         var matched = True
         for i in range(n):
-            if text_ptr[pos + i] != pattern_ptr[i]:
+            if text_ptr[unsafe_offset=pos + i] != pattern_ptr[unsafe_offset=i]:
                 matched = False
                 break
 
@@ -1500,7 +1518,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
         for i in range(self.literal_count):
             var lit = literals[i]
             if lit.byte_length() > 0:
-                self.first_bytes[i] = lit.unsafe_ptr()[0]
+                self.first_bytes[i] = lit.unsafe_ptr()[unsafe_offset=0]
                 self.max_len = max(self.max_len, lit.byte_length())
                 self.min_len = min(self.min_len, lit.byte_length())
         self.literals = literals^
@@ -1524,7 +1542,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
 
         # Process text in SIMD chunks
         while pos + SIMD_WIDTH <= text_len - self.min_len + 1:
-            var chunk = text_ptr.load[width=SIMD_WIDTH](pos)
+            var chunk = text_ptr.unsafe_load[width=SIMD_WIDTH](pos)
 
             # Check if any first bytes match
             var any_match = SIMD[DType.bool, SIMD_WIDTH](fill=False)
@@ -1544,7 +1562,7 @@ struct MultiLiteralSearcher(Copyable, Movable):
                         for lit_idx in range(self.literal_count):
                             var lit = self.literals[lit_idx]
                             if lit.byte_length() > 0 and Int(
-                                text_ptr[text_pos]
+                                text_ptr[unsafe_offset=text_pos]
                             ) == Int(self.first_bytes[lit_idx]):
                                 # Verify full literal
                                 if self._verify_literal(text, text_pos, lit):
@@ -1585,6 +1603,6 @@ struct MultiLiteralSearcher(Copyable, Movable):
         var text_ptr = text.unsafe_ptr()
         var lit_ptr = literal.unsafe_ptr()
         for i in range(lit_len):
-            if text_ptr[pos + i] != lit_ptr[i]:
+            if text_ptr[unsafe_offset=pos + i] != lit_ptr[unsafe_offset=i]:
                 return False
         return True

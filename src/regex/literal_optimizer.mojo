@@ -453,7 +453,9 @@ def _longest_common_prefix(s1: String, s2: String) -> String:
     var i = 0
     var s1_ptr = s1.unsafe_ptr()
     var s2_ptr = s2.unsafe_ptr()
-    while i < min_len and Int(s1_ptr[i]) == Int(s2_ptr[i]):
+    while i < min_len and Int(s1_ptr[unsafe_offset=i]) == Int(
+        s2_ptr[unsafe_offset=i]
+    ):
         i += 1
     return String(s1[byte=:i])
 

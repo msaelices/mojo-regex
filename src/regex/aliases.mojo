@@ -51,7 +51,7 @@ def byte_in_string[O: Origin](ch_code: Int, s: StringSlice[O]) -> Bool:
     var ptr = s.unsafe_ptr()
     var target = UInt8(ch_code)
     for i in range(s.byte_length()):
-        if ptr[i] == target:
+        if ptr[unsafe_offset=i] == target:
             return True
     return False
 
@@ -73,7 +73,9 @@ def imm_slice_from_ptr(
     around the 1.0.0b2 `StringSlice(unsafe_from_utf8=Span(...))`
     constructor so call sites stay compact."""
     return ImmSlice(
-        unsafe_from_utf8=Span[Byte, ImmutAnyOrigin](ptr=ptr, length=length)
+        unsafe_from_utf8=Span[Byte, ImmutAnyOrigin](
+            unsafe_ptr=ptr, length=length
+        )
     )
 
 

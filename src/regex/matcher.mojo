@@ -84,11 +84,11 @@ struct OptimizedLiteralInfo(Copyable, Movable):
         self.has_anchors = copy.has_anchors
         self.is_exact_match = copy.is_exact_match
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.best_literal = take.best_literal^
-        self.has_anchors = take.has_anchors
-        self.is_exact_match = take.is_exact_match
+        self.best_literal = move.best_literal^
+        self.has_anchors = move.has_anchors
+        self.is_exact_match = move.is_exact_match
 
     def get_best_required_literal(self) -> Optional[String]:
         """Get the best required literal for matching."""
@@ -158,7 +158,7 @@ def _find_rare_required_byte(
         ref s = val.value()
         if s.byte_length() != 1:
             continue
-        var byte = Int(s.unsafe_ptr()[0])
+        var byte = Int(s.unsafe_ptr()[unsafe_offset=0])
         if first_class_lookup[byte] == 0:
             return byte
     return -1
@@ -337,13 +337,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         else:
             self._onepass_ptr = None
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor. Transfers ownership of the heap-allocated
-        engines from `take` to `self`."""
-        self.engine = take.engine^
-        self.ast = take.ast^
-        self._lazy_dfa_ptr = take._lazy_dfa_ptr
-        self._onepass_ptr = take._onepass_ptr
+        engines from `move` to `self`."""
+        self.engine = move.engine^
+        self.ast = move.ast^
+        self._lazy_dfa_ptr = move._lazy_dfa_ptr
+        self._onepass_ptr = move._onepass_ptr
 
     def __del__(deinit self):
         """Free the heap-allocated engines if we still own them."""
@@ -470,7 +470,7 @@ def _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
 
     var pattern_ptr = pattern.unsafe_ptr()
     for i in range(pattern_len):
-        var c = Int(pattern_ptr[i])
+        var c = Int(pattern_ptr[unsafe_offset=i])
         if c == ord("*") or c == ord("+") or c == ord("?"):
             has_quantifiers = True
         elif c == ord("|"):
@@ -501,7 +501,7 @@ def _is_simple_pattern_skip_prefilter(pattern: String) -> Bool:
         # Short alternation patterns like "a|b|c" yield single-char literals
         var alternation_chars = 0
         for i in range(pattern_len):
-            if Int(pattern_ptr[i]) == ord("|"):
+            if Int(pattern_ptr[unsafe_offset=i]) == ord("|"):
                 alternation_chars += 1
         # If it's mostly single chars separated by |, skip
         if (
@@ -704,18 +704,18 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
         self._use_dfa = copy._use_dfa
         self._required_byte = copy._required_byte
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.dfa_matcher = take.dfa_matcher^
-        self.nfa_matcher = take.nfa_matcher^
-        self.complexity = take.complexity
-        self.prefilter = take.prefilter^
-        self.literal_info = take.literal_info^
-        self.is_exact_literal = take.is_exact_literal
-        self.is_wildcard_match_any = take.is_wildcard_match_any
-        self.use_pure_dfa = take.use_pure_dfa
-        self._use_dfa = take._use_dfa
-        self._required_byte = take._required_byte
+        self.dfa_matcher = move.dfa_matcher^
+        self.nfa_matcher = move.nfa_matcher^
+        self.complexity = move.complexity
+        self.prefilter = move.prefilter^
+        self.literal_info = move.literal_info^
+        self.is_exact_literal = move.is_exact_literal
+        self.is_wildcard_match_any = move.is_wildcard_match_any
+        self.use_pure_dfa = move.use_pure_dfa
+        self._use_dfa = move._use_dfa
+        self._required_byte = move._required_byte
 
     @always_inline
     def is_match(self, text: ImmSlice, start: Int = 0) -> Bool:
@@ -880,7 +880,10 @@ struct HybridMatcher(Copyable, Movable, RegexMatcher):
             # character class. That gives the earliest possible match start
             # for a pattern of shape `[class]+<needle>...`.
             var start = hit
-            while start > 0 and cc.lookup_table[Int(text_ptr[start - 1])] != 0:
+            while (
+                start > 0
+                and cc.lookup_table[Int(text_ptr[unsafe_offset=start - 1])] != 0
+            ):
                 start -= 1
             var m = self.dfa_matcher.match_first(text, start)
             if m and m.value().end_idx > hit:
@@ -946,10 +949,10 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
     fixed-width form and `sub()` goes through the general NFA path."""
     var _fixed_sub_num_groups: Int
     """Number of capture groups in the fixed-width pattern (1..9)."""
-    var _fixed_sub_offsets: InlineArray[Int, 10]
+    var _fixed_sub_offsets: Array[Int, 10]
     """Byte offset of each capture group relative to the match start.
     Indexed by group number (1..num_groups)."""
-    var _fixed_sub_widths: InlineArray[Int, 10]
+    var _fixed_sub_widths: Array[Int, 10]
     """Byte width of each capture group. Indexed by group number."""
     var _fixed_sub_concat: Bool
     """True when the fixed-width pattern has no literal separators (pure
@@ -968,8 +971,8 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.compiled_at = Int(monotonic())
         self._fixed_sub_total_width = -1
         self._fixed_sub_num_groups = 0
-        self._fixed_sub_offsets = InlineArray[Int, 10](fill=0)
-        self._fixed_sub_widths = InlineArray[Int, 10](fill=0)
+        self._fixed_sub_offsets = Array[Int, 10](fill=0)
+        self._fixed_sub_widths = Array[Int, 10](fill=0)
         self._fixed_sub_concat = False
         self._try_precompute_fixed_sub()
 
@@ -984,16 +987,16 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self._fixed_sub_widths = copy._fixed_sub_widths
         self._fixed_sub_concat = copy._fixed_sub_concat
 
-    def __init__(out self, *, deinit take: Self):
+    def __init__(out self, *, deinit move: Self):
         """Move constructor."""
-        self.matcher = take.matcher^
-        self.pattern = take.pattern^
-        self.compiled_at = take.compiled_at
-        self._fixed_sub_total_width = take._fixed_sub_total_width
-        self._fixed_sub_num_groups = take._fixed_sub_num_groups
-        self._fixed_sub_offsets = take._fixed_sub_offsets
-        self._fixed_sub_widths = take._fixed_sub_widths
-        self._fixed_sub_concat = take._fixed_sub_concat
+        self.matcher = move.matcher^
+        self.pattern = move.pattern^
+        self.compiled_at = move.compiled_at
+        self._fixed_sub_total_width = move._fixed_sub_total_width
+        self._fixed_sub_num_groups = move._fixed_sub_num_groups
+        self._fixed_sub_offsets = move._fixed_sub_offsets
+        self._fixed_sub_widths = move._fixed_sub_widths
+        self._fixed_sub_concat = move._fixed_sub_concat
 
     def _try_precompute_fixed_sub(mut self):
         """If `pattern` is a sequence of fixed-width `(\\d{N})` capture
@@ -1406,8 +1409,8 @@ def _parse_repl_template(repl: ImmSlice) -> List[_ReplSegment]:
     var literal_start = 0
 
     while i < repl_len:
-        if Int(repl_ptr[i]) == CHAR_SLASH and i + 1 < repl_len:
-            var next_ch = Int(repl_ptr[i + 1])
+        if Int(repl_ptr[unsafe_offset=i]) == CHAR_SLASH and i + 1 < repl_len:
+            var next_ch = Int(repl_ptr[unsafe_offset=i + 1])
             if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
                 if i > literal_start:
                     segments.append(
@@ -1432,8 +1435,8 @@ def _has_group_refs(repl: ImmSlice) -> Bool:
     var repl_ptr = repl.unsafe_ptr()
     var repl_len = repl.byte_length()
     for i in range(repl_len - 1):
-        if Int(repl_ptr[i]) == CHAR_SLASH:
-            var next_ch = Int(repl_ptr[i + 1])
+        if Int(repl_ptr[unsafe_offset=i]) == CHAR_SLASH:
+            var next_ch = Int(repl_ptr[unsafe_offset=i + 1])
             if next_ch >= CHAR_ONE and next_ch <= CHAR_NINE:
                 return True
     return False
@@ -1461,14 +1464,17 @@ def _detect_fixed_width_groups(
     var literal_run = 0  # track bytes of literal content between groups
 
     while i < plen:
-        if Int(p[i]) == CHAR_LEFT_PAREN:
+        if Int(p[unsafe_offset=i]) == CHAR_LEFT_PAREN:
             # Flush any literal run
             if literal_run > 0:
                 segments.append(-literal_run)
                 literal_run = 0
 
             # Check for non-capturing (?:...)
-            if i + 1 < plen and Int(p[i + 1]) == CHAR_QUESTION_MARK:
+            if (
+                i + 1 < plen
+                and Int(p[unsafe_offset=i + 1]) == CHAR_QUESTION_MARK
+            ):
                 return None
 
             i += 1  # skip (
@@ -1476,44 +1482,51 @@ def _detect_fixed_width_groups(
             # Expect \d or \d{N}
             if (
                 i + 1 >= plen
-                or Int(p[i]) != CHAR_SLASH
-                or Int(p[i + 1]) != CHAR_DIGIT
+                or Int(p[unsafe_offset=i]) != CHAR_SLASH
+                or Int(p[unsafe_offset=i + 1]) != CHAR_DIGIT
             ):
                 return None
             i += 2  # skip \d
 
             # Check for {N}
-            if i < plen and Int(p[i]) == CHAR_LEFT_CURLY:
+            if i < plen and Int(p[unsafe_offset=i]) == CHAR_LEFT_CURLY:
                 i += 1  # skip {
                 var num_start = i
                 while (
                     i < plen
-                    and Int(p[i]) >= CHAR_ZERO
-                    and Int(p[i]) <= CHAR_NINE
+                    and Int(p[unsafe_offset=i]) >= CHAR_ZERO
+                    and Int(p[unsafe_offset=i]) <= CHAR_NINE
                 ):
                     i += 1
-                if i == num_start or i >= plen or Int(p[i]) != CHAR_RIGHT_CURLY:
+                if (
+                    i == num_start
+                    or i >= plen
+                    or Int(p[unsafe_offset=i]) != CHAR_RIGHT_CURLY
+                ):
                     return None
                 var width = 0
                 for j in range(num_start, i):
-                    width = width * 10 + (Int(p[j]) - CHAR_ZERO)
+                    width = width * 10 + (Int(p[unsafe_offset=j]) - CHAR_ZERO)
                 i += 1  # skip }
                 segments.append(width)
-            elif i < plen and Int(p[i]) == CHAR_RIGHT_PAREN:
+            elif i < plen and Int(p[unsafe_offset=i]) == CHAR_RIGHT_PAREN:
                 # Bare \d: width 1
                 segments.append(1)
             else:
                 return None  # Variable quantifier
 
             # Expect closing )
-            if i >= plen or Int(p[i]) != CHAR_RIGHT_PAREN:
+            if i >= plen or Int(p[unsafe_offset=i]) != CHAR_RIGHT_PAREN:
                 return None
             i += 1  # skip )
-        elif Int(p[i]) == CHAR_VERTICAL_BAR or Int(p[i]) == CHAR_LEFT_BRACKET:
+        elif (
+            Int(p[unsafe_offset=i]) == CHAR_VERTICAL_BAR
+            or Int(p[unsafe_offset=i]) == CHAR_LEFT_BRACKET
+        ):
             return None
         else:
             # Literal or escape between groups
-            if Int(p[i]) == CHAR_SLASH and i + 1 < plen:
+            if Int(p[unsafe_offset=i]) == CHAR_SLASH and i + 1 < plen:
                 literal_run += (
                     1  # the escaped char takes 1 byte in matched text
                 )
@@ -1542,8 +1555,8 @@ def _apply_template_fixed(
     repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     match_start: Int,
-    group_offsets: InlineArray[Int, 10],
-    group_widths: InlineArray[Int, 10],
+    group_offsets: Array[Int, 10],
+    group_widths: Array[Int, 10],
     num_groups: Int,
     output_estimate: Int,
 ) -> String:
@@ -1556,13 +1569,15 @@ def _apply_template_fixed(
     var tpl_len = len(template)
 
     for ti in range(tpl_len):
-        ref seg = tpl_ptr[ti]
+        ref seg = tpl_ptr[unsafe_offset=ti]
         if seg.group_ref > 0 and seg.group_ref <= num_groups:
             var gs = match_start + group_offsets[seg.group_ref]
             var gw = group_widths[seg.group_ref]
-            out += imm_slice_from_ptr(text_ptr + gs, gw)
+            out += imm_slice_from_ptr(text_ptr.unsafe_offset(gs), gw)
         else:
-            out += imm_slice_from_ptr(repl_ptr + seg.start, seg.length)
+            out += imm_slice_from_ptr(
+                repl_ptr.unsafe_offset(seg.start), seg.length
+            )
     return out
 
 
@@ -1573,7 +1588,7 @@ def _apply_template_groups[
     template: List[_ReplSegment],
     repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
     groups: List[Match[O]],
-    group_idx: InlineArray[Int, 10],
+    group_idx: Array[Int, 10],
 ) -> String:
     """Apply pre-parsed template using NFA-extracted group matches."""
     var out = String(capacity=32)
@@ -1581,13 +1596,15 @@ def _apply_template_groups[
     var tpl_len = len(template)
 
     for ti in range(tpl_len):
-        ref seg = tpl_ptr[ti]
+        ref seg = tpl_ptr[unsafe_offset=ti]
         if seg.group_ref > 0:
             var idx = group_idx[seg.group_ref]
             if idx >= 0:
                 out += groups[idx].get_match_text()
         else:
-            out += imm_slice_from_ptr(repl_ptr + seg.start, seg.length)
+            out += imm_slice_from_ptr(
+                repl_ptr.unsafe_offset(seg.start), seg.length
+            )
     return out
 
 
@@ -1669,7 +1686,7 @@ def _sub_impl_with_repl(
             if compiled._fixed_sub_concat and text_len == total_width:
                 var all_digits = True
                 for i in range(total_width):
-                    var b = Int(text_ptr[i])
+                    var b = Int(text_ptr[unsafe_offset=i])
                     if b < CHAR_ZERO or b > CHAR_NINE:
                         all_digits = False
                         break
@@ -1696,7 +1713,7 @@ def _sub_impl_with_repl(
 
                 if match_start > pos:
                     result += imm_slice_from_ptr(
-                        text_ptr + pos, match_start - pos
+                        text_ptr.unsafe_offset(pos), match_start - pos
                     )
 
                 result += _apply_template_fixed(
@@ -1713,7 +1730,9 @@ def _sub_impl_with_repl(
 
                 if match_end == match_start:
                     if pos < text_len:
-                        result += imm_slice_from_ptr(text_ptr + pos, 1)
+                        result += imm_slice_from_ptr(
+                            text_ptr.unsafe_offset(pos), 1
+                        )
                     pos = match_end + 1
                 else:
                     pos = match_end
@@ -1734,11 +1753,11 @@ def _sub_impl_with_repl(
 
                 if m.start_idx > pos:
                     result += imm_slice_from_ptr(
-                        text_ptr + pos, m.start_idx - pos
+                        text_ptr.unsafe_offset(pos), m.start_idx - pos
                     )
 
                 # Build group index for this match
-                var group_idx = InlineArray[Int, 10](fill=-1)
+                var group_idx = Array[Int, 10](fill=-1)
                 for gi in range(len(mg[1])):
                     var gid = mg[1][gi].group_id
                     if 1 <= gid <= 9:
@@ -1751,7 +1770,9 @@ def _sub_impl_with_repl(
 
                 if m.end_idx == m.start_idx:
                     if pos < text_len:
-                        result += imm_slice_from_ptr(text_ptr + pos, 1)
+                        result += imm_slice_from_ptr(
+                            text_ptr.unsafe_offset(pos), 1
+                        )
                     pos = m.end_idx + 1
                 else:
                     pos = m.end_idx
@@ -1768,14 +1789,16 @@ def _sub_impl_with_repl(
             var match_end = m.value().end_idx
 
             if match_start > pos:
-                result += imm_slice_from_ptr(text_ptr + pos, match_start - pos)
+                result += imm_slice_from_ptr(
+                    text_ptr.unsafe_offset(pos), match_start - pos
+                )
 
             result += repl
             replacements += 1
 
             if match_end == match_start:
                 if pos < text_len:
-                    result += imm_slice_from_ptr(text_ptr + pos, 1)
+                    result += imm_slice_from_ptr(text_ptr.unsafe_offset(pos), 1)
                 pos = match_end + 1
             else:
                 pos = match_end
@@ -1784,7 +1807,9 @@ def _sub_impl_with_repl(
                 break
 
     if pos < text_len:
-        result += imm_slice_from_ptr(text_ptr + pos, text_len - pos)
+        result += imm_slice_from_ptr(
+            text_ptr.unsafe_offset(pos), text_len - pos
+        )
 
     return result
 

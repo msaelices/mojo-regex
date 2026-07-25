@@ -61,7 +61,7 @@ blow-ups. ONEPASS_MAX_STATES is comfortably within Int16 range."""
 
 def _epsilon_close(
     program: Program,
-    imm start_pcs: InlineArray[Int, MAX_STATES],
+    imm start_pcs: Array[Int, MAX_STATES],
     start_count: Int,
     at_start: Bool,
     at_end: Bool = False,
@@ -74,7 +74,7 @@ def _epsilon_close(
     retained in the set.
     """
     var result = SIMD[DType.uint8, MAX_STATES](0)
-    var stack = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var stack = Array[Int, MAX_STATES](uninitialized=True)
     var stack_len = start_count
     for i in range(start_count):
         stack[i] = start_pcs[i]
@@ -127,7 +127,7 @@ def _closure_reaches_match_with_end_anchor(
     """True iff the epsilon closure of `nfa_set` with `OP_END_ANCHOR`
     fired reaches OP_MATCH. Used at compile time to precompute the
     per-state answer; at match time the cached Bool is a single load."""
-    var start_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var start_pcs = Array[Int, MAX_STATES](uninitialized=True)
     var count = 0
     for pc in range(len(program)):
         if nfa_set[pc] != 0:
@@ -204,7 +204,7 @@ def compile_onepass(
             has_end_anchor = True
 
     # Seed the worklist with the start state.
-    var start_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var start_pcs = Array[Int, MAX_STATES](uninitialized=True)
     start_pcs[0] = 0
     var start_set = _epsilon_close(program, start_pcs, 1, at_start=True)
     var states = List[OnePassState](capacity=32)
@@ -218,21 +218,21 @@ def compile_onepass(
     worklist.append(0)
 
     # Temporary buffers reused per state.
-    var next_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
-    var first_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
-    var other_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var next_pcs = Array[Int, MAX_STATES](uninitialized=True)
+    var first_pcs = Array[Int, MAX_STATES](uninitialized=True)
+    var other_pcs = Array[Int, MAX_STATES](uninitialized=True)
 
     # Per-state scratch: list of "active" PCs (those marked in nfa_set
     # with a byte-consuming op). Filtering once per state is O(prog_len);
     # the inner byte loop then only touches the (typically small) active
     # set instead of probing all PCs for every byte.
-    var active_pcs = InlineArray[Int, MAX_STATES](uninitialized=True)
+    var active_pcs = Array[Int, MAX_STATES](uninitialized=True)
 
     while len(worklist) > 0:
         var state_id = worklist[len(worklist) - 1]
         _ = worklist.pop()
         var cur_set = states[state_id].nfa_set
-        var transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD_INT)
+        var transitions = Array[Int, 256](fill=ONEPASS_DEAD_INT)
 
         # Collect byte-consuming PCs once per state.
         var active_count = 0
@@ -325,11 +325,11 @@ def compile_onepass(
     # cold `nfa_set` is dropped from runtime so the per-byte hot loop
     # touches only ~512B per state instead of ~2576B.
     var num_states = len(states)
-    var runtime_transitions = List[InlineArray[Int16, 256]](capacity=num_states)
+    var runtime_transitions = List[Array[Int16, 256]](capacity=num_states)
     var is_match_flags = List[Bool](capacity=num_states)
     var is_end_match_flags = List[Bool](capacity=num_states)
     for i in range(num_states):
-        var compact = InlineArray[Int16, 256](fill=ONEPASS_DEAD)
+        var compact = Array[Int16, 256](fill=ONEPASS_DEAD)
         ref src = states[i].transitions
         for b in range(256):
             compact[b] = Int16(src[b])
@@ -411,7 +411,7 @@ struct OnePassState(Copyable, Movable):
     state reaches OP_MATCH. Precomputed at compile_onepass time so the
     per-call `match_first` end-of-text fixup is a single field load
     instead of a state-set DFS walk."""
-    var transitions: InlineArray[Int, 256]
+    var transitions: Array[Int, 256]
     """Byte -> next OnePass state id. `ONEPASS_DEAD` for bytes that
     have no valid successor."""
 
@@ -423,7 +423,7 @@ struct OnePassState(Copyable, Movable):
         self.nfa_set = nfa_set
         self.is_match = is_match
         self.is_end_match = False
-        self.transitions = InlineArray[Int, 256](fill=ONEPASS_DEAD_INT)
+        self.transitions = Array[Int, 256](fill=ONEPASS_DEAD_INT)
 
 
 struct OnePassNFA(Copyable, Movable):
@@ -434,7 +434,7 @@ struct OnePassNFA(Copyable, Movable):
     `nfa_set` from compilation is dropped; `is_match` / `is_end_match`
     live in their own dense `List[Bool]` arrays."""
 
-    var transitions: List[InlineArray[Int16, 256]]
+    var transitions: List[Array[Int16, 256]]
     """Per-state byte -> next-state-id table. Int16 since
     `ONEPASS_MAX_STATES = 512` and `ONEPASS_DEAD = -1` both fit. Each
     entry is 512B vs the compile-time 2KB table — 4x denser, 4x more
@@ -452,7 +452,7 @@ struct OnePassNFA(Copyable, Movable):
 
     def __init__(
         out self,
-        var transitions: List[InlineArray[Int16, 256]],
+        var transitions: List[Array[Int16, 256]],
         var is_match_flags: List[Bool],
         var is_end_match_flags: List[Bool],
         has_start_anchor: Bool,
@@ -485,21 +485,25 @@ struct OnePassNFA(Copyable, Movable):
         var match_end = -1
         var trans_ptr = self.transitions.unsafe_ptr()
         var match_ptr = self.is_match_flags.unsafe_ptr()
-        if match_ptr[0]:
+        if match_ptr[unsafe_offset=0]:
             match_end = start
         var pos = start
         while pos < text_len:
-            var next_id = Int(trans_ptr[state_id][Int(text_ptr[pos])])
+            var next_id = Int(
+                trans_ptr[unsafe_offset=state_id][
+                    Int(text_ptr[unsafe_offset=pos])
+                ]
+            )
             if next_id == Int(ONEPASS_DEAD):
                 break
             state_id = next_id
             pos += 1
-            if match_ptr[state_id]:
+            if match_ptr[unsafe_offset=state_id]:
                 match_end = pos
         # End-of-text fixup for `$` anchors: cached per-state at compile
         # time, so no per-call state-set DFS walk.
         if self.has_end_anchor and pos == text_len:
-            if self.is_end_match_flags.unsafe_ptr()[state_id]:
+            if self.is_end_match_flags.unsafe_ptr()[unsafe_offset=state_id]:
                 match_end = pos
         if match_end >= 0:
             return Match(0, start, match_end, text)
