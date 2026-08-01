@@ -162,7 +162,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         #     ": ",
         #     child,
         # )
-        (self.children_ptr + self.children_len).unsafe_write(child^)
+        self.children_ptr.unsafe_offset(self.children_len).unsafe_write(child^)
         self.children_len += 1
 
 
