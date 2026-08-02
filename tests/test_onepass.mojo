@@ -25,7 +25,7 @@ def test_onepass_compiles_simple_literal() raises:
     if opt_ptr:
         var ptr = opt_ptr.value()
         ptr.unsafe_deinit_pointee()
-        ptr.free()
+        ptr.unsafe_free()
 
 
 def test_onepass_compiles_phone_validation() raises:
@@ -38,7 +38,7 @@ def test_onepass_compiles_phone_validation() raises:
     if opt_ptr:
         var ptr = opt_ptr.value()
         ptr.unsafe_deinit_pointee()
-        ptr.free()
+        ptr.unsafe_free()
 
 
 def test_onepass_literal_matches() raises:
@@ -56,7 +56,7 @@ def test_onepass_literal_matches() raises:
         assert_equal(m_good.value().start_idx, 0)
         assert_equal(m_good.value().end_idx, 3)
     ptr.unsafe_deinit_pointee()
-    ptr.free()
+    ptr.unsafe_free()
 
 
 def test_onepass_end_anchor() raises:
@@ -74,7 +74,7 @@ def test_onepass_end_anchor() raises:
     if m_hit:
         assert_equal(m_hit.value().end_idx, 4)
     ptr.unsafe_deinit_pointee()
-    ptr.free()
+    ptr.unsafe_free()
 
 
 def main() raises:

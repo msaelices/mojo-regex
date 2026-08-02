@@ -309,7 +309,7 @@ def compile_onepass(
                 worklist.append(idx)
             transitions[byte] = idx
 
-        states[state_id].transitions = transitions
+        states[state_id].transitions = transitions^
 
     # Precompute the `$` end-of-text answer for each state so match_first
     # can resolve the end-anchor fixup with a single field load.

@@ -345,16 +345,16 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self._lazy_dfa_ptr = move._lazy_dfa_ptr
         self._onepass_ptr = move._onepass_ptr
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         """Free the heap-allocated engines if we still own them."""
         if self._lazy_dfa_ptr:
             var ptr = self._lazy_dfa_ptr.value()
             ptr.unsafe_deinit_pointee()
-            ptr.free()
+            ptr.unsafe_free()
         if self._onepass_ptr:
             var ptr = self._onepass_ptr.value()
             ptr.unsafe_deinit_pointee()
-            ptr.free()
+            ptr.unsafe_free()
 
     @always_inline
     def match_first[
@@ -983,8 +983,8 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.compiled_at = copy.compiled_at
         self._fixed_sub_total_width = copy._fixed_sub_total_width
         self._fixed_sub_num_groups = copy._fixed_sub_num_groups
-        self._fixed_sub_offsets = copy._fixed_sub_offsets
-        self._fixed_sub_widths = copy._fixed_sub_widths
+        self._fixed_sub_offsets = copy._fixed_sub_offsets.copy()
+        self._fixed_sub_widths = copy._fixed_sub_widths.copy()
         self._fixed_sub_concat = copy._fixed_sub_concat
 
     def __init__(out self, *, deinit move: Self):
@@ -994,8 +994,8 @@ struct CompiledRegex(ImplicitlyCopyable, Movable):
         self.compiled_at = move.compiled_at
         self._fixed_sub_total_width = move._fixed_sub_total_width
         self._fixed_sub_num_groups = move._fixed_sub_num_groups
-        self._fixed_sub_offsets = move._fixed_sub_offsets
-        self._fixed_sub_widths = move._fixed_sub_widths
+        self._fixed_sub_offsets = move._fixed_sub_offsets^
+        self._fixed_sub_widths = move._fixed_sub_widths^
         self._fixed_sub_concat = move._fixed_sub_concat
 
     def _try_precompute_fixed_sub(mut self):

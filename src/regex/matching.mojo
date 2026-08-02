@@ -39,7 +39,7 @@ struct Match[origin: ImmOrigin](Copyable, Movable, TrivialRegisterPassable):
         """Returns the text that was matched."""
         return StringSlice[Self.origin](
             unsafe_from_utf8=Span[Byte, Self.origin](
-                unsafe_ptr=self.text_ptr + self.start_idx,
+                unsafe_ptr=self.text_ptr.unsafe_offset(self.start_idx),
                 length=self.end_idx - self.start_idx,
             )
         )
@@ -100,10 +100,10 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
         # var call_location = __call_location()
         # print("Copying MatchList", call_location)
 
-    def __del__(deinit self):
+    def __deinit__(deinit self):
         """Destructor to free allocated memory."""
         if self._capacity > 0:
-            self._data.free()
+            self._data.unsafe_free()
 
     @always_inline
     def __len__(self) -> Int:
@@ -124,7 +124,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
         Returns:
             A reference to the match at the given index.
         """
-        return self._data[idx]
+        return self._data[unsafe_offset=idx]
 
     @no_inline
     def _realloc(mut self, new_capacity: Int):
@@ -132,7 +132,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
 
         if self._capacity > 0:
             unsafe_memcpy(dest=new_data, src=self._data, count=len(self))
-            self._data.free()
+            self._data.unsafe_free()
         self._data = new_data
         self._capacity = new_capacity
 
@@ -146,7 +146,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
                 self._capacity * 2, self.DEFAULT_RESERVE_SIZE
             )
             self._realloc(new_capacity)
-        self._data[self._len] = m
+        self._data[unsafe_offset=self._len] = m
         self._len += 1
 
     def clear(
