@@ -1,4 +1,5 @@
-from std.memory import Pointer, UnsafePointer, unsafe_memcpy, alloc
+from std.memory import Pointer, unsafe_memcpy
+from std.memory.alloc import unsafe_alloc
 from std.os import abort
 
 from regex.aliases import (
@@ -83,9 +84,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
     comptime ImmOrigin = ImmOrigin(Self.origin)
     comptime Immutable = Regex[origin=Self.ImmOrigin]
     var pattern: String
-    var children_ptr: UnsafePointer[
-        ASTNode[ImmUntrackedOrigin], MutUntrackedOrigin
-    ]
+    var children_ptr: Pointer[ASTNode[ImmUntrackedOrigin], MutUntrackedOrigin]
     var children_len: Int
     """Regex struct for representing a regular expression pattern."""
 
@@ -93,7 +92,7 @@ struct Regex[origin: Origin](Copyable, Equatable, Movable, Writable):
         """Initialize a Regex with a pattern."""
         self.pattern = pattern
         self.children_len = 0
-        self.children_ptr = alloc[ASTNode[ImmUntrackedOrigin]](
+        self.children_ptr = unsafe_alloc[ASTNode[ImmUntrackedOrigin]](
             pattern.byte_length() * 2
         )  # Allocate enough space for children
 
@@ -181,7 +180,7 @@ struct ASTNode[regex_origin: ImmOrigin](
 
     var type: Int
     """The type of AST node (e.g., ELEMENT, GROUP, RANGE, etc.)."""
-    var regex_ptr: UnsafePointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin]
+    var regex_ptr: Pointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin]
     """Pointer to the parent regex object containing the pattern string."""
     var start_idx: Int
     """Starting position of this node in the original pattern string."""
@@ -209,7 +208,7 @@ struct ASTNode[regex_origin: ImmOrigin](
     def __init__(
         out self,
         type: Int,
-        regex_ptr: UnsafePointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
+        regex_ptr: Pointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
         start_idx: Int,
         end_idx: Int,
         capturing_group: Bool = False,
@@ -236,7 +235,7 @@ struct ASTNode[regex_origin: ImmOrigin](
 
     def __init__(
         out self,
-        regex_ptr: UnsafePointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
+        regex_ptr: Pointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
         type: Int,
         child_index: UInt16,
         start_idx: Int,
@@ -264,7 +263,7 @@ struct ASTNode[regex_origin: ImmOrigin](
 
     def __init__(
         out self,
-        regex_ptr: UnsafePointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
+        regex_ptr: Pointer[Regex[ImmUntrackedOrigin], ImmUntrackedOrigin],
         type: Int,
         children_indexes: ChildrenIndexes,
         start_idx: Int,
@@ -470,7 +469,9 @@ struct ASTNode[regex_origin: ImmOrigin](
         """Check if a character code is in a range pattern. Zero-allocation
         version of _is_char_in_range."""
         if range_pattern.startswith("["):
-            var inner_pattern = range_pattern[byte=1:-1]
+            var inner_pattern = range_pattern[
+                byte = 1 : range_pattern.byte_length() - 1
+            ]
             return self._char_code_matches_range(ch_code, inner_pattern)
         else:
             # Expanded string, check if char is in it
@@ -567,9 +568,7 @@ def Element[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create an Element node with a value string."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=ELEMENT,
@@ -591,9 +590,7 @@ def WildcardElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a WildcardElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=WILDCARD,
@@ -615,9 +612,7 @@ def SpaceElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a SpaceElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=SPACE,
@@ -639,9 +634,7 @@ def DigitElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a DigitElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=DIGIT,
@@ -663,9 +656,7 @@ def WordElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a WordElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=WORD,
@@ -675,6 +666,30 @@ def WordElement[
         min=1,
         max=1,
     )
+
+
+@always_inline
+def _has_range_seq(pattern: StringSlice, lo: Int, hi: Int) -> Bool:
+    """Scalar scan for a `lo-hi` byte triple (e.g. 'a','-','z') inside `pattern`.
+
+    Deliberately avoids `StringSlice.__contains__` / slicing: those lower
+    to a SIMD substring search that over-reads a 16-byte chunk past the
+    end of a short class, which the 1.0.0 comptime interpreter rejects
+    as an out-of-bounds access. A plain byte loop through `unsafe_ptr`
+    stays interpretable at comptime and keeps `classify_range_kind`
+    usable from the comptime-regex path for explicit classes.
+    """
+    var ptr = pattern.unsafe_ptr()
+    var n = pattern.byte_length()
+    var dash = ord("-")
+    for i in range(n - 2):
+        if (
+            Int(ptr[unsafe_offset=i]) == lo
+            and Int(ptr[unsafe_offset=i + 1]) == dash
+            and Int(ptr[unsafe_offset=i + 2]) == hi
+        ):
+            return True
+    return False
 
 
 @always_inline
@@ -694,14 +709,17 @@ def classify_range_kind(pattern: StringSlice) -> Int:
         return RANGE_KIND_ALNUM
     if pattern == "[a-zA-Z]":
         return RANGE_KIND_ALPHA
-    # Check for complex alphanumeric patterns like [a-zA-Z0-9._%+-]
+    # Check for complex alphanumeric patterns like [a-zA-Z0-9._%+-].
+    # The length gate (inner length = pattern length minus the two
+    # brackets) short-circuits short explicit classes before the byte
+    # scans. Both the gate and the scans stay scalar so this remains
+    # comptime-evaluable (see `_has_range_seq`).
     if pattern.startswith("[") and pattern.endswith("]"):
-        var inner = pattern[byte=1:-1]
         if (
-            "a-z" in inner
-            and "A-Z" in inner
-            and "0-9" in inner
-            and inner.byte_length() > COMPLEX_CHAR_CLASS_THRESHOLD
+            pattern.byte_length() - 2 > COMPLEX_CHAR_CLASS_THRESHOLD
+            and _has_range_seq(pattern, ord("a"), ord("z"))
+            and _has_range_seq(pattern, ord("A"), ord("Z"))
+            and _has_range_seq(pattern, ord("0"), ord("9"))
         ):
             return RANGE_KIND_COMPLEX_ALNUM
     return RANGE_KIND_OTHER
@@ -718,9 +736,7 @@ def RangeElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a RangeElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     # Classify the range pattern once at build time.
     var kind = RANGE_KIND_OTHER
@@ -749,9 +765,7 @@ def StartElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a StartElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=START,
@@ -773,9 +787,7 @@ def EndElement[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create an EndElement node."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=END,
@@ -799,9 +811,7 @@ def OrNode[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create an OrNode with left and right children."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=OR,
@@ -827,9 +837,7 @@ def NotNode[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a NotNode with a child."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     return ASTNode[ImmUntrackedOrigin](
         type=NOT,
@@ -853,9 +861,7 @@ def GroupNode[
 ) -> ASTNode[ImmUntrackedOrigin]:
     """Create a GroupNode with children."""
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     var node = ASTNode[ImmUntrackedOrigin](
         type=GROUP,

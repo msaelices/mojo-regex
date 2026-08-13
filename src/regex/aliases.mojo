@@ -67,7 +67,7 @@ without allocating a `String`."""
 
 @always_inline
 def imm_slice_from_ptr(
-    ptr: UnsafePointer[Byte, ImmutAnyOrigin], length: Int
+    ptr: Pointer[Byte, ImmutAnyOrigin], length: Int
 ) -> ImmSlice:
     """Construct an `ImmSlice` over `[ptr, ptr+length)`. Thin wrapper
     around the 1.0.0b2 `StringSlice(unsafe_from_utf8=Span(...))`

@@ -6,7 +6,8 @@ and implements the hybrid routing system that selects the optimal engine based
 on pattern complexity.
 """
 from std.hashlib import hash
-from std.memory import UnsafePointer, alloc
+from std.memory import Pointer
+from std.memory.alloc import unsafe_alloc
 from std.os import abort
 from std.ffi import _Global
 from std.time import monotonic
@@ -211,10 +212,10 @@ trait RegexMatcher:
 struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
     """High-performance DFA-based matcher for simple patterns."""
 
-    var engine_ptr: Optional[UnsafePointer[DFAEngine, MutUntrackedOrigin]]
+    var engine_ptr: Optional[Pointer[DFAEngine, MutUntrackedOrigin]]
     """The underlying DFA engine for pattern matching. None when the
     matcher was default-constructed and no AST has been compiled into
-    it (1.0.0b1 forbids null UnsafePointer, so absence goes through
+    it (1.0.0b1 forbids null Pointer, so absence goes through
     Optional's None niche)."""
 
     def __init__(out self):
@@ -230,8 +231,8 @@ struct DFAMatcher(Boolable, Copyable, Movable, RegexMatcher):
             ast: AST representing the regex pattern.
             pattern: The original regex pattern string.
         """
-        engine = compile_dfa_pattern(ast)
-        var ptr = alloc[DFAEngine](1)
+        var engine = compile_dfa_pattern(ast)
+        var ptr = unsafe_alloc[DFAEngine](1)
         ptr.unsafe_write(engine^)
         self.engine_ptr = ptr
 
@@ -273,7 +274,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """NFA-based matcher with lazy DFA acceleration.
 
     Owns an optional heap-allocated `LazyDFA`. The lazy DFA is stored
-    behind a nullable `UnsafePointer` rather than an `Optional[LazyDFA]`
+    behind a nullable `Pointer` rather than an `Optional[LazyDFA]`
     inline so that calling `mut self` methods on it (the lazy DFA caches
     transitions as it runs) is possible through the read-only `self` that
     the `RegexMatcher` trait demands. An empty `Optional` means no lazy
@@ -287,11 +288,11 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
     """The underlying NFA engine for pattern matching."""
     var ast: ASTNode[MutUntrackedOrigin]
     """The parsed AST representation of the regex pattern."""
-    var _lazy_dfa_ptr: Optional[UnsafePointer[LazyDFA, MutUntrackedOrigin]]
+    var _lazy_dfa_ptr: Optional[Pointer[LazyDFA, MutUntrackedOrigin]]
     """Heap-allocated lazy DFA. None when the pattern is not eligible
     for lazy-DFA acceleration (e.g., PikeVM program exceeds MAX_STATES).
     """
-    var _onepass_ptr: Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]
+    var _onepass_ptr: Optional[Pointer[OnePassNFA, MutUntrackedOrigin]]
     """Heap-allocated OnePass NFA for unambiguous patterns. None when
     the pattern failed the one-pass check. Preferred over the lazy DFA
     and the backtracking NFA when available since it does not pay per-
@@ -310,7 +311,7 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         if vm.is_supported():
             if _program_has_end_anchor(vm.program):
                 self._onepass_ptr = compile_onepass(vm.program.copy())
-            var ptr = alloc[LazyDFA](1)
+            var ptr = unsafe_alloc[LazyDFA](1)
             # `unsafe_write` constructs into uninitialized memory.
             # The previous `self._lazy_dfa_ptr[] = LazyDFA(vm^)` form ran
             # move-assignment into garbage storage, which was the source
@@ -325,13 +326,13 @@ struct NFAMatcher(Copyable, Movable, RegexMatcher):
         self.engine = copy.engine.copy()
         self.ast = copy.ast
         if copy._lazy_dfa_ptr:
-            var ptr = alloc[LazyDFA](1)
+            var ptr = unsafe_alloc[LazyDFA](1)
             ptr.unsafe_write(copy._lazy_dfa_ptr.value()[].copy())
             self._lazy_dfa_ptr = ptr
         else:
             self._lazy_dfa_ptr = None
         if copy._onepass_ptr:
-            var ptr = alloc[OnePassNFA](1)
+            var ptr = unsafe_alloc[OnePassNFA](1)
             ptr.unsafe_write(copy._onepass_ptr.value()[].copy())
             self._onepass_ptr = ptr
         else:
@@ -1180,7 +1181,7 @@ def _init_regex_cache() -> RegexCache:
     return RegexCache()
 
 
-def _get_regex_cache() -> UnsafePointer[RegexCache, MutUntrackedOrigin]:
+def _get_regex_cache() -> Pointer[RegexCache, MutUntrackedOrigin]:
     """Returns an pointer to the global regex cache."""
     try:
         return _CACHE_GLOBAL.get_or_create_ptr()
@@ -1196,7 +1197,7 @@ def _get_regex_cache() -> UnsafePointer[RegexCache, MutUntrackedOrigin]:
 # the public API only accepts `StringSlice` which is read-only, so
 # such misuse requires going out of the typed API.
 #
-# We cannot cache the `UnsafePointer[CompiledRegex]` returned from the
+# We cannot cache the `Pointer[CompiledRegex]` returned from the
 # regex Dict across calls: an intervening `compile_regex` on a
 # different pattern can rehash the Dict and invalidate prior pointers.
 # Caching only `hash(pattern)` is safe — we re-probe the Dict but skip
@@ -1234,7 +1235,7 @@ def _init_last_sub_cache() -> _LastSubCache:
     )
 
 
-def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutUntrackedOrigin]:
+def _get_last_sub_cache() -> Pointer[_LastSubCache, MutUntrackedOrigin]:
     try:
         return _LAST_SUB_CACHE_GLOBAL.get_or_create_ptr()
     except e:
@@ -1243,10 +1244,10 @@ def _get_last_sub_cache() -> UnsafePointer[_LastSubCache, MutUntrackedOrigin]:
 
 def _compile_and_cache(
     pattern: ImmSlice,
-) raises -> UnsafePointer[CompiledRegex, MutUntrackedOrigin]:
+) raises -> Pointer[CompiledRegex, MutUntrackedOrigin]:
     """Compile a regex pattern and return a pointer into the global cache.
 
-    Returns an UnsafePointer to the cached CompiledRegex, avoiding the
+    Returns an Pointer to the cached CompiledRegex, avoiding the
     copy that compile_regex() must do when returning by value. Callers
     must not store this pointer past the current call — the cache may
     rehash on a subsequent compile_regex() call.
@@ -1258,13 +1259,13 @@ def _compile_and_cache(
 def _compile_and_cache_with_key(
     pattern: ImmSlice,
     key: UInt64,
-) raises -> UnsafePointer[CompiledRegex, MutUntrackedOrigin]:
+) raises -> Pointer[CompiledRegex, MutUntrackedOrigin]:
     """Variant of `_compile_and_cache` that takes a precomputed hash.
 
     Used by `sub()` with a pointer-identity fast path so repeat calls
     with the same `StaticString` pattern skip the `hash()` call
     entirely. The Dict lookup itself is unavoidable (pointers into the
-    cache can rehash, so we cannot cache the resulting `UnsafePointer`
+    cache can rehash, so we cannot cache the resulting `Pointer`
     across calls without stale-pointer risk)."""
     var regex_cache_ptr = _get_regex_cache()
 
@@ -1272,17 +1273,17 @@ def _compile_and_cache_with_key(
         try:
             ref cached = regex_cache_ptr[][key]
             if cached.pattern == pattern:
-                return UnsafePointer(to=cached)
+                return Pointer(to=cached)
         except:
             pass
 
     var compiled = CompiledRegex(String(pattern))
     try:
         regex_cache_ptr[][key] = compiled
-        return UnsafePointer(to=regex_cache_ptr[][key])
+        return Pointer(to=regex_cache_ptr[][key])
     except e:
         # Dict insertion must succeed (failure here would indicate an
-        # allocator bug). 1.0.0b1 forbids returning a null UnsafePointer
+        # allocator bug). 1.0.0b1 forbids returning a null Pointer
         # sentinel, so propagate the error instead of silently producing
         # a dangling pointer.
         raise e
@@ -1316,7 +1317,7 @@ def compile_regex(pattern: ImmSlice) raises -> CompiledRegex:
 
 def clear_regex_cache():
     """Clear the compiled regex cache."""
-    regex_cache_ptr = _get_regex_cache()
+    var regex_cache_ptr = _get_regex_cache()
     regex_cache_ptr[].clear()
 
 
@@ -1552,8 +1553,8 @@ def _detect_fixed_width_groups(
 @always_inline
 def _apply_template_fixed(
     template: List[_ReplSegment],
-    repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
-    text_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+    repl_ptr: Pointer[Byte, ImmutAnyOrigin],
+    text_ptr: Pointer[Byte, ImmutAnyOrigin],
     match_start: Int,
     group_offsets: Array[Int, 10],
     group_widths: Array[Int, 10],
@@ -1586,7 +1587,7 @@ def _apply_template_groups[
     O: ImmOrigin
 ](
     template: List[_ReplSegment],
-    repl_ptr: UnsafePointer[Byte, ImmutAnyOrigin],
+    repl_ptr: Pointer[Byte, ImmutAnyOrigin],
     groups: List[Match[O]],
     group_idx: Array[Int, 10],
 ) -> String:

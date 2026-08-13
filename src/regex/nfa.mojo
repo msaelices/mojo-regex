@@ -1,4 +1,4 @@
-from std.memory import UnsafePointer
+from std.memory import Pointer
 
 from regex.ast import (
     ASTNode,
@@ -600,7 +600,9 @@ struct NFAEngine(Copyable, Engine):
         # Expand the range pattern if needed
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
             # It's a pattern like "[a-z]", need to expand it
-            var inner = range_pattern[byte=1:-1]
+            var inner = range_pattern[
+                byte = 1 : range_pattern.byte_length() - 1
+            ]
 
             # Handle common patterns with specialized matchers
             # Return None for simple ranges to use RangeBasedMatcher instead
@@ -972,7 +974,9 @@ struct NFAEngine(Copyable, Engine):
                 var opt = ast.get_value()
                 if opt:
                     ref range_pattern = opt.value()
-                    var inner = range_pattern[byte=1:-1]
+                    var inner = range_pattern[
+                        byte = 1 : range_pattern.byte_length() - 1
+                    ]
                     ch_found = byte_in_string(ch_code, inner)
         else:
             # RANGE_KIND_OTHER: use direct byte-level range matching.
@@ -1555,7 +1559,9 @@ struct NFAEngine(Copyable, Engine):
                         max_matches,
                     )
             elif kind == RANGE_KIND_COMPLEX_ALNUM:
-                var inner = range_pattern[byte=1:-1]
+                var inner = range_pattern[
+                    byte = 1 : range_pattern.byte_length() - 1
+                ]
                 var pos = str_i
                 var match_count = 0
                 var actual_max = max_matches
@@ -1646,7 +1652,9 @@ struct NFAEngine(Copyable, Engine):
     ](self, range_pattern: StringSlice[O], ch_code: Int) -> Bool:
         """Helper function to check if a character matches a range pattern."""
         if range_pattern.startswith("[") and range_pattern.endswith("]"):
-            var inner = range_pattern[byte=1:-1]
+            var inner = range_pattern[
+                byte = 1 : range_pattern.byte_length() - 1
+            ]
 
             # Handle simple ranges like [c-n]
             if inner.byte_length() == 3 and inner[byte=1] == "-":
@@ -1666,7 +1674,7 @@ struct NFAEngine(Copyable, Engine):
     ](
         self,
         matcher: RangeBasedMatcher,
-        str_ptr: UnsafePointer[Byte, O],
+        str_ptr: Pointer[Byte, O],
         str: StringSlice[O],
         str_i: Int,
         min_matches: Int,
@@ -1697,7 +1705,7 @@ struct NFAEngine(Copyable, Engine):
         range_start: Int,
         range_end: Int,
         positive_logic: Bool,
-        str_ptr: UnsafePointer[Byte, O],
+        str_ptr: Pointer[Byte, O],
         str: StringSlice[O],
         str_i: Int,
         min_matches: Int,

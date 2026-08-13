@@ -27,7 +27,7 @@ struct LiteralInfo[node_origin: ImmOrigin](ImplicitlyCopyable, Movable):
     Built only during regex compilation (pattern analysis), never on the
     per-match hot path, so it does not need to stay `TrivialRegisterPassable`;
     that lets `node_ptr` be a safe `Optional[Pointer[...]]` borrow instead of
-    a raw `UnsafePointer`."""
+    a raw `Pointer`."""
 
     var node_ptr: Optional[
         Pointer[ASTNode[ImmUntrackedOrigin], Self.node_origin]

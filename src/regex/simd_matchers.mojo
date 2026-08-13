@@ -7,7 +7,7 @@ Based on techniques from: http://0x80.pl/notesen/2018-10-18-simd-byte-lookup.htm
 from std.os import abort
 from std.sys.info import simd_width_of
 from std.ffi import _Global
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from regex.aliases import (
     SIMD_MATCHER_NONE,
     SIMD_MATCHER_WHITESPACE,
@@ -370,7 +370,7 @@ def analyze_character_class_pattern(pattern: String) -> String:
     else:
         # Check if it's a simple range
         if pattern.startswith("[") and pattern.endswith("]") and "-" in pattern:
-            var inner = pattern[byte=1:-1]
+            var inner = pattern[byte = 1 : pattern.byte_length() - 1]
             if len(inner) == 3 and Int(
                 inner.unsafe_ptr()[unsafe_offset=1]
             ) == ord("-"):
@@ -389,7 +389,7 @@ def _init_range_matchers() -> RangeMatchers:
     return matchers^
 
 
-def _get_range_matchers() -> UnsafePointer[RangeMatchers, MutUntrackedOrigin]:
+def _get_range_matchers() -> Pointer[RangeMatchers, MutUntrackedOrigin]:
     """Returns a pointer to the global range matchers dictionary."""
     try:
         return _RANGE_MATCHERS_GLOBAL.get_or_create_ptr()
@@ -410,7 +410,7 @@ def _init_nibble_matchers() -> NibbleMatchers:
     return matchers^
 
 
-def _get_nibble_matchers() -> UnsafePointer[NibbleMatchers, MutUntrackedOrigin]:
+def _get_nibble_matchers() -> Pointer[NibbleMatchers, MutUntrackedOrigin]:
     """Returns a pointer to the global nibble matchers dictionary."""
     try:
         return _NIBBLE_MATCHERS_GLOBAL.get_or_create_ptr()

@@ -110,7 +110,7 @@ def _expand_character_range[
         return WORD_CHARS
 
     # Extract the inner part: [a-z] -> a-z
-    var inner = range_str[byte=1:-1]
+    var inner = range_str[byte = 1 : range_str.byte_length() - 1]
 
     # Handle negated ranges like [^a-z]
     var negated = inner.startswith("^")
@@ -2433,17 +2433,17 @@ def compile_dfa_pattern[
         dfa.has_end_anchor = has_end
     elif _is_multi_character_class_sequence(ast):
         # Handle multi-character class sequences like [a-z]+[0-9]+, \d+\w+
-        sequence_info = _extract_multi_class_sequence_info(ast)
+        var sequence_info = _extract_multi_class_sequence_info(ast)
         dfa.compile_multi_character_class_sequence[use_matcher_cache](
             sequence_info^
         )
     elif _is_sequential_character_class_pattern(ast):
         # Handle sequential character class patterns like [+]*\d+[-]*\d+
-        sequence_info = _extract_sequential_pattern_info(ast)
+        var sequence_info = _extract_sequential_pattern_info(ast)
         dfa.compile_sequential_pattern(sequence_info^)
     elif _is_mixed_sequential_pattern(ast):
         # Handle mixed patterns like [0-9]+\.?[0-9]* (numbers with optional decimal)
-        sequence_info = _extract_mixed_sequential_pattern_info(ast)
+        var sequence_info = _extract_mixed_sequential_pattern_info(ast)
         dfa.compile_multi_character_class_sequence[use_matcher_cache](
             sequence_info^
         )
