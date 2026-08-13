@@ -91,7 +91,7 @@ def find_first_in_nibble_tables(
     lo_nibble: SIMD[DType.uint8, 16],
     hi_nibble: SIMD[DType.uint8, 16],
     filter: SIMD[DType.uint8, 256],
-    text_ptr: UnsafePointer[Byte, _],
+    text_ptr: Pointer[Byte, _],
     start: Int,
     text_len: Int,
 ) -> Int:
@@ -215,7 +215,7 @@ def _first_true(r: SIMD[DType.bool, SIMD_WIDTH]) -> Int:
 
 @always_inline
 def simd_find_byte(
-    text_ptr: UnsafePointer[Byte, _],
+    text_ptr: Pointer[Byte, _],
     start: Int,
     text_len: Int,
     needle: UInt8,
@@ -564,7 +564,7 @@ struct CharacterClassSIMD(
 
     @always_inline
     def find_first_nibble_match(
-        self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
+        self, text_ptr: Pointer[Byte, _], start: Int, text_len: Int
     ) -> Int:
         """Find first matching character using a SIMD scan.
 
@@ -649,7 +649,7 @@ struct CharacterClassSIMD(
 
     @always_inline
     def count_consecutive_matches(
-        self, text_ptr: UnsafePointer[Byte, _], start: Int, text_len: Int
+        self, text_ptr: Pointer[Byte, _], start: Int, text_len: Int
     ) -> Int:
         """Count consecutive matching characters from start position.
 
@@ -786,7 +786,7 @@ struct CharacterClassSIMD(
         return pos - start
 
     def _check_chunk_simd(
-        self, text_ptr: UnsafePointer[Byte, _], pos: Int
+        self, text_ptr: Pointer[Byte, _], pos: Int
     ) -> SIMD[DType.bool, SIMD_WIDTH]:
         """Check a chunk of characters using SIMD operations.
 
@@ -1126,7 +1126,7 @@ def _init_simd_matchers() -> SIMDMatchers:
     return matchers^
 
 
-def _get_simd_matchers() -> UnsafePointer[SIMDMatchers, MutUntrackedOrigin]:
+def _get_simd_matchers() -> Pointer[SIMDMatchers, MutUntrackedOrigin]:
     """Returns a pointer to the global SIMD matchers dictionary."""
     try:
         return _SIMD_MATCHERS_GLOBAL.get_or_create_ptr()

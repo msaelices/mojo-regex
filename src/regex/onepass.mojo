@@ -24,7 +24,8 @@ bytecode, with an added ambiguity check: if any byte can fire more than
 one distinct follow-up closure, the pattern is rejected.
 """
 
-from std.memory import alloc, UnsafePointer
+from std.memory import Pointer
+from std.memory.alloc import unsafe_alloc
 
 from regex.matching import Match, MatchList
 from regex.pikevm import (
@@ -178,7 +179,7 @@ def _hash_set(nfa_set: SIMD[DType.uint8, MAX_STATES]) -> UInt64:
 
 def compile_onepass(
     var program: Program,
-) -> Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]:
+) -> Optional[Pointer[OnePassNFA, MutUntrackedOrigin]]:
     # Compile a PikeVM program into a OnePass NFA and heap-allocate it.
     # Returns None when the pattern is not one-pass (caller falls back
     # to another engine).
@@ -337,7 +338,7 @@ def compile_onepass(
         is_match_flags.append(states[i].is_match)
         is_end_match_flags.append(states[i].is_end_match)
 
-    var ptr = alloc[OnePassNFA](1)
+    var ptr = unsafe_alloc[OnePassNFA](1)
     ptr.unsafe_write(
         OnePassNFA(
             runtime_transitions^,

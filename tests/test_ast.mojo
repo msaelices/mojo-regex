@@ -31,9 +31,7 @@ def test_ASTNode() raises:
     var pattern = String("")
     var regex = Regex[ImmUntrackedOrigin](pattern)
     var regex_ptr = (
-        UnsafePointer(to=regex)
-        .as_imm()
-        .unsafe_origin_cast[ImmUntrackedOrigin]()
+        Pointer(to=regex).as_imm().unsafe_origin_cast[ImmUntrackedOrigin]()
     )
     var ast_node = ASTNode[ImmUntrackedOrigin](
         type=ELEMENT, regex_ptr=regex_ptr, start_idx=0, end_idx=0

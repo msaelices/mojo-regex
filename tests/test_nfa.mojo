@@ -1033,19 +1033,19 @@ def test_phone_numbers() raises:
     """Test phone number pattern matching using DFA."""
     # Simplified phone number pattern that works with current implementation
     # This tests basic phone number matching with + prefix and digit sequences
-    pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
-    result = match_first(pattern, "+1-541-236-5432")
+    var pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
+    var result = match_first(pattern, "+1-541-236-5432")
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), "+1-541-236-5432")
 
 
 def test_es_phone_numbers() raises:
-    es_pattern = "[5-9]\\d{8}"
-    phone = "810123456"
+    var es_pattern = "[5-9]\\d{8}"
+    var phone = "810123456"
     var result = match_first(es_pattern, phone)
     assert_true(result.__bool__())
     assert_equal(result.value().get_match_text(), phone)
-    es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
+    var es_fixed_line_pattern = "96906(?:0[0-8]|1[1-9]|[2-9]\\d)\\d\\d|9(?:69(?:0[0-57-9]|[1-9]\\d)|73(?:[0-8]\\d|9[1-9]))\\d{4}|(?:8(?:[1356]\\d|[28][0-8]|[47][1-9])|9(?:[135]\\d|[268][0-8]|4[1-9]|7[124-9]))\\d{6}"
     var result2 = match_first(es_fixed_line_pattern, phone)
     assert_true(result2.__bool__())
     assert_equal(result2.value().get_match_text(), phone)

@@ -607,7 +607,7 @@ struct PikeVMEngine(Copyable, Movable):
         mut count: Int,
         mut seen: SIMD[DType.uint8, MAX_STATES],
         pc: Int,
-        text_ptr: UnsafePointer[UInt8, _],
+        text_ptr: Pointer[UInt8, _],
         pos: Int,
         text_len: Int,
     ):
@@ -725,7 +725,7 @@ struct LazyDFA(Copyable, Movable):
     @always_inline
     def _find_first_candidate(
         self,
-        text_ptr: UnsafePointer[Byte, _],
+        text_ptr: Pointer[Byte, _],
         start: Int,
         text_len: Int,
     ) -> Int:
@@ -871,7 +871,7 @@ struct LazyDFA(Copyable, Movable):
         mut self,
         state_id: Int,
         ch: Int,
-        text_ptr: UnsafePointer[UInt8, _],
+        text_ptr: Pointer[UInt8, _],
         pos: Int,
         text_len: Int,
     ) -> Int:
@@ -948,9 +948,9 @@ struct LazyDFA(Copyable, Movable):
         var count = 0
         var seen = SIMD[DType.uint8, MAX_STATES](0)
         # Dummy text_ptr for epsilon closure (no bytes consumed). 1.0.0b1
-        # forbids constructing a null UnsafePointer; `unsafe_dangling` is
+        # forbids constructing a null Pointer; `unsafe_dangling` is
         # the supported non-null placeholder.
-        var dummy = UnsafePointer[UInt8, MutAnyOrigin].unsafe_dangling()
+        var dummy = Pointer[UInt8, MutAnyOrigin].unsafe_dangling()
         self.pikevm._add_state(pcs, count, seen, pc, dummy, pos, 0)
 
         if count == 0 and not self._has_match_in_set(seen):

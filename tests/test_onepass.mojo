@@ -1,4 +1,4 @@
-from std.memory import UnsafePointer
+from std.memory import Pointer
 from std.testing import assert_equal, assert_true, assert_false, TestSuite
 
 from regex.ast import ASTNode
@@ -10,7 +10,7 @@ from regex.aliases import ImmSlice
 
 def _build_onepass(
     pattern: String,
-) raises -> Optional[UnsafePointer[OnePassNFA, MutUntrackedOrigin]]:
+) raises -> Optional[Pointer[OnePassNFA, MutUntrackedOrigin]]:
     """Parse a pattern, compile to PikeVM bytecode, attempt OnePass
     compilation, and return the heap pointer (None if not one-pass)."""
     var ast = parse(pattern)

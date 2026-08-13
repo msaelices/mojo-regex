@@ -21,7 +21,7 @@ from regex.tokens import (
     NotToken,
     Wildcard,
 )
-from std.memory import alloc
+from std.memory.alloc import unsafe_alloc
 
 from regex.ast import (
     ASTNode,
@@ -478,7 +478,7 @@ def parse(pattern: String) raises -> ASTNode[ImmUntrackedOrigin]:
     """
     # Create a persistent Regex object to hold the pattern and children
     # Allocate on heap to ensure it survives function return
-    var regex_ptr = alloc[Regex[ImmUntrackedOrigin]](1)
+    var regex_ptr = unsafe_alloc[Regex[ImmUntrackedOrigin]](1)
     regex_ptr.unsafe_write(Regex[ImmUntrackedOrigin](pattern))
 
     # Tokenize the pattern

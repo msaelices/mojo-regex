@@ -1,4 +1,5 @@
-from std.memory import UnsafePointer, unsafe_memcpy, alloc
+from std.memory import Pointer, unsafe_memcpy
+from std.memory.alloc import unsafe_alloc
 
 
 struct Match[origin: ImmOrigin](Copyable, Movable, TrivialRegisterPassable):
@@ -17,7 +18,7 @@ struct Match[origin: ImmOrigin](Copyable, Movable, TrivialRegisterPassable):
     """Starting position of the match in the text."""
     var end_idx: Int
     """Ending position of the match in the text (exclusive)."""
-    var text_ptr: UnsafePointer[Byte, Self.origin]
+    var text_ptr: Pointer[Byte, Self.origin]
     """Origin-tracked pointer to the start of the backing text bytes. Does
     not own memory; the `origin` parameter ties its lifetime to the source
     text. We store the base pointer (not a full slice) to keep Match at a
@@ -59,10 +60,10 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
     comptime DEFAULT_RESERVE_SIZE = 8
     """Default number of matches to reserve on first allocation."""
 
-    var _data: UnsafePointer[Match[Self.origin], MutUntrackedOrigin]
+    var _data: Pointer[Match[Self.origin], MutUntrackedOrigin]
     """Internal list storing the matches. Dangling (and never read
     from) until the first allocation runs through `_realloc`; tracked
-    via `_capacity > 0` since 1.0.0b1 forbids null UnsafePointer
+    via `_capacity > 0` since 1.0.0b1 forbids null Pointer
     sentinels."""
     var _len: Int
     var _capacity: Int
@@ -72,7 +73,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
         capacity: Int = 0,
     ):
         """Initialize empty Matches container."""
-        self._data = UnsafePointer[
+        self._data = Pointer[
             Match[Self.origin], MutUntrackedOrigin
         ].unsafe_dangling()
         self._capacity = 0
@@ -87,7 +88,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
         copy: Self,
     ):
         """Copy constructor."""
-        self._data = UnsafePointer[
+        self._data = Pointer[
             Match[Self.origin], MutUntrackedOrigin
         ].unsafe_dangling()
         self._len = 0
@@ -128,7 +129,7 @@ struct MatchList[origin: ImmOrigin](Copyable, Movable, Sized):
 
     @no_inline
     def _realloc(mut self, new_capacity: Int):
-        var new_data = alloc[Match[Self.origin]](new_capacity)
+        var new_data = unsafe_alloc[Match[Self.origin]](new_capacity)
 
         if self._capacity > 0:
             unsafe_memcpy(dest=new_data, src=self._data, count=len(self))

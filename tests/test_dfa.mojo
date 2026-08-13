@@ -331,7 +331,7 @@ def test_dfa_anchors_with_high_level_api() raises:
 def test_phone_numbers() raises:
     """Test phone number pattern matching using DFA."""
     # Complex phone number pattern with sequential character classes
-    pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
+    var pattern = "[+]*\\d+[-]*\\d+[-]*\\d+[-]*\\d+"
     var ast = parse(pattern)
     var dfa = compile_dfa_pattern(ast)
     var result = dfa.match_first("+1-541-236-5432", 0)

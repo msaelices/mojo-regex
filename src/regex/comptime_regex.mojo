@@ -28,7 +28,6 @@ call goes through the returned pointer. See the proposal's
 """
 
 from std.ffi import _Global
-from std.collections.string.string_slice import get_static_string
 from std.os import abort
 
 from regex.aliases import ImmSlice, imm_slice_from_ptr
@@ -121,15 +120,20 @@ def _init_ct_engine[pattern: StaticString]() -> DFAEngine:
 
 def _get_ct_engine[
     pattern: StaticString
-]() -> UnsafePointer[DFAEngine, MutUntrackedOrigin]:
+]() -> Pointer[DFAEngine, MutUntrackedOrigin]:
     """Return the process-global engine for `pattern`.
 
     The `_Global` slot is keyed by the pattern itself under the
     `__ctregex__:` namespace so it cannot collide with the runtime
     cache globals ("RegexCache", "LastSubCache", "SIMDMatchers").
     """
+    # Build the per-pattern slot name as a comptime `StaticString`.
+    # (`get_static_string` was removed from the public stdlib API in
+    # 1.0.0; a type-annotated comptime concatenation interns the same
+    # static string.)
+    comptime slot_name: StaticString = "__ctregex__:" + pattern
     comptime ENGINE_GLOBAL = _Global[
-        get_static_string["__ctregex__:", pattern](),
+        slot_name,
         _init_ct_engine[pattern],
     ]
     try:
