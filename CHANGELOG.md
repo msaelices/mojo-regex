@@ -1,6 +1,11 @@
 # Changelog
 
-## v0.21.0 (2026-07-04)
+## v0.21.0 (2026-08-01)
+
+### Stable Mojo 1.0.0 (PR #180)
+
+- Moves off the nightly toolchain onto the released **Mojo 1.0.0**, pulling from the stable `https://conda.modular.com/max` channel (pin `mojo ==1.0.0`). The intervening development tracked the `1.0.0b3` nightlies (PRs #163, #170-#179), adapting to each breaking change; this release consolidates on the stable API surface.
+- Stable-release migrations: `UnsafePointer` -> `Pointer`, `alloc` -> `unsafe_alloc`, negative slice indices removed (`[byte=1:-1]` -> explicit length), `get_static_string` removal (the comptime `_Global` slot name is built via `StaticString` concatenation), and a scalar rewrite of `classify_range_kind`'s complex-alnum detection so comptime char-class specialization keeps working under 1.0.0's stricter comptime interpreter (its `StringSlice` substring scan over-read a 16-byte chunk past short classes). Runtime classification is unchanged. 389 tests pass, zero compiler warnings.
 
 ### Comptime regex: compile-time pattern specialization (PRs #167, #168, #169)
 
