@@ -159,18 +159,31 @@ def _find_median(mut times: List[Float64]) -> Float64:
     return (times[n // 2 - 1] + times[n // 2]) / 2.0
 
 
+def _pad_to(width: Int, used: Int) -> String:
+    """Return the spaces needed to pad `used` columns out to `width` (never
+    negative)."""
+    var n = width - used
+    return " " * n if n > 0 else ""
+
+
 def _print_result(name: String, median_ms: Float64, total_iters: Int):
     """Print benchmark result in table format."""
-    var padded_name = name + " " * (25 - name.byte_length())
+    var mstr = String(median_ms)
+    # Truncate to the column width without over-slicing: `[byte=:24]` on a
+    # shorter string is an out-of-bounds slice under Mojo 1.0.0.
+    var take = 24 if mstr.byte_length() > 24 else mstr.byte_length()
+    var mcol = String(mstr[byte=0:take])
+    var iters = String(total_iters)
     print(
         "| "
-        + padded_name
+        + name
+        + _pad_to(25, name.byte_length())
         + " | "
-        + String(median_ms)[byte=:24]
-        + " " * (25 - String(median_ms)[byte=:24].byte_length())
+        + mcol
+        + _pad_to(25, mcol.byte_length())
         + " | "
-        + String(total_iters)
-        + " " * (6 - String(total_iters).byte_length())
+        + iters
+        + _pad_to(6, iters.byte_length())
         + " |"
     )
 
