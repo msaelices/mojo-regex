@@ -1354,6 +1354,45 @@ def findall[
     return compiled_ptr[].match_all(text)
 
 
+def split[
+    O: ImmOrigin
+](pattern: ImmSlice, text: StringSlice[O], maxsplit: Int = 0) raises -> List[
+    String
+]:
+    """Split `text` by the occurrences of `pattern` (equivalent to re.split).
+
+    The text between successive non-overlapping matches is returned as a
+    list of substrings; the matched separators themselves are removed. A
+    separator at the very start or end (or two adjacent separators)
+    yields an empty string in that position, matching Python's `re.split`.
+
+    Args:
+        pattern: Regex pattern to split on.
+        text: Text to split.
+        maxsplit: Maximum number of splits to perform. `0` (the default)
+            means no limit; after `maxsplit` splits the remainder of the
+            text is returned unsplit as the final element. A negative
+            value performs no split at all (matching Python's `re.split`),
+            returning the whole text as a single element.
+
+    Returns:
+        The list of substrings between matches.
+    """
+    var matches = findall(pattern, text)
+    var result = List[String]()
+    var prev_end = 0
+    var splits_done = 0
+    for i in range(len(matches)):
+        if maxsplit != 0 and splits_done >= maxsplit:
+            break
+        ref m = matches[i]
+        result.append(String(text[byte = prev_end : m.start_idx]))
+        prev_end = m.end_idx
+        splits_done += 1
+    result.append(String(text[byte = prev_end : text.byte_length()]))
+    return result^
+
+
 def match_first[
     O: ImmOrigin
 ](pattern: ImmSlice, text: StringSlice[O]) raises -> Optional[Match[O]]:

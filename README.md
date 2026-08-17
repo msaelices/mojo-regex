@@ -42,6 +42,11 @@ print(cleaned)  # "hello world"
 # Capture group interpolation
 var formatted = sub("(\\d{3})(\\d{3})(\\d{4})", "\\1-\\2-\\3", "6502530000")
 print(formatted)  # "650-253-0000"
+
+# Splitting (re.split equivalent)
+var fields = split("\\s*,\\s*", "a, b ,c,  d")
+for f in fields:
+    print(f)  # "a" "b" "c" "d"
 ```
 
 ## Compile-time patterns (experimental)
@@ -90,7 +95,6 @@ pixi run mojo run -I src benchmarks/bench_engine.mojo
 
 - Named groups (`(?<name>...)`)
 - Case insensitive matching
-- String splitting (`split()`)
 - Non-greedy quantifiers (`*?`, `+?`, `??`)
 - Word boundaries (`\b`, `\B`)
 - Unicode character classes (`\p{L}`, `\p{N}`)
