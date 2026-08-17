@@ -1371,7 +1371,9 @@ def split[
         text: Text to split.
         maxsplit: Maximum number of splits to perform. `0` (the default)
             means no limit; after `maxsplit` splits the remainder of the
-            text is returned unsplit as the final element.
+            text is returned unsplit as the final element. A negative
+            value performs no split at all (matching Python's `re.split`),
+            returning the whole text as a single element.
 
     Returns:
         The list of substrings between matches.
@@ -1381,7 +1383,7 @@ def split[
     var prev_end = 0
     var splits_done = 0
     for i in range(len(matches)):
-        if maxsplit > 0 and splits_done >= maxsplit:
+        if maxsplit != 0 and splits_done >= maxsplit:
             break
         ref m = matches[i]
         result.append(String(text[byte = prev_end : m.start_idx]))

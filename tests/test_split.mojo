@@ -63,6 +63,13 @@ def test_split_maxsplit_zero_is_unlimited() raises:
     assert_equal(parts[3], "d")
 
 
+def test_split_negative_maxsplit_no_split() raises:
+    # A negative maxsplit performs no split (matches Python re.split).
+    var parts = split(",", "a,b,c", maxsplit=-1)
+    assert_equal(len(parts), 1)
+    assert_equal(parts[0], "a,b,c")
+
+
 def test_split_char_class() raises:
     var parts = split("[;,]", "a;b,c;d")
     assert_equal(len(parts), 4)
