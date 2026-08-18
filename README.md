@@ -102,6 +102,9 @@ pixi run mojo run -I src benchmarks/bench_engine.mojo
 - Lookahead / lookbehind
 - Negated predefined classes (`\S`, `\D`, `\W`)
 
+See [docs/roadmap-1.0.md](docs/roadmap-1.0.md) for which of these gate a
+stable 1.0 release and in what order they are planned.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for architecture overview, development setup, and guidelines.
