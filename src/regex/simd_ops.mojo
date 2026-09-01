@@ -1283,11 +1283,11 @@ def process_text_with_matcher[
     """
     var matches = List[Int]()
     var pos = start
-    var text_len = len(text)
+    var text_len = text.byte_length()
 
     while pos + 16 <= text_len:
         var chunk = text.unsafe_ptr().unsafe_load[width=16](pos)
-        var chunk_matches = matcher.match_chunk(chunk)
+        var chunk_matches = matcher.match_chunk[16](chunk)
 
         for i in range(16):
             if chunk_matches[i]:
@@ -1371,14 +1371,14 @@ def find_in_text_simd[
     Returns:
         Position of first match, or -1 if not found.
     """
-    var actual_end = end if end != -1 else len(text)
+    var actual_end = end if end != -1 else text.byte_length()
     var pos = start
     var text_ptr = text.unsafe_ptr()
 
     # Process in SIMD chunks for speed
     while pos + 16 <= actual_end:
         var chunk = text_ptr.unsafe_load[width=16](pos)
-        var matches = matcher.match_chunk(chunk)
+        var matches = matcher.match_chunk[16](chunk)
 
         # Check if any match in chunk
         if matches.reduce_or():

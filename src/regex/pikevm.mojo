@@ -426,7 +426,7 @@ struct PikeVMEngine(Copyable, Movable):
         O: ImmOrigin
     ](self, text: StringSlice[O], start: Int = 0) -> Optional[Match[O]]:
         """Search for pattern anywhere in text (like re.search)."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         if self.has_filter:
             var text_ptr = text.unsafe_ptr()
             var pos = start
@@ -453,7 +453,7 @@ struct PikeVMEngine(Copyable, Movable):
 
     def match_all[O: ImmOrigin](self, text: StringSlice[O]) -> MatchList[O]:
         """Find all non-overlapping matches (like re.findall)."""
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var matches = MatchList[O](
             capacity=text_len >> 7 if text_len >= 1024 else 0
         )
@@ -500,7 +500,7 @@ struct PikeVMEngine(Copyable, Movable):
         """Run PikeVM with fixed-size SIMD state tracking.
         Zero heap allocations per step."""
         var text_ptr = text.unsafe_ptr()
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var prog_len = len(self.program)
 
         if prog_len > MAX_STATES:

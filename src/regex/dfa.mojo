@@ -2268,7 +2268,7 @@ struct DFAEngine(Engine):
             Position of next matching character, or -1 if not found.
         """
         var pos = start
-        var text_len = len(text)
+        var text_len = text.byte_length()
         var text_ptr = text.unsafe_ptr()
 
         # Process characters in SIMD chunks for maximum efficiency
