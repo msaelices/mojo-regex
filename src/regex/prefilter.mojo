@@ -67,11 +67,11 @@ struct LiteralInfo(Copyable, Movable):
             return None
 
         var best_literal = self.required_literals[0]
-        var best_len = len(best_literal)
+        var best_len = best_literal.byte_length()
 
         for i in range(1, len(self.required_literals)):
             var current_literal = self.required_literals[i]
-            var current_len = len(current_literal)
+            var current_len = current_literal.byte_length()
             if current_len > best_len:
                 best_literal = current_literal
                 best_len = current_len
@@ -84,11 +84,11 @@ struct LiteralInfo(Copyable, Movable):
             return None
 
         var best_prefix = self.literal_prefixes[0]
-        var best_len = len(best_prefix)
+        var best_len = best_prefix.byte_length()
 
         for i in range(1, len(self.literal_prefixes)):
             var current_prefix = self.literal_prefixes[i]
-            var current_len = len(current_prefix)
+            var current_len = current_prefix.byte_length()
             if current_len > best_len:
                 best_prefix = current_prefix
                 best_len = current_len
@@ -118,7 +118,7 @@ struct LiteralExtractor:
         # Check for exact literal patterns first
         if is_literal_pattern(ast):
             var literal_str = get_literal_string(ast)
-            if len(literal_str) > 0:
+            if literal_str.byte_length() > 0:
                 info.required_literals.append(literal_str)
                 info.literal_prefixes.append(literal_str)
                 info.literal_suffixes.append(literal_str)
@@ -163,7 +163,7 @@ struct LiteralExtractor:
         elif ast.type == GROUP:
             # Check if this is a literal group
             var literal_text = self._extract_literal_sequence(ast)
-            if len(literal_text) > 0:
+            if literal_text.byte_length() > 0:
                 info.required_literals.append(literal_text)
                 # If it's at the beginning, it's also a prefix
                 if self._is_at_beginning(ast):
@@ -209,7 +209,7 @@ struct LiteralExtractor:
                 var child_literal = self._extract_literal_sequence(
                     ast.get_child(i)
                 )
-                if len(child_literal) == 0:
+                if child_literal.byte_length() == 0:
                     return EMPTY_STRING  # Non-literal child found
                 result += child_literal
             return result^
@@ -229,7 +229,7 @@ struct LiteralExtractor:
         # Check if all branches are literals
         var all_literal = True
         for branch in branches:
-            if len(branch) == 0:
+            if branch.byte_length() == 0:
                 all_literal = False
                 break
 
@@ -240,12 +240,12 @@ struct LiteralExtractor:
 
             # Check for common prefix among all branches
             var common_prefix = self._compute_common_prefix(branches)
-            if len(common_prefix) > 0:
+            if common_prefix.byte_length() > 0:
                 info.literal_prefixes.append(common_prefix)
 
             # Check for common suffix among all branches
             var common_suffix = self._compute_common_suffix(branches)
-            if len(common_suffix) > 0:
+            if common_suffix.byte_length() > 0:
                 info.literal_suffixes.append(common_suffix)
 
     def _collect_alternation_branches(
@@ -268,12 +268,12 @@ struct LiteralExtractor:
 
         var prefix = String()
         var first_branch = branches[0]
-        var min_length = len(first_branch)
+        var min_length = first_branch.byte_length()
 
         # Find minimum length
         for i in range(1, len(branches)):
-            if len(branches[i]) < min_length:
-                min_length = len(branches[i])
+            if branches[i].byte_length() < min_length:
+                min_length = branches[i].byte_length()
 
         # Find common prefix
         var fb_ptr = first_branch.unsafe_ptr()
@@ -301,12 +301,12 @@ struct LiteralExtractor:
 
         var suffix = String()
         var first_branch = branches[0]
-        var min_length = len(first_branch)
+        var min_length = first_branch.byte_length()
 
         # Find minimum length
         for i in range(1, len(branches)):
-            if len(branches[i]) < min_length:
-                min_length = len(branches[i])
+            if branches[i].byte_length() < min_length:
+                min_length = branches[i].byte_length()
 
         if min_length == 0:
             return EMPTY_STRING
@@ -314,13 +314,18 @@ struct LiteralExtractor:
         # Find common suffix (work backwards)
         var fb_ptr = first_branch.unsafe_ptr()
         for pos in range(1, min_length + 1):
-            var char_at_pos = Int(fb_ptr[unsafe_offset=len(first_branch) - pos])
+            var char_at_pos = Int(
+                fb_ptr[unsafe_offset=first_branch.byte_length() - pos]
+            )
             var all_match = True
 
             for i in range(1, len(branches)):
                 var branch = branches[i]
                 var br_ptr = branch.unsafe_ptr()
-                if Int(br_ptr[unsafe_offset=len(branch) - pos]) != char_at_pos:
+                if (
+                    Int(br_ptr[unsafe_offset=branch.byte_length() - pos])
+                    != char_at_pos
+                ):
                     all_match = False
                     break
 
@@ -451,7 +456,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         for literal in self.literals:
             var start = 0
 
-            while start <= len(text) - len(literal):
+            while start <= text.byte_length() - literal.byte_length():
                 var pos = text.find(literal, start)
                 if pos == -1:
                     break
@@ -468,7 +473,7 @@ struct ExactLiteralMatcher(PrefilterMatcher):
         var best_pos: Optional[Int] = None
 
         for literal in self.literals:
-            if start + len(literal) > len(text):
+            if start + literal.byte_length() > text.byte_length():
                 continue
 
             var pos = text.find(literal, start)
@@ -499,14 +504,14 @@ def create_prefilter(literal_info: LiteralInfo) -> Optional[MemchrPrefilter]:
     if best_literal:
         var literal = best_literal.value()
         # Only use literals that are long enough to be effective
-        if len(literal) >= 2:
+        if literal.byte_length() >= 2:
             return MemchrPrefilter(literal, False)
 
     # Use the best prefix if available
     var best_prefix = literal_info.get_best_prefix()
     if best_prefix:
         var prefix = best_prefix.value()
-        if len(prefix) >= 2:
+        if prefix.byte_length() >= 2:
             return MemchrPrefilter(prefix, True)
 
     return None
