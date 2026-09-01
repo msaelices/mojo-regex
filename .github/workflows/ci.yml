@@ -26,3 +26,8 @@ jobs:
       run: pixi x pre-commit run --all-files
     - name: Run tests
       run: pixi run test
+
+    # Packaging type-checks paths that building a test binary does not, so a
+    # broken .mojopkg can otherwise reach the conda recipe unnoticed.
+    - name: Build the package
+      run: pixi run mojo package src/regex -o regex.mojopkg
